@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Testnet Faucet — free tPRL for developers</title>
+<meta name="description" content="Community-built Pearl (PRL) testnet faucet frontend. Request testnet tPRL for development; connect it to your own faucet backend.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <a class="brand" href="https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/">&#128059; Pearl <span>PRL</span></a>
+    <nav class="nav">
+      <a href="#request">Request</a>
+      <a href="#status">Backend</a>
+      <a href="#how">How it works</a>
+      <a href="#runyourown">Run your own</a>
+      <a href="https://github.com/Kshot3000/Pearl-Muse-24-7-Ai-builder/tree/main/examples/faucet-backend" target="_blank" rel="noopener">Backend source</a>
+    </nav>
+    <span class="conn" id="connBadge" title="Faucet backend connection state">&#9679; backend not configured</span>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <h1>Pearl Testnet Faucet</h1>
+    <p class="lede">Free <strong>tPRL</strong> (testnet Pearl) for developers building on
+    the Pearl Proof-of-Useful-Work chain. This page is a static frontend &mdash; it sends
+    your request to a faucet backend you configure below.</p>
+    <div class="hint" id="backendHint">
+      <strong>No backend connected yet.</strong> Point the faucet at a running
+      backend (see <a href="#runyourown">Run your own</a>) or use the default
+      <code>http://127.0.0.1:8090</code> when testing locally.
+    </div>
+  </section>
+
+  <section id="request" class="card">
+    <div class="card-head">
+      <h2>Request tPRL</h2>
+      <span class="pill" id="ratePill">1 drip / address / 24h</span>
+    </div>
+    <form id="dripForm" novalidate>
+      <label class="field">
+        <span class="label">Network</span>
+        <select id="networkSel" class="input">
+          <option value="testnet" selected>testnet (tprl&hellip;)</option>
+          <option value="testnet2">testnet2 (tprl&hellip;)</option>
+        </select>
+      </label>
+      <label class="field">
+        <span class="label">Your testnet address</span>
+        <input id="addrInput" class="input mono" type="text"
+               placeholder="tprl1p&hellip;" autocomplete="off" spellcheck="false">
+        <span class="field-note" id="addrNote">Bech32m segwit address (witness v1+, Taproot) on the selected network. Validated locally before sending.</span>
+      </label>
+      <label class="field">
+        <span class="label">Faucet backend URL</span>
+        <input id="backendInput" class="input mono" type="text"
+               placeholder="http://127.0.0.1:8090" autocomplete="off" spellcheck="false">
+        <span class="field-note">Saved in your browser (localStorage). The backend disburses from its own funded Oyster wallet.</span>
+      </label>
+      <button class="btn primary" id="dripBtn" type="submit">Request tPRL</button>
+      <p class="err" id="formErr" hidden></p>
+    </form>
+    <div id="result" class="result" hidden>
+      <h3 id="resultTitle"></h3>
+      <p id="resultBody" class="mono small"></p>
+      <button class="btn" id="copyTxBtn" hidden>Copy txid</button>
+    </div>
+  </section>
+
+  <section id="status" class="card">
+    <div class="card-head">
+      <h2>Faucet backend status</h2>
+      <button id="refreshBtn" class="btn">Refresh</button>
+    </div>
+    <div class="grid" id="statusGrid">
+      <div class="stat"><span class="label">Network</span><span class="value mono" id="stNetwork">&mdash;</span></div>
+      <div class="stat"><span class="label">Max drip</span><span class="value mono" id="stMaxDrip">&mdash;</span></div>
+      <div class="stat"><span class="label">Cooldown</span><span class="value mono" id="stCooldown">&mdash;</span></div>
+      <div class="stat"><span class="label">Daily cap</span><span class="value mono" id="stDailyCap">&mdash;</span></div>
+      <div class="stat"><span class="label">Wallet connected</span><span class="value" id="stWallet">&mdash;</span></div>
+      <div class="stat"><span class="label">Backend</span><span class="value mono small" id="stBackend">&mdash;</span></div>
+    </div>
+    <p class="err" id="statusErr" hidden></p>
+  </section>
+
+  <section id="how" class="card">
+    <h2>How it works</h2>
+    <ol class="steps">
+      <li>Paste a <strong>testnet</strong> Pearl address (<code class="mono">tprl1&hellip;</code> &mdash; bech32m per BIP-350, witness v1+ Taproot/P2MR only, like all Pearl addresses).</li>
+      <li>The page validates the address <strong>locally</strong> (bech32m checksum + witness-program rules from <code class="mono">node/btcutil/address.go</code>), then POSTs it to the faucet backend.</li>
+      <li>The backend rate-limits (default: 1 drip per address per 24h, operator-set daily cap) and pays out from its own funded <strong>Oyster</strong> wallet via the Oyster legacy JSON-RPC <code class="mono">sendtoaddress</code> method.</li>
+      <li>You get back a real transaction id on the Pearl testnet.</li>
+    </ol>
+    <p class="muted">Testnet coins have no monetary value. Mainnet PRL addresses
+    (<code class="mono">prl1&hellip;</code>) are rejected &mdash; this faucet is testnet-only by design.
+    Nothing here is custodial: the page never sees private keys, and the backend only ever pays <em>out</em>.</p>
+  </section>
+
+  <section id="runyourown" class="card">
+    <h2>Run your own faucet backend</h2>
+    <p>A zero-dependency Node.js reference backend lives in this repo:</p>
+    <p><a class="mono small" href="https://github.com/Kshot3000/Pearl-Muse-24-7-Ai-builder/tree/main/examples/faucet-backend" target="_blank" rel="noopener">examples/faucet-backend</a></p>
+    <pre class="code">git clone https://github.com/Kshot3000/Pearl-Muse-24-7-Ai-builder.git
+cd Pearl-Muse-24-7-Ai-builder/examples/faucet-backend
+cp .env.example .env   # set OYSTER_RPC_USER / OYSTER_RPC_PASS
+node server.js         # listens on http://127.0.0.1:8090</pre>
+    <p class="muted">It needs a funded <strong>Oyster</strong> wallet on testnet
+    (Oyster legacy JSON-RPC defaults: <code class="mono">127.0.0.1:44209</code> on testnet,
+    <code class="mono">44211</code> on testnet2) and a <code>pearld</code> testnet node
+    behind it. Without wallet credentials the backend starts but honestly reports
+    <code class="mono">walletConfigured: false</code> and refuses drips.</p>
+  </section>
+
+  <section class="card donate">
+    <h2>Support this builder</h2>
+    <p class="muted">This faucet, the explorer, and the Pearl website recreation are built by
+    an autonomous open-source builder. Donations keep it running:</p>
+    <div class="donate-row">
+      <code class="mono small" id="donateAddr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+      <button class="btn" id="copyDonateBtn">Copy address</button>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <span>Community-built Pearl tooling &mdash; not an official pearl-research-labs property.</span>
+    <span>PRL: <code class="mono small">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code></span>
+    <span>Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a></span>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,1 @@
+{"description":"Reference backend for the Pearl testnet faucet: rate-limits drip requests and pays out tPRL via an Oyster wallet daemon's legacy JSON-RPC.","engines":{"node":">=18"},"license":"MIT","main":"server.js","name":"pearl-faucet-backend","scripts":{"check":"node --check server.js","start":"node server.js"},"type":"commonjs","version":"0.1.0"}
