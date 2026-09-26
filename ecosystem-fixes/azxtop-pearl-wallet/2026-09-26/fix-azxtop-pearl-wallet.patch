@@ -1,0 +1,303 @@
+From fe172bcc19f66e8e7416230ce2430f4cb799b0f1 Mon Sep 17 00:00:00 2001
+From: Kshot3000 <kshot9000@gmail.com>
+Date: Sat, 26 Sep 2026 21:52:23 +0000
+Subject: [PATCH] Fix stale pending-outgoing UTXO lock, 24h change reference,
+ auth fail-closed, address validation
+
+- pending-outgoing: inputs of never-confirmed (>48h stale) broadcast records
+  were permanently excluded from availableUtxos, locking funds in the send
+  preview and available-balance display. Staleness is now checked before
+  marking inputs spent; regression tests added.
+- server: /api/safetrade 24h changePercent measured against the first trade
+  inside the window (could span minutes on low-volume pairs). Now uses the
+  last trade before the window (priorTrade), extracted to stats24h() in
+  market.mjs with tests.
+- server: /api/safetrade auth now fails closed when PEARL_READ_TOKEN is unset
+  (previously a missing token silently disabled auth).
+- keystore: encryptMnemonic address check hardened from startsWith('prl1p')
+  to full isValidPearlAddress() for the AES-GCM AAD binding.
+- Promoted the taproot-signing consensus check to a permanent regression test
+  (signatures verify against the tweaked output key).
+---
+ server/index.mjs                   | 21 ++++-----
+ server/market.mjs                  | 24 ++++++++++
+ server/market.test.mjs             | 27 ++++++++++-
+ src/crypto/taproot-signing.test.ts | 74 ++++++++++++++++++++++++++++++
+ src/lib/keystore.ts                |  6 ++-
+ src/lib/pending-outgoing.test.ts   | 11 ++++-
+ src/lib/pending-outgoing.ts        |  4 +-
+ 7 files changed, 151 insertions(+), 16 deletions(-)
+ create mode 100644 src/crypto/taproot-signing.test.ts
+
+diff --git a/server/index.mjs b/server/index.mjs
+index 7b671dc..6a7d2a4 100644
+--- a/server/index.mjs
++++ b/server/index.mjs
+@@ -3,7 +3,7 @@ import { readFileSync, mkdirSync } from 'node:fs';
+ import { createHmac } from 'node:crypto';
+ import { DatabaseSync } from 'node:sqlite';
+ import { resolve } from 'node:path';
+-import { candlesFromTrades, normalizeTrade } from './market.mjs';
++import { candlesFromTrades, normalizeTrade, stats24h } from './market.mjs';
+ 
+ const HOST = process.env.PEARL_SERVER_HOST || '127.0.0.1';
+ const PORT = Number(process.env.PEARL_SERVER_PORT || 8787);
+@@ -161,7 +161,8 @@ const server = http.createServer((request, response) => {
+     return;
+   }
+   const readToken = process.env.PEARL_READ_TOKEN;
+-  if (readToken && request.headers.authorization !== `Bearer ${readToken}`) {
++  // Fail closed: a missing PEARL_READ_TOKEN must never silently disable auth.
++  if (!readToken || request.headers.authorization !== `Bearer ${readToken}`) {
+     response.statusCode = 401;
+     response.end(JSON.stringify({ error: 'Unauthorized' }));
+     return;
+@@ -178,20 +179,18 @@ const server = http.createServer((request, response) => {
+   const rows = latestTrades.all(start);
+   const previousClose = priorTrade.get(start)?.price ?? null;
+   const candles = candlesFromTrades(rows, start, end, previousClose, seconds);
+-  const last24h = latestTrades.all(Math.floor(Date.now() / 1000) - 86_400);
+-  const high24h = last24h.reduce((value, trade) => Math.max(value, trade.price), -Infinity);
+-  const low24h = last24h.reduce((value, trade) => Math.min(value, trade.price), Infinity);
+-  const volume24h = last24h.reduce((sum, trade) => sum + trade.amount, 0);
+-  const turnover24h = last24h.reduce((sum, trade) => sum + trade.amount * trade.price, 0);
+-  const first24h = last24h[0]?.price;
+-  const last24hPrice = last24h.at(-1)?.price;
+-  const change24h = first24h && last24hPrice ? (last24hPrice / first24h - 1) * 100 : null;
++  const windowStart = Math.floor(Date.now() / 1000) - 86_400;
++  const last24h = latestTrades.all(windowStart);
++  // The 24h change must be measured against the last trade BEFORE the window, not the
++  // first trade inside it, so the percentage always spans a full day on low-volume pairs.
++  const referencePrice = priorTrade.get(windowStart)?.price ?? last24h[0]?.price ?? null;
++  const stats = stats24h(last24h, referencePrice);
+   response.end(JSON.stringify({
+     pair: 'PRL/USDT',
+     interval,
+     price: rows.at(-1)?.price ?? previousClose,
+     candles,
+-    stats24h: { high: Number.isFinite(high24h) ? high24h : null, low: Number.isFinite(low24h) ? low24h : null, volume: volume24h, turnover: turnover24h, changePercent: change24h },
++    stats24h: stats,
+     balances: state.balances,
+     lastTradeAt: state.lastTradeAt,
+     accountUpdatedAt: state.accountUpdatedAt,
+diff --git a/server/market.mjs b/server/market.mjs
+index ee08668..c093823 100644
+--- a/server/market.mjs
++++ b/server/market.mjs
+@@ -45,3 +45,27 @@ export function candlesFromTrades(trades, startMinute, endMinute, previousClose
+   }
+   return result;
+ }
++
++/**
++ * 24h market stats for a list of trades inside the trailing window.
++ *
++ * `referencePrice` must be the last trade BEFORE the window (or null): the
++ * change percentage is measured against it so it always spans a full day.
++ * Using the first trade *inside* the window would silently shrink the window
++ * to minutes on low-volume pairs.
++ */
++export function stats24h(trades, referencePrice) {
++  const high = trades.reduce((value, trade) => Math.max(value, trade.price), -Infinity);
++  const low = trades.reduce((value, trade) => Math.min(value, trade.price), Infinity);
++  const volume = trades.reduce((sum, trade) => sum + trade.amount, 0);
++  const turnover = trades.reduce((sum, trade) => sum + trade.amount * trade.price, 0);
++  const last = trades.at(-1)?.price;
++  const changePercent = referencePrice && last ? (last / referencePrice - 1) * 100 : null;
++  return {
++    high: Number.isFinite(high) ? high : null,
++    low: Number.isFinite(low) ? low : null,
++    volume,
++    turnover,
++    changePercent,
++  };
++}
+diff --git a/server/market.test.mjs b/server/market.test.mjs
+index 1e8aecf..189cc04 100644
+--- a/server/market.test.mjs
++++ b/server/market.test.mjs
+@@ -1,6 +1,6 @@
+ import assert from 'node:assert/strict';
+ import test from 'node:test';
+-import { candlesFromTrades, normalizeTrade } from './market.mjs';
++import { candlesFromTrades, normalizeTrade, stats24h } from './market.mjs';
+ 
+ test('builds one-minute OHLCV and marks minutes with no trade', () => {
+   const trades = [
+@@ -33,3 +33,28 @@ test('groups trades into selected chart intervals', () => {
+   assert.equal(candles[1].open, 1.1);
+   assert.equal(candles[2].empty, true);
+ });
++
++test('measures the 24h change against the last trade before the window', () => {
++  // Low-volume pair: only two trades in the last 24h, minutes apart. The change
++  // must span the full day (vs the last trade before the window), not minutes
++  // (vs the first trade inside the window).
++  const trades = [
++    { id: 'a', ts: 100_000, price: 1.0, amount: 2 },
++    { id: 'b', ts: 100_600, price: 1.5, amount: 4 },
++  ];
++  const stats = stats24h(trades, 1.2);
++  assert.equal(stats.high, 1.5);
++  assert.equal(stats.low, 1.0);
++  assert.equal(stats.volume, 6);
++  assert.equal(stats.turnover, 2 * 1.0 + 4 * 1.5);
++  assert.equal(stats.changePercent, (1.5 / 1.2 - 1) * 100);
++});
++
++test('returns null change and stats when there are no trades', () => {
++  const stats = stats24h([], null);
++  assert.equal(stats.high, null);
++  assert.equal(stats.low, null);
++  assert.equal(stats.volume, 0);
++  assert.equal(stats.changePercent, null);
++  assert.equal(stats24h([{ id: 'a', ts: 1, price: 2, amount: 1 }], null).changePercent, null);
++});
+diff --git a/src/crypto/taproot-signing.test.ts b/src/crypto/taproot-signing.test.ts
+new file mode 100644
+index 0000000..1475597
+--- /dev/null
++++ b/src/crypto/taproot-signing.test.ts
+@@ -0,0 +1,74 @@
++import { describe, expect, it } from "vitest";
++import * as btc from "@scure/btc-signer";
++import { hexToBytes } from "@noble/hashes/utils";
++import { schnorr } from "@noble/curves/secp256k1";
++import { derivePearlWallet } from "../lib/pearl";
++import { prepareSend, scriptForAddress } from "../lib/send";
++
++const mnemonic =
++  "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
++
++describe("taproot signing is consensus-valid", () => {
++  it("schnorr signatures verify against the tweaked output key", async () => {
++    const { children, addresses } = await derivePearlWallet(mnemonic);
++    const utxo = {
++      txid: "22".repeat(32),
++      vout: 0,
++      valueGrains: 100_000_000n,
++      scriptHex: scriptForAddress(addresses[0]!),
++      poolIndex: 0,
++    };
++    const preview = prepareSend([utxo], addresses[1]!, 10_000_000n, addresses[0]!);
++    expect(preview.inputs.length).toBe(1);
++    expect(preview.outputs.length).toBe(2);
++
++    // Build exactly like signSend() in src/crypto/wallet-worker.ts
++    const tx = new btc.Transaction({ allowUnknownOutputs: false });
++    for (const input of preview.inputs) {
++      const child = children[input.poolIndex]!;
++      tx.addInput({
++        txid: hexToBytes(input.txid),
++        index: input.vout,
++        witnessUtxo: { amount: BigInt(input.valueGrains), script: hexToBytes(input.scriptHex) },
++        tapInternalKey: child.publicKey!.slice(1),
++      });
++    }
++    const network = { bech32: "prl", pubKeyHash: 0x00, scriptHash: 0x05, wif: 0x80 };
++    for (const output of preview.outputs) {
++      tx.addOutputAddress(output.address, BigInt(output.amountGrains), network);
++    }
++
++    // Sighash preimages BEFORE signing (finalize wipes witnessUtxo)
++    const prevScripts = preview.inputs.map((i) => hexToBytes(i.scriptHex));
++    const amounts = preview.inputs.map((i) => BigInt(i.valueGrains));
++    const messages = preview.inputs.map((_, idx) =>
++      tx.preimageWitnessV1(idx, prevScripts, btc.SigHash.DEFAULT, amounts)
++    );
++
++    preview.inputs.forEach((input, index) => {
++      tx.signIdx(children[input.poolIndex]!.privateKey!, index);
++    });
++    tx.finalize();
++
++    expect(preview.inputs.length).toBe(1);
++    for (let idx = 0; idx < preview.inputs.length; idx++) {
++      const input = tx.getInput(idx);
++      const witness = (input as { finalScriptWitness?: Uint8Array[] }).finalScriptWitness;
++      expect(witness).toBeDefined();
++      const sig = witness![0]!;
++      expect(sig.length).toBe(64); // DEFAULT sighash: no appended sighash byte
++      // The tweaked output key is the last 32 bytes of the P2TR scriptPubKey
++      const tweakedKey = hexToBytes(preview.inputs[idx]!.scriptHex).slice(2);
++      expect(schnorr.verify(sig, messages[idx]!, tweakedKey)).toBe(true);
++    }
++
++    // Also verify the raw hex round-trips and stays a sane segwit tx
++    const raw = tx.hex;
++    expect(raw).toMatch(/^[0-9a-f]+$/);
++    const reparsed = btc.Transaction.fromRaw(hexToBytes(raw));
++    expect(reparsed.outputsLength).toBe(2);
++    expect(reparsed.inputsLength).toBe(1);
++
++    for (const child of children) child.privateKey?.fill(0);
++  });
++});
+diff --git a/src/lib/keystore.ts b/src/lib/keystore.ts
+index 2af48ea..2847bd3 100644
+--- a/src/lib/keystore.ts
++++ b/src/lib/keystore.ts
+@@ -1,3 +1,5 @@
++import { isValidPearlAddress } from "./pearl";
++
+ export interface EncryptedWallet {
+   version: 2;
+   address: string;
+@@ -37,7 +39,9 @@ async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey>
+ 
+ export async function encryptMnemonic(mnemonic: string, password: string, address: string): Promise<EncryptedWallet> {
+   if (password.length < 12) throw new Error("密码至少需要 12 个字符");
+-  if (!address.startsWith("prl1p")) throw new Error("钱包地址无效");
++  // The address is bound into the AES-GCM associated data; validate it fully so a
++  // malformed string can never be silently bound into a wallet blob.
++  if (!isValidPearlAddress(address)) throw new Error("钱包地址无效");
+   const salt = crypto.getRandomValues(new Uint8Array(16));
+   const iv = crypto.getRandomValues(new Uint8Array(12));
+   const key = await deriveKey(password, salt);
+diff --git a/src/lib/pending-outgoing.test.ts b/src/lib/pending-outgoing.test.ts
+index 4155216..b5dca32 100644
+--- a/src/lib/pending-outgoing.test.ts
++++ b/src/lib/pending-outgoing.test.ts
+@@ -82,11 +82,18 @@ describe("locally broadcast transactions", () => {
+     expect(loadPendingOutgoing(storage)).toEqual([pending]);
+   });
+ 
+-  it("stops estimating an unresolved transfer after 48 hours", () => {
++  it("releases the inputs of an unresolved transfer after 48 hours so they can be spent again", () => {
+     const view = projectWalletSnapshot(base, [pending], now + 49 * 60 * 60 * 1000);
+     expect(view.balanceGrains).toBe(1000n);
+     expect(view.estimated).toBe(false);
+-    expect(view.availableUtxos).toEqual([]);
++    expect(view.availableUtxos).toEqual([coin]);
+     expect(view.staleTxids.has(sentTxid)).toBe(true);
++    expect(view.activities).toMatchObject([{ txid: sentTxid, deltaGrains: -110n, confirmations: 0 }]);
++  });
++
++  it("still locks the inputs of a fresh unconfirmed transfer", () => {
++    const view = projectWalletSnapshot(base, [pending], now + 60 * 60 * 1000);
++    expect(view.availableUtxos).toEqual([]);
++    expect(view.estimated).toBe(true);
+   });
+ });
+diff --git a/src/lib/pending-outgoing.ts b/src/lib/pending-outgoing.ts
+index b315f86..1164b24 100644
+--- a/src/lib/pending-outgoing.ts
++++ b/src/lib/pending-outgoing.ts
+@@ -104,11 +104,13 @@ export function projectWalletSnapshot(snapshot: WalletSnapshot, records: Pending
+     if (!visible.has(record.txid.toLowerCase())) visible.set(record.txid.toLowerCase(), {
+       txid: record.txid, deltaGrains, time: Math.floor(record.createdAt / 1000), confirmations: 0,
+     });
++    // A broadcast that never confirms (dropped from the mempool, never relayed) must not
++    // lock its inputs forever: once the record goes stale, its inputs become spendable again.
++    if (now - record.createdAt > ACTIVE_MS) { staleTxids.add(record.txid.toLowerCase()); continue; }
+     for (const input of record.inputs) {
+       const key = `${input.txid.toLowerCase()}:${input.vout}`;
+       spent.add(key);
+     }
+-    if (now - record.createdAt > ACTIVE_MS) { staleTxids.add(record.txid.toLowerCase()); continue; }
+     estimated = true;
+     for (const input of record.inputs) {
+       const key = `${input.txid.toLowerCase()}:${input.vout}`;
+-- 
+2.43.0
+
