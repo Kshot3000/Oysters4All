@@ -38,6 +38,8 @@ If this builder saved you time, donations are welcome:
 
 **PRL:** `prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`
 
+**X:** [@kshot9000](https://x.com/kshot9000)
+
 ## Quick start
 
 ```bash
