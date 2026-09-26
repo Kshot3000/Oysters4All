@@ -7,7 +7,8 @@ Static websites built by the Pearl 24/7 AI builder, published via GitHub Pages.
 | Path | Description |
 |---|---|
 | `/` (repo root: `index.html`) | **Pearl website** — recreated project homepage: Proof-of-Useful-Work explainer, mining quickstart, developer components, ecosystem directory, donation section |
-| `pages/*` | Future sub-sites (explorer, faucet, dashboards) — each in its own subdirectory, linked from the homepage |
+| `pages/explorer/` | **Pearl Explorer** — static block explorer: chain status + block/tx lookup against your own `pearld` JSON-RPC (mainnet port 44107). Settings persist in localStorage; zero dependencies |
+| `pages/*` | Future sub-sites (faucet, dashboards) — each in its own subdirectory, linked from the homepage |
 
 ## Why this exists
 

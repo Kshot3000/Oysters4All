@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Block Explorer — PRL (Proof-of-Useful-Work)</title>
+<meta name="description" content="Static Pearl (PRL) block explorer. Point it at any pearld JSON-RPC endpoint and browse blocks, transactions and chain status.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <a class="brand" href="https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/">&#128059; Pearl <span>PRL</span></a>
+    <nav class="nav">
+      <a href="#status">Chain status</a>
+      <a href="#lookup">Look up</a>
+      <a href="#settings">Settings</a>
+      <a href="https://github.com/Kshot3000/Pearl-Muse-24-7-Ai-builder/tree/main/pages/explorer" target="_blank" rel="noopener">Source</a>
+    </nav>
+    <span class="conn" id="connBadge" title="RPC connection state">&#9679; not connected</span>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <h1>Pearl Block Explorer</h1>
+    <p class="lede">A zero-dependency static page that talks directly to a
+    <code>pearld</code> JSON-RPC endpoint. No server, no build step — open it and
+    browse the Pearl Proof-of-Useful-Work chain.</p>
+    <div class="hint" id="demoHint">
+      <strong>Demo mode:</strong> no node configured yet — connect one below to
+      query live chain data.
+    </div>
+  </section>
+
+  <section id="status" class="card">
+    <div class="card-head">
+      <h2>Chain status</h2>
+      <button id="refreshBtn" class="btn">Refresh</button>
+    </div>
+    <div class="grid" id="statusGrid">
+      <div class="stat"><span class="label">Best block height</span><span class="value mono" id="stHeight">—</span></div>
+      <div class="stat"><span class="label">Best block hash</span><span class="value mono small" id="stHash">—</span></div>
+      <div class="stat"><span class="label">Chain</span><span class="value" id="stChain">—</span></div>
+      <div class="stat"><span class="label">Difficulty</span><span class="value mono" id="stDiff">—</span></div>
+      <div class="stat"><span class="label">Connections</span><span class="value mono" id="stPeers">—</span></div>
+      <div class="stat"><span class="label">Protocol version</span><span class="value mono" id="stHeaders">—</span></div>
+    </div>
+    <p class="err" id="statusErr" hidden></p>
+  </section>
+
+  <section id="lookup" class="card">
+    <h2>Look up a block</h2>
+    <form id="lookupForm" class="lookup-row">
+      <input id="lookupInput" class="input mono" type="text" placeholder="block height (e.g. 12345) or block hash" autocomplete="off" spellcheck="false">
+      <button class="btn primary" type="submit">Inspect</button>
+    </form>
+    <div id="blockDetail" hidden>
+      <h3>Block <span class="mono" id="bdHeight"></span></h3>
+      <dl class="kv">
+        <div><dt>Hash</dt><dd class="mono" id="bdHash"></dd></div>
+        <div><dt>Previous</dt><dd class="mono" id="bdPrev"></dd></div>
+        <div><dt>Time (UTC)</dt><dd class="mono" id="bdTime"></dd></div>
+        <div><dt>Transactions</dt><dd class="mono" id="bdTxCount"></dd></div>
+        <div><dt>Size</dt><dd class="mono" id="bdSize"></dd></div>
+        <div><dt>Merkle root</dt><dd class="mono" id="bdMerkle"></dd></div>
+        <div><dt>Nonce / bits</dt><dd class="mono" id="bdNonce"></dd></div>
+      </dl>
+      <h4>Transactions <span class="count" id="txCount"></span></h4>
+      <ol class="txlist" id="txList"></ol>
+    </div>
+    <p class="err" id="lookupErr" hidden></p>
+  </section>
+
+  <section id="settings" class="card">
+    <h2>RPC settings</h2>
+    <p class="note">The explorer calls <code>getinfo</code>,
+    <code>getblockcount</code>, <code>getblockhash</code>, <code>getblock</code>
+    and <code>getrawtransaction</code> on the endpoint you configure. Your node must allow browser requests:</p>
+    <pre class="code"># pearld RPC is mainnet :44107 by default. Browsers can't reach it directly
+# unless it serves CORS headers — easiest is the upstream node/proxy
+# Caddy sidecar (TLS + CORS), or serve this page from the node host.</pre>
+    <form id="settingsForm" class="settings-row">
+      <label>Endpoint
+        <input id="rpcUrl" class="input mono" type="text" placeholder="http://127.0.0.1:44107" autocomplete="off" spellcheck="false">
+      </label>
+      <label>RPC user
+        <input id="rpcUser" class="input" type="text" autocomplete="off" spellcheck="false">
+      </label>
+      <label>RPC password
+        <input id="rpcPass" class="input" type="password" autocomplete="off" spellcheck="false">
+      </label>
+      <button class="btn primary" type="submit">Connect</button>
+    </form>
+    <p class="note">Credentials are stored only in this browser's localStorage and
+    sent to your endpoint via HTTP Basic auth. Never point this at an RPC endpoint
+    you don't control.</p>
+    <p class="err" id="settingsErr" hidden></p>
+  </section>
+
+  <section class="card donate">
+    <h2>Support this work</h2>
+    <p>Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> for the Pearl community.</p>
+    <div class="donate-row">
+      <code class="mono" id="donateAddr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+      <button class="btn" id="copyBtn">Copy</button>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <span>Pearl Block Explorer · community-built, MIT</span>
+    <span><a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> ·
+    <a href="https://github.com/Kshot3000/Pearl-Muse-24-7-Ai-builder" target="_blank" rel="noopener">GitHub</a></span>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

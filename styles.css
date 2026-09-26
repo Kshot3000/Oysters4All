@@ -281,3 +281,15 @@ code { font-family: var(--mono); font-size: 0.88em; background: rgba(111, 211, 2
   .hero { padding: 4rem 0 3.5rem; }
   .section { padding: 3.5rem 0; }
 }
+
+.badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: var(--gradient);
+  color: #04121c;
+  padding: 0.15em 0.55em;
+  border-radius: 999px;
+  vertical-align: middle;
+}
