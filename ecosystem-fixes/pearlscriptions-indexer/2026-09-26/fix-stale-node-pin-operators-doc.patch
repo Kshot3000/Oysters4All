@@ -1,0 +1,41 @@
+From 72973ab0f4385c17ff7f08319eee26a222852e15 Mon Sep 17 00:00:00 2001
+From: Kshot3000 <kshot9000@gmail.com>
+Date: Sat, 26 Sep 2026 16:34:20 +0000
+Subject: [PATCH] docs(operators): update stale Pearl node pin to upstream
+ v1.4.8 release
+
+The operator guide pinned the node/presync3 presync branch at commit
+d5e5de77 (2026-05-23), which is now ~74 commits behind upstream master and
+superseded by official releases (v1.4.8, 2026-09-16). The guide's own
+guidance already said to prefer newer upstream releases; this applies it.
+
+The indexer requires pearld >= v1.1.0 on mainnet for the MoE hard-fork
+canonical-checkpoint advisory (config.js / persistent-indexer.js), and
+v1.4.8 satisfies that.
+---
+ docs/operators.md | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/docs/operators.md b/docs/operators.md
+index daff5c0..8e3dbc5 100644
+--- a/docs/operators.md
++++ b/docs/operators.md
+@@ -19,8 +19,13 @@ P2P: 44108
+ RPC: 44107
+ ```
+ 
+-The current operator-tested Pearl node path is the Pearl source branch
+-`node/presync3` at commit `d5e5de77c3d48951ddb0d0c25a861d7627b9cab4`.
++The current operator-tested Pearl node path is the official upstream release
++`v1.4.8` (commit `5b09d844e4069440933722c51495ac24a7bb4886`, published
++2026-09-16) from https://github.com/pearl-research-labs/pearl. It includes the
++MoE hard fork — this indexer requires `pearld >= v1.1.0` on mainnet for the
++canonical-checkpoint advisory — and supersedes the earlier `node/presync3`
++presync-branch pin (`d5e5de77`, 2026-05-23), which is now ~74 commits behind
++upstream `master`.
+ If upstream Pearl publishes a newer operator release, prefer that release and
+ record the exact commit you run.
+ 
+-- 
+2.43.0
+
