@@ -1,0 +1,68 @@
+From eba95a9aabc40b3a842d23518a6662409c8a7028 Mon Sep 17 00:00:00 2001
+From: Kshot3000 <kshot9000@gmail.com>
+Date: Sat, 26 Sep 2026 23:34:11 +0000
+Subject: [PATCH] fix: build.rs watches this worktree's HEAD; g1-soak.sh
+ keepalive exits if orphaned
+
+crates/spm/build.rs: git_dir() used 'git rev-parse --git-common-dir', which
+resolves to the MAIN checkout's .git. In a linked worktree the live HEAD is
+<common>/worktrees/<name>/HEAD, so incremental builds inside a worktree never
+re-ran the build script when the worktree's own HEAD moved, and SPM_GIT_COMMIT
+could disagree with the rerun trigger. Use --git-dir, which is correct for
+plain checkouts and worktrees alike.
+
+bench/g1-soak.sh: the sudo keepalive loop was only stopped by the EXIT/INT/TERM
+trap. If the script is SIGKILLed the trap cannot run and the orphaned loop
+refreshes the sudo timestamp every 5 minutes indefinitely. The loop now pins
+the script's identity (PID + /proc starttime, immune to PID reuse) and exits
+once that process is gone. (kill -0 $PPID would not work: orphans are
+reparented to init, which always answers.)
+---
+ bench/g1-soak.sh    | 11 ++++++++++-
+ crates/spm/build.rs |  7 +++++--
+ 2 files changed, 15 insertions(+), 3 deletions(-)
+
+diff --git a/bench/g1-soak.sh b/bench/g1-soak.sh
+index 067bd80..a6988db 100755
+--- a/bench/g1-soak.sh
++++ b/bench/g1-soak.sh
+@@ -27,7 +27,16 @@ fi
+ echo "== building bench"; cargo build --release -p spm-gpu --features gpu --example bench >/dev/null
+ BENCH=$(ls -t "$CARGO_TARGET_DIR"/release/examples/bench 2>/dev/null | head -1)
+ echo "== validating sudo (kept alive every 5 min so the cleanup never waits for a password)"; sudo -v
+-( while true; do sleep 300; sudo -n true 2>/dev/null || exit; done ) & KEEP=$!
++# The keepalive must never outlive this script: if the parent is SIGKILLed the
++# EXIT/INT/TERM trap below cannot run, and the orphan would otherwise refresh
++# the sudo timestamp every 5 min indefinitely. So the loop pins the script's
++# identity (PID + process start time from /proc, immune to PID reuse) and exits
++# once that process is gone. (A `kill -0 $PPID` guard would NOT work: the
++# orphaned loop is reparented to init, which always answers kill -0.)
++SOAK_PID=$$; SOAK_START=$(cut -d' ' -f22 /proc/$$/stat)
++( while [ "$(cut -d' ' -f22 /proc/$SOAK_PID/stat 2>/dev/null)" = "$SOAK_START" ]; do
++    sleep 300; sudo -n true 2>/dev/null || exit
++  done ) & KEEP=$!
+ echo "== locking SM clock at $MHZ MHz (sudo)"; sudo nvidia-smi -lgc 300,"$MHZ" >/dev/null
+ START_UP=$(cut -d' ' -f1 /proc/uptime)
+ cleanup() {
+diff --git a/crates/spm/build.rs b/crates/spm/build.rs
+index f53b0d1..97c96a9 100644
+--- a/crates/spm/build.rs
++++ b/crates/spm/build.rs
+@@ -22,9 +22,12 @@ fn main() {
+     println!("cargo:rustc-env=SPM_GIT_COMMIT={}", commit.unwrap_or_else(|| "unknown".into()));
+ }
+ 
+-/// The repository's `.git` directory (also right for worktrees), or None outside a checkout.
++/// The repository's `.git` directory for this checkout (worktree-aware), or None
++/// outside a checkout. `--git-dir` is correct in worktrees (it points at
++/// `<common>/worktrees/<name>`), where `--git-common-dir` would point at the
++/// main checkout's `.git` and miss this worktree's HEAD moves.
+ fn git_dir() -> Option<std::path::PathBuf> {
+-    let out = Command::new("git").args(["rev-parse", "--git-common-dir"]).output().ok()?;
++    let out = Command::new("git").args(["rev-parse", "--git-dir"]).output().ok()?;
+     if !out.status.success() {
+         return None;
+     }
+-- 
+2.43.0
+
