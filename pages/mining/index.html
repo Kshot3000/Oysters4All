@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Mining Calculator — PRL (Proof-of-Useful-Work)</title>
+<meta name="description" content="Estimate Pearl (PRL) mining rewards from the exact upstream emission formula. Block subsidy schedule, profitability calculator, live node data — zero dependencies.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="aurora" aria-hidden="true"><span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span></div>
+
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <a class="brand" href="https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/">&#128059; Pearl <span>PRL</span></a>
+    <nav class="nav">
+      <a href="#calculator">Calculator</a>
+      <a href="#emission">Emission</a>
+      <a href="#node">Live node</a>
+      <a href="#mining">How mining works</a>
+      <a href="https://github.com/Kshot3000/Pearl-Muse-24-7-Ai-builder/tree/main/pages/mining" target="_blank" rel="noopener">Source</a>
+    </nav>
+    <span class="conn" id="connBadge" title="RPC connection state">&#9679; manual mode</span>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <p class="eyebrow">Proof-of-Useful-Work &middot; GPU mining</p>
+    <h1>Pearl Mining Calculator</h1>
+    <p class="lede">Estimate PRL mining rewards with the <em>exact</em> block-subsidy
+    formula from the Pearl node source (<code>CalcBlockSubsidy</code> in
+    <code>node/blockchain/validate.go</code>) — no guesses, no made-up numbers.
+    Enter your share of network useful work, or pull live figures from your own
+    <code>pearld</code> node.</p>
+    <div class="hero-stats">
+      <div class="hero-stat"><span class="hs-label">Block target</span><span class="hs-value">3m 14s</span></div>
+      <div class="hero-stat"><span class="hs-label">Blocks / day</span><span class="hs-value">~445.4</span></div>
+      <div class="hero-stat"><span class="hs-label">Max supply</span><span class="hs-value">2.1B PRL</span></div>
+      <div class="hero-stat"><span class="hs-label">Coinbase maturity</span><span class="hs-value">100 blocks</span></div>
+    </div>
+  </section>
+
+  <!-- ================= Calculator ================= -->
+  <section id="calculator" class="card glow">
+    <div class="card-head">
+      <h2>Reward calculator</h2>
+      <button id="fillLiveBtn" class="btn">Use live node data</button>
+    </div>
+    <div class="calc-grid">
+      <div class="inputs">
+        <label class="field">
+          <span>Block height</span>
+          <input id="inHeight" class="input mono" type="number" min="1" step="1" placeholder="e.g. 236500">
+          <small>Height the subsidy is computed at. Fetch from a node or type one.</small>
+        </label>
+        <div class="field-row">
+          <label class="field">
+            <span>Your hashrate</span>
+            <input id="inHash" class="input mono" type="number" min="0" step="any" placeholder="e.g. 33">
+          </label>
+          <label class="field unit">
+            <span>Unit</span>
+            <select id="inHashUnit" class="input">
+              <option value="1">H/s</option>
+              <option value="1e3">KH/s</option>
+              <option value="1e6">MH/s</option>
+              <option value="1e9" selected>GH/s</option>
+              <option value="1e12">TH/s</option>
+              <option value="1e15">PH/s</option>
+            </select>
+          </label>
+        </div>
+        <div class="field-row">
+          <label class="field">
+            <span>Network hashrate</span>
+            <input id="inNetHash" class="input mono" type="number" min="0" step="any" placeholder="e.g. 330">
+          </label>
+          <label class="field unit">
+            <span>Unit</span>
+            <select id="inNetHashUnit" class="input">
+              <option value="1">H/s</option>
+              <option value="1e3">KH/s</option>
+              <option value="1e6">MH/s</option>
+              <option value="1e9" selected>GH/s</option>
+              <option value="1e12">TH/s</option>
+              <option value="1e15">PH/s</option>
+            </select>
+          </label>
+        </div>
+        <label class="field">
+          <span>PRL price (USD) <em class="opt">optional</em></span>
+          <input id="inPrice" class="input mono" type="number" min="0" step="any" placeholder="e.g. 0.05">
+        </label>
+        <div class="field-row">
+          <label class="field">
+            <span>Rig power (W) <em class="opt">optional</em></span>
+            <input id="inWatts" class="input mono" type="number" min="0" step="any" placeholder="e.g. 700">
+          </label>
+          <label class="field">
+            <span>Electricity ($/kWh) <em class="opt">optional</em></span>
+            <input id="inKwh" class="input mono" type="number" min="0" step="any" placeholder="e.g. 0.10">
+          </label>
+        </div>
+        <p class="note">Rewards scale with your share of network <strong>useful work</strong>.
+        On Pearl, mining is GPU matrix-multiplication work via vLLM — the
+        <code>networkhashps</code> figure from <code>getmininginfo</code> is the
+        network's estimated useful-work rate.</p>
+      </div>
+      <div class="outputs">
+        <div class="out-main">
+          <span class="label">Block subsidy at height <span class="mono" id="outHeightEcho">—</span></span>
+          <span class="big mono" id="outSubsidy">—</span>
+          <span class="sub">PRL per block (exact formula)</span>
+        </div>
+        <div class="out-grid">
+          <div class="ostat"><span class="label">Your share</span><span class="value mono" id="outShare">—</span></div>
+          <div class="ostat"><span class="label">Blocks / day (you)</span><span class="value mono" id="outBlocksDay">—</span></div>
+          <div class="ostat"><span class="label">PRL / day</span><span class="value mono" id="outPrlDay">—</span></div>
+          <div class="ostat"><span class="label">PRL / week</span><span class="value mono" id="outPrlWeek">—</span></div>
+          <div class="ostat"><span class="label">PRL / 30 days</span><span class="value mono" id="outPrlMonth">—</span></div>
+          <div class="ostat"><span class="label">PRL / year</span><span class="value mono" id="outPrlYear">—</span></div>
+        </div>
+        <div class="out-grid usd" id="usdBlock" hidden>
+          <div class="ostat"><span class="label">Revenue / day</span><span class="value mono" id="outUsdDay">—</span></div>
+          <div class="ostat"><span class="label">Revenue / 30 days</span><span class="value mono" id="outUsdMonth">—</span></div>
+          <div class="ostat"><span class="label">Power cost / 30 days</span><span class="value mono" id="outCostMonth">—</span></div>
+          <div class="ostat profit"><span class="label">Net / 30 days</span><span class="value mono" id="outProfitMonth">—</span></div>
+          <div class="ostat"><span class="label">Break-even PRL price</span><span class="value mono" id="outBreakEven">—</span></div>
+        </div>
+        <p class="err" id="calcErr" hidden></p>
+        <p class="disclaimer">Estimates only: difficulty retargets (WTEMA), the
+        subsidy decays every block, and transaction fees are not included. Not
+        financial advice.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= Emission ================= -->
+  <section id="emission" class="card">
+    <div class="card-head">
+      <h2>Emission schedule</h2>
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-chart="subsidy" role="tab">Block subsidy</button>
+        <button class="tab" data-chart="supply" role="tab">Cumulative supply</button>
+      </div>
+    </div>
+    <p class="lede small">Subsidy(h) = 2.1B &times; 650226 &divide; ((h + 650226)(h &minus; 1 + 650226)) —
+    verified against <code>CalcBlockSubsidy</code> and the upstream emission tests
+    (h=1 &rarr; 3229.64 PRL, h=650226 &rarr; 807.41 PRL).</p>
+    <div class="chart-wrap"><canvas id="chart" height="300"></canvas></div>
+    <div class="milestones">
+      <h3>Subsidy milestones</h3>
+      <table class="mtable">
+        <thead><tr><th>Height</th><th>Approx. date</th><th>Subsidy (PRL)</th><th>Note</th></tr></thead>
+        <tbody id="milestoneBody"></tbody>
+      </table>
+      <p class="disclaimer">Dates assume a constant 194&nbsp;s block time from
+      genesis — indicative only. Milestone subsidies are computed live on this
+      page with the exact formula.</p>
+    </div>
+  </section>
+
+  <!-- ================= Live node ================= -->
+  <section id="node" class="card">
+    <div class="card-head">
+      <h2>Live node data</h2>
+      <button id="fetchBtn" class="btn primary">Fetch from node</button>
+    </div>
+    <p class="lede small">Point the calculator at your own <code>pearld</code>
+    JSON-RPC endpoint. It reads <code>getblockcount</code> (fills block height)
+    and <code>getmininginfo</code> (fills network hashrate + difficulty).
+    Credentials stay in your browser's localStorage — nothing else leaves this page.</p>
+    <div class="node-grid">
+      <label class="field"><span>RPC URL</span>
+        <input id="rpcUrl" class="input mono" type="text" placeholder="http://127.0.0.1:44107" autocomplete="off" spellcheck="false"></label>
+      <label class="field"><span>RPC user</span>
+        <input id="rpcUser" class="input mono" type="text" autocomplete="off" spellcheck="false"></label>
+      <label class="field"><span>RPC password</span>
+        <input id="rpcPass" class="input mono" type="password" autocomplete="off" spellcheck="false"></label>
+    </div>
+    <div class="node-stats">
+      <div class="stat"><span class="label">Best height</span><span class="value mono" id="nHeight">—</span></div>
+      <div class="stat"><span class="label">Network hashrate</span><span class="value mono" id="nHashps">—</span></div>
+      <div class="stat"><span class="label">Difficulty</span><span class="value mono" id="nDiff">—</span></div>
+      <div class="stat"><span class="label">Live subsidy</span><span class="value mono" id="nSubsidy">—</span></div>
+    </div>
+    <p class="err" id="nodeErr" hidden></p>
+    <p class="note">RPC is disabled on <code>pearld</code> unless
+    <code>rpcuser</code>/<code>rpcpass</code> are set. Browsers block plain-HTTP
+    calls to a node from an HTTPS page — run this page locally
+    (<code>python3 -m http.server</code>) or front the node with the upstream
+    <code>node/proxy</code> Caddy sidecar for TLS.</p>
+  </section>
+
+  <!-- ================= How mining works ================= -->
+  <section id="mining" class="card">
+    <h2>How Pearl mining works</h2>
+    <div class="how-grid">
+      <div class="how">
+        <h3>&#9881; Useful work, not busywork</h3>
+        <p>Pearl replaces hash grinding with <strong>Proof-of-Useful-Work</strong>:
+        miners run real matrix multiplications as a by-product of LLM inference
+        (vLLM + NoisyGEMM CUDA kernels). The work is useful <em>and</em> secures
+        the chain. Paper: <a href="https://arxiv.org/abs/2504.09971" target="_blank" rel="noopener">arxiv.org/abs/2504.09971</a>.</p>
+      </div>
+      <div class="how">
+        <h3>&#128187; Hardware</h3>
+        <p>The reference miner is a vLLM plugin. It needs an <strong>NVIDIA GPU</strong>
+        (currently <code>sm90</code> — H100 / H200), CUDA toolkit, Python 3.12 and
+        <code>uv</code>. Source: <code>miner/</code> in
+        <a href="https://github.com/pearl-research-labs/pearl" target="_blank" rel="noopener">pearl-research-labs/pearl</a>.</p>
+      </div>
+      <div class="how">
+        <h3>&#128274; ZK-PoW certificates</h3>
+        <p>Blocks carry <strong>ZK-PoW certificates</strong> (Plonky2/STARKy) that
+        prove the useful work was done. Since the salted-seed hard fork
+        (mainnet height <strong>99000</strong>), <code>getblocktemplate</code>
+        reports <code>requiredcertversion: 3</code> — miners must submit V3
+        salted noise-seed certificates.</p>
+      </div>
+      <div class="how">
+        <h3>&#9201; Payout rhythm</h3>
+        <p>One block every ~3m14s &rarr; ~445 blocks/day. Coinbase outputs
+        <strong>mature after 100 blocks</strong> (~22.5 hours) before they can
+        be spent. Difficulty retargets with a WTEMA filter, so network growth
+        smoothly raises difficulty.</p>
+      </div>
+    </div>
+    <h3>Quickstart (from the upstream miner README)</h3>
+<pre class="code">git clone https://github.com/pearl-research-labs/pearl && cd pearl
+uv sync --package vllm-miner        # builds pearl-gemm CUDA kernels
+# point the miner at your pearld via pearl-gateway, then run the vLLM plugin</pre>
+    <p class="note">Full build + test instructions live in the upstream
+    <code>miner/README.md</code>. Docker one-click images exist from the
+    community (see the ecosystem survey) — verify any third-party image before
+    trusting it with your keys.</p>
+  </section>
+
+  <section class="card donate">
+    <h2>Support this work</h2>
+    <p>Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> for the Pearl community.</p>
+    <div class="donate-row">
+      <code class="mono" id="donateAddr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+      <button class="btn" id="copyAddr">Copy</button>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    <span><a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> &middot;
+    <a href="https://github.com/Kshot3000/Pearl-Muse-24-7-Ai-builder" target="_blank" rel="noopener">builder repo</a> &middot;
+    emission math verified against <a href="https://github.com/pearl-research-labs/pearl" target="_blank" rel="noopener">pearl-research-labs/pearl</a></span>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
