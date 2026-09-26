@@ -20,9 +20,10 @@ and Plonky2 zk-SNARK block certificates.
 |---|---|---|
 | `index.html` (Pearl website) | ✅ live | Recreated project homepage — PoUW explainer, mining quickstart, dev docs, ecosystem. Served via GitHub Pages |
 | `examples/hello-pearl` | ✅ scaffolded | Minimal TypeScript JSON-RPC client — your first `pearld` connection |
-| `pearl-rpc-client` | 🔲 queued | Fuller typed RPC client library |
+| `pearl-rpc-client` | ✅ built | Fuller typed TypeScript RPC client library (20+ methods; typechecked + built) |
 | `wallet-helper` | 🔲 queued | Address generation & balance lookup helpers |
-| `block-explorer-stub` | 🔲 queued | Static explorer page querying a local node |
+| `pages/explorer/` | ✅ built | Static block explorer querying a `pearld` RPC node |
+| `guides/rpc-cheatsheet.md` | ✅ done | `pearld` JSON-RPC cheatsheet with `curl` examples, verified against upstream docs |
 
 ## How the 24/7 builder loop works
 
