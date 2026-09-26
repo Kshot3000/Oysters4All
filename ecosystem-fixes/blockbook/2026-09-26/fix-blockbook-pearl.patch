@@ -1,0 +1,114 @@
+From e80b36e14c4097d7d45c6b42d23aa9883a454a19 Mon Sep 17 00:00:00 2001
+From: Kshot3000 <kshot9000@gmail.com>
+Date: Sat, 26 Sep 2026 19:00:42 +0000
+Subject: [PATCH] fix(pearl): real backend package config + getinfo fallback
+ type + chain-name comment
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- configs/coins/pearl.json, pearl_testnet.json, pearl_testnet2.json: replace
+  placeholder backend package (version 0.24.2, binary_url
+  https://example.com/pearld.tar.gz, fake sha256) with the real upstream
+  release: pearl v1.4.8 linux-amd64 tarball URL + SHA-256 verified against
+  the release checksums.txt (17af51da...). RPC ports already correct
+  (44107/44109/44111); tarball layout (./pearld at root) matches
+  extract_command (--strip 1) and exec_command_template.
+- bchain/coins/pearl/pearlrpc.go: decode chain-server getinfo into
+  btcjson.InfoChainResult instead of the wallet-server InfoWalletResult
+  (same fields read; correct contract for the endpoint).
+- bchain/coins/pearl/pearlrpc.go: fix Initialize() comment — pearld reports
+  'mainnet'/'testnet'/... chain names (chaincfg.Params.Name), not
+  'main'/'test'.
+---
+ bchain/coins/pearl/pearlrpc.go    | 10 ++++++++--
+ configs/coins/pearl.json          |  6 +++---
+ configs/coins/pearl_testnet.json  |  6 +++---
+ configs/coins/pearl_testnet2.json |  6 +++---
+ 4 files changed, 17 insertions(+), 11 deletions(-)
+
+diff --git a/bchain/coins/pearl/pearlrpc.go b/bchain/coins/pearl/pearlrpc.go
+index 8cdbe727..ac17f063 100644
+--- a/bchain/coins/pearl/pearlrpc.go
++++ b/bchain/coins/pearl/pearlrpc.go
+@@ -124,7 +124,8 @@ func (d *PearlRPC) Initialize() error {
+ 	d.Parser = NewPearlParser(ci.Chain, &d.cfg)
+ 
+ 	// Set Network/Testnet flags for Blockbook.
+-	// Pearl node uses "main" / "test" style chain names.
++	// Pearl node reports "mainnet" / "testnet" / "testnet2" / "regtest" /
++	// "signet" / "simnet" style chain names (chaincfg.Params.Name).
+ 	if strings.Contains(strings.ToLower(ci.Chain), "test") || strings.Contains(strings.ToLower(ci.Chain), "reg") || strings.Contains(strings.ToLower(ci.Chain), "signet") {
+ 		d.Testnet = true
+ 		d.Network = "testnet"
+@@ -252,7 +253,12 @@ func (d *PearlRPC) GetChainInfo() (*bchain.ChainInfo, error) {
+ 	if err != nil {
+ 		// Fall back to getinfo for older nodes.
+ 		if rpcErr, ok := err.(*btcjson.RPCError); ok && int(rpcErr.Code) == -1 && rpcErr.Message == "Command unimplemented" {
+-			var gi btcjson.InfoWalletResult
++			// NewGetInfoCmd is a chain-server command: decode into the chain
++			// result type (InfoChainResult), not the wallet-server
++			// InfoWalletResult. The fields read below share the same JSON
++			// tags and Go types in both, but the chain type is the correct
++			// contract for this endpoint.
++			var gi btcjson.InfoChainResult
+ 			if err := d.call(btcjson.NewGetInfoCmd(), &gi); err != nil {
+ 				return nil, err
+ 			}
+diff --git a/configs/coins/pearl.json b/configs/coins/pearl.json
+index f5180ea8..a7388fa3 100644
+--- a/configs/coins/pearl.json
++++ b/configs/coins/pearl.json
+@@ -22,10 +22,10 @@
+         "package_name": "backend-pearl",
+         "package_revision": "1",
+         "system_user": "pearl",
+-        "version": "0.24.2",
+-        "binary_url": "https://example.com/pearld.tar.gz",
++        "version": "1.4.8",
++        "binary_url": "https://github.com/pearl-research-labs/pearl/releases/download/v1.4.8/pearl-linux-amd64-v1.4.8.tar.gz",
+         "verification_type": "sha256",
+-        "verification_source": "1fd58d0ae94b8a9e21bbaeab7d53395a44976e82bd5492b0a894826c135f9009",
++        "verification_source": "17af51da763fe4bfcb59498d922c1b73bcacc3b08fd3e8a8ef736b650e8d1be7",
+         "extract_command": "tar -C backend --strip 1 -xf",
+         "exclude_files": [],
+         "exec_command_template": "{{.Env.BackendInstallPath}}/{{.Coin.Alias}}/pearld --datadir={{.Env.BackendDataPath}}/{{.Coin.Alias}}/backend --configfile={{.Env.BackendInstallPath}}/{{.Coin.Alias}}/{{.Coin.Alias}}.conf",
+diff --git a/configs/coins/pearl_testnet.json b/configs/coins/pearl_testnet.json
+index a044d484..87b4884b 100644
+--- a/configs/coins/pearl_testnet.json
++++ b/configs/coins/pearl_testnet.json
+@@ -22,10 +22,10 @@
+         "package_name": "backend-pearl",
+         "package_revision": "1",
+         "system_user": "pearl",
+-        "version": "0.24.2",
+-        "binary_url": "https://example.com/pearld.tar.gz",
++        "version": "1.4.8",
++        "binary_url": "https://github.com/pearl-research-labs/pearl/releases/download/v1.4.8/pearl-linux-amd64-v1.4.8.tar.gz",
+         "verification_type": "sha256",
+-        "verification_source": "1fd58d0ae94b8a9e21bbaeab7d53395a44976e82bd5492b0a894826c135f9009",
++        "verification_source": "17af51da763fe4bfcb59498d922c1b73bcacc3b08fd3e8a8ef736b650e8d1be7",
+         "extract_command": "tar -C backend --strip 1 -xf",
+         "exclude_files": [],
+         "exec_command_template": "{{.Env.BackendInstallPath}}/{{.Coin.Alias}}/pearld --datadir={{.Env.BackendDataPath}}/{{.Coin.Alias}}/backend --configfile={{.Env.BackendInstallPath}}/{{.Coin.Alias}}/{{.Coin.Alias}}.conf",
+diff --git a/configs/coins/pearl_testnet2.json b/configs/coins/pearl_testnet2.json
+index cfabca5e..6befa1ce 100644
+--- a/configs/coins/pearl_testnet2.json
++++ b/configs/coins/pearl_testnet2.json
+@@ -22,10 +22,10 @@
+         "package_name": "backend-pearl-testnet2",
+         "package_revision": "1",
+         "system_user": "pearl",
+-        "version": "0.24.2",
+-        "binary_url": "https://example.com/pearld.tar.gz",
++        "version": "1.4.8",
++        "binary_url": "https://github.com/pearl-research-labs/pearl/releases/download/v1.4.8/pearl-linux-amd64-v1.4.8.tar.gz",
+         "verification_type": "sha256",
+-        "verification_source": "1fd58d0ae94b8a9e21bbaeab7d53395a44976e82bd5492b0a894826c135f9009",
++        "verification_source": "17af51da763fe4bfcb59498d922c1b73bcacc3b08fd3e8a8ef736b650e8d1be7",
+         "extract_command": "tar -C backend --strip 1 -xf",
+         "exclude_files": [],
+         "exec_command_template": "{{.Env.BackendInstallPath}}/{{.Coin.Alias}}/pearld --datadir={{.Env.BackendDataPath}}/{{.Coin.Alias}}/backend --configfile={{.Env.BackendInstallPath}}/{{.Coin.Alias}}/{{.Coin.Alias}}.conf",
+-- 
+2.43.0
+
