@@ -54,9 +54,23 @@ Prints chain status, difficulty, mempool size and a summary of the latest block.
 | Network | `getConnectionCount`, `getPeerInfo`, `validateAddress` |
 | Escape hatch | `call(method, params)` for anything else |
 
-Note: pearld is btcd-style — it has `getinfo` but **no** `getblockchaininfo`.
+Note: pearld is btcd-style — it exposes **both** `getinfo` and
+`getblockchaininfo` (verified against upstream `node/rpcserver.go`: both are
+registered; `getblockchaininfo` returns the Bitcoin-style `Chain` / `Blocks` /
+`Headers` / `BestBlockHash` / `Difficulty` field set).
 Result shapes were taken from the upstream API docs
 (`pearl-research-labs/pearl`, `node/docs/json_rpc_api.md`).
+
+## Tests
+
+Zero new dependencies — plain `node:test` run through `tsx`, with `fetch`
+stubbed (no live node needed):
+
+```bash
+npm test        # 15 tests: constructor/env, wire format, error handling, wrappers
+npm run typecheck
+npm run build   # emits dist/
+```
 
 ## Support this work
 

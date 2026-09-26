@@ -1,44 +1,20 @@
-import { Buffer } from "node:buffer";
+import { basicAuth, readConfig, rpc, rpcEndpoint } from "./lib.js";
 
-const HOST = process.env.PEARL_RPCHOST ?? "localhost";
-const PORT = process.env.PEARL_RPCPORT ?? "44107";
-const USER = process.env.PEARL_RPCUSER ?? "";
-const PASS = process.env.PEARL_RPCPASS ?? "";
+const cfg = readConfig(process.env);
 
-if (!USER || !PASS) {
+if (!cfg.user || !cfg.pass) {
   console.error("Set PEARL_RPCUSER and PEARL_RPCPASS before running.");
   process.exit(1);
 }
 
-const auth = Buffer.from(`${USER}:${PASS}`).toString("base64");
-
-let id = 0;
-
-/** Minimal JSON-RPC call to pearld. */
-async function rpc<T>(method: string, params: unknown[] = []): Promise<T> {
-  const res = await fetch(`http://${HOST}:${PORT}/`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Basic ${auth}`,
-    },
-    body: JSON.stringify({ jsonrpc: "1.0", id: ++id, method, params }),
-  });
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status}: ${await res.text()}`);
-  }
-  const data = (await res.json()) as { result?: T; error?: unknown };
-  if (data.error) {
-    throw new Error(`RPC error: ${JSON.stringify(data.error)}`);
-  }
-  return data.result as T;
-}
+const endpoint = rpcEndpoint(cfg.host, cfg.port);
+const auth = basicAuth(cfg.user, cfg.pass);
 
 async function main() {
-  console.log(`Connected to pearld @ ${HOST}:${PORT}`);
-  const blockCount = await rpc<number>("getblockcount");
+  console.log(`Connected to pearld @ ${cfg.host}:${cfg.port}`);
+  const blockCount = await rpc<number>(endpoint, auth, "getblockcount", [], 1);
   console.log(`Block count: ${blockCount}`);
-  const bestHash = await rpc<string>("getbestblockhash");
+  const bestHash = await rpc<string>(endpoint, auth, "getbestblockhash", [], 2);
   console.log(`Best block hash: ${bestHash}`);
 }
 
