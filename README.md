@@ -18,6 +18,7 @@ and Plonky2 zk-SNARK block certificates.
 
 | App | Status | Description |
 |---|---|---|
+| `index.html` (Pearl website) | ✅ live | Recreated project homepage — PoUW explainer, mining quickstart, dev docs, ecosystem. Served via GitHub Pages |
 | `examples/hello-pearl` | ✅ scaffolded | Minimal TypeScript JSON-RPC client — your first `pearld` connection |
 | `pearl-rpc-client` | 🔲 queued | Fuller typed RPC client library |
 | `wallet-helper` | 🔲 queued | Address generation & balance lookup helpers |
