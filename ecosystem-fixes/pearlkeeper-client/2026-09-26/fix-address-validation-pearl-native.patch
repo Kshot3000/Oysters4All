@@ -1,0 +1,81 @@
+diff --git a/packages/app-flows/package.json b/packages/app-flows/package.json
+index de24171..debbd5e 100644
+--- a/packages/app-flows/package.json
++++ b/packages/app-flows/package.json
+@@ -25,6 +25,7 @@
+     "@prl-wallet/config": "*",
+     "@prl-wallet/core": "*",
+     "@prl-wallet/services": "*",
++    "@scure/base": "1.2.6",
+     "@scure/bip39": "^1.4.0",
+     "bitcoinjs-lib": "^7.0.0",
+     "semver-compare": "^1.0.0",
+diff --git a/packages/app-flows/src/flows/send/sendHelpers.ts b/packages/app-flows/src/flows/send/sendHelpers.ts
+index 195437c..77d0df1 100644
+--- a/packages/app-flows/src/flows/send/sendHelpers.ts
++++ b/packages/app-flows/src/flows/send/sendHelpers.ts
+@@ -1,5 +1,6 @@
+ import { address } from "bitcoinjs-lib";
+ import type { Network } from "bitcoinjs-lib";
++import { bech32m } from "@scure/base";
+ 
+ type SendWalletLike = {
+   id: string;
+@@ -13,6 +14,38 @@ export function selectSendWallet<T extends SendWalletLike>(
+   return wallets.find((wallet) => wallet.id === walletId) ?? null;
+ }
+ 
++/**
++ * Witness versions Pearl consensus accepts as addresses, and the required
++ * witness program length. Mirrors upstream `node/btcutil/address.go`
++ * `DecodeAddress` / `newAddress`: only SegWit v1 (P2TR Taproot) and v2 (P2MR),
++ * bech32m (BIP-350), 32-byte program. Version 0 (bech32), base58, future
++ * witness versions, and non-32-byte programs are all rejected by the node.
++ */
++const PEARL_WITNESS_VERSIONS = new Set([1, 2]);
++const PEARL_WITNESS_PROGRAM_BYTES = 32;
++
++/**
++ * Pearl-native address check: bech32m with the network's HRP, witness
++ * version 1 or 2, and a 32-byte witness program — exactly what `pearld`
++ * accepts in `DecodeAddress`.
++ */
++function isPearlNativeAddress(value: string, network: Network): boolean {
++  let decoded: { prefix: string; words: number[] };
++  try {
++    decoded = bech32m.decode(value);
++  } catch {
++    return false;
++  }
++  if (decoded.prefix.toLowerCase() !== network.bech32.toLowerCase()) {
++    return false;
++  }
++  const words = decoded.words;
++  if (words.length === 0 || !PEARL_WITNESS_VERSIONS.has(words[0])) {
++    return false;
++  }
++  return bech32m.fromWords(words.slice(1)).length === PEARL_WITNESS_PROGRAM_BYTES;
++}
++
+ export function validateRecipientAddress(
+   value: string,
+   network: Network | null,
+@@ -27,9 +60,17 @@ export function validateRecipientAddress(
+   }
+ 
+   try {
++    // First pass: reject malformed input (bad checksum, unknown HRP, bad
++    // base58, unparseable scripts).
+     address.toOutputScript(recipientAddress, network);
+-    return true;
+   } catch {
+     return false;
+   }
++
++  // Second pass: bitcoinjs-lib also accepts SegWit v0 (bech32), base58, and
++  // future witness versions, but Pearl consensus rejects all of them — only
++  // bech32m v1/v2 addresses are spendable/recognized by the network. Accepting
++  // the others here would mark an address "valid" that the chain can never
++  // resolve, so the send must fail closed instead.
++  return isPearlNativeAddress(recipientAddress, network);
+ }
