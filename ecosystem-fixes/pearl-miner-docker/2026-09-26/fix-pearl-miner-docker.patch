@@ -1,0 +1,264 @@
+diff --git a/Dockerfile b/Dockerfile
+index f081d73..4ce78f1 100644
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -7,12 +7,22 @@
+ # Build (from this repo root):
+ #   docker buildx build -t pearl-miner .
+ 
++# Pinned Pearl release. The node binary AND the miner source must track the
++# same upstream release: consensus rules changed at the salted-seed hard fork
++# (mainnet height 99000, Aug 2026 — V2 MoE -> V3 salted noise-seed ZK
++# certificates), and a pre-fork pearld (< v1.4.1) cannot validate post-fork
++# blocks, so the image would stall below height 99000 and never mine current
++# mainnet. Bump this on new upstream releases (node binary + miner source move
++# together automatically).
++ARG PEARL_RELEASE=v1.4.8
++
+ ARG CUDA_VERSION=12.9.1
+ 
+ # ============================================================
+ # Stage 1: Builder — compile CUDA kernels + Python packages
+ # ============================================================
+ FROM nvidia/cuda:${CUDA_VERSION}-devel-ubuntu24.04 AS builder
++ARG PEARL_RELEASE
+ 
+ # Install system deps
+ RUN apt-get update && apt-get install -y --no-install-recommends \
+@@ -43,8 +53,9 @@ RUN uv python install 3.12 --default
+ 
+ WORKDIR /app
+ 
+-# Clone Pearl monorepo
+-RUN git clone --depth 1 https://github.com/pearl-research-labs/pearl.git .
++# Clone Pearl monorepo, pinned to the release above so miner source and
++# node binary always agree on consensus rules.
++RUN git clone --depth 1 --branch ${PEARL_RELEASE} https://github.com/pearl-research-labs/pearl.git .
+ 
+ # Install dependencies (remote packages first for caching)
+ RUN --mount=type=cache,target=/root/.cache/uv \
+@@ -68,12 +79,16 @@ RUN --mount=type=cache,target=/root/.cache/uv \
+ # Stage 2: Download Go binaries (pearld, oyster, prlctl)
+ # ============================================================
+ FROM ubuntu:24.04 AS go-bins
++ARG PEARL_RELEASE
+ 
+ RUN apt-get update && apt-get install -y curl tar && rm -rf /var/lib/apt/lists/*
+ 
+-RUN curl -LO https://github.com/pearl-research-labs/pearl/releases/download/pearl-wallet-v1.0.0/go-binaries-linux-amd64-v1.0.2.tar.gz \
++# Post-fork node binary. The v1.0.2 binaries previously pinned here predate the
++# salted-seed hard fork (mainnet height 99000) and cannot validate V3
++# certificates — the image could not sync or mine current mainnet.
++RUN curl -LO https://github.com/pearl-research-labs/pearl/releases/download/${PEARL_RELEASE}/pearl-linux-amd64-${PEARL_RELEASE}.tar.gz \
+     && mkdir -p /go-bins \
+-    && tar xzf go-binaries-linux-amd64-v1.0.2.tar.gz -C /go-bins \
++    && tar xzf pearl-linux-amd64-${PEARL_RELEASE}.tar.gz -C /go-bins \
+     && chmod +x /go-bins/*
+ 
+ # ============================================================
+diff --git a/QUICK_START_GUIDE.md b/QUICK_START_GUIDE.md
+index fa8f4c2..484f166 100644
+--- a/QUICK_START_GUIDE.md
++++ b/QUICK_START_GUIDE.md
+@@ -95,11 +95,11 @@ Click **RENT** and you're done!
+ | Item | Value |
+ |------|-------|
+ | GPU Cost | ~$4/hr ($96/day) |
+-| Pearl Block Reward | Varies by difficulty |
+-| Current PRL Price | Check https://pearl-otc.com/marketplace |
++| Pearl Block Reward | ~2,305 PRL/block (Sept 2026; decays per upstream `CalcBlockSubsidy`) |
++| Current PRL Price | Listed on SafeTrade, CoinEx, BigONE (+ OTC at pearl-otc.com/marketplace) |
+ | Break-even | Depends on network hashrate & PRL price |
+ 
+-**Rule of thumb:** At current network size, 1x H200 can find several blocks per day. Check the OTC market for current PRL price to estimate daily revenue.
++**Rule of thumb:** check live network stats at https://lordofpearls.xyz and the current PRL price, then estimate daily revenue from your expected share of blocks before renting hardware.
+ 
+ ---
+ 
+diff --git a/README.md b/README.md
+index f2a2480..4f013e5 100644
+--- a/README.md
++++ b/README.md
+@@ -76,12 +76,20 @@ mining components, or expose `HF_TOKEN`/RPC credentials. It reports process
+ health, GPU usage, vLLM counters, Pearl node template availability, gateway
+ mining-related metrics, and wallet outcomes from the public explorer.
+ 
+-## Economics (as of May 2026)
+-
+-- Block reward: ~2,845 PRL/block
+-- Block time: ~74 seconds
+-- Network hashrate: ~2.38 EH/s
+-- **No exchange listing yet** — PRL trades OTC only (pearl-otc.com)
++## Economics (as of 2026-09-26 — re-check live stats before sizing a deployment)
++
++- Block reward: **~2,305 PRL/block** at height ~119,372. The subsidy decays
++  continuously per upstream `CalcBlockSubsidy`
++  (`node/blockchain/validate.go`):
++  `totalSupply * 650226 / ((height+650226) * (height-1+650226))` grains.
++- Block time: **194 s protocol target** (3m14s, `TargetTimePerBlock`); ~157 s
++  observed average over the last 1,000 blocks (via blockbook.pearlresearch.ai).
++  At target pace that's ~445 blocks/day → roughly 1.0M PRL/day in new emission.
++- **PRL is exchange-listed**: SafeTrade, CoinEx, and BigONE (BigONE listed
++  PRL/USDT on 2026-09-18). Price hit a record ~$1.76 on 2026-09-23
++  (cryptotimes.io). OTC trading also remains available at pearl-otc.com.
++- Network hashrate moves fast — check https://lordofpearls.xyz for live stats
++  rather than relying on a figure printed here.
+ 
+ ## Notes
+ 
+diff --git a/entrypoint.sh b/entrypoint.sh
+index 3dd27a2..763538a 100644
+--- a/entrypoint.sh
++++ b/entrypoint.sh
+@@ -117,6 +117,11 @@ export PEARLD_MINING_ADDRESS="$PEARL_WALLET_ADDRESS"
+ start_sshd
+ 
+ # Start pearld
++# NOTE: RPC is bound to loopback only. The node runs with --notls, so RPC
++# credentials travel in cleartext; every in-container consumer (this script,
++# pearl-gateway via PEARLD_RPC_URL, miner_observer.py) already talks to
++# localhost, so there is no reason to expose the RPC port on the container's
++# external interface (especially on shared GPU hosts like Vast.ai/RunPod).
+ start_logged pearld PEARLD_PID pearld \
+     "${PEARLD_NETWORK_ARGS[@]}" \
+     --datadir=/app/chain-data \
+@@ -124,7 +129,7 @@ start_logged pearld PEARLD_PID pearld \
+     --rpcpass="$RPC_PASS" \
+     --miningaddr="$PEARL_WALLET_ADDRESS" \
+     --listen=":${PEARLD_LISTEN_PORT}" \
+-    --rpclisten=":${PEARLD_RPC_PORT}" \
++    --rpclisten="127.0.0.1:${PEARLD_RPC_PORT}" \
+     --notls
+ 
+ # Wait for node RPC to be ready
+diff --git a/guides/BLOG_POST.md b/guides/BLOG_POST.md
+index 3377a49..7ae9567 100644
+--- a/guides/BLOG_POST.md
++++ b/guides/BLOG_POST.md
+@@ -2,6 +2,14 @@
+ 
+ *May 2026 · 8 min read*
+ 
++> **Update — Sept 2026:** the network figures below are from May 2026 and have
++> moved substantially. Current snapshot: block reward **~2,305 PRL** (height
++> ~119,372; decays per upstream `CalcBlockSubsidy`), block time **194 s**
++> protocol target, PRL **listed on SafeTrade, CoinEx, and BigONE** (PRL/USDT
++> since 2026-09-18; record ~$1.76 on 2026-09-23), ~12% of the 2.1B max supply
++> minted. Re-run all profitability math with live numbers before renting
++> hardware.
++
+ ---
+ 
+ There's a new blockchain that doesn't waste electricity on meaningless hashes. Pearl (PRL) uses **Proof-of-Useful-Work** — your GPU runs actual LLM inference (Llama-3.3-70B) and finds blocks as a byproduct of the matrix multiplications. Same game theory as Bitcoin, but the compute produces something useful.
+@@ -12,12 +20,17 @@ The managed mining service (Pearl Compute) is sold out. So we built a one-click
+ 
+ The numbers tell the story:
+ 
+-- **Only 6.6% of the 2.1B max supply has been minted.** You're earlier than Bitcoin at block 50,000.
+-- **Network hashrate is 2.33 EH/s** — still small enough for solo miners to be competitive.
+-- **Block reward is ~2,845 PRL every 73 seconds** — that's 3.4M PRL/day being distributed.
+-- **OTC price: ~$0.05** — no exchange listing yet. When that happens, price discovery will be... interesting.
++- **~12% of the 2.1B max supply has been minted** (Sept 2026; was 6.6% in May 2026).
++- **Block reward is ~2,305 PRL** (Sept 2026; was ~2,845 in May) — the subsidy
++  decays continuously per upstream `CalcBlockSubsidy`, and the protocol block
++  time target is **194 seconds** (3m14s).
++- **PRL is now exchange-listed** (SafeTrade, CoinEx, BigONE since Sept 2026;
++  record ~$1.76 on 2026-09-23) — the May-2026 "$0.05 OTC only" era is over.
++  When that happened, price discovery was... interesting.
+ 
+-A single H200 GPU can expect to find roughly one block every 26 hours. At current OTC prices, that's ~$130/day revenue against $84-102/day in GPU rental. **Net positive from day one.**
++The May-2026 worked example below (one H200 ≈ one block every 26 hours,
++~$130/day at $0.05 OTC) is kept for reference — re-derive it from current
++hashrate and price before making decisions.
+ 
+ The real bet isn't today's price. It's that a protocol with Bitcoin's security model, useful computation, and <7% emission will be worth significantly more once it hits exchanges.
+ 
+@@ -119,7 +132,8 @@ Submitted plain proof to gateway
+ 
+ ## The Economics in Detail
+ 
+-Let's do the math properly:
++Let's do the math properly. *(May 2026 figures — see the Sept 2026 update note
++at the top; re-derive with current hashrate, block reward, and PRL price.)*
+ 
+ ```
+ Network blocks/day:        1,186 (one every 73s)
+@@ -175,7 +189,10 @@ Everything is open source:
+ 
+ ## What's Next
+ 
+-Pearl is pre-exchange. The OTC market is thin. The network is young (block 45,935 of billions to come). Only 6.6% of supply has been minted.
++PRL is now listed on SafeTrade, CoinEx, and BigONE (Sept 2026) alongside the
++OTC market. The network has matured past block 119,000 and roughly 12% of the
++2.1B max supply has been minted — still early, but no longer the sub-7% era
++described above.
+ 
+ If you believe that a blockchain where mining does useful work (LLM inference) has a future, the math says: rent an H100, point it at the chain, and accumulate. The window where solo mining is profitable doesn't last forever — it didn't for Bitcoin, and it won't here.
+ 
+diff --git a/guides/DISCORD_GUIDE.md b/guides/DISCORD_GUIDE.md
+index e2b38cf..b495aaf 100644
+--- a/guides/DISCORD_GUIDE.md
++++ b/guides/DISCORD_GUIDE.md
+@@ -3,21 +3,20 @@
+ ## TL;DR
+ Mine PRL by running LLM inference on rented H100/H200 GPUs. One Docker image, two env vars, zero SSH.
+ 
+-## 💰 Economics (May 2026)
++## 💰 Economics (Sept 2026 — verify live before deploying)
+ ```
+-Block reward:     ~2,845 PRL/block
+-Block time:       ~73 seconds
+-Network hashrate: 2.33 EH/s
+-PRL OTC price:    ~$0.05
++Block reward:     ~2,305 PRL/block (decays per upstream CalcBlockSubsidy)
++Block time:       194 s protocol target (~157 s observed avg, last 1k blocks)
++PRL price:        listed on SafeTrade, CoinEx, BigONE (record ~$1.76, 2026-09-23);
++                  OTC also at pearl-otc.com
+ 
+ Per H200:
+-  Revenue: ~2,600 PRL/day (~$130)
++  Revenue: estimate from live hashrate (lordofpearls.xyz) × current PRL price
+   Cost:    $84-102/day (Vast.ai)
+-  Profit:  ~$28-46/day net
+-  
+-Breakeven: $0.039/PRL
++  Profit:  depends on live hashrate & PRL price — run the numbers with
++           current figures before renting hardware
+ ```
+-⚠️ Solo mining = high variance. Expect ~1 block per 26 hours per GPU. Could be 0 for 48h, could be 3 in a day.
++⚠️ Solo mining = high variance. Expect long dry spells between blocks per GPU.
+ 
+ ## ✅ Requirements
+ - Vast.ai account (funded)
+diff --git a/guides/HOW_TO_MINE_PEARL.md b/guides/HOW_TO_MINE_PEARL.md
+index d78a6b0..e2c6063 100644
+--- a/guides/HOW_TO_MINE_PEARL.md
++++ b/guides/HOW_TO_MINE_PEARL.md
+@@ -4,20 +4,19 @@
+ 
+ Pearl (PRL) is a Proof-of-Useful-Work blockchain where mining = running LLM inference. Instead of burning electricity on SHA-256 hashes, your GPU runs Llama-3.3-70B inference and finds blocks as a byproduct of the matrix multiplications. Same security model as Bitcoin, but the compute does useful work.
+ 
+-**Current Network Stats (May 2026):**
+-- Block reward: ~2,845 PRL/block
+-- Block time: ~73 seconds (~1,186 blocks/day)
+-- Network hashrate: 2.33 EH/s
+-- Circulating supply: 138.5M / 2.1B max (6.6% minted — very early)
+-- PRL trades OTC only at ~$0.05 (pearl-otc.com)
++**Current Network Stats (Sept 2026 — verify live before deploying):**
++- Block reward: ~2,305 PRL/block (height ~119,372; decays per upstream `CalcBlockSubsidy`)
++- Block time: 194 s protocol target (~157 s observed avg over last 1,000 blocks)
++- Circulating supply: ~255M / 2.1B max (~12% minted)
++- PRL is listed on SafeTrade, CoinEx, and BigONE (PRL/USDT since 2026-09-18); record ~$1.76 on 2026-09-23. OTC also at pearl-otc.com
+ 
+ ## Economics
+ 
+ | Metric | Value |
+ |--------|-------|
+-| Revenue per H200/day | ~2,600 PRL (~$130 at $0.05) |
++| Revenue per H200/day | Varies — estimate from live hashrate (lordofpearls.xyz) and current PRL price |
+ | GPU cost (Vast.ai H200) | ~$3.50-4.25/hr ($84-102/day) |
+-| **Net profit per GPU** | **~$28-46/day** |
++| **Net profit per GPU** | **Depends on network hashrate & PRL price — do the math with current numbers** |
+ | Breakeven PRL price | ~$0.039 |
+ | Expected time between blocks (1 GPU) | ~26 hours |
+ 
