@@ -1,0 +1,122 @@
+From 5856283d48ad4d389a9b4b9283c382d4bce67f9b Mon Sep 17 00:00:00 2001
+From: Kshot3000 <kshot9000@gmail.com>
+Date: Sat, 26 Sep 2026 23:03:12 +0000
+Subject: [PATCH] fix(pool): treat omitted cert_version as unsupported; correct
+ VIABILITY subsidy projections
+
+- spm-pool on_job: cert_version None no longer silently assumed V3.
+  Matches spm-proto Job::requires_update() docs ('treated as unknown and
+  refuses') and spm-work WorkUnit::build (rejects None). Previously a pool
+  omitting cert_version was promoted as V3, then every bind failed with
+  'job refused: network upgrade - update required', GPU idled, and the
+  update-required pause never engaged. Now raises the update-required
+  alert and UnsupportedScheme pause like cert_version >= 4.
+- tests: new cert_version_omitted_pauses_with_update_required scenario;
+  invariants explorer keeps generating None via raw JobReceived events.
+- docs: VIABILITY.md (en + pt-BR) forward subsidy curve recomputed from
+  upstream CalcBlockSubsidy at snapshot height 119365 (was ~1-9% high).
+---
+ crates/spm-pool/src/lib.rs          |  5 +++--
+ crates/spm-pool/tests/invariants.rs |  8 ++++++--
+ crates/spm-pool/tests/scenarios.rs  | 15 +++++++++++++++
+ docs/en/VIABILITY.md                |  2 +-
+ docs/pt-BR/VIABILIDADE.md           |  2 +-
+ 5 files changed, 26 insertions(+), 6 deletions(-)
+
+diff --git a/crates/spm-pool/src/lib.rs b/crates/spm-pool/src/lib.rs
+index f43c5ab..c77ff58 100644
+--- a/crates/spm-pool/src/lib.rs
++++ b/crates/spm-pool/src/lib.rs
+@@ -438,7 +438,8 @@ pub enum Event {
+     Authorized { slot: SlotId },
+     /// Authorize rejected (bad wallet/worker): the slot becomes a config error.
+     AuthRejected { slot: SlotId, msg: String },
+-    /// A `mining.notify`. `cert_version: None` means the pool omits it (assume V3).
++    /// A `mining.notify`. `cert_version: None` means the pool omits it (treated
++    /// as unsupported — an "update required" alert is raised, like for `>= 4`).
+     JobReceived { slot: SlotId, job_id: String, cert_version: Option<u32> },
+     /// A submit was accepted.
+     ShareAccepted { slot: SlotId },
+@@ -1200,7 +1201,7 @@ impl State {
+         if !accepts_jobs {
+             return;
+         }
+-        if cert_version.unwrap_or(SUPPORTED_CERT_VERSION) != SUPPORTED_CERT_VERSION {
++        if cert_version != Some(SUPPORTED_CERT_VERSION) {
+             self.on_unsupported(i, cert_version, now, out);
+             return;
+         }
+diff --git a/crates/spm-pool/tests/invariants.rs b/crates/spm-pool/tests/invariants.rs
+index 175ebd5..0426f61 100644
+--- a/crates/spm-pool/tests/invariants.rs
++++ b/crates/spm-pool/tests/invariants.rs
+@@ -134,8 +134,12 @@ fn drive(st: &State, sel: u8, var: u8, jobs: &mut u64) -> Event {
+             _ => Event::AuthRejected { slot, msg: "unknown worker".into() },
+         },
+         Some(SlotState::AwaitingJob) => match v {
+-            0..=16 => new_job(Some(3)),
+-            17 => new_job(None),
++            // NOTE: a pool that omits `cert_version` (None) is now refused by
++            // `on_job` like any other unsupported version (see
++            // `cert_version_omitted_pauses_with_update_required` in scenarios.rs),
++            // so the explorer only generates it via raw `JobReceived` events;
++            // here None would just burn the slot and starve coverage.
++            0..=17 => new_job(Some(3)),
+             18 => new_job(Some(4)),
+             _ => Event::Disconnected { slot, was_active_for_s: 0 },
+         },
+diff --git a/crates/spm-pool/tests/scenarios.rs b/crates/spm-pool/tests/scenarios.rs
+index e8a908d..db8d32a 100644
+--- a/crates/spm-pool/tests/scenarios.rs
++++ b/crates/spm-pool/tests/scenarios.rs
+@@ -755,6 +755,21 @@ fn cert_version_4_pauses_with_update_required() {
+     assert_eq!(sim.manager(), ManagerState::Paused { reason: PauseReason::UnsupportedScheme });
+ }
+ 
++#[test]
++fn cert_version_omitted_pauses_with_update_required() {
++    let mut sim = Sim::new(pools(3), vec![]);
++    sim.start();
++    sim.run_until(secs(10));
++    assert!(sim.gpu);
++    sim.pools[0].cert_version = None; // the pool omits cert_version; treat as unsupported
++    sim.run_until(secs(31));
++    assert_eq!(sim.manager(), ManagerState::Paused { reason: PauseReason::UnsupportedScheme });
++    assert!(!sim.gpu);
++    assert!(sim.alerts().iter().any(|m| m.contains(UPDATE_REQUIRED_ALERT)));
++    assert!(sim.state.is_unsupported(P1));
++    assert!(SlotId::all().all(|s| !sim.slot(s).is_open()));
++}
++
+ #[test]
+ fn cert_version_4_on_a_probe_only_disables_that_slot() {
+     let mut sim = Sim::new(pools(2), vec![FakePool::refusing()]);
+diff --git a/docs/en/VIABILITY.md b/docs/en/VIABILITY.md
+index 1cf56fa..8b4fdd7 100644
+--- a/docs/en/VIABILITY.md
++++ b/docs/en/VIABILITY.md
+@@ -34,7 +34,7 @@ On a Spark that also serves LLMs (like the author's), mining only happens while
+ 
+ ## 3. Headwinds (all measured, none hypothetical)
+ - Difficulty **+36 % in 30 days**; PRL-per-TH fell **−32 % in 10 weeks**; miner software alone doubled per-card rates between June and September 2026.
+-- Block subsidy decays smoothly: ~2,206 PRL in 1 month, ~1,794 in 6 months, ~1,435 in 12 months.
++- Block subsidy decays smoothly: ~2,228 PRL in 1 month, ~1,891 in 6 months, ~1,579 in 12 months (from upstream `CalcBlockSubsidy` at snapshot height 119,365, 194 s/block target).
+ - If block time returns to the 194 s target, daily emission drops another ~22 %.
+ - Thin, concentrated liquidity: ~US$2.9 M/day volume, ~87 % on SafeTrade (a 1.9/5 Trustpilot exchange with withdrawal complaints). Daily emission ≈ 60 % of daily volume (sell overhang).
+ - Pools concentrated: Kryptex ~45–50 %, pearlhash.xyz ~25–28 %.
+diff --git a/docs/pt-BR/VIABILIDADE.md b/docs/pt-BR/VIABILIDADE.md
+index ed1599d..332e62f 100644
+--- a/docs/pt-BR/VIABILIDADE.md
++++ b/docs/pt-BR/VIABILIDADE.md
+@@ -34,7 +34,7 @@ Num Spark que também serve LLMs (como o do autor), só se minera com a GPU ocio
+ 
+ ## 3. Ventos contrários (todos medidos, nenhum hipotético)
+ - Dificuldade **+36 % em 30 dias**; PRL por TH caiu **−32 % em 10 semanas**; só o software dos mineradores dobrou o rendimento por placa entre junho e setembro de 2026.
+-- A recompensa por bloco cai suavemente: ~2.206 PRL em 1 mês, ~1.794 em 6 meses, ~1.435 em 12 meses.
++- A recompensa por bloco cai suavemente: ~2.228 PRL em 1 mês, ~1.891 em 6 meses, ~1.579 em 12 meses (de `CalcBlockSubsidy` do upstream na altura de referência 119.365, alvo de 194 s/bloco).
+ - Se o tempo de bloco voltar ao alvo de 194 s, a emissão diária cai mais ~22 %.
+ - Liquidez fina e concentrada: ~US$2,9 M/dia de volume, ~87 % na SafeTrade (nota 1,9/5 no Trustpilot, com reclamações de saque). Emissão diária ≈ 60 % do volume diário (pressão vendedora).
+ - Pools concentradas: Kryptex ~45–50 %, pearlhash.xyz ~25–28 %.
+-- 
+2.43.0
+
