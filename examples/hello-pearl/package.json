@@ -1,0 +1,1 @@
+{"description":"Minimal TypeScript JSON-RPC client for a Pearl (pearld) node","devDependencies":{"tsx":"^4.19.0","typescript":"^5.6.0"},"main":"src/index.ts","name":"hello-pearl","scripts":{"start":"npx tsx src/index.ts"},"type":"module","version":"0.1.0"}
