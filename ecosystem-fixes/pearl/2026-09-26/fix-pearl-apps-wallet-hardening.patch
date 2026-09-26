@@ -1,0 +1,592 @@
+From fd3aff67b3c344620b19efe2d45c6e493c0bac99 Mon Sep 17 00:00:00 2001
+From: Kshot3000 <kshot9000@gmail.com>
+Date: Sat, 26 Sep 2026 20:38:52 +0000
+Subject: [PATCH 1/2] fix(wallet): use https for blockbook fee-estimate
+ requests
+
+The desktop wallet's BlockbookClient hardcoded http:// URLs for
+blockbook.pearlresearch.ai and blockbook.testnet.pearlresearch.ai. Both
+hosts 301-redirect to https, so the wallet's first request went out in the
+clear before following the redirect. Request the https endpoints directly.
+---
+ .../src/main/clients/blockbook-client.ts                  | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/apps/apps/pearl-desktop-wallet/src/main/clients/blockbook-client.ts b/apps/apps/pearl-desktop-wallet/src/main/clients/blockbook-client.ts
+index a14c529..5aefdf7 100644
+--- a/apps/apps/pearl-desktop-wallet/src/main/clients/blockbook-client.ts
++++ b/apps/apps/pearl-desktop-wallet/src/main/clients/blockbook-client.ts
+@@ -1,8 +1,12 @@
+ import { getCurrentNetwork, type Network } from '../config/network-config';
+ 
+ const BlockbookBaseUrlMap: Record<Network, string> = {
+-    testnet: 'http://blockbook.testnet.pearlresearch.ai',
+-    mainnet: 'http://blockbook.pearlresearch.ai',
++    // NOTE: plain-https only. The host 301-redirects http -> https, but the
++    // wallet must not send its first request in the clear (fee-estimate
++    // traffic is metadata about wallet activity; a MITM on the initial
++    // plaintext hop could also serve a forged estimate before the redirect).
++    testnet: 'https://blockbook.testnet.pearlresearch.ai',
++    mainnet: 'https://blockbook.pearlresearch.ai',
+ };
+ 
+ function getBaseUrl(): string {
+-- 
+2.43.0
+
+
+From f6dfc513c0c6947b41973b543b0be5b2f2718c34 Mon Sep 17 00:00:00 2001
+From: Kshot3000 <kshot9000@gmail.com>
+Date: Sat, 26 Sep 2026 20:38:52 +0000
+Subject: [PATCH 2/2] fix(apps): repair pearl-address-validation package
+ (tests, base58, docs)
+
+- Remove the base58 branch: Pearl is Taproot-only (bech32m, witness v1+,
+  32-byte programs; see node/btcutil/address.go decodeSegWitAddress) and has
+  never had base58 addresses. The branch used Bitcoin version bytes
+  (0x00/0x6f/0x05/0xc4), so e.g. a Bitcoin P2PKH address validated as a
+  'valid Pearl address'. base58-js and sha256-uint8array deps removed.
+- Fix the test suite: it referenced dup/td/duprt/sd HRPs that the
+  implementation rejects, so 9/17 tests failed as published. Tests now use
+  real prl/tprl/rprl bech32m vectors (mainnet vector is a known-good Pearl
+  address) plus regression cases for v0, v2, short programs, bad checksums,
+  wrong HRPs, base58, and mixed case. 19/19 pass.
+- Rewrite the README, which documented Bitcoin-style base58 examples and a
+  signet network the code does not implement.
+---
+ .../pearl-address-validation/README.md        |  78 +++++-----
+ .../pearl-address-validation/package.json     |   4 +-
+ .../pearl-address-validation/src/index.ts     |  80 +---------
+ .../tests/index.spec.ts                       | 147 +++++++++---------
+ apps/pnpm-lock.yaml                           |   6 -
+ 5 files changed, 128 insertions(+), 187 deletions(-)
+
+diff --git a/apps/packages/pearl-address-validation/README.md b/apps/packages/pearl-address-validation/README.md
+index a61f67e..10e9b10 100644
+--- a/apps/packages/pearl-address-validation/README.md
++++ b/apps/packages/pearl-address-validation/README.md
+@@ -2,16 +2,21 @@
+ 
+ Validate Pearl Taproot (P2TR) addresses using bech32m encoding for mainnet, testnet, regtest, and simnet networks.
+ 
++Pearl is Taproot-only: valid addresses are bech32m (BIP-350), witness version
++1, with a 32-byte witness program. Legacy SegWit v0 addresses, future witness
++versions, non-32-byte programs, and base58 addresses (Pearl has never had any)
++are all rejected — matching `pearld`'s `decodeSegWitAddress`.
++
+ ```js
+-validate('dup1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4');
++validate('prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d');
+ ==> true
+ 
+-getAddressInfo('dup1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4');
++getAddressInfo('prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d');
+ ==> {
+   bech32: true,
+   network: 'mainnet',
+-  address: 'dup1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4',
+-  type: 'p2wpkh'
++  address: 'prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d',
++  type: 'p2tr'
+ }
+ ```
+ 
+@@ -42,9 +47,12 @@ import { validate, getAddressInfo } from 'pearl-address-validation';
+ `validate(address)` returns `true` for valid Pearl addresses or `false` for invalid Pearl addresses.
+ 
+ ```js
+-validate('17VZNX1SN5NtKa8UQFxwQbFeFc3iqRYhem')
++validate('prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d')
+ ==> true
+ 
++validate('17VZNX1SN5NtKa8UQFxwQbFeFc3iqRYhem') // a Bitcoin base58 address
++==> false
++
+ validate('invalid')
+ ==> false
+ ```
+@@ -54,13 +62,13 @@ validate('invalid')
+ `validate(address, network)` allows you to validate whether an address is valid and belongs to `network`.
+ 
+ ```js
+-validate('36bJ4iqZbNevh9b9kzaMEkXb28Gpqrv2bd', 'mainnet')
++validate('prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d', 'mainnet')
+ ==> true
+ 
+-validate('36bJ4iqZbNevh9b9kzaMEkXb28Gpqrv2bd', 'testnet')
++validate('prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d', 'testnet')
+ ==> false
+ 
+-validate('2N4RsPe5F2fKssy2HBf2fH2d7sHdaUjKk1c', 'testnet')
++validate('tprl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psh7xs6c', 'testnet')
+ ==> true
+ ```
+ 
+@@ -71,51 +79,49 @@ validate('2N4RsPe5F2fKssy2HBf2fH2d7sHdaUjKk1c', 'testnet')
+ If the input address is invalid, an exception will be thrown.
+ 
+ ```js
+-getAddressInfo('17VZNX1SN5NtKa8UQFxwQbFeFc3iqRYhem')
++getAddressInfo('prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d')
+ ==> {
+-  address: '17VZNX1SN5NtKa8UQFxwQbFeFc3iqRYhem',
+-  type: 'p2pkh',
++  address: 'prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d',
++  type: 'p2tr',
+   network: 'mainnet',
+-  bech32: false
++  bech32: true
+ }
+ ```
+ 
+ ### Networks
+ 
+-This library supports the following Pearl networks: `mainnet`, `testnet`, `regtest` and `signet`.
+-
+-> `signet` addresses will always be recognized as `testnet` addresses.
++This library supports the following Pearl networks: `mainnet`, `testnet`, `regtest` and `simnet`.
+ 
+-> Non-bech32 `regtest` addresses will be recognized as `testnet` addresses.
++Address prefixes: `prl` (mainnet), `tprl` (testnet), `rprl` (regtest/simnet).
+ 
+-#### Casting testnet addresses to regtest or signet
++#### Casting testnet addresses to regtest or simnet
+ 
+-You can use the `options` parameter to cast `testnet` addresses to `regtest` or `signet`.
++You can use the `options` parameter to cast `testnet` addresses to `regtest` or `simnet`.
+ 
+ ```js
+ // Default - No casting
+-getAddressInfo('td1qg3hss5p9g9jp0es5u5aaz3lszf6cvdggtmjarr');
++getAddressInfo('tprl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psh7xs6c');
+ ==> {
+-  address: 'td1qg3hss5p9g9jp0es5u5aaz3lszf6cvdggtmjarr',
+-  type: 'p2wpkh',
++  address: 'tprl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psh7xs6c',
++  type: 'p2tr',
+   network: 'testnet',
+   bech32: true
+ }
+ 
+-// Cast testnet to signet
+-getAddressInfo('td1qg3hss5p9g9jp0es5u5aaz3lszf6cvdggtmjarr', {
+-  castTestnetTo: 'signet'
++// Cast testnet to regtest
++getAddressInfo('tprl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psh7xs6c', {
++  castTestnetTo: 'regtest'
+ })
+ ==> {
+-  address: 'td1qg3hss5p9g9jp0es5u5aaz3lszf6cvdggtmjarr',
+-  type: 'p2wpkh',
+-  network: 'signet',
++  address: 'tprl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psh7xs6c',
++  type: 'p2tr',
++  network: 'regtest',
+   bech32: true
+ }
+ 
+ // Validating and casting
+-validate('td1qg3hss5p9g9jp0es5u5aaz3lszf6cvdggtmjarr', 'signet', {
+-  castTestnetTo: 'signet'
++validate('tprl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psh7xs6c', 'regtest', {
++  castTestnetTo: 'regtest'
+ })
+ ==> true
+ ```
+@@ -129,14 +135,14 @@ enum Network {
+   mainnet = 'mainnet',
+   testnet = 'testnet',
+   regtest = 'regtest',
+-  signet = 'signet',
++  simnet = 'simnet',
+ }
+ 
+ enum AddressType {
+-  p2pkh = 'p2pkh',
+-  p2sh = 'p2sh',
+-  p2wpkh = 'p2wpkh',
+-  p2wsh = 'p2wsh',
++  p2pkh = 'p2pkh', // legacy, never returned for Pearl addresses
++  p2sh = 'p2sh',   // legacy, never returned for Pearl addresses
++  p2wpkh = 'p2wpkh', // legacy, never returned for Pearl addresses
++  p2wsh = 'p2wsh',   // legacy, never returned for Pearl addresses
+   p2tr = 'p2tr',
+ }
+ 
+@@ -153,10 +159,10 @@ type AddressInfo = {
+ ```ts
+ import { validate, getAddressInfo, Network, AddressInfo } from 'pearl-address-validation';
+ 
+-validate('36nGbqV7XCNf2xepCLAtRBaqzTcSjF4sv9', Network.mainnet);
++validate('prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d', Network.mainnet);
+ ==> true
+ 
+-const addressInfo: AddressInfo = getAddressInfo('2Mz8rxD6FgfbhpWf9Mde9gy6w8ZKE8cnesp');
++const addressInfo: AddressInfo = getAddressInfo('tprl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psh7xs6c');
+ addressInfo.network;
+ 
+ ==> 'testnet'
+diff --git a/apps/packages/pearl-address-validation/package.json b/apps/packages/pearl-address-validation/package.json
+index 99ab284..a7f6e8d 100644
+--- a/apps/packages/pearl-address-validation/package.json
++++ b/apps/packages/pearl-address-validation/package.json
+@@ -51,8 +51,6 @@
+     "vitest": "^3.2.6"
+   },
+   "dependencies": {
+-    "base58-js": "^3.0.2",
+-    "bech32": "^2.0.0",
+-    "sha256-uint8array": "^0.10.3"
++    "bech32": "^2.0.0"
+   }
+ }
+\ No newline at end of file
+diff --git a/apps/packages/pearl-address-validation/src/index.ts b/apps/packages/pearl-address-validation/src/index.ts
+index ad06b2a..9aa005d 100644
+--- a/apps/packages/pearl-address-validation/src/index.ts
++++ b/apps/packages/pearl-address-validation/src/index.ts
+@@ -1,8 +1,4 @@
+-import { base58_to_binary } from 'base58-js';
+ import { bech32, bech32m } from 'bech32';
+-import { createHash } from 'sha256-uint8array';
+-
+-const sha256 = (payload: Uint8Array) => createHash().update(payload).digest();
+ 
+ enum Network {
+   mainnet = 'mainnet',
+@@ -11,6 +7,10 @@ enum Network {
+   simnet = 'simnet',
+ }
+ 
++// Pearl is Taproot-only (bech32m, witness v1+, 32-byte programs — see
++// node/btcutil/address.go `decodeSegWitAddress` in pearl-research-labs/pearl).
++// The legacy members below are kept only for API compatibility; the parser
++// never returns them.
+ enum AddressType {
+   p2pkh = 'p2pkh',
+   p2sh = 'p2sh',
+@@ -26,28 +26,6 @@ type AddressInfo = {
+   type: AddressType;
+ };
+ 
+-const addressTypes: { [key: number]: { type: AddressType; network: Network } } = {
+-  0x00: {
+-    type: AddressType.p2pkh,
+-    network: Network.mainnet,
+-  },
+-
+-  0x6f: {
+-    type: AddressType.p2pkh,
+-    network: Network.testnet,
+-  },
+-
+-  0x05: {
+-    type: AddressType.p2sh,
+-    network: Network.mainnet,
+-  },
+-
+-  0xc4: {
+-    type: AddressType.p2sh,
+-    network: Network.testnet,
+-  },
+-};
+-
+ type Options = {
+   castTestnetTo?: Network.regtest | Network.simnet;
+ };
+@@ -128,10 +106,10 @@ const parseBech32 = (address: string, options?: Options): AddressInfo => {
+ };
+ 
+ const getAddressInfo = (address: string, options?: Options): AddressInfo => {
+-  let decoded: Uint8Array;
+-
+   const lowerAddress = address.toLowerCase();
+-  // Check if it's a bech32/bech32m address (starts with network prefix + '1')
++  // Pearl addresses are bech32m segwit (Taproot, witness v1+). There are no
++  // base58 Pearl addresses — base58 strings (e.g. Bitcoin '1…'/'3…' or any
++  // other chain's) are never valid here and must be rejected.
+   if (lowerAddress.startsWith('prl1') || lowerAddress.startsWith('tprl1') || lowerAddress.startsWith('rprl1')) {
+     try {
+       return parseBech32(address, options);
+@@ -140,49 +118,7 @@ const getAddressInfo = (address: string, options?: Options): AddressInfo => {
+     }
+   }
+ 
+-  try {
+-    decoded = base58_to_binary(address);
+-  } catch (error) {
+-    throw new Error('Invalid address');
+-  }
+-
+-  const { length } = decoded;
+-
+-  if (length !== 25) {
+-    throw new Error('Invalid address');
+-  }
+-
+-  const version = decoded[0];
+-
+-  const checksum = decoded.slice(length - 4, length);
+-  const body = decoded.slice(0, length - 4);
+-
+-  const expectedChecksum = sha256(sha256(body)).slice(0, 4);
+-
+-  if (checksum.some((value: number, index: number) => value !== expectedChecksum[index])) {
+-    throw new Error('Invalid address');
+-  }
+-
+-  const validVersions = Object.keys(addressTypes).map(Number);
+-
+-  if (version === undefined || !validVersions.includes(version)) {
+-    throw new Error('Invalid address');
+-  }
+-
+-  const addressType = addressTypes[version];
+-
+-  if (!addressType) {
+-    throw new Error('Invalid address');
+-  }
+-
+-  return normalizeAddressInfo(
+-    {
+-      ...addressType,
+-      address,
+-      bech32: false,
+-    },
+-    options,
+-  );
++  throw new Error('Invalid address');
+ };
+ 
+ const validate = (address: string, network?: Network, options?: Options) => {
+diff --git a/apps/packages/pearl-address-validation/tests/index.spec.ts b/apps/packages/pearl-address-validation/tests/index.spec.ts
+index 532ca0b..e83bf87 100644
+--- a/apps/packages/pearl-address-validation/tests/index.spec.ts
++++ b/apps/packages/pearl-address-validation/tests/index.spec.ts
+@@ -1,93 +1,103 @@
+ import validate, { getAddressInfo, Network } from '../src/index';
+ import { expect, describe, it } from 'vitest';
+ 
++// Vectors: all share one 32-byte witness program. The mainnet vector is a
++// real, known-good Pearl address; testnet/simnet vectors were re-encoded
++// from the same program with a self-checked bech32m codec (BIP-350).
++const MAINNET = 'prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d';
++const TESTNET = 'tprl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psh7xs6c';
++const SIMNET = 'rprl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psd86gls';
++
+ describe('Taproot Address Validation', () => {
+   describe('Valid Taproot Addresses', () => {
+     it('validates Mainnet P2TR', () => {
+-      const address = 'dup1paardr2nczq0rx5rqpfwnvpzm497zvux64y0f7wjgcs7xuuuh2nnqnqzpxm';
+-
+-      expect(validate(address)).toBe(true);
+-      expect(getAddressInfo(address)).toEqual({ bech32: true, type: 'p2tr', network: 'mainnet', address });
++      expect(validate(MAINNET)).toBe(true);
++      expect(getAddressInfo(MAINNET)).toEqual({
++        bech32: true,
++        type: 'p2tr',
++        network: 'mainnet',
++        address: MAINNET,
++      });
+     });
+ 
+     it('validates Testnet P2TR', () => {
+-      const address = 'td1paardr2nczq0rx5rqpfwnvpzm497zvux64y0f7wjgcs7xuuuh2nnql32xdy';
+-
+-      expect(validate(address)).toBe(true);
+-      expect(getAddressInfo(address)).toEqual({ bech32: true, type: 'p2tr', network: 'testnet', address });
+-    });
+-
+-    it('validates Regtest P2TR', () => {
+-      const address = 'duprt1paardr2nczq0rx5rqpfwnvpzm497zvux64y0f7wjgcs7xuuuh2nnqevu7ll';
+-
+-      expect(validate(address)).toBe(true);
+-      expect(getAddressInfo(address)).toEqual({ bech32: true, type: 'p2tr', network: 'regtest', address });
++      expect(validate(TESTNET)).toBe(true);
++      expect(getAddressInfo(TESTNET)).toEqual({
++        bech32: true,
++        type: 'p2tr',
++        network: 'testnet',
++        address: TESTNET,
++      });
+     });
+ 
+-    it('validates Simnet P2TR', () => {
+-      const address = 'sd1paardr2nczq0rx5rqpfwnvpzm497zvux64y0f7wjgcs7xuuuh2nnqcqqp5p';
+-
+-      expect(validate(address)).toBe(true);
+-      expect(getAddressInfo(address)).toEqual({ bech32: true, type: 'p2tr', network: 'simnet', address });
++    it('validates Simnet (rprl) P2TR', () => {
++      expect(validate(SIMNET)).toBe(true);
++      expect(getAddressInfo(SIMNET)).toEqual({
++        bech32: true,
++        type: 'p2tr',
++        network: 'simnet',
++        address: SIMNET,
++      });
+     });
+   });
+ 
+   describe('Validation with Network Parameter', () => {
+     it('validates Mainnet P2TR with network parameter', () => {
+-      const address = 'dup1paardr2nczq0rx5rqpfwnvpzm497zvux64y0f7wjgcs7xuuuh2nnqnqzpxm';
+-      expect(validate(address, Network.mainnet)).toBe(true);
++      expect(validate(MAINNET, Network.mainnet)).toBe(true);
+     });
+ 
+     it('validates Testnet P2TR with network parameter', () => {
+-      const address = 'td1paardr2nczq0rx5rqpfwnvpzm497zvux64y0f7wjgcs7xuuuh2nnql32xdy';
+-      expect(validate(address, Network.testnet)).toBe(true);
+-    });
+-
+-    it('validates Regtest P2TR with network parameter', () => {
+-      const address = 'duprt1paardr2nczq0rx5rqpfwnvpzm497zvux64y0f7wjgcs7xuuuh2nnqevu7ll';
+-      expect(validate(address, Network.regtest)).toBe(true);
++      expect(validate(TESTNET, Network.testnet)).toBe(true);
+     });
+ 
+     it('validates Simnet P2TR with network parameter', () => {
+-      const address = 'sd1paardr2nczq0rx5rqpfwnvpzm497zvux64y0f7wjgcs7xuuuh2nnqcqqp5p';
+-      expect(validate(address, Network.simnet)).toBe(true);
++      expect(validate(SIMNET, Network.simnet)).toBe(true);
+     });
+ 
+     it('rejects mainnet address when validating against testnet', () => {
+-      const address = 'dup1paardr2nczq0rx5rqpfwnvpzm497zvux64y0f7wjgcs7xuuuh2nnqnqzpxm';
+-      expect(validate(address, Network.testnet)).toBe(false);
++      expect(validate(MAINNET, Network.testnet)).toBe(false);
++    });
++
++    it('casts testnet to regtest via options', () => {
++      const info = getAddressInfo(TESTNET, { castTestnetTo: Network.regtest });
++      expect(info.network).toBe('regtest');
++      expect(validate(TESTNET, Network.regtest, { castTestnetTo: Network.regtest })).toBe(true);
+     });
+   });
+ 
+   describe('Invalid/Rejected Addresses', () => {
+-    it('rejects Legacy SegWit v0 P2WPKH addresses', () => {
+-      const addresses = [
+-        'dup1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4', // mainnet
+-        'td1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx', // testnet
+-        'duprt1q6z64a43mjgkcq0ul2znwneq3spghrlau9slefp', // regtest
+-        'sd1qw508d6qejxtdg4y5r3zarvary0c5xw7kwahwc4', // simnet
+-      ];
+-
+-      addresses.forEach((address) => {
+-        expect(validate(address)).toBe(false);
+-      });
++    it('rejects Legacy SegWit v0 P2WPKH addresses (Pearl is v1+ only)', () => {
++      // Same program as MAINNET, witness version 0
++      expect(
++        validate('prl1q62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psr6jtcn'),
++      ).toBe(false);
++    });
++
++    it('rejects future witness versions (v2)', () => {
++      expect(
++        validate('prl1z62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8ps5vmptx'),
++      ).toBe(false);
+     });
+ 
+-    it('rejects Legacy SegWit v0 P2WSH addresses', () => {
+-      const addresses = [
+-        'dup1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3', // mainnet
+-        'td1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3q0sl5k7', // testnet
+-        'duprt1q5n2k3frgpxces3dsw4qfpqk4kksv0cz96pldxdwxrrw0d5ud5hcqzzx7zt', // regtest
+-      ];
++    it('rejects non-32-byte witness programs', () => {
++      // 20-byte program, witness v1
++      expect(validate('prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqmu48ck')).toBe(false);
++    });
+ 
+-      addresses.forEach((address) => {
+-        expect(validate(address)).toBe(false);
+-      });
++    it('rejects base58 addresses (Pearl has no base58 addresses)', () => {
++      // A valid Bitcoin P2PKH address — must NOT validate as a Pearl address
++      expect(validate('17VZNX1SN5NtKa8UQFxwQbFeFc3iqRYhem')).toBe(false);
++      expect(() => getAddressInfo('17VZNX1SN5NtKa8UQFxwQbFeFc3iqRYhem')).toThrow('Invalid address');
+     });
+ 
+-    it('rejects invalid bech32 address', () => {
+-      const address = 'dup1qw508d6qejxtdg4y5r3zrrvary0c5xw7kv8f3t4'; // invalid checksum
+-      expect(validate(address)).toBe(false);
++    it('rejects addresses with the wrong human-readable part', () => {
++      // Same program, Bitcoin mainnet HRP
++      expect(validate('bc1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psyzhlne')).toBe(false);
++    });
++
++    it('rejects invalid bech32m checksum', () => {
++      // MAINNET with the last character corrupted
++      expect(validate('prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw99')).toBe(false);
+     });
+ 
+     it('rejects bogus addresses', () => {
+@@ -95,32 +105,29 @@ describe('Taproot Address Validation', () => {
+       expect(validate('invalid')).toBe(false);
+       expect(validate('')).toBe(false);
+     });
+-
+-    it('rejects addresses with wrong witness version', () => {
+-      // Address with witness version 2 (not v1/Taproot)
+-      expect(validate('dup1z...someaddress')).toBe(false);
+-    });
+   });
+ 
+   describe('Case Sensitivity', () => {
+     it('validates uppercase Taproot addresses', () => {
+-      const address = 'DUP1PAARDR2NCZQ0RX5RQPFWNVPZM497ZVUX64Y0F7WJGCS7XUUUH2NNQNQZPXM';
++      const address = 'PRL1P62V09VUZYD8KDZ9L23JAF3KPH4WWX6JQCMHKKHG8LHR2QLXKY8PSU3ZW9D';
+       expect(validate(address)).toBe(true);
++      expect(getAddressInfo(address).network).toBe('mainnet');
++    });
++
++    it('rejects mixed-case addresses', () => {
++      expect(validate('prl1P62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d')).toBe(false);
+     });
+   });
+ 
+   describe('Error Messages', () => {
+-    it('throws error for P2WPKH addresses', () => {
+-      const address = 'dup1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4';
+-
+-      // The error message is caught and re-thrown as "Invalid address" by getAddressInfo
+-      expect(() => getAddressInfo(address)).toThrow('Invalid address');
++    it('throws error for v0 addresses', () => {
++      expect(() =>
++        getAddressInfo('prl1q62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psr6jtcn'),
++      ).toThrow('Invalid address');
+     });
+ 
+     it('throws descriptive error for invalid address', () => {
+-      const address = 'invalid';
+-
+-      expect(() => getAddressInfo(address)).toThrow('Invalid address');
++      expect(() => getAddressInfo('invalid')).toThrow('Invalid address');
+     });
+   });
+ });
+diff --git a/apps/pnpm-lock.yaml b/apps/pnpm-lock.yaml
+index e6bcc1d..ec74467 100644
+--- a/apps/pnpm-lock.yaml
++++ b/apps/pnpm-lock.yaml
+@@ -317,15 +317,9 @@ importers:
+ 
+   packages/pearl-address-validation:
+     dependencies:
+-      base58-js:
+-        specifier: ^3.0.2
+-        version: 3.0.3
+       bech32:
+         specifier: ^2.0.0
+         version: 2.0.0
+-      sha256-uint8array:
+-        specifier: ^0.10.3
+-        version: 0.10.7
+     devDependencies:
+       '@arethetypeswrong/cli':
+         specifier: ^0.17.3
+-- 
+2.43.0
+
