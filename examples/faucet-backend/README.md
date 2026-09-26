@@ -58,6 +58,24 @@ reports `walletConfigured: false` and every drip is refused with HTTP 503 —
 | `CORS_ORIGIN` | `*` | allowed browser origin |
 | `STORE_FILE` | `./drips.json` | drip history (rate limiting) |
 
+## Tests
+
+Zero dependencies — the suite uses only Node's built-in test runner:
+
+```bash
+npm test        # 31 tests: unit + integration
+npm run check   # node --check on server.js, lib.js, and both test files
+```
+
+- `test/unit.test.js` — pure-function tests for `lib.js`: bech32m decoding,
+  Pearl address policy (v1+ only, `tprl` HRP), per-address cooldown and the
+  rolling 24h daily cap. Address vectors are independently generated from the
+  official BIP-86 known-answer output key.
+- `test/integration.test.js` — boots the real `server.js` over HTTP with a
+  stub Oyster JSON-RPC and drives `/api/status` + `/api/drip` end to end:
+  malformed input (400s), cooldown 429, daily-cap 429, the honest 503 when no
+  wallet is configured (no fake txids), and drip persistence to the store file.
+
 ## Operating notes
 
 - Keep `OYSTER_RPC_*` and `drips.json` private; never commit a filled-in `.env`.
