@@ -30,8 +30,13 @@ and Plonky2 zk-SNARK block certificates.
 2. It works the prioritized queue: fix broken builds → scaffold apps → improve docs.
 3. Each run appends to `hidden_files/build-log.md` so you can see exactly what
    changed and why.
-4. **Nothing is pushed to GitHub automatically.** Finished work waits for your
-   approval before any push happens.
+4. Finished work is **committed and pushed to `main`** automatically every run.
+
+## Support this work
+
+If this builder saved you time, donations are welcome:
+
+**PRL:** `prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`
 
 ## Quick start
 
