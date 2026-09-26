@@ -1,0 +1,88 @@
+From a45fa3decc11d9516f4ef35f4b9c35417ab53e64 Mon Sep 17 00:00:00 2001
+From: Pearl Builder <kshot9000@gmail.com>
+Date: Sat, 26 Sep 2026 17:57:42 +0000
+Subject: [PATCH] fix(termux): repair start-pearl.sh tunnel URL detection and
+ checkout path
+
+- Fix tunnel URL regex: grep -oP with double-escaped dots never matched
+  cloudflared quick-tunnel URLs, so TUNNEL_URL was always empty and
+  PRL20_OPERATOR_PUBLIC_URL was never updated. Use grep -oE with a
+  correct ERE pattern.
+- Use a single INDEXER_DIR ($HOME/pearl-indexer) for cd and .env path
+  instead of a nonexistent ~/indexer (push-github.sh clones to
+  ~/pearl-indexer); add a clear error when the checkout is missing.
+- Mark fix-push.sh / push-github.sh executable.
+---
+ fix-push.sh    |  0
+ push-github.sh |  0
+ start-pearl.sh | 18 ++++++++++++++----
+ 3 files changed, 14 insertions(+), 4 deletions(-)
+ mode change 100644 => 100755 fix-push.sh
+ mode change 100644 => 100755 push-github.sh
+
+diff --git a/fix-push.sh b/fix-push.sh
+old mode 100644
+new mode 100755
+diff --git a/push-github.sh b/push-github.sh
+old mode 100644
+new mode 100755
+diff --git a/start-pearl.sh b/start-pearl.sh
+index 3a76d91..92bfe87 100755
+--- a/start-pearl.sh
++++ b/start-pearl.sh
+@@ -4,6 +4,16 @@
+ 
+ set -e
+ 
++# Checkout location of this repo on the device. The helper scripts
++# (push-github.sh / fix-push.sh) clone it as ~/pearl-indexer, so use the
++# same path here instead of a different ~/indexer directory.
++INDEXER_DIR="$HOME/pearl-indexer"
++if [ ! -d "$INDEXER_DIR" ]; then
++  echo "❌ Indexer checkout not found at $INDEXER_DIR"
++  echo "   Clone this repo there first, then re-run ./start-pearl.sh"
++  exit 1
++fi
++
+ echo "🚀 Starting Pearl services..."
+ echo ""
+ 
+@@ -30,7 +40,7 @@ echo "  ⏳ Waiting for tunnel URL..."
+ TUNNEL_URL=""
+ for i in {1..15}; do
+   sleep 2
+-  TUNNEL_URL=$(grep -oP 'https://[a-z0-9-]+\.trycloudflare\.com' ~/cloudflared.log 2>/dev/null | head -1)
++  TUNNEL_URL=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' ~/cloudflared.log 2>/dev/null | head -1)
+   if [ -n "$TUNNEL_URL" ]; then
+     echo "  ✅ Tunnel URL: $TUNNEL_URL"
+     break
+@@ -45,7 +55,7 @@ fi
+ 
+ # 3. Update .env with new tunnel URL
+ echo "[4/6] 🔄 Updating config with new URL..."
+-INDEXER_ENV="$HOME/indexer/.env"
++INDEXER_ENV="$INDEXER_DIR/.env"
+ if [ -n "$TUNNEL_URL" ] && [ -f "$INDEXER_ENV" ]; then
+   # Check if URL changed
+   OLD_URL=$(grep "^PRL20_OPERATOR_PUBLIC_URL=" "$INDEXER_ENV" | cut -d= -f2-)
+@@ -74,7 +84,7 @@ fi
+ 
+ # 4. Start Indexer (picks up fresh .env)
+ echo "[5/6] 📡 Starting Indexer API..."
+-cd ~/indexer
++cd "$INDEXER_DIR"
+ npm run indexer:serve > ~/indexer-api.log 2>&1 &
+ INDEXER_PID=$!
+ echo "  ⏳ Waiting for indexer..."
+@@ -115,7 +125,7 @@ if [ "$INDEXER_READY" = true ]; then
+     echo "     Restarting indexer to pick up config..."
+     pkill -f "node.*cli.js serve" 2>/dev/null || true
+     sleep 2
+-    cd ~/indexer
++    cd "$INDEXER_DIR"
+     npm run indexer:serve > ~/indexer-api.log 2>&1 &
+     sleep 5
+     echo "  ✅ Indexer restarted"
+-- 
+2.43.0
+
