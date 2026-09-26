@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pearlscriptions · PRL-20 Explorer — Pearl</title>
+<meta name="description" content="Community-built static dashboard for Pearl PRL-20 tokens and Pearlscriptions. Queries your own Pearlscriptions indexer API." />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner wrap">
+    <a class="brand" href="../../index.html">Pearl <span>🐚</span> <small>PRL-20 Explorer</small></a>
+    <nav class="nav">
+      <a href="../../index.html">Home</a>
+      <a href="../explorer/">Explorer</a>
+      <a href="../faucet/">Faucet</a>
+      <a href="./" class="active">PRL-20</a>
+    </nav>
+    <span id="conn" class="conn">indexer: unconfigured</span>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <h1>Pearlscriptions &amp; PRL-20</h1>
+    <p class="lede">
+      Ordinals-style inscriptions and PRL-20 tokens on the Pearl blockchain.
+      This dashboard talks to a <strong>public Pearlscriptions indexer API</strong>
+      (<code>GET</code>-only, read-only) that you point it at — no keys, no wallet,
+      nothing leaves your browser.
+    </p>
+    <div id="api-hint" class="hint">
+      <strong>Not connected.</strong> Set the indexer API base URL below (e.g.
+      the public endpoint published by a Pearlscriptions indexer operator).
+      Data is fetched live from that API; nothing is bundled or faked.
+    </div>
+  </section>
+
+  <section class="card" id="settings">
+    <h2>Indexer API</h2>
+    <form id="api-form" class="row">
+      <input id="api-url" class="input mono" type="url" inputmode="url"
+             placeholder="https://indexer.example.com"
+             aria-label="Indexer API base URL" />
+      <button class="btn" type="submit">Connect</button>
+      <button class="btn ghost" type="button" id="api-clear">Clear</button>
+    </form>
+    <p class="note">
+      Saved in this browser's localStorage only. The API must allow CORS from
+      this page's origin, or sit behind a reverse proxy that does. Reference:
+      <a href="https://github.com/Pearlscriptions/indexer" target="_blank" rel="noopener">Pearlscriptions/indexer</a>
+      (MIT) — operators run <code>apps/indexer-api</code> and publish the URL
+      via the <code>/operator</code> endpoint.
+    </p>
+  </section>
+
+  <section class="card hidden" id="status">
+    <h2>Indexer status</h2>
+    <div class="stats" id="status-stats"></div>
+  </section>
+
+  <section class="tabs" id="tabs">
+    <div class="tabbar" role="tablist">
+      <button class="tab active" data-tab="tokens" role="tab">Tokens</button>
+      <button class="tab" data-tab="inscriptions" role="tab">Inscriptions</button>
+      <button class="tab" data-tab="operations" role="tab">Operations</button>
+      <button class="tab" data-tab="address" role="tab">Address</button>
+    </div>
+
+    <div class="tabpanel" id="panel-tokens" role="tabpanel">
+      <div class="row wrap-controls">
+        <input id="token-search" class="input mono" placeholder="Search ticker (e.g. prls)" aria-label="Token ticker" />
+        <button class="btn" id="token-lookup">Look up</button>
+        <button class="btn ghost" id="tokens-refresh">Refresh list</button>
+      </div>
+      <div id="token-detail"></div>
+      <div id="tokens" class="grid"></div>
+    </div>
+
+    <div class="tabpanel hidden" id="panel-inscriptions" role="tabpanel">
+      <div class="row wrap-controls">
+        <button class="btn ghost" id="insc-refresh">Load latest</button>
+        <input id="insc-search" class="input mono" placeholder="Inscription id or number" aria-label="Inscription id or number" />
+        <button class="btn" id="insc-lookup">Look up</button>
+      </div>
+      <div id="insc-detail"></div>
+      <div id="inscriptions" class="grid"></div>
+    </div>
+
+    <div class="tabpanel hidden" id="panel-operations" role="tabpanel">
+      <div class="row wrap-controls">
+        <select id="op-filter" class="input" aria-label="Operation type filter">
+          <option value="">All operations</option>
+          <option value="deploy">deploy</option>
+          <option value="mint">mint</option>
+          <option value="transfer">transfer</option>
+        </select>
+        <button class="btn ghost" id="ops-refresh">Load latest</button>
+      </div>
+      <div id="operations" class="list"></div>
+    </div>
+
+    <div class="tabpanel hidden" id="panel-address" role="tabpanel">
+      <form id="addr-form" class="row wrap-controls">
+        <input id="addr-input" class="input mono wide" placeholder="prl1… / tprl1… address" aria-label="Pearl address" />
+        <button class="btn" type="submit">Look up</button>
+      </form>
+      <div id="addr-result"></div>
+    </div>
+  </section>
+
+  <section class="card" id="about">
+    <h2>About PRL-20</h2>
+    <p>
+      Pearlscriptions are Ordinals-style inscriptions on Pearl's Taproot-only
+      chain. <strong>PRL-20</strong> is the inscription-based token standard:
+      a <code>deploy</code> inscription defines a ticker (<code>tick</code>),
+      max supply (<code>max</code>), per-mint limit (<code>lim</code>) and
+      decimals (<code>dec</code>); <code>mint</code> and <code>transfer</code>
+      inscriptions move balances. State is derived by independent indexers and
+      exposed through the read-only HTTP API this dashboard uses.
+    </p>
+    <p class="note">
+      Docs: <a href="https://github.com/Pearlscriptions/indexer/blob/master/docs/api-contract.md" target="_blank" rel="noopener">API contract</a> ·
+      <a href="https://github.com/Pearlscriptions/indexer/blob/master/docs/prl-20-v0-spec.md" target="_blank" rel="noopener">PRL-20 v0 spec</a> ·
+      <a href="https://www.pearlscriptions.com" target="_blank" rel="noopener">pearlscriptions.com</a>
+    </p>
+  </section>
+
+  <section class="card donate" id="donate">
+    <h2>Support the builder</h2>
+    <p class="muted">This dashboard is community-built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a>. If it saved you time, tips in PRL are appreciated:</p>
+    <div class="row">
+      <code class="addr mono" id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+      <button class="btn" id="donate-copy">Copy</button>
+    </div>
+    <p class="note muted" id="donate-msg"></p>
+  </section>
+
+  <footer class="footer">
+    <p>
+      Community-built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> ·
+      Indexer: <a href="https://github.com/Pearlscriptions/indexer" target="_blank" rel="noopener">Pearlscriptions/indexer</a> ·
+      <a href="../../index.html">Pearl home</a>
+    </p>
+  </footer>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
