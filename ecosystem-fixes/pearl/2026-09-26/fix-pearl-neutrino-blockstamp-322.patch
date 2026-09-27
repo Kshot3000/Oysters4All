@@ -1,0 +1,239 @@
+From 62da9c56524550e014ca67f6e86a2dc43cb7cbcb Mon Sep 17 00:00:00 2001
+From: Kshot3000 <kshot9000@gmail.com>
+Date: Sun, 27 Sep 2026 02:05:04 +0000
+Subject: [PATCH] fix(wallet/chain): BlockStamp reads live chain-service tip
+ (fixes #322)
+
+NeutrinoClient.notificationHandler snapshotted the best block once at
+startup and only refreshed it when a BlockConnected notification was
+dequeued. If the tip advanced without one -- e.g. the initial sync only
+produced pre-birthday blocks (which never enqueue BlockConnected), or the
+filter headers were still catching up when the snapshot was taken --
+BlockStamp() served a stale height indefinitely. Coin selection in
+wallet/wallet/createtx.go counts confirmations against that stamp, so every
+UTXO was filtered out and sends failed with a misleading 'insufficient
+funds available to construct transaction' until the next block arrived,
+even though listunspent showed mature, spendable outputs and
+getsyncprogress reported synced:true.
+
+BlockStamp() now consults CS.BestBlock() (min of header/filter-header tip)
+directly on every call, keeping the shutdown semantics via s.quit. This is
+also more correct for confirmation counting: the wallet only selects from
+UTXOs it has already scanned, so the chain service tip can only make the
+minconf/coinbase-maturity math accurate, never looser. The now-dead
+snapshot machinery (currentBlock channel, bs seed/update/serve) is removed.
+
+Adds TestNeutrinoClientBlockStampTracksChainService: advances a mock chain
+service tip with no BlockConnected enqueued and asserts BlockStamp tracks
+it (fails before the fix, passes after), plus the disconnected-after-Stop
+case. Full wallet/chain suite green, race detector clean.
+---
+ wallet/chain/neutrino.go      | 46 +++++++++---------
+ wallet/chain/neutrino_test.go | 88 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 109 insertions(+), 25 deletions(-)
+
+diff --git a/wallet/chain/neutrino.go b/wallet/chain/neutrino.go
+index 734faa44..ef6c4595 100644
+--- a/wallet/chain/neutrino.go
++++ b/wallet/chain/neutrino.go
+@@ -47,7 +47,6 @@ type NeutrinoClient struct {
+ 	startTime               time.Time
+ 	lastProgressSent        bool
+ 	lastFilteredBlockHeader *wire.BlockHeader
+-	currentBlock            chan *waddrmgr.BlockStamp
+ 
+ 	quit       chan struct{}
+ 	rescanQuit chan struct{}
+@@ -114,7 +113,6 @@ func (s *NeutrinoClient) Start(ctx context.Context) error {
+ 		// Reset the client state.
+ 		s.enqueueNotification = make(chan interface{})
+ 		s.dequeueNotification = make(chan interface{})
+-		s.currentBlock = make(chan *waddrmgr.BlockStamp)
+ 		s.quit = make(chan struct{})
+ 		s.started = true
+ 
+@@ -203,15 +201,33 @@ func (s *NeutrinoClient) SyncProgress() (*SyncProgress, error) {
+ 	}, nil
+ }
+ 
+-// BlockStamp returns the latest block notified by the client, or an error
++// BlockStamp returns the chain service's current best block, or an error
+ // if the client has been shut down.
++//
++// The best block is read live from the chain service rather than from a
++// snapshot taken when the notification handler started: the handler only
++// learned about new blocks via BlockConnected notifications, so a tip that
++// advanced without one (e.g. the initial sync only produced pre-birthday
++// blocks, or the filter headers were still catching up at startup) would be
++// served stale indefinitely, breaking coin selection with a misleading
++// "insufficient funds" error until the next block arrived.
+ func (s *NeutrinoClient) BlockStamp() (*waddrmgr.BlockStamp, error) {
+ 	select {
+-	case bs := <-s.currentBlock:
+-		return bs, nil
+ 	case <-s.quit:
+ 		return nil, errors.New("disconnected")
++	default:
+ 	}
++
++	chainTip, err := s.CS.BestBlock()
++	if err != nil {
++		return nil, err
++	}
++
++	return &waddrmgr.BlockStamp{
++		Hash:      chainTip.Hash,
++		Height:    chainTip.Height,
++		Timestamp: chainTip.Timestamp,
++	}, nil
+ }
+ 
+ // GetBlockHash returns the block hash for the given height, or an error if the
+@@ -752,17 +768,6 @@ func (s *NeutrinoClient) dispatchRescanFinished() {
+ // no bounds on the queue, so the dequeue channel should be read continually to
+ // avoid running out of memory.
+ func (s *NeutrinoClient) notificationHandler() {
+-	hash, height, err := s.GetBestBlock()
+-	if err != nil {
+-		log.Errorf("Failed to get best block from chain service: %s",
+-			err)
+-		s.Stop()
+-		s.wg.Done()
+-		return
+-	}
+-
+-	bs := &waddrmgr.BlockStamp{Hash: *hash, Height: height}
+-
+ 	// TODO: Rather than leaving this as an unbounded queue for all types of
+ 	// notifications, try dropping ones where a later enqueued notification
+ 	// can fully invalidate one waiting to be processed.  For example,
+@@ -798,13 +803,6 @@ out:
+ 			notifications = append(notifications, n)
+ 
+ 		case dequeue <- next:
+-			if n, ok := next.(BlockConnected); ok {
+-				bs = &waddrmgr.BlockStamp{
+-					Height: n.Height,
+-					Hash:   n.Hash,
+-				}
+-			}
+-
+ 			notifications[0] = nil
+ 			notifications = notifications[1:]
+ 			if len(notifications) != 0 {
+@@ -823,8 +821,6 @@ out:
+ 				log.Errorf("Neutrino rescan ended with error: %s", err)
+ 			}
+ 
+-		case s.currentBlock <- bs:
+-
+ 		case <-s.quit:
+ 			break out
+ 		}
+diff --git a/wallet/chain/neutrino_test.go b/wallet/chain/neutrino_test.go
+index 6e51bf62..cb03d543 100644
+--- a/wallet/chain/neutrino_test.go
++++ b/wallet/chain/neutrino_test.go
+@@ -7,7 +7,9 @@ import (
+ 	"time"
+ 
+ 	"github.com/pearl-research-labs/pearl/node/btcutil"
++	"github.com/pearl-research-labs/pearl/node/chaincfg/chainhash"
+ 	"github.com/pearl-research-labs/pearl/node/wire"
++	"github.com/pearl-research-labs/pearl/spv/headerfs"
+ 	"github.com/stretchr/testify/assert"
+ 	"github.com/stretchr/testify/require"
+ )
+@@ -216,3 +218,89 @@ func TestNeutrinoClientNotifyReceivedRescan(t *testing.T) {
+ 		require.Equal(t, wantMsgs, gotMsgs)
+ 	}
+ }
++
++// advanceableChainService is a mock chain service whose best block the test
++// can advance without any BlockConnected notification being enqueued. It
++// simulates a chain service that finished syncing after the client's
++// notification handler snapshotted its tip (e.g. the sync only produced
++// pre-birthday blocks, which never enqueue BlockConnected, or the filter
++// headers were still catching up when the handler took its snapshot).
++type advanceableChainService struct {
++	mockChainService
++
++	mu        sync.Mutex
++	bestBlock *headerfs.BlockStamp
++}
++
++func (m *advanceableChainService) BestBlock() (*headerfs.BlockStamp, error) {
++	m.mu.Lock()
++	defer m.mu.Unlock()
++	bs := *m.bestBlock
++	return &bs, nil
++}
++
++func (m *advanceableChainService) setBestBlock(bs *headerfs.BlockStamp) {
++	m.mu.Lock()
++	defer m.mu.Unlock()
++	m.bestBlock = bs
++}
++
++// TestNeutrinoClientBlockStampTracksChainService is a regression test for
++// https://github.com/pearl-research-labs/pearl/issues/322: BlockStamp must
++// reflect the chain service's current best block even when the chain service
++// advances without the notification handler ever observing a BlockConnected
++// notification. Before the fix, the handler snapshotted the tip once at
++// startup and only refreshed it on dequeued BlockConnected notifications, so
++// BlockStamp served a stale height indefinitely and coin selection in
++// createtx.go dropped every UTXO with a misleading "insufficient funds"
++// error until the next block arrived.
++func TestNeutrinoClientBlockStampTracksChainService(t *testing.T) {
++	stampAt := func(h int32) *headerfs.BlockStamp {
++		var hash chainhash.Hash
++		hash[0] = byte(h)
++		hash[1] = byte(h >> 8)
++		return &headerfs.BlockStamp{
++			Height:    h,
++			Hash:      hash,
++			Timestamp: time.Unix(int64(600*h), 0),
++		}
++	}
++
++	svc := &advanceableChainService{bestBlock: stampAt(100)}
++	nc := newMockNeutrinoClient()
++	nc.CS = svc
++
++	require.NoError(t, nc.Start(t.Context()))
++	defer func() {
++		nc.Stop()
++		nc.WaitForShutdown()
++	}()
++
++	// The handler snapshots the chain service tip at startup.
++	bs, err := nc.BlockStamp()
++	require.NoError(t, err)
++	require.Equal(t, int32(100), bs.Height)
++	require.Equal(t, stampAt(100).Hash, bs.Hash)
++
++	// Advance the chain service tip without any BlockConnected
++	// notification being enqueued.
++	svc.setBestBlock(stampAt(105))
++
++	// BlockStamp must track the live chain service tip rather than the
++	// stale startup snapshot.
++	require.Eventually(t, func() bool {
++		bs, err := nc.BlockStamp()
++		if err != nil {
++			return false
++		}
++		return bs.Height == 105 && bs.Hash == stampAt(105).Hash
++	}, maxDur, 10*time.Millisecond,
++		"BlockStamp did not advance with the chain service tip")
++
++	// Once shut down, BlockStamp must report disconnection instead of a
++	// stamp.
++	nc.Stop()
++	nc.WaitForShutdown()
++	_, err = nc.BlockStamp()
++	require.ErrorContains(t, err, "disconnected")
++}
+-- 
+2.43.0
+
