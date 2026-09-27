@@ -296,14 +296,17 @@ export class Pool {
       proofB64: submit.proofB64,
       templateId: job.templateId,
       // NOTE: assembling a submittable block requires the winning certificate
-      // (full STARK proof), which only a proving miner can produce. The candidate
-      // is archived here for the operator; see README "Block found flow".
+      // (full STARK proof), which only a proving miner can produce — and the
+      // pool does not implement submitblock. The candidate is archived for the
+      // operator; NO balances are credited. See README "Block found flow".
       submittable: false,
     };
     this.blockCandidates.push(candidate);
     if (this.blockCandidates.length > 100) this.blockCandidates.shift();
     if (this.payouts) {
-      this.payouts.creditBlock({
+      // Pending ONLY — creditConfirmedBlock() is operator-invoked after the
+      // block is submitted, accepted, and its coinbase matures.
+      this.payouts.recordPendingBlock({
         height: job.height,
         rewardGrains: this._template?.coinbaseValueGrains ?? 0n,
         finderWallet: miner.wallet,

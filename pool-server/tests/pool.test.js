@@ -141,7 +141,7 @@ test("share pipeline: stale job accepted but flagged and excluded from PPLNS", a
   await pool.stop();
 });
 
-test("share pipeline: block candidate archived and round credited", async () => {
+test("share pipeline: block candidate archived, recorded pending, NOTHING credited", async () => {
   const { pool, payouts } = await makePool({ block: true });
   const { miner, jobs } = addMiner(pool);
   const s = submit(); s.jobId = jobs[0].jobId;
@@ -153,8 +153,13 @@ test("share pipeline: block candidate archived and round credited", async () => 
   assert.equal(c.finder, WALLET);
   assert.equal(c.submittable, false);
   assert.ok(c.headerHex.length === 152);
+  // Honest v1: candidate archived + pending recorded, but no round credited
+  // and no balances changed — the pool does not submit blocks.
   assert.equal(payouts.blocksFound, 1);
-  assert.equal(payouts.rounds.length, 1);
+  assert.equal(payouts.rounds.length, 0, "no round credited for unconfirmed candidate");
+  assert.equal(payouts.listPendingBlocks().length, 1);
+  assert.equal(payouts.listPendingBlocks()[0].status, "awaiting-submission");
+  assert.equal(payouts.balancesView().length, 0, "no balances credited for unconfirmed candidate");
   await pool.stop();
 });
 

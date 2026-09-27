@@ -80,7 +80,14 @@ export class ApiServer {
         case "/api/rounds":
           return this._json(res, { rounds: this.payouts.stats().rounds });
         case "/api/blocks":
-          return this._json(res, { candidates: this.pool.blockCandidates.map(stripProof) });
+          return this._json(res, {
+            candidates: this.pool.blockCandidates.map(stripProof),
+            // Pending = found but never submitted/credited. The pool does not
+            // assemble or submit blocks; only the operator can confirm these
+            // out-of-band and then credit them via creditConfirmedBlock().
+            pending: this.payouts.listPendingBlocks(),
+            note: "Candidates are archived, not submitted. Nothing is credited until the operator submits the block, the network accepts it, and the coinbase matures.",
+          });
         case "/api/balances":
           return this._json(res, { balances: this.payouts.balancesView() });
         case "/api/payouts/due": {

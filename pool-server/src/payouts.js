@@ -3,10 +3,14 @@
  *
  * - Each accepted non-stale, non-solo share adds weight = its difficulty to the
  *   trailing window (last N shares).
- * - When a block is found, the block reward (minus pool fee) is split across
- *   window wallets in exact grain units (1 PRL = 1e8 grains); remainders go by
- *   largest-remainder so the books always balance to the grain.
- * - Solo miners bypass PPLNS: a solo block pays its finder directly.
+ * - When a block CANDIDATE is found it is recorded as pending only — nothing
+ *   is credited, because the pool does not submit blocks. The operator
+ *   confirms out-of-band; creditConfirmedBlock() then splits the matured
+ *   reward (minus pool fee) across window wallets in exact grain units
+ *   (1 PRL = 1e8 grains); remainders go by largest-remainder so the books
+ *   always balance to the grain. Crediting before submit+accept+mature
+ *   (100 blocks on Pearl mainnet) would pay out coins that may never exist.
+ * - Solo miners bypass PPLNS: a confirmed solo block pays its finder directly.
  * - State (balances, window, rounds) persists to a JSON file so restarts don't
  *   lose the books.
  *
@@ -32,6 +36,7 @@ export class Payouts {
     this.balances = new Map(); // wallet -> { unpaid: BigInt-as-string, paid: string, blocks: n }
     this.rounds = [];        // paid rounds, newest last (bounded)
     this.blocksFound = 0;
+    this.pendingBlocks = []; // found-but-unconfirmed candidates (NO balances touched)
     this._sinceSave = 0;
     if (this.cfg.stateFile && existsSync(this.cfg.stateFile)) this._load();
   }
@@ -56,13 +61,48 @@ export class Payouts {
   }
 
   /**
-   * Credit a found block. Reward split:
+   * Record a block CANDIDATE. The share met network difficulty, but the pool
+   * does not assemble or submit full blocks (see README "Block found flow"),
+   * so nothing is credited here — no balances change, no round is created.
+   * The operator must submit the block out-of-band; only after the network
+   * accepts it AND the coinbase matures (100 blocks on Pearl mainnet) may
+   * the operator call creditConfirmedBlock(). This is the ONLY entry point
+   * the pool calls automatically on a found block.
+   */
+  recordPendingBlock({ height, rewardGrains, finderWallet, solo, at }) {
+    this.blocksFound++;
+    const entry = {
+      height, solo: !!solo,
+      rewardGrains: BigInt(rewardGrains).toString(),
+      finder: finderWallet,
+      at: at || Date.now(),
+      status: "awaiting-submission", // -> operator submits -> "accepted"/"orphaned"
+      credited: false,
+    };
+    this.pendingBlocks.push(entry);
+    if (this.pendingBlocks.length > 200) this.pendingBlocks.shift();
+    this.save();
+    return entry;
+  }
+
+  /** Blocks found but not yet confirmed/credited. Read-only copies. */
+  listPendingBlocks() {
+    return this.pendingBlocks.map((b) => ({ ...b }));
+  }
+
+  /**
+   * Credit a CONFIRMED block. OPERATOR-INVOKED ONLY — call this after the
+   * block the pool found was submitted to the network, accepted, and its
+   * coinbase matured. Crediting anything earlier pays out coins that may
+   * never exist (orphaned or never-submitted blocks).
+   *
+   * Reward split:
    *   fee = reward * poolFeePct
    *   bonus = reward * finderBonusPct -> finder
    *   rest -> PPLNS window wallets by weight (exact grains, largest remainder)
    * Solo blocks: full reward minus fee goes to the finder directly.
    */
-  creditBlock({ height, rewardGrains, finderWallet, solo, at }) {
+  creditConfirmedBlock({ height, rewardGrains, finderWallet, solo, at }) {
     const reward = BigInt(rewardGrains);
     const feePct = this.cfg.poolFeePct;
     const bonusPct = this.cfg.finderBonusPct;
@@ -161,6 +201,7 @@ export class Payouts {
       poolFeePct: this.cfg.poolFeePct,
       finderBonusPct: this.cfg.finderBonusPct,
       blocksFound: this.blocksFound,
+      pendingBlocks: this.pendingBlocks.length,
       miners: this.balances.size,
       rounds: this.rounds.slice(-20).reverse(),
     };
@@ -175,6 +216,7 @@ export class Payouts {
       balances: [...this.balances.entries()],
       rounds: this.rounds.slice(-200),
       blocksFound: this.blocksFound,
+      pendingBlocks: this.pendingBlocks.slice(-200),
     };
     // Atomic-ish: write temp then rename.
     writeFileSync(this.cfg.stateFile + ".tmp", JSON.stringify(data));
@@ -189,6 +231,7 @@ export class Payouts {
       this.balances = new Map(data.balances || []);
       this.rounds = data.rounds || [];
       this.blocksFound = data.blocksFound || 0;
+      this.pendingBlocks = data.pendingBlocks || [];
     } catch {
       // Corrupt state file: start fresh rather than refuse to start.
     }

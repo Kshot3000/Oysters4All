@@ -96,8 +96,15 @@ proofs are rejected by SHA-256 digest of the decoded bytes.
 When a share also meets the header's network nbits, the pool:
 
 1. archives the candidate (header, proof, finder) in memory + the API (`/api/blocks`),
-2. credits the PPLNS round / solo finder in `data/payouts.json`,
+2. records it as **pending** (`status: "awaiting-submission"`) in `data/payouts.json` —
+   **nothing is credited and no balances change**,
 3. refreshes the template so miners move to the new tip.
+
+Crediting happens only via `creditConfirmedBlock()`, which the **operator invokes
+manually** after they have submitted the block themselves, the network accepted it,
+and the coinbase matured (100 blocks on Pearl mainnet). Crediting earlier would pay
+out coins that may never exist — orphaned or never-submitted blocks must never touch
+miner balances.
 
 **What the pool does NOT do yet:** assemble and `submitblock` a full block. A submittable
 Pearl block needs the complete certificate for the winning proof, which only a proving
