@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Pearl Wallet</title>
+<meta name="description" content="Pearl Wallet — the self-custody PRL vault. Taproot-native, private, yours.">
+<meta name="theme-color" content="#0a1322">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pearl Wallet">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ================= ONBOARDING ================= -->
+  <section id="view-onboarding" class="view">
+    <div class="wrap onb">
+      <!-- step: welcome -->
+      <div class="obstep" id="ob-welcome">
+        <div class="lockgem">◈</div>
+        <h1>Your <span class="grad">Pearl vault</span>,<br>in your pocket.</h1>
+        <p class="lead">Self-custody PRL on Taproot rails. Your keys never leave this device — no accounts, no tracking, no middlemen.</p>
+        <div class="btnrow" style="flex-direction:column">
+          <button class="btn" id="btn-new">Create new wallet</button>
+          <button class="btn ghost" id="btn-import">Import existing wallet</button>
+        </div>
+        <p class="tiny center mt">By continuing you accept that <b>you</b> are the bank.<br>Lose your recovery phrase and your PRL is gone forever.</p>
+      </div>
+
+      <!-- step: choose length -->
+      <div class="obstep hidden" id="ob-length">
+        <div class="stepdot"><i class="on"></i><i></i><i></i><i></i></div>
+        <h1>Recovery phrase<br>length</h1>
+        <p class="lead">12 words is standard. 24 words adds brute-force margin for large vaults.</p>
+        <div class="btnrow" style="flex-direction:column">
+          <button class="btn" data-words="12">12 words <span class="tiny">— recommended</span></button>
+          <button class="btn ghost" data-words="24">24 words</button>
+        </div>
+        <button class="btn ghost sm mt ob-back">← Back</button>
+      </div>
+
+      <!-- step: show seed -->
+      <div class="obstep hidden" id="ob-seed">
+        <div class="stepdot"><i class="on"></i><i class="on"></i><i></i><i></i></div>
+        <h1>Write these down</h1>
+        <p class="lead">Pen and paper. Offline. Never screenshot, never share — anyone with these words owns your PRL.</p>
+        <div class="card iris"><div class="seedgrid" id="seed-grid"></div></div>
+        <div class="btnrow">
+          <button class="btn ghost sm" id="btn-copy-seed">Copy</button>
+          <button class="btn" id="btn-seed-done" style="flex:2">I've written it down</button>
+        </div>
+        <button class="btn ghost sm mt ob-back">← Back</button>
+      </div>
+
+      <!-- step: quiz -->
+      <div class="obstep hidden" id="ob-quiz">
+        <div class="stepdot"><i class="on"></i><i class="on"></i><i class="on"></i><i></i></div>
+        <h1>Prove it</h1>
+        <p class="lead" id="quiz-prompt">Tap the words in order.</p>
+        <div class="card"><div class="seedgrid" id="quiz-slots"></div></div>
+        <div class="quizbank" id="quiz-bank"></div>
+        <div class="ferr" id="quiz-err"></div>
+        <button class="btn ghost sm mt ob-back">← Back</button>
+      </div>
+
+      <!-- step: import -->
+      <div class="obstep hidden" id="ob-import">
+        <div class="stepdot"><i class="on"></i><i></i><i></i><i></i></div>
+        <h1>Bring your vault</h1>
+        <p class="lead">Paste a 12/24-word recovery phrase <b>or</b> a WIF private key.</p>
+        <div class="field">
+          <label>Recovery phrase or WIF</label>
+          <textarea class="input mono" id="import-secret" placeholder="abandon abandon …  or  Kx… / L… / c…"></textarea>
+          <div class="ferr" id="import-err"></div>
+        </div>
+        <div class="field">
+          <label>Passphrase <span class="tiny">(optional BIP-39 passphrase)</span></label>
+          <input class="input" id="import-passphrase" type="password" autocomplete="off" placeholder="Leave empty if none">
+        </div>
+        <button class="btn" id="btn-import-continue">Continue</button>
+        <button class="btn ghost sm mt ob-back">← Back</button>
+      </div>
+
+      <!-- step: password -->
+      <div class="obstep hidden" id="ob-password">
+        <div class="stepdot"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div>
+        <h1>Lock the vault</h1>
+        <p class="lead">This password encrypts your backup on this device. It can't be recovered — don't forget it.</p>
+        <div class="field">
+          <label>Password (min 8 characters)</label>
+          <input class="input" id="pw1" type="password" autocomplete="new-password">
+        </div>
+        <div class="field">
+          <label>Confirm password</label>
+          <input class="input" id="pw2" type="password" autocomplete="new-password">
+          <div class="ferr" id="pw-err"></div>
+        </div>
+        <button class="btn" id="btn-finish">Create my wallet</button>
+        <button class="btn ghost sm mt ob-back">← Back</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= LOCK ================= -->
+  <section id="view-lock" class="view">
+    <div class="lockwrap">
+      <div class="lockgem">◈</div>
+      <h1 style="margin:0 0 6px;letter-spacing:-.5px">Vault locked</h1>
+      <p class="lead" style="color:var(--ink-2);margin:0 0 20px">Your keys are encrypted. Enter your password.</p>
+      <div class="wrap">
+        <div class="field"><input class="input" id="lock-pw" type="password" placeholder="Password" autocomplete="current-password"></div>
+        <div class="ferr" id="lock-err"></div>
+        <button class="btn" id="btn-unlock">Unlock</button>
+        <button class="btn ghost sm mt" id="btn-lock-wipe" style="width:auto">Forgot password? Wipe &amp; restore…</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= APP ================= -->
+  <section id="view-app" class="view">
+    <header class="navbar"><div class="wrap">
+      <div class="brand"><span class="gem">◈</span> Pearl Wallet</div>
+      <div class="row" style="gap:8px">
+        <span class="netpill" id="net-pill">Mainnet</span>
+        <button class="iconbtn" id="btn-settings" aria-label="Settings">⚙</button>
+      </div>
+    </div></header>
+
+    <main class="wrap" style="flex:1">
+      <!-- HOME -->
+      <div class="tabpage" id="tab-home">
+        <div class="card hidden" id="a2hs-card">
+          <div class="row"><h3>📲 Install Pearl Wallet</h3><button class="btn ghost sm" id="a2hs-dismiss">✕</button></div>
+          <p class="hint">On iPhone: tap <b>Share</b> → <b>Add to Home Screen</b>. It installs as a fullscreen app with an offline shell — your vault, on your home screen.</p>
+        </div>
+        <div class="hero">
+          <p class="eyebrow">Total balance</p>
+          <h2 class="bal-big"><span id="bal-prl">—</span> <small>PRL</small></h2>
+          <p class="bal-sub"><span id="bal-fiat">—</span> <span id="bal-pend"></span></p>
+          <div class="chip-row">
+            <span class="chip"><span class="dot" id="net-dot"></span><span id="net-label">Blockbook</span></span>
+            <span class="chip" id="price-chip">PRL —</span>
+          </div>
+        </div>
+        <div class="btnrow">
+          <button class="btn ghost" id="qa-send">↑ Send</button>
+          <button class="btn ghost" id="qa-receive">↓ Receive</button>
+          <button class="iconbtn" id="btn-refresh" aria-label="Refresh" style="flex:none;width:52px">↻</button>
+        </div>
+        <div class="card iris">
+          <div class="row"><h3>PRL-20 tokens</h3><span class="tiny" id="tokens-src"></span></div>
+          <div id="token-list"><div class="empty"><div class="big">◌</div>No tokens found.<br>Tokens appear here once the indexer is reachable.</div></div>
+        </div>
+        <div class="card">
+          <h3>Vault status</h3>
+          <div class="kv"><span class="k">Addresses watched</span><span class="v" id="stat-addrs">—</span></div>
+          <div class="kv"><span class="k">Auto-lock</span><span class="v" id="stat-lock">—</span></div>
+          <div class="kv"><span class="k">Network</span><span class="v" id="stat-net">—</span></div>
+          <p class="hint">Keys live only in this device's memory and are wiped on lock. Nothing here is sent anywhere except the Pearl network when you transact.</p>
+        </div>
+      </div>
+
+      <!-- SEND -->
+      <div class="tabpage" id="tab-send">
+        <div class="hero"><p class="eyebrow">Send</p><h2 class="bal-big" style="font-size:34px">Move <small>PRL</small></h2></div>
+        <div class="card iris">
+          <div class="field">
+            <label>To address</label>
+            <input class="input mono" id="send-to" placeholder="prl1p…" autocomplete="off" spellcheck="false">
+            <div class="ferr" id="send-to-err"></div>
+          </div>
+          <div class="field">
+            <label>Amount (PRL)</label>
+            <input class="input" id="send-amt" inputmode="decimal" placeholder="0.00" autocomplete="off">
+            <div class="row" style="margin-top:8px">
+              <button class="btn ghost sm" id="send-max">Max</button>
+              <span class="fiatline" id="send-fiat">≈ —</span>
+            </div>
+            <div class="ferr" id="send-amt-err"></div>
+          </div>
+          <div class="field">
+            <label>Network fee</label>
+            <div class="feeseg" id="fee-seg">
+              <div class="feeopt" data-fee="slow"><div class="f-name">Slow</div><div class="f-val" id="fee-slow">—</div></div>
+              <div class="feeopt sel" data-fee="normal"><div class="f-name">Normal</div><div class="f-val" id="fee-normal">—</div></div>
+              <div class="feeopt" data-fee="fast"><div class="f-name">Fast</div><div class="f-val" id="fee-fast">—</div></div>
+            </div>
+            <p class="tiny" style="margin:8px 0 0">Fee: <span id="fee-est" class="mono">—</span> · <span id="fee-note">live estimate</span></p>
+          </div>
+          <button class="btn" id="btn-review">Review &amp; send →</button>
+          <p class="tiny center" style="margin:10px 0 0">You'll sign locally and see every detail before anything broadcasts.</p>
+        </div>
+      </div>
+
+      <!-- RECEIVE -->
+      <div class="tabpage" id="tab-receive">
+        <div class="hero"><p class="eyebrow">Receive</p><h2 class="bal-big" style="font-size:34px">Get <small>PRL</small></h2></div>
+        <div class="card iris center">
+          <div class="qrbox" id="recv-qr"></div>
+          <div class="addrline" id="recv-addr">—</div>
+          <div class="btnrow">
+            <button class="btn ghost sm" id="btn-copy-addr" style="flex:1">⧉ Copy</button>
+            <button class="btn sm" id="btn-new-addr" style="flex:2">↻ Fresh address</button>
+          </div>
+          <p class="hint">A fresh address is derived for every tap (BIP-86). Old addresses keep working.</p>
+        </div>
+        <div class="card">
+          <h3>Address history</h3>
+          <div id="addr-history"><div class="empty">No addresses yet.</div></div>
+        </div>
+      </div>
+
+      <!-- ACTIVITY -->
+      <div class="tabpage" id="tab-activity">
+        <div class="hero"><p class="eyebrow">Activity</p><h2 class="bal-big" style="font-size:34px">History</h2></div>
+        <div class="card">
+          <div class="row"><h3>Transactions</h3><button class="btn ghost sm" id="btn-act-refresh">↻</button></div>
+          <div id="tx-list"><div class="spin"></div></div>
+        </div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div class="tabpage" id="tab-settings">
+        <div class="hero"><p class="eyebrow">Settings</p><h2 class="bal-big" style="font-size:34px">Control</h2></div>
+
+        <div class="card iris">
+          <h3>Network</h3>
+          <div class="setrow"><span>Chain</span>
+            <div class="seg" id="seg-net"><button data-net="mainnet" class="sel">Mainnet</button><button data-net="testnet">Testnet</button></div>
+          </div>
+          <p class="hint" id="net-warn">Testnet needs a Blockbook endpoint you trust — none is bundled.</p>
+        </div>
+
+        <div class="card">
+          <h3>Endpoints</h3>
+          <div class="field"><label>Blockbook URL</label><input class="input mono" id="set-blockbook" placeholder="https://blockbook.pearlresearch.ai"></div>
+          <div class="field"><label>Testnet Blockbook URL</label><input class="input mono" id="set-testbook" placeholder="https://…"></div>
+          <div class="field"><label>Pearlscriptions indexer URL</label><input class="input mono" id="set-pearlsc" placeholder="https://…"></div>
+          <div class="field"><label>Fiat currency</label>
+            <select class="input" id="set-fiat"><option>USD</option><option>EUR</option><option>GBP</option><option>JPY</option></select>
+          </div>
+          <button class="btn" id="btn-save-settings">Save settings</button>
+        </div>
+
+        <div class="card">
+          <h3>Security</h3>
+          <div class="setrow"><span>Auto-lock<span class="sub">Lock after inactivity</span></span>
+            <div class="seg" id="seg-lock"><button data-lock="2">2m</button><button data-lock="5" class="sel">5m</button><button data-lock="15">15m</button><button data-lock="60">1h</button></div>
+          </div>
+          <div class="setrow"><span>Lock now</span><button class="btn ghost sm" id="btn-lock-now">Lock</button></div>
+          <div class="setrow"><span>Change password</span><button class="btn ghost sm" id="btn-change-pw">Change</button></div>
+        </div>
+
+        <div class="card">
+          <h3>Backup</h3>
+          <p class="hint">Export an encrypted backup (AES-256-GCM, 600k PBKDF2 rounds). Import it on any device with your password.</p>
+          <div class="btnrow">
+            <button class="btn ghost" id="btn-export">Export</button>
+            <button class="btn ghost" id="btn-import-bak">Import</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>About Pearl Wallet</h3>
+          <p class="hint">Self-custody PRL vault · Taproot-native (BIP-86) · keys never leave your device · no telemetry, no analytics.</p>
+          <div class="donate">
+            <b>⛏ Support Pearl development</b><br>
+            <span class="mono">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</span><br>
+            <span class="tiny">X: @kshot9000</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="color:var(--bad)">Danger zone</h3>
+          <p class="hint">Wipe this device. Your PRL stays on-chain — restore anytime with your recovery phrase.</p>
+          <button class="btn danger" id="btn-wipe">Wipe wallet from this device</button>
+        </div>
+        <div style="height:20px"></div>
+      </div>
+    </main>
+
+    <nav class="tabbar"><div class="tabs">
+      <button class="tab active" data-tab="home"><span class="t-ic">◈</span>Home</button>
+      <button class="tab" data-tab="send"><span class="t-ic">↑</span>Send</button>
+      <button class="tab" data-tab="receive"><span class="t-ic">↓</span>Receive</button>
+      <button class="tab" data-tab="activity"><span class="t-ic">≣</span>Activity</button>
+    </div></nav>
+  </section>
+</div>
+
+<!-- ================= SHEETS ================= -->
+<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true">
+  <div class="grab"></div>
+  <div id="sheet-body"></div>
+</div></div>
+
+<div id="toast"></div>
+
+<script src="qrcode.min.js"></script>
+<script src="pearl-wallet.bundle.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
