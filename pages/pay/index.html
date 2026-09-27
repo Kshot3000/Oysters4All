@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pearl Pay — Accept PRL Payments</title><meta name="description" content="Payment buttons, invoices, and a WooCommerce plugin for Pearl (PRL). Fresh BIP-86 Taproot address per invoice, live Blockbook verification, no custody, no server." />
+<link rel="stylesheet" href="styles.css" />
+<link rel="stylesheet" href="pay.css" />
+</head>
+<body>
+<header class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="../../index.html" aria-label="Pearl home"><span class="brand-mark">🐚</span> Pearl <span class="badge">Pay</span></a>
+    <button class="nav-toggle" aria-label="Open menu" aria-expanded="false">☰</button>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="../../index.html">Home</a>
+      <a href="../explorer/">Explorer</a>
+      <a href="../faucet/">Faucet</a>
+      <a href="../prl20/">PRL-20</a>
+      <a href="../prl20-launcher/">Launcher</a>
+      <a href="./" class="active" aria-current="page">Pay</a>
+    </nav>
+    <span id="conn" class="conn">not connected</span>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="hero-bg"></div>
+    <div class="container hero-inner hero-pay">
+      <div>
+        <div class="eyebrow">PRL payment toolkit</div>
+        <h1>Accept Pearl <span class="gradient-text-pay">payments</span></h1>
+        <p class="lede">
+          Payment buttons, shareable invoices, and a WooCommerce plugin for the Pearl
+          blockchain. Every invoice gets a <strong>fresh BIP-86 Taproot address</strong>
+          derived from your account xpub — your keys never leave your wallet, and this
+          page never sees them. Payments are verified live against Blockbook.
+        </p>
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="#invoices">Create an invoice</a>
+          <a class="btn btn-ghost" href="#sdk">Get the SDK</a>
+        </div>
+        <div class="hint" id="network-hint">
+          <strong>Mainnet is live.</strong> Real PRL will move if customers pay a mainnet
+          invoice. Practice on <strong>testnet</strong> first — switch networks in Settings.
+        </div>
+        <div class="rate-strip" id="rate-strip">
+          <span class="rate-label">PRL/USD</span>
+          <strong id="rate-value" class="gradient-text-pay">…</strong>
+          <span class="muted" id="rate-meta">fetching…</span>
+          <button class="btn btn-ghost btn-small" id="rate-refresh" type="button">Refresh</button>
+        </div>
+      </div>
+      <div class="invoice-preview" aria-label="Live invoice preview">
+        <div class="ip-head">
+          <span class="ip-label">Invoice #1042</span>
+          <span class="ip-status"></span>
+        </div>
+        <div class="ip-amount">25.00 <span class="gradient-text-pay">PRL</span></div>
+        <div class="ip-usd" id="hero-usd">≈ … USD</div>
+        <canvas class="ip-qr" id="hero-qr" width="168" height="168"></canvas>
+        <div class="ip-addr" id="hero-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</div>
+        <div class="ip-foot">
+          <span>1 confirmation required</span>
+          <span>Blockbook · live</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="container">
+  <section class="card" id="settings">
+    <div class="card-head">
+      <span class="icon-chip">⚙️</span>
+      <div>
+        <div class="eyebrow">Configure</div>
+        <h2>Merchant settings</h2>
+      </div>
+    </div>
+    <p class="muted">Stored only in this browser (<code>localStorage</code>). Nothing is uploaded anywhere.</p>
+    <div class="grid2">
+      <label>Network
+        <select id="set-network" class="input">
+          <option value="mainnet">Mainnet (prl)</option>
+          <option value="testnet">Testnet (tprl)</option>
+        </select>
+      </label>
+      <label>Blockbook URL
+        <input id="set-blockbook" class="input mono wide" type="url" inputmode="url"
+               placeholder="https://blockbook.pearlresearch.ai" />
+      </label>
+    </div>
+    <label>Account xpub <span class="muted">(BIP-86 account public key — <code>m/86'/coin'/0'</code>. Never a private key.)</span>
+      <textarea id="set-xpub" class="input mono wide" rows="2" spellcheck="false"
+                placeholder="xpub6… (mainnet) or tpub6… (testnet)"></textarea>
+    </label>
+    <div id="xpub-status" class="xpub-status muted">No xpub configured — paste one to enable fresh addresses.</div>
+    <div class="grid3">
+      <label>Next invoice index
+        <input id="set-index" class="input mono" type="number" min="0" step="1" value="0" />
+      </label>
+      <label>Required confirmations
+        <input id="set-conf" class="input mono" type="number" min="0" max="100" step="1" value="1" />
+      </label>
+      <label>Invoice expiry <span class="muted">(minutes)</span>
+        <input id="set-expiry" class="input mono" type="number" min="5" max="4320" step="1" value="60" />
+      </label>
+    </div>
+    <div class="row">
+      <button class="btn btn-ghost" id="btn-scan" type="button">🔍 Scan chain for next unused index</button>
+      <span class="muted" id="scan-status"></span>
+    </div>
+    <div class="grid2" style="margin-top:.75rem">
+      <label>Rate source
+        <select id="set-rate-src" class="input">
+          <option value="auto">Auto — CoinGecko (pearl-2)</option>
+          <option value="manual">Manual rate</option>
+        </select>
+      </label>
+      <label>Manual PRL/USD rate
+        <input id="set-rate-manual" class="input mono" type="number" min="0" step="any" placeholder="e.g. 1.50" />
+      </label>
+    </div>
+  </section>
+
+  <section class="card" id="generator">
+    <div class="card-head">
+      <span class="icon-chip">💳</span>
+      <div>
+        <div class="eyebrow">Embed</div>
+        <h2>Payment button generator</h2>
+      </div>
+    </div>
+    <p class="muted">Configure a button, preview the checkout, then paste the snippet into any website.</p>
+    <div class="grid3">
+      <label>Amount in
+        <select id="gen-cur" class="input">
+          <option value="PRL">PRL</option>
+          <option value="USD">USD</option>
+        </select>
+      </label>
+      <label>Amount
+        <input id="gen-amount" class="input mono" type="number" min="0" step="any" value="10" />
+      </label>
+      <label>Label
+        <input id="gen-label" class="input" type="text" value="Order #123" maxlength="120" />
+      </label>
+    </div>
+    <div class="row">
+      <button class="btn btn-primary" id="btn-preview" type="button">👁 Preview checkout</button>
+      <button class="btn btn-ghost" id="btn-demo" type="button">▶ Demo mode (no chain)</button>
+    </div>
+    <div id="gen-preview" class="preview-box"></div>
+    <label>Embed snippet <span class="muted">(uses a fresh address derived below — regenerate per order on your server for production)</span>
+      <textarea id="gen-snippet" class="input mono wide" rows="12" readonly spellcheck="false"></textarea>
+    </label>
+    <div class="row">
+      <button class="btn btn-ghost" id="btn-copy-snippet" type="button">📋 Copy snippet</button>
+      <span class="muted" id="snippet-meta"></span>
+    </div>
+  </section>
+
+  <section class="card" id="invoices">
+    <div class="card-head">
+      <span class="icon-chip">🧾</span>
+      <div>
+        <div class="eyebrow">Bill</div>
+        <h2>Invoice creator</h2>
+      </div>
+    </div>
+    <p class="muted">Build a shareable invoice link with QR code, countdown, and live payment tracking.</p>
+    <div class="grid3">
+      <label>Amount in
+        <select id="inv-cur" class="input">
+          <option value="PRL">PRL</option>
+          <option value="USD">USD</option>
+        </select>
+      </label>
+      <label>Amount
+        <input id="inv-amount" class="input mono" type="number" min="0" step="any" value="25" />
+      </label>
+      <label>Label
+        <input id="inv-label" class="input" type="text" value="Invoice #1" maxlength="120" />
+      </label>
+    </div>
+    <div class="row">
+      <button class="btn btn-primary" id="btn-invoice" type="button">Create invoice</button>
+      <span class="muted" id="invoice-meta"></span>
+    </div>
+    <div id="invoice-out" class="invoice-out" hidden>
+      <canvas id="invoice-qr"></canvas>
+      <div class="invoice-detail">
+        <div class="inv-addr-row"><code id="invoice-addr" class="mono"></code>
+          <button class="btn btn-ghost btn-small" id="btn-copy-addr" type="button">Copy</button></div>
+        <div><strong id="invoice-amount"></strong> <span class="muted" id="invoice-usd"></span></div>
+        <div class="muted" id="invoice-idx"></div>
+        <label>Shareable link
+          <input id="invoice-link" class="input mono wide" readonly />
+        </label>
+        <div class="row">
+          <button class="btn btn-ghost btn-small" id="btn-copy-link" type="button">📋 Copy link</button>
+          <a class="btn btn-primary btn-small" id="btn-open-invoice" href="#" target="_blank" rel="noopener">Open invoice →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="sdk">
+    <div class="card-head">
+      <span class="icon-chip">🧰</span>
+      <div>
+        <div class="eyebrow">Integrate</div>
+        <h2>SDK &amp; WooCommerce</h2>
+      </div>
+    </div>
+    <div class="grid2">
+      <div>
+        <h3><code>pearl-pay.js</code> SDK</h3>
+        <p class="muted">Dependency-free checkout buttons, modals, QR codes, and payment verification for any website.</p>
+        <div class="row">
+          <a class="btn btn-ghost btn-small" href="pearl-pay.js" download>⬇ pearl-pay.js</a>
+          <a class="btn btn-ghost btn-small" href="README.md">📖 SDK docs</a>
+        </div>
+<pre class="code-snippet">&lt;script src="pearl-pay.js"&gt;&lt;/script&gt;
+&lt;div id="pay"&gt;&lt;/div&gt;
+&lt;script&gt;
+PearlPay.createButton("#pay", {
+  address: "prl1p…",      // fresh invoice address
+  grains: "150000000",    // 1.5 PRL
+  label: "Order #123",
+  requiredConfirmations: 2,
+  onState: (s) =&gt; console.log(s),
+});
+&lt;/script&gt;</pre>
+      </div>
+      <div>
+        <h3>WooCommerce plugin</h3>
+        <p class="muted">Full <code>WC_Payment_Gateway</code>: xpub settings, per-order Taproot addresses derived in PHP, order-page QR + polling, server-side confirmation checks, address-pool management.</p>
+        <div class="row">
+          <a class="btn btn-ghost btn-small" href="woocommerce/pearl-gateway-for-woocommerce.zip" download>⬇ Plugin .zip</a>
+          <a class="btn btn-ghost btn-small" href="woocommerce/pearl-gateway-for-woocommerce/README.txt">📖 Plugin readme</a>
+        </div>
+        <p class="muted small">PHP 7.4+ with GMP. No private keys anywhere — the plugin derives public addresses from your account xpub.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="security">
+    <div class="card-head">
+      <span class="icon-chip">🔒</span>
+      <div>
+        <div class="eyebrow">Stay safe</div>
+        <h2>Security notes</h2>
+      </div>
+    </div>
+    <ul class="tight">
+      <li><strong>Fresh address per invoice.</strong> Reusing addresses links your customers' payments together. This toolkit derives <code>m/86'/coin'/0'/0/index</code> per invoice — bump the index (or scan) every time.</li>
+      <li><strong>Only <code>confirmed</code> counts.</strong> <code>detected</code> means seen on the network (0-conf) — fine for low-value goods, not for anything expensive. Set required confirmations to match the order value.</li>
+      <li><strong>An xpub is public data.</strong> Anyone with it can see all your invoice addresses (but can never spend). Keep your seed phrase offline regardless.</li>
+      <li><strong>Verify the domain.</strong> Invoice links are only trustworthy from your own site. Bookmark this page; beware lookalike domains.</li>
+      <li><strong>Testnet first.</strong> Get free tPRL from the <a href="../faucet/">faucet</a>, then run a full payment on testnet before mainnet.</li>
+    </ul>
+  </section>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <div class="footer-brand">
+      <span class="brand-mark">🐚</span>
+      <div>
+        <strong>Pearl Pay</strong><br />
+        <span class="muted small">Non-custodial PRL payments for the web</span>
+      </div>
+    </div>
+    <div class="footer-links">
+      <a href="./">Pay</a>
+      <a href="README.md">SDK docs</a>
+      <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a>
+    </div>
+  </div>
+  <div class="container footer-bottom">
+    <p class="small">Support Pearl development:
+      <code class="mono address-inline" id="donate-address">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+      <button class="btn btn-ghost btn-small" id="copy-donate" type="button">Copy</button>
+    </p>
+    <p class="small muted">Built for the Pearl 🐚 blockchain · <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a></p>
+  </div>
+</footer>
+
+<script src="pearl-pay.js"></script>
+<script src="pearl-pay-core.bundle.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

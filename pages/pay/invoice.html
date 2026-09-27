@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pay invoice — Pearl Pay</title>
+<meta name="description" content="Pay a Pearl (PRL) invoice. Scan the QR, send the exact amount, watch confirmations live." />
+<link rel="stylesheet" href="styles.css" />
+<link rel="stylesheet" href="pay.css" />
+</head>
+<body>
+<header class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="./" aria-label="Pearl Pay home"><span class="brand-mark">🐚</span> Pearl <span class="badge">Pay</span></a>
+    <button class="nav-toggle" aria-label="Open menu" aria-expanded="false">☰</button>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="../../index.html">Home</a>
+      <a href="./">Pay</a>
+    </nav>
+    <span id="conn" class="conn">not connected</span>
+  </div>
+</header>
+
+<main class="container inv-wrap">
+  <div id="demo-banner" class="demo-banner" hidden>DEMO MODE — simulated payment, no real PRL moves.</div>
+  <section class="card inv-card" id="inv-card" hidden>
+    <div class="eyebrow">Pearl invoice</div>
+    <div class="inv-label" id="inv-label">Invoice</div>
+    <div class="inv-amount"><span id="inv-amount" class="gradient-text-pay">…</span> <span class="muted small">PRL</span></div>
+    <div class="muted" id="inv-usd"></div>
+    <div><span class="pill awaiting" id="inv-pill">Awaiting payment</span></div>
+    <div class="progress"><div id="inv-progress"></div></div>
+    <canvas id="inv-qr"></canvas>
+    <div class="inv-addr">
+      <code id="inv-addr" class="mono"></code>
+      <button class="btn btn-ghost btn-small" id="btn-copy" type="button">Copy</button>
+    </div>
+    <div class="countdown" id="inv-countdown"></div>
+    <p class="muted small" id="inv-note">Send the exact amount to the address above. This page watches the Pearl blockchain and updates automatically.</p>
+    <p class="muted small">Needs <strong id="inv-conf">1</strong> confirmation(s) before counting as paid.</p>
+  </section>
+  <section class="card" id="inv-error" hidden>
+    <div class="eyebrow">Error</div>
+    <h2>Invalid invoice link</h2>
+    <p class="muted" id="inv-error-msg">This invoice code could not be decoded.</p>
+    <p><a class="btn btn-ghost" href="./">← Back to Pearl Pay</a></p>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <div class="footer-brand">
+      <span class="brand-mark">🐚</span>
+      <div>
+        <strong>Pearl Pay</strong><br />
+        <span class="muted small">Non-custodial PRL payments for the web</span>
+      </div>
+    </div>
+    <div class="footer-links">
+      <a href="./">Pay</a>
+      <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a>
+    </div>
+  </div>
+  <div class="container footer-bottom">
+    <p class="small">Support Pearl development:
+      <code class="mono address-inline">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+    </p>
+  </div>
+</footer>
+
+<script src="pearl-pay.js"></script>
+<script src="pearl-pay-core.bundle.js"></script>
+<script src="invoice.js"></script>
+</body>
+</html>
