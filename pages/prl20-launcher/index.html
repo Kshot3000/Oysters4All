@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PRL-20 Token Launcher — Pearl</title>
+<meta name="description" content="Design, validate, and inscribe PRL-20 deploy and mint operations on Pearl. Commit/reveal builder with real Taproot transactions — runs entirely in your browser." />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner wrap">
+    <a class="brand" href="../../index.html">Pearl <span>🐚</span> <small>PRL-20 Token Launcher</small></a>
+    <nav class="nav">
+      <a href="../../index.html">Home</a>
+      <a href="../explorer/">Explorer</a>
+      <a href="../faucet/">Faucet</a>
+      <a href="../prl20/">PRL-20</a>
+      <a href="./" class="active">Launcher</a>
+    </nav>
+    <span id="conn" class="conn">not connected</span>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <h1>Launch a PRL-20 token</h1>
+    <p class="lede">
+      Design a token, validate it against the exact on-chain PRL-20 rules, then
+      inscribe the deploy and mint operations with a real Taproot
+      <strong>commit&nbsp;→&nbsp;reveal</strong> flow. Everything is built and signed
+      locally in your browser — no server, no custody, no build step.
+    </p>
+    <div class="hint" id="network-hint">
+      <strong>Mainnet is live.</strong> Real PRL will move if you broadcast.
+      Practice on <strong>testnet</strong> first — switch networks in Settings below.
+    </div>
+  </section>
+
+  <section class="card" id="settings">
+    <h2>Settings</h2>
+    <div class="grid2">
+      <label>Network
+        <select id="set-network" class="input">
+          <option value="mainnet">Mainnet (prl)</option>
+          <option value="testnet">Testnet (tprl)</option>
+        </select>
+      </label>
+      <label>Blockbook URL
+        <input id="set-blockbook" class="input mono wide" type="url" inputmode="url"
+               placeholder="https://blockbook.pearlresearch.ai" aria-label="Blockbook base URL" />
+      </label>
+      <label>Pearlscriptions indexer URL <span class="muted">(token directory)</span>
+        <input id="set-indexer" class="input mono wide" type="url" inputmode="url"
+               placeholder="https://indexer.example.com" aria-label="Indexer API base URL" />
+      </label>
+      <label>Fee rate <span class="muted">(grains/vB)</span>
+        <div class="row">
+          <input id="set-feerate" class="input mono" type="number" min="1" step="1" value="10" aria-label="Fee rate grains per vByte" />
+          <button class="btn ghost" id="fee-auto" type="button">Auto</button>
+        </div>
+      </label>
+    </div>
+    <p class="note" id="settings-note">
+      Saved in this browser's localStorage only. The Blockbook default only covers
+      mainnet — there is no verified public testnet endpoint, so testnet users must
+      supply their own. Endpoints must allow CORS from this page's origin.
+    </p>
+  </section>
+
+  <section class="tabs" id="tabs">
+    <div class="tabbar" role="tablist" aria-label="Launcher sections">
+      <button class="tab active" data-tab="deploy" role="tab" aria-selected="true">Deploy</button>
+      <button class="tab" data-tab="mint" role="tab" aria-selected="false">Mint</button>
+      <button class="tab" data-tab="wallet" role="tab" aria-selected="false">Wallet</button>
+      <button class="tab" data-tab="launch" role="tab" aria-selected="false">Launch</button>
+      <button class="tab" data-tab="directory" role="tab" aria-selected="false">Directory</button>
+      <button class="tab" data-tab="learn" role="tab" aria-selected="false">Learn</button>
+    </div>
+
+    <!-- DEPLOY -->
+    <div class="tabpanel" id="panel-deploy" role="tabpanel">
+      <div class="card">
+        <h2>Design your token</h2>
+        <div class="grid2">
+          <label>Token name <span class="tag offchain">off-chain label</span>
+            <input id="d-name" class="input" type="text" maxlength="64" placeholder="Pearl Dollar" />
+            <span class="field-note">Display name only. PRL-20 has no on-chain name field — this never goes into the inscription JSON.</span>
+          </label>
+          <label>Ticker
+            <input id="d-tick" class="input mono" type="text" maxlength="16" placeholder="pearl" autocapitalize="none" spellcheck="false" />
+            <span class="field-note">1–16 chars, a–z 0–9. Lowercased automatically. First valid deploy wins the ticker on-chain.</span>
+          </label>
+          <label>Max supply <span class="muted">(whole units)</span>
+            <input id="d-max" class="input mono" type="text" inputmode="numeric" placeholder="21000000" />
+          </label>
+          <label>Decimals
+            <input id="d-dec" class="input mono" type="number" min="0" max="18" value="8" />
+          </label>
+          <label>Per-mint limit <span class="muted">(whole units)</span>
+            <input id="d-lim" class="input mono" type="text" inputmode="numeric" placeholder="1000" />
+            <span class="field-note">Each mint inscription may claim at most this much. Must be ≤ max supply.</span>
+          </label>
+          <label>Premine plan <span class="tag offchain">local plan</span>
+            <select id="d-premine-mode" class="input">
+              <option value="none">No premine</option>
+              <option value="tokens">Premine a token amount</option>
+              <option value="mints">Premine a number of mints</option>
+            </select>
+            <span class="field-note">PRL-20 has no premine field — a premine is just mint inscriptions you publish right after deploy.</span>
+          </label>
+        </div>
+        <div class="grid2 hidden" id="d-premine-row">
+          <label>Premine amount <span class="muted">(whole units)</span>
+            <input id="d-premine-amt" class="input mono" type="text" inputmode="numeric" placeholder="1000000" />
+          </label>
+          <div class="premine-out">
+            <span class="muted">Plan:</span>
+            <div id="d-premine-plan" class="mono"></div>
+          </div>
+        </div>
+        <div id="d-errors" class="verrors" aria-live="polite"></div>
+        <h3>Inscription JSON <span class="muted">— byte-exact, this is what gets inscribed</span></h3>
+        <pre id="d-json" class="jsonbox" aria-live="polite">{}</pre>
+        <div class="row">
+          <button class="btn" id="d-copy" type="button">Copy JSON</button>
+          <button class="btn ghost" id="d-download" type="button">Download JSON</button>
+          <button class="btn ghost" id="d-to-launch" type="button">Send to Launch →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MINT -->
+    <div class="tabpanel hidden" id="panel-mint" role="tabpanel">
+      <div class="card">
+        <h2>Mint tokens</h2>
+        <div class="grid2">
+          <label>Ticker
+            <input id="m-tick" class="input mono" list="m-tickers" placeholder="prls" autocapitalize="none" spellcheck="false" />
+            <datalist id="m-tickers">
+              <option value="prls">prls — Pearlscriptions (fixed 100,000/mint, 1 PRL fee)</option>
+              <option value="pearl">pearl — example</option>
+            </datalist>
+          </label>
+          <label>Amount <span class="muted">(whole units)</span>
+            <input id="m-amt" class="input mono" type="text" inputmode="numeric" placeholder="1000" />
+          </label>
+        </div>
+        <div id="m-prls-box" class="hint warn hidden">
+          <strong>PRLS mint rules.</strong> Amount is fixed at <code class="mono">100000</code> per mint and each
+          credited mint pays a <strong>1 PRL</strong> fee to the launch operator's fee recipient.
+          The recipient address is <em>not</em> universal — get it from your Pearlscriptions indexer
+          operator or release manifest and paste it below. The launcher will never guess it for you.
+          <label style="display:block;margin-top:0.6rem">Fee recipient address
+            <input id="m-fee-recipient" class="input mono wide" placeholder="prl1p…" autocapitalize="none" spellcheck="false" />
+          </label>
+        </div>
+        <div id="m-errors" class="verrors" aria-live="polite"></div>
+        <h3>Inscription JSON</h3>
+        <pre id="m-json" class="jsonbox" aria-live="polite">{}</pre>
+        <div class="row">
+          <button class="btn" id="m-copy" type="button">Copy JSON</button>
+          <button class="btn ghost" id="m-download" type="button">Download JSON</button>
+          <button class="btn ghost" id="m-to-launch" type="button">Send to Launch →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- WALLET -->
+    <div class="tabpanel hidden" id="panel-wallet" role="tabpanel">
+      <div class="card">
+        <h2>Wallet</h2>
+        <p class="note">
+          Keys are generated with <code class="mono">crypto.getRandomValues</code> and a BIP-39
+          mnemonic, derived along <code class="mono">m/86'/coin'/0'/0/0</code> (BIP-86 Taproot).
+          <strong>Nothing is stored</strong> — closing or reloading this page wipes the wallet
+          from memory. Back up the mnemonic before funding the address.
+        </p>
+        <div class="row">
+          <button class="btn" id="w-generate" type="button">Generate new wallet</button>
+          <button class="btn ghost hidden" id="w-reveal" type="button">Reveal mnemonic</button>
+          <button class="btn ghost hidden" id="w-hide" type="button">Hide</button>
+        </div>
+        <div id="w-mnemonic-box" class="hidden">
+          <h3>Recovery phrase — write it down, never share it</h3>
+          <div id="w-mnemonic" class="mnemonic blur" aria-live="polite"></div>
+          <div class="row"><button class="btn ghost" id="w-copy-mnemonic" type="button">Copy phrase</button></div>
+        </div>
+        <div id="w-address-box" class="hidden">
+          <h3>Address <span class="muted" id="w-network-label"></span></h3>
+          <div class="row">
+            <code id="w-address" class="mono addr"></code>
+            <button class="btn ghost" id="w-copy-address" type="button">Copy</button>
+          </div>
+          <div class="qrrow">
+            <img id="w-qr" alt="Address QR code" />
+            <p class="note">Fund this address to pay for the commit and reveal transactions.</p>
+          </div>
+        </div>
+        <h3>Import WIF</h3>
+        <div class="row">
+          <input id="w-wif" class="input mono wide" type="password" placeholder="K… / L… (mainnet) or c… (testnet)"
+                 autocapitalize="none" spellcheck="false" aria-label="WIF private key" />
+          <button class="btn ghost" id="w-import" type="button">Import</button>
+        </div>
+        <p class="note warn-text" id="w-import-note"></p>
+      </div>
+    </div>
+
+    <!-- LAUNCH -->
+    <div class="tabpanel hidden" id="panel-launch" role="tabpanel">
+      <div class="card">
+        <h2>1 · Operation</h2>
+        <label>PRL-20 inscription JSON
+          <textarea id="l-json" class="input mono wide" rows="3" spellcheck="false"
+                    placeholder='{"p":"prl-20","op":"deploy",…} — paste, or use “Send to Launch” from the Deploy/Mint tabs'></textarea>
+        </label>
+        <div id="l-json-errors" class="verrors" aria-live="polite"></div>
+        <div id="l-op-summary" class="hint ok hidden"></div>
+      </div>
+
+      <div class="card">
+        <h2>2 · Funding</h2>
+        <p class="note">The Launch tab uses the wallet from the <strong>Wallet</strong> tab. UTXOs are read from your Blockbook.</p>
+        <div class="row">
+          <button class="btn" id="l-fetch-utxos" type="button">Fetch UTXOs</button>
+          <span id="l-utxo-summary" class="muted"></span>
+        </div>
+        <div id="l-utxos" class="utxos"></div>
+      </div>
+
+      <div class="card">
+        <h2>3 · Build transactions</h2>
+        <div id="l-cost" class="costbox hidden"></div>
+        <div class="row">
+          <button class="btn" id="l-build" type="button">Build commit + reveal</button>
+        </div>
+        <div id="l-build-errors" class="verrors" aria-live="polite"></div>
+        <div id="l-txs" class="hidden">
+          <h3>Commit transaction <span class="muted">— funds the reveal</span></h3>
+          <div class="row"><span class="muted">txid</span><code id="l-commit-txid" class="mono addr"></code>
+            <button class="btn ghost" data-copy="l-commit-txid" type="button">Copy</button></div>
+          <label>Raw hex <textarea id="l-commit-hex" class="input mono wide" rows="3" readonly></textarea></label>
+          <div class="row">
+            <button class="btn ghost" data-copy="l-commit-hex" type="button">Copy hex</button>
+            <button class="btn ghost" id="l-commit-download" type="button">Download hex</button>
+            <button class="btn" id="l-broadcast-commit" type="button">Broadcast commit</button>
+          </div>
+          <div id="l-commit-status" class="hint hidden"></div>
+          <h3>Reveal transaction <span class="muted">— publishes the inscription</span></h3>
+          <div class="row"><span class="muted">txid</span><code id="l-reveal-txid" class="mono addr"></code>
+            <button class="btn ghost" data-copy="l-reveal-txid" type="button">Copy</button></div>
+          <label>Raw hex <textarea id="l-reveal-hex" class="input mono wide" rows="4" readonly></textarea></label>
+          <div class="row">
+            <button class="btn ghost" data-copy="l-reveal-hex" type="button">Copy hex</button>
+            <button class="btn ghost" id="l-reveal-download" type="button">Download hex</button>
+            <button class="btn" id="l-broadcast-reveal" type="button" disabled>Broadcast reveal</button>
+          </div>
+          <label class="check"><input type="checkbox" id="l-zero-conf" /> Allow 0-conf reveal
+            <span class="muted">— broadcast before the commit confirms. Faster, but the reveal is invalid if the commit drops from the mempool.</span></label>
+          <div id="l-reveal-status" class="hint hidden"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DIRECTORY -->
+    <div class="tabpanel hidden" id="panel-directory" role="tabpanel">
+      <div class="card">
+        <h2>Token directory</h2>
+        <p class="note">Live data from your Pearlscriptions indexer (<code class="mono">GET /tokens</code>, read-only). Set the indexer URL in Settings.</p>
+        <div class="row">
+          <button class="btn" id="dir-refresh" type="button">Refresh</button>
+          <input id="dir-search" class="input mono" placeholder="Filter ticker…" aria-label="Filter tokens" />
+          <span id="dir-status" class="muted"></span>
+        </div>
+        <div id="dir-tokens" class="grid"></div>
+        <div id="dir-detail" class="hidden"></div>
+      </div>
+    </div>
+
+    <!-- LEARN -->
+    <div class="tabpanel hidden" id="panel-learn" role="tabpanel">
+      <div class="card">
+        <h2>Why two transactions?</h2>
+        <p>
+          A PRL-20 operation lives inside a Taproot <strong>inscription envelope</strong> — a script that
+          reveals the JSON on-chain. If that script's hash were visible beforehand, anyone could
+          front-run your deploy or mint. The <strong>commit → reveal</strong> pattern fixes this:
+        </p>
+        <ol class="steps">
+          <li><strong>Commit.</strong> You send PRL to a Taproot address derived from your key <em>tweaked</em>
+            with the inscription script. The tweak commits to the script without revealing it —
+            observers see an ordinary Taproot payment.</li>
+          <li><strong>Reveal.</strong> You spend that output with a script-path witness containing the
+            envelope and a control block proving it was committed to. The JSON becomes public
+            <em>only now</em>, and the inscription is assigned to the first output of the reveal.</li>
+        </ol>
+        <h3>Fees</h3>
+        <p>
+          You pay for both transactions: the commit (a small keypath spend) and the reveal (larger —
+          it carries the whole inscription in its witness). The launcher estimates both from the
+          actual serialized sizes and shows a full cost breakdown before you sign anything.
+          PRLS mints additionally pay a <strong>1 PRL</strong> launch fee to the operator's fee recipient.
+        </p>
+        <h3>Safety notes</h3>
+        <ul class="checks">
+          <li>Keys never leave your browser and are never stored. Reload the page and the wallet is gone.</li>
+          <li>Broadcasting is a separate, explicit click per transaction — building signs locally but sends nothing.</li>
+          <li>The reveal must wait for the commit to confirm (or be in the mempool with the 0-conf override).</li>
+          <li>Always verify the JSON in the preview — what you inscribe is final.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <p>
+      Built for the Pearl community · Donations:
+      <code class="mono">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+      <button class="btn ghost tiny" id="donate-copy" type="button">Copy</button> ·
+      <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> ·
+      <a href="../../index.html">Pearl home</a>
+    </p>
+    <p class="note">PRL-20 envelope format: Pearlscriptions (ISC/MIT). Launcher code is dependency-vendored and runs fully offline except for chain reads and broadcasts you trigger.</p>
+  </footer>
+</main>
+
+<script src="qrcode.min.js"></script>
+<script src="pearl-bundle.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

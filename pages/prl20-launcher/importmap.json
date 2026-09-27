@@ -1,0 +1,29 @@
+{
+  "imports": {
+    "@noble/curves/": "./lib/noble-curves/",
+    "@noble/hashes/": "./lib/noble-hashes/",
+    "@scure/base": "./lib/scure-base/index.js",
+    "@scure/bip32": "./lib/scure-bip32/index.js",
+    "@scure/bip39": "./lib/scure-bip39/index.js",
+    "@noble/hashes/sha256": "./lib/noble-hashes/sha256.js",
+    "@noble/hashes/utils": "./lib/noble-hashes/utils.js",
+    "@noble/curves/abstract/utils": "./lib/noble-curves/abstract/utils.js",
+    "@noble/curves/secp256k1": "./lib/noble-curves/secp256k1.js",
+    "@scure/bip39/wordlists/english": "./lib/scure-bip39/wordlists/english.js",
+    "@noble/curves/abstract/modular": "./lib/noble-curves/abstract/modular.js",
+    "@noble/curves/bls12-381": "./lib/noble-curves/bls12-381.js",
+    "@noble/curves/ed25519": "./lib/noble-curves/ed25519.js",
+    "@noble/curves/ed448": "./lib/noble-curves/ed448.js",
+    "@noble/hashes/blake2": "./lib/noble-hashes/blake2.js",
+    "@noble/hashes/blake3": "./lib/noble-hashes/blake3.js",
+    "@noble/hashes/crypto": "./lib/noble-hashes/crypto.js",
+    "@noble/hashes/hkdf": "./lib/noble-hashes/hkdf.js",
+    "@noble/hashes/hmac": "./lib/noble-hashes/hmac.js",
+    "@noble/hashes/legacy": "./lib/noble-hashes/legacy.js",
+    "@noble/hashes/pbkdf2": "./lib/noble-hashes/pbkdf2.js",
+    "@noble/hashes/scrypt": "./lib/noble-hashes/scrypt.js",
+    "@noble/hashes/sha2": "./lib/noble-hashes/sha2.js",
+    "@noble/hashes/sha3": "./lib/noble-hashes/sha3.js",
+    "@noble/hashes/sha3-addons": "./lib/noble-hashes/sha3-addons.js"
+  }
+}
