@@ -17,7 +17,11 @@
 .book-side h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; }
 .book-side.asks h3 { color: var(--rose); }
 .book-side.bids h3 { color: var(--good); }
-.book-row { position: relative; display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.5rem; padding: 0.45rem 0.6rem; font-family: var(--mono); font-size: 0.85rem; border-radius: 6px; overflow: hidden; }
+.book-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, auto); gap: 0.5rem; padding: 0.45rem 0.6rem; font-family: var(--mono); font-size: 0.85rem; border-radius: 6px; overflow: hidden; }
+/* grid children must be allowed to shrink, otherwise long bidder chips
+   overflow and collide with the quantity column */
+.book-row > span:not(.depth-bar), .book-row > button { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.book-row .bidder-chip { max-width: 100%; }
 .book-row .depth-bar { position: absolute; top: 0; bottom: 0; right: 0; opacity: 0.14; pointer-events: none; }
 .book-side.asks .depth-bar { background: var(--rose); }
 .book-side.bids .depth-bar { background: var(--good); }

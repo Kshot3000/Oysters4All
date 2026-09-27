@@ -106,11 +106,13 @@
     return { tokens: [], source: "offline" };
   }
 
-  function unitPriceStr(priceGrains, amt) { // grains per whole token, human
+  function unitPriceStr(priceGrains, amt) { // per-token price, human-readable
     const g = BigInt(priceGrains), a = BigInt(amt);
-    if (a === 0n) return "—";
-    const per = (g * 100000000n) / a; // 1e8 fixed point
-    return M.fmtPRL(per) + " PRL";
+    if (a <= 0n) return "—";
+    // g/a = whole grains per token; fmtPRL renders grains/1e8, so per-token
+    // price x lot size == total exactly (up to sub-grain truncation, which
+    // 8-decimal PRL display cannot represent anyway).
+    return M.fmtPRL(g / a) + " PRL";
   }
 
   /* ---------------- key handling (memory only) ---------------- */
@@ -161,6 +163,30 @@
     // last point
     ctx.fillStyle = "#e8c47a";
     ctx.beginPath(); ctx.arc(X(px.length - 1), Y(px[px.length - 1]), 8, 0, 7); ctx.fill();
+    // x-axis: real time progression across the tape's range (hourly steps
+    // for intraday tapes, daily for multi-day, monthly beyond that)
+    const ts0 = trades.map((t) => Number(t.ts) || 0).filter(Boolean);
+    if (ts0.length > 1) {
+      const t0 = Math.min(...ts0), t1 = Math.max(...ts0), range = Math.max(1, t1 - t0);
+      const fmtTick = (ts) => {
+        const d = new Date(ts);
+        if (range < 2 * 86400000)
+          return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+        if (range < 90 * 86400000)
+          return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+      };
+      const nT = 5;
+      ctx.fillStyle = "#6b7891"; ctx.font = "22px monospace"; ctx.textAlign = "center";
+      ctx.strokeStyle = "rgba(244,63,94,0.25)"; ctx.lineWidth = 1;
+      for (let k = 0; k <= nT; k++) {
+        const x = pad + (k / nT) * (W - pad * 2);
+        const ts = t0 + (range * k) / nT;
+        ctx.beginPath(); ctx.moveTo(x, H - 44); ctx.lineTo(x, H - 36); ctx.stroke();
+        ctx.fillText(fmtTick(ts), x, H - 12);
+      }
+      ctx.textAlign = "left";
+    }
   }
 
   /* ---------------- shared widgets ---------------- */
@@ -272,7 +298,7 @@
 
     // featured listings: cheapest asks across tokens
     const featured = [];
-    for (const t of ticks) for (const a of getBook(t.ticker).asks.slice(0, 2)) featured.push(a);
+    for (const t of ticks) for (const a of getBook(t).asks.slice(0, 2)) featured.push(a);
     featured.sort(cmpAsk);
     $("#featured").innerHTML = featured.length ? `
       <div class="table-wrap"><table class="data">
@@ -329,17 +355,21 @@
         ? `${esc(M.fmtPRL(BigInt(Math.round(lastPx))))} <span class="muted small">PRL / ${esc(t.toUpperCase())}</span>` : "—";
       drawChart($("#chart"), tape);
 
-      // depth
-      const maxAmt = Math.max(1, ...asks.map((a) => Number(BigInt(a.amt) > 10n ** 18n ? 10n ** 18n : BigInt(a.amt))), ...bids.map((b) => Number(BigInt(b.amount) > 10n ** 18n ? 10n ** 18n : BigInt(b.amount))));
+      // depth: per-side maxima (a whale on one side must not flatten the
+      // other side's bars), guarded so an empty/zero side yields 0% bars.
+      const capNum = (v) => { const b = BigInt(v); return Number(b > 10n ** 18n ? 10n ** 18n : b); };
+      const askMax = Math.max(0, ...asks.map((a) => capNum(a.amt)));
+      const bidMax = Math.max(0, ...bids.map((b) => capNum(b.amount)));
       const row = (o, isAsk) => {
         const amt = isAsk ? o.amt : o.amount;
         const price = isAsk ? o.priceGrains : o.maxPrice;
-        const w = Math.min(100, (Number(BigInt(amt) > 10n ** 18n ? 10n ** 18n : BigInt(amt)) / maxAmt) * 100);
+        const max = isAsk ? askMax : bidMax;
+        const w = max > 0 ? Math.min(100, Math.max(0, (capNum(amt) / max) * 100)) : 0;
         return `<div class="book-row">
           <span class="depth-bar" style="width:${w.toFixed(1)}%"></span>
           <span>${esc(unitPriceStr(price, isAsk ? o.amt : o.amount))}</span>
           <span>${esc(M.fmtInt(amt))}</span>
-          ${isAsk ? `<button class="btn btn-ghost btn-small fill-btn" data-ask="${esc(o.boardId || o.seller + o.created)}" type="button">Fill</button>` : `<span class="tape-side">${esc(M.shortAddr(o.buyerAddress))}</span>`}
+          ${isAsk ? `<button class="btn btn-ghost btn-small fill-btn" data-ask="${esc(o.boardId || o.seller + o.created)}" type="button">Fill</button>` : `<span class="tape-side bidder-chip">${esc(M.shortAddr(o.buyerAddress))}</span>`}
         </div>`;
       };
       $("#asks").innerHTML = `<h3>Asks (${asks.length})</h3>` +
