@@ -394,4 +394,152 @@ input[type="checkbox"] { width: 1.05rem; height: 1.05rem; accent-color: var(--ac
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition: none !important; }
+  .tape-track { animation: none !important; }
+  .env-arrow { animation: none !important; }
+  .env-card { transform: none !important; }
+}
+
+/* ============================================================
+   Token Studio identity — lavender-led, same brand foundation.
+   Distinct personality for the inscriptions product: studio
+   gradient, envelope motif, ticker tape, diamond section markers.
+   ============================================================ */
+:root {
+  --studio: #c9a7ff;
+  --studio-gradient: linear-gradient(120deg, #c9a7ff, #6fd3ff 55%, #7dffd4);
+}
+
+.eyebrow { color: var(--studio); }
+.studio-gradient-text {
+  background: var(--studio-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+::selection { background: rgba(201, 167, 255, 0.35); }
+code { background: rgba(201, 167, 255, 0.1); }
+
+/* studio section markers — diamond rhythm on card headings */
+.card > h2::before {
+  content: "";
+  display: inline-block;
+  width: 9px; height: 9px;
+  margin-right: 0.65rem;
+  background: var(--studio);
+  border-radius: 2px;
+  transform: rotate(45deg) translateY(-1px);
+  box-shadow: 0 0 10px rgba(201, 167, 255, 0.6);
+}
+
+/* primary buttons + active tab lead with the studio gradient */
+.btn { background: var(--studio-gradient); }
+.btn:hover:not(:disabled) { box-shadow: 0 8px 28px rgba(201, 167, 255, 0.38); }
+.tab.active { background: var(--studio-gradient); box-shadow: 0 4px 16px rgba(201, 167, 255, 0.35); }
+.tcard .tick {
+  background: var(--studio-gradient);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+/* ---------- hero: split layout + envelope motif ---------- */
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1.12fr 0.88fr;
+  gap: 2.5rem;
+  align-items: center;
+}
+.hero::before {
+  background:
+    radial-gradient(560px 300px at 18% 20%, rgba(201, 167, 255, 0.15), transparent 60%),
+    radial-gradient(640px 340px at 82% 30%, rgba(111, 211, 255, 0.10), transparent 60%);
+}
+.hero-visual { display: flex; justify-content: center; }
+.env-card {
+  width: min(340px, 100%);
+  background: rgba(13, 20, 32, 0.88);
+  border: 1px dashed rgba(201, 167, 255, 0.5);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.25rem 1.25rem;
+  box-shadow: 0 18px 50px rgba(2, 6, 12, 0.55), 0 0 44px rgba(201, 167, 255, 0.09);
+  transform: rotate(1.5deg);
+  transition: transform 0.25s ease;
+}
+.env-card:hover { transform: rotate(0deg) translateY(-3px); }
+.env-head { display: flex; align-items: center; gap: 0.45rem; margin-bottom: 0.8rem; }
+.env-dot { width: 9px; height: 9px; border-radius: 50%; background: rgba(201, 167, 255, 0.32); }
+.env-dot:first-child { background: var(--studio); }
+.env-title {
+  margin-left: auto;
+  font-size: 0.66rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.14em;
+  color: var(--muted);
+}
+.env-json {
+  margin: 0; padding: 0.9rem 1rem;
+  font-size: 0.82rem; line-height: 1.7;
+  color: var(--studio);
+  background: #04070c;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+.env-flow { display: flex; align-items: center; justify-content: center; gap: 0.7rem; margin-top: 1rem; }
+.env-chip {
+  font-size: 0.7rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.12em;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(201, 167, 255, 0.5);
+  color: var(--studio);
+  background: rgba(201, 167, 255, 0.07);
+}
+.env-chip.reveal { background: var(--studio-gradient); color: #0b0616; border-color: transparent; }
+.env-arrow {
+  width: 44px; height: 2px; border-radius: 2px;
+  background: linear-gradient(90deg, var(--studio), var(--accent));
+  position: relative;
+  animation: env-pulse 2.2s ease-in-out infinite;
+}
+.env-arrow::after {
+  content: "";
+  position: absolute; right: -1px; top: 50%;
+  width: 8px; height: 8px;
+  border-right: 2px solid var(--accent);
+  border-top: 2px solid var(--accent);
+  transform: translateY(-50%) rotate(45deg);
+}
+@keyframes env-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+
+/* ---------- ticker tape ---------- */
+.tape {
+  overflow: hidden;
+  margin: 2.1rem -1.5rem 0;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+.tape-track {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.6rem;
+  padding: 0.4rem 0;
+  white-space: nowrap;
+  animation: tape-scroll 30s linear infinite;
+}
+.tape:hover .tape-track { animation-play-state: paused; }
+.tape-chip {
+  font-family: var(--mono);
+  font-size: 0.85rem; font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.tape-chip::before { content: "◈ "; color: var(--studio); font-size: 0.7rem; }
+.tape-sep {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: rgba(201, 167, 255, 0.4);
+  flex-shrink: 0;
+}
+@keyframes tape-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+/* ---------- studio responsive ---------- */
+@media (max-width: 900px) {
+  .hero-grid { grid-template-columns: 1fr; gap: 1.75rem; }
+  .env-card { transform: none; }
 }
