@@ -1,0 +1,161 @@
+From 3b5486591fa226e34b2eaee380b54bcd750bfd60 Mon Sep 17 00:00:00 2001
+From: Kshot3000 <kshot9000@gmail.com>
+Date: Sun, 27 Sep 2026 01:21:48 +0000
+Subject: [PATCH] fix(oystercli): stop reversing newest-first listtransactions
+ pages
+
+oystercli assumed listtransactions returns oldest-first and reversed the
+page before rendering. The wallet actually returns newest-first
+(wallet/wallet/wallet.go: RangeTransactions(txmgrNs, -1, 0, ...) --
+'Return newer results first'), so both the Transactions screen and the
+Overview 'Recent activity' list showed the oldest entry at the top and
+buried the newest (including any pending send) at the bottom.
+
+Drop the reversal in transactionsScreen and overviewScreen, fix the two
+stale comments, and extract the row-building loops into txPageOptions /
+recentActivityRows so the newest-first contract is covered by unit tests.
+
+Fixes pearl-research-labs/pearl#321.
+---
+ wallet/cmd/oystercli/overview.go     | 18 +++++++--
+ wallet/cmd/oystercli/transactions.go | 18 +++++++--
+ wallet/cmd/oystercli/txorder_test.go | 58 ++++++++++++++++++++++++++++
+ 3 files changed, 87 insertions(+), 7 deletions(-)
+ create mode 100644 wallet/cmd/oystercli/txorder_test.go
+
+diff --git a/wallet/cmd/oystercli/overview.go b/wallet/cmd/oystercli/overview.go
+index b4cedc83..55b0284a 100644
+--- a/wallet/cmd/oystercli/overview.go
++++ b/wallet/cmd/oystercli/overview.go
+@@ -58,13 +58,25 @@ func overviewScreen(c *client) error {
+ 	}
+ 
+ 	lipgloss.Println(th.title.Render("Recent activity"))
+-	// listtransactions returns oldest first; show newest at the top.
+-	for i := len(recent) - 1; i >= 0; i-- {
+-		lipgloss.Println("  " + txRow(recent[i]))
++	// listtransactions returns newest first; print the page in that order so
++	// the newest activity is at the top.
++	for _, row := range recentActivityRows(recent) {
++		lipgloss.Println("  " + row)
+ 	}
+ 	return nil
+ }
+ 
++// recentActivityRows renders one line per transaction for the Overview
++// "Recent activity" list. The page comes from listtransactions newest-first,
++// so rows keep that order: newest activity first.
++func recentActivityRows(recent []btcjson.ListTransactionsResult) []string {
++	rows := make([]string, 0, len(recent))
++	for i := range recent {
++		rows = append(rows, txRow(recent[i]))
++	}
++	return rows
++}
++
+ // txRow renders one transaction as a compact single line.
+ func txRow(tx btcjson.ListTransactionsResult) string {
+ 	amount := fmtPRLFloat(tx.Amount)
+diff --git a/wallet/cmd/oystercli/transactions.go b/wallet/cmd/oystercli/transactions.go
+index 8051de60..d2cdf226 100644
+--- a/wallet/cmd/oystercli/transactions.go
++++ b/wallet/cmd/oystercli/transactions.go
+@@ -41,10 +41,9 @@ func transactionsScreen(c *client) error {
+ 		}
+ 
+ 		opts := make([]huh.Option[string], 0, len(page)+3)
+-		// listtransactions returns oldest first within the page.
+-		for i := len(page) - 1; i >= 0; i-- {
+-			opts = append(opts, huh.NewOption(txRow(page[i]), page[i].TxID))
+-		}
++		// listtransactions returns newest first within the page; keep that
++		// order so the newest transaction is the first row.
++		opts = append(opts, txPageOptions(page)...)
+ 		if len(page) == txPageSize {
+ 			opts = append(opts, huh.NewOption(th.subtle.Render("→ Older transactions"), txNavNext))
+ 		}
+@@ -88,6 +87,17 @@ func transactionsScreen(c *client) error {
+ 	}
+ }
+ 
++// txPageOptions renders one select option per transaction on the page.
++// listtransactions returns newest first within the page, so the page is
++// shown in the order the wallet returned it: newest transaction first.
++func txPageOptions(page []btcjson.ListTransactionsResult) []huh.Option[string] {
++	opts := make([]huh.Option[string], 0, len(page))
++	for i := range page {
++		opts = append(opts, huh.NewOption(txRow(page[i]), page[i].TxID))
++	}
++	return opts
++}
++
+ // showTransactionDetail prints the full record for one transaction.
+ func showTransactionDetail(c *client, txid string) error {
+ 	tx, err := c.transaction(txid)
+diff --git a/wallet/cmd/oystercli/txorder_test.go b/wallet/cmd/oystercli/txorder_test.go
+new file mode 100644
+index 00000000..0715fa85
+--- /dev/null
++++ b/wallet/cmd/oystercli/txorder_test.go
+@@ -0,0 +1,58 @@
++// Copyright (c) 2025-2026 The Pearl Research Labs
++// Use of this source code is governed by an ISC
++// license that can be found in the LICENSE file.
++
++package main
++
++import (
++	"testing"
++
++	"github.com/pearl-research-labs/pearl/node/btcjson"
++	"github.com/stretchr/testify/assert"
++	"github.com/stretchr/testify/require"
++)
++
++// newestFirstPage builds a page exactly the way Wallet.ListTransactions
++// returns it: newest (fewest confirmations) first. See
++// wallet/wallet/wallet.go: "Return newer results first by starting at
++// mempool height and working down to the genesis block."
++func newestFirstPage() []btcjson.ListTransactionsResult {
++	return []btcjson.ListTransactionsResult{
++		{TxID: "pending-tx", Category: "send", Amount: -1.5, Confirmations: 0},
++		{TxID: "one-conf-tx", Category: "receive", Amount: 2.0, Confirmations: 1},
++		{TxID: "two-conf-tx", Category: "generate", Amount: 3229.64, Confirmations: 2},
++	}
++}
++
++// Guards pearl-research-labs/pearl#321: the Transactions screen must keep the
++// wallet's newest-first page order instead of reversing it (which buried the
++// pending send at the bottom of the list).
++func TestTxPageOptionsPreservesNewestFirst(t *testing.T) {
++	page := newestFirstPage()
++
++	opts := txPageOptions(page)
++
++	require.Len(t, opts, len(page))
++	for i := range page {
++		assert.Equal(t, page[i].TxID, opts[i].Value,
++			"option %d must select the %d-th newest transaction", i, i)
++	}
++	assert.Equal(t, "pending-tx", opts[0].Value,
++		"the pending (newest) transaction must be the first row")
++}
++
++// Guards pearl-research-labs/pearl#321: the Overview "Recent activity" list
++// must show the newest activity at the top.
++func TestRecentActivityRowsPreservesNewestFirst(t *testing.T) {
++	page := newestFirstPage()
++
++	rows := recentActivityRows(page)
++
++	require.Len(t, rows, len(page))
++	for i := range page {
++		assert.Equal(t, txRow(page[i]), rows[i],
++			"row %d must render the %d-th newest transaction", i, i)
++	}
++	assert.Equal(t, txRow(page[0]), rows[0],
++		"the first row must render the newest transaction")
++}
+-- 
+2.43.0
+
