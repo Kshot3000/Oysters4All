@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Bazaar — PRL-20 Marketplace</title>
+<meta name="description" content="Pearl Bazaar: the PRL-20 marketplace. Trade inscription transfer lots with atomic swaps on Pearl.">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="market.css">
+</head>
+<body data-page="home">
+
+<header class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="./" aria-label="Pearl Bazaar home">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 L28 12 L16 29 L4 12 Z" fill="none" stroke="#f43f5e" stroke-width="2.5"/><path d="M16 3 L22 12 L16 29 L10 12 Z" fill="#e8c47a" opacity="0.85"/></svg>
+      Pearl Bazaar <span class="tag">PRL-20</span>
+    </a>
+    <button class="nav-toggle" aria-label="Open menu" aria-expanded="false">☰</button>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="./">Market</a>
+      <a href="#tokens">Tokens</a>
+      <a href="portfolio.html">Portfolio</a>
+      <a href="list.html">List a lot</a>
+      <a href="../../index.html">Pearl home</a>
+    </nav>
+    <span id="conn" class="conn">not connected</span>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="container narrow">
+      <p class="eyebrow">The PRL-20 marketplace</p>
+      <h1>Trade transfer lots.<br><span style="color:var(--gold)">Atomic swaps, no middlemen.</span></h1>
+      <p class="lede">Pearl Bazaar is the trading venue for PRL-20 tokens. Sellers presign lots with
+        <span class="mono">SIGHASH_SINGLE&nbsp;|&nbsp;ANYONECANPAY</span>; buyers fill them in one atomic
+        transaction. The lot UTXO moves, the price output is locked — nothing in between.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="#tokens">Browse tokens</a>
+        <a class="btn btn-ghost" href="list.html">List a lot</a>
+      </div>
+      <div id="demo-slot"></div>
+      <div id="local-slot"></div>
+    </div>
+  </section>
+
+  <section class="section" id="tokens">
+    <div class="container">
+      <div class="section-head">
+        <h2>Token directory</h2>
+        <p class="muted">Live from your indexer — or simulated in demo mode.</p>
+      </div>
+      <div id="tokens-error"></div>
+      <div class="grid cards" id="token-dir"><p class="muted">Loading…</p></div>
+    </div>
+  </section>
+
+  <section class="section alt">
+    <div class="container">
+      <div class="section-head">
+        <h2>Top movers</h2>
+        <p class="muted">24h change across the local trade tape.</p>
+      </div>
+      <div id="movers"><p class="muted">Loading…</p></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="section-head">
+        <h2>Featured listings</h2>
+        <p class="muted">Cheapest open asks across all tokens.</p>
+      </div>
+      <div id="featured"><p class="muted">Loading…</p></div>
+    </div>
+  </section>
+
+  <section class="section alt">
+    <div class="container narrow">
+      <h2>How it works</h2>
+      <div class="grid cards" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+        <div class="card"><h3>1. List with a presignature</h3>
+          <p class="muted">Pick a transfer lot you own. Your key signs a 0x83 presignature that commits to the lot outpoint and your exact price — it cannot be altered or replayed onto another lot.</p></div>
+        <div class="card"><h3>2. Buyer verifies &amp; fills</h3>
+          <p class="muted">Any buyer can verify your presignature locally, attach their own funding inputs, and broadcast one transaction that moves the lot to them and the PRL to you.</p></div>
+        <div class="card"><h3>3. Settlement on-chain</h3>
+          <p class="muted">The lot UTXO changes hands on Pearl. The indexer sees the move and credits the token balance to the buyer. No escrow, no custody.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <div id="settings-slot"></div>
+</main>
+
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <h3>Pearl Bazaar</h3>
+        <p class="muted small">The PRL-20 marketplace — atomic-swap trading of inscription transfer lots on Pearl. Listings on the local board are visible only in this browser; no listing relay is configured. Demo mode is fully simulated.</p>
+        <p class="small"><a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> · <a href="https://github.com/Kshot3000/Pearl-Muse-24-7-Ai-builder" target="_blank" rel="noopener">Builder repo ↗</a></p>
+      </div>
+      <div>
+        <h3>Support the builder</h3>
+        <div class="address-row">
+          <code class="address" id="donate-address">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+          <button class="btn btn-ghost btn-small" data-copy="donate-address" type="button">Copy</button>
+        </div>
+        <p class="muted small" style="margin-top:0.5rem">Taproot address — tips keep the 24/7 builder running.</p>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p class="small muted">Pearl Bazaar — built for the Pearl blockchain. No real trades were executed in testing; live trading needs your funds and a reachable indexer.</p>
+      <p class="small"><a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a></p>
+    </div>
+  </div>
+</footer>
+
+<script src="market.bundle.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

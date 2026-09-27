@@ -1,0 +1,66 @@
+/* Pearl Bazaar — market-specific components. */
+
+/* token directory cards */
+.token-card { cursor: pointer; transition: transform 0.1s ease, border-color 0.15s ease; text-decoration: none; color: inherit; display: block; }
+.token-card:hover { transform: translateY(-2px); border-color: var(--rose); }
+.token-card .tick { font-size: 1.35rem; font-weight: 800; letter-spacing: 0.02em; }
+.token-card .tick small { color: var(--faint); font-weight: 500; font-size: 0.8rem; }
+
+/* price chart */
+.chart-wrap { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 1rem; margin-bottom: 1.5rem; }
+.chart-wrap canvas { width: 100%; height: 260px; display: block; }
+.chart-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.5rem; }
+.chart-price { font-family: var(--mono); font-size: 1.5rem; font-weight: 700; }
+
+/* order book */
+.book-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+.book-side h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; }
+.book-side.asks h3 { color: var(--rose); }
+.book-side.bids h3 { color: var(--good); }
+.book-row { position: relative; display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.5rem; padding: 0.45rem 0.6rem; font-family: var(--mono); font-size: 0.85rem; border-radius: 6px; overflow: hidden; }
+.book-row .depth-bar { position: absolute; top: 0; bottom: 0; right: 0; opacity: 0.14; pointer-events: none; }
+.book-side.asks .depth-bar { background: var(--rose); }
+.book-side.bids .depth-bar { background: var(--good); }
+.book-row:hover { background: rgba(244, 63, 94, 0.06); }
+.book-row .fill-btn { position: relative; z-index: 1; }
+
+/* trade tape */
+.tape-side { font-size: 0.78rem; color: var(--faint); }
+
+/* wizard */
+.steps { display: flex; gap: 0.5rem; margin-bottom: 2rem; flex-wrap: wrap; }
+.step-dot { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: 999px; border: 1px solid var(--card-border); color: var(--faint); font-size: 0.85rem; font-weight: 600; }
+.step-dot .n { width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--bg-alt); border: 1px solid var(--card-border); display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; }
+.step-dot.active { border-color: var(--rose); color: var(--text); }
+.step-dot.active .n { background: var(--rose); border-color: var(--rose); color: #16060a; font-weight: 800; }
+.step-dot.done { border-color: var(--gold-deep); color: var(--gold); }
+.step-dot.done .n { background: var(--gold-soft); border-color: var(--gold-deep); color: var(--gold); }
+.wizard-panel { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 1.75rem; }
+.wizard-nav { display: flex; justify-content: space-between; margin-top: 1.75rem; gap: 1rem; }
+.lot-option { display: flex; gap: 0.9rem; align-items: flex-start; border: 1px solid var(--card-border); border-radius: 10px; padding: 0.9rem 1rem; margin-bottom: 0.6rem; cursor: pointer; }
+.lot-option:hover { border-color: var(--rose); }
+.lot-option.selected { border-color: var(--rose); background: var(--rose-soft); }
+.lot-option input { margin-top: 0.3rem; }
+
+/* review summary */
+.review-box { background: var(--bg-alt); border: 1px solid var(--card-border); border-radius: 10px; padding: 1.25rem; margin: 1rem 0; }
+.review-box .total { font-size: 1.3rem; font-weight: 800; font-family: var(--mono); color: var(--gold); }
+
+/* modal */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(3, 5, 9, 0.78); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.modal { background: var(--card-2); border: 1px solid var(--card-border); border-radius: var(--radius); max-width: 560px; width: 100%; max-height: 90vh; overflow-y: auto; padding: 1.75rem; }
+.modal h3 { margin-bottom: 1rem; }
+
+/* settings */
+.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.7rem 0; border-bottom: 1px solid rgba(244, 63, 94, 0.08); }
+.switch { position: relative; width: 46px; height: 26px; flex: none; cursor: pointer; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch .track { position: absolute; inset: 0; background: var(--bg-alt); border: 1px solid var(--card-border); border-radius: 999px; transition: 0.15s; }
+.switch .track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: var(--muted); transition: 0.15s; }
+.switch input:checked + .track { background: var(--rose-soft); border-color: var(--rose); }
+.switch input:checked + .track::after { left: 22px; background: var(--rose); }
+
+@media (max-width: 760px) {
+  .book-grid, .settings-grid { grid-template-columns: 1fr; }
+}
