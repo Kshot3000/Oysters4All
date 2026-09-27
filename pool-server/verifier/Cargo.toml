@@ -1,0 +1,22 @@
+[package]
+name = "pearl-pool-verifier"
+version = "0.1.0"
+edition = "2021"
+description = "Share verification worker for the Pearl open-source mining pool. Verifies miner-submitted plain_proof shares against pool share targets using the vendored zk-pow verifier (same code path the reference pools use). Speaks line-delimited JSON on stdin/stdout."
+
+[[bin]]
+name = "pearl-pool-verifier"
+path = "src/main.rs"
+
+[dependencies]
+zk-pow = { path = "/home/hatch/workspace/goals/pearl-blockchain-24-7-builder/hidden_files/ecosystem-checkouts/chernuha-dev_miner-cpm90hx-pearl/third_party/zk-pow", default-features = false }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+base64 = "0.21"
+hex = "0.4"
+flate2 = "1.1"
+zstd = "0.13"
+sha2 = "0.10"
+
+[profile.release]
+opt-level = 2

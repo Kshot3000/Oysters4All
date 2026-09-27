@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pearl Foundry — Open-Source PRL Mining Pool</title>
+<meta name="description" content="Pearl Foundry: the open-source mining pool for Pearl Blockchain (PRL). Real share verification, vardiff, PPLNS payouts.">
+<style>
+  :root{
+    --bg:#0d0a08; --bg2:#141009; --panel:#1a130c; --panel2:#211810;
+    --line:#3a2a1a; --ember:#ff9a3c; --ember2:#ff6b1a; --gold:#ffc25e;
+    --txt:#f5e9d8; --dim:#b8a58c; --faint:#7d6c58;
+    --ok:#7ddf8a; --bad:#ff6b6b; --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);font-family:Inter,system-ui,-apple-system,'Segoe UI',sans-serif;line-height:1.55;
+    background-image:radial-gradient(1200px 500px at 50% -10%,rgba(255,107,26,.10),transparent 60%);}
+  a{color:var(--ember)}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+  header.top{border-bottom:1px solid var(--line);background:rgba(13,10,8,.85);backdrop-filter:blur(8px);position:sticky;top:0;z-index:10}
+  .top-in{display:flex;align-items:center;gap:14px;padding:14px 0}
+  .logo{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:24px;
+    background:linear-gradient(135deg,var(--ember2),#a33d00);box-shadow:0 0 24px rgba(255,107,26,.45)}
+  .brand h1{font-size:20px;letter-spacing:.5px}
+  .brand h1 span{color:var(--ember)}
+  .brand p{font-size:12px;color:var(--dim)}
+  .status-pill{margin-left:auto;display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:13px;
+    border:1px solid var(--line);border-radius:999px;padding:7px 14px;background:var(--panel)}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--bad);box-shadow:0 0 10px var(--bad)}
+  .dot.live{background:var(--ok);box-shadow:0 0 10px var(--ok);animation:pulse 2s infinite}
+  @keyframes pulse{50%{opacity:.5}}
+  .demo-banner{display:none;margin:18px 0;padding:14px 18px;border:1px dashed var(--ember);border-radius:12px;
+    background:rgba(255,154,60,.07);font-size:14px}
+  .demo-banner.show{display:block}
+  .demo-banner b{color:var(--ember)}
+  .hero{padding:44px 0 30px;text-align:center}
+  .hero h2{font-size:clamp(28px,5vw,46px);font-weight:800;letter-spacing:-.5px;
+    background:linear-gradient(180deg,#ffe9c9,var(--ember));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p{color:var(--dim);max-width:640px;margin:12px auto 0}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:26px 0}
+  .card{background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);border-radius:14px;padding:16px}
+  .card .k{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--faint)}
+  .card .v{font-size:26px;font-weight:700;font-family:var(--mono);margin-top:6px;color:var(--gold)}
+  .card .v small{font-size:13px;color:var(--dim)}
+  .card .s{font-size:12px;color:var(--dim);margin-top:4px}
+  section.block{margin:34px 0}
+  section.block h3{font-size:18px;margin-bottom:4px;display:flex;align-items:center;gap:10px}
+  section.block h3::before{content:"";width:8px;height:22px;border-radius:4px;background:linear-gradient(180deg,var(--ember),var(--ember2))}
+  section.block .sub{color:var(--faint);font-size:13px;margin-bottom:14px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;color:var(--faint);font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:1px;
+    padding:10px;border-bottom:1px solid var(--line)}
+  td{padding:10px;border-bottom:1px solid rgba(58,42,26,.5);font-family:var(--mono)}
+  td.addr{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  tr:hover td{background:rgba(255,154,60,.04)}
+  .empty{color:var(--faint);padding:22px;text-align:center;border:1px dashed var(--line);border-radius:12px;font-size:14px}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:860px){.cols{grid-template-columns:1fr}}
+  pre.cfg{background:#0a0806;border:1px solid var(--line);border-radius:12px;padding:16px;font-family:var(--mono);
+    font-size:12.5px;overflow-x:auto;color:#ffd9a8;line-height:1.7}
+  pre.cfg .c{color:var(--faint)}
+  .btnrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  .btn{display:inline-block;padding:10px 18px;border-radius:10px;font-weight:600;font-size:14px;text-decoration:none;
+    background:linear-gradient(135deg,var(--ember2),#c2570b);color:#fff;border:1px solid #ff8c3a}
+  .btn.ghost{background:transparent;color:var(--ember);border:1px solid var(--line)}
+  .apibox{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap}
+  .apibox input{background:#0a0806;border:1px solid var(--line);border-radius:8px;color:var(--txt);
+    font-family:var(--mono);font-size:13px;padding:9px 12px;min-width:280px}
+  .apibox button{background:var(--panel2);border:1px solid var(--line);color:var(--ember);border-radius:8px;
+    padding:9px 16px;font-weight:600;cursor:pointer}
+  footer{border-top:1px solid var(--line);margin-top:50px;padding:26px 0 40px;color:var(--faint);font-size:13px}
+  footer .wrap{display:flex;gap:20px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+  code.addr{font-family:var(--mono);font-size:12px;color:var(--dim);word-break:break-all}
+  .tag{font-size:11px;border:1px solid var(--line);border-radius:6px;padding:2px 8px;color:var(--dim)}
+  .tag.solo{color:var(--ember);border-color:var(--ember)}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap top-in">
+  <div class="logo">⛏️</div>
+  <div class="brand"><h1>PEARL <span>FOUNDRY</span></h1><p>Open-source PRL mining pool · PPLNS · real share verification</p></div>
+  <div class="status-pill"><span class="dot" id="dot"></span><span id="connLabel">connecting…</span></div>
+</div></header>
+
+<div class="wrap">
+  <div class="demo-banner" id="demoBanner">⚠️ <b>DEMO MODE</b> — no pool backend reachable at the configured API URL.
+    Figures below are illustrative samples, <b>not</b> live pool data. Point the page at a real backend to go live.</div>
+
+  <div class="hero">
+    <h2>Mine Pearl. Keep it open.</h2>
+    <p>A stratum pool for Pearl Blockchain that speaks the dialects real miners use —
+      HeroMiners, LuckyPool and Kryptex handshakes — verifies every share with the official
+      zk-pow verifier, retargets difficulty per miner, and pays PPLNS to the grain.</p>
+    <div class="btnrow" style="justify-content:center">
+      <a class="btn" href="#connect">Connect a miner</a>
+      <a class="btn ghost" href="https://github.com/Kshot3000/Pearl-Muse-24-7-Ai-builder/tree/main/files/pool-server" target="_blank" rel="noopener">Source code</a>
+    </div>
+  </div>
+
+  <div class="grid" id="statGrid"></div>
+
+  <section class="block">
+    <h3>Miners online</h3><div class="sub" id="minerSub"></div>
+    <div id="minerTable"></div>
+  </section>
+
+  <div class="cols">
+    <section class="block">
+      <h3>Recent blocks &amp; rounds</h3><div class="sub">PPLNS rounds paid per block found</div>
+      <div id="roundList"></div>
+    </section>
+    <section class="block">
+      <h3>Payout balances</h3><div class="sub">Unpaid balances awaiting the payout threshold</div>
+      <div id="balanceList"></div>
+    </section>
+  </div>
+
+  <section class="block" id="connect">
+    <h3>Connect your miner</h3>
+    <div class="sub">Any stratum endpoint below — pick the closest region. TLS optional where noted.</div>
+    <pre class="cfg" id="stratumCfg"><span class="c"># Stratum (plain TCP)</span>
+stratum+tcp://<span id="hostLine">pool.example.com:3333</span>
+<span class="c"># Miner login: your prl1... address, worker after the dot</span>
+-u prl1YOURADDRESS.worker1 -p x
+<span class="c"># Solo mining: prefix the wallet with solo:</span>
+-u solo:prl1YOURADDRESS.worker1 -p x
+<span class="c"># Static difficulty (Kryptex-style): -p d=4194304</span></pre>
+    <div class="cols" style="margin-top:16px">
+      <div>
+        <h3 style="font-size:15px">spark-pearl-miner</h3>
+        <pre class="cfg"><span class="c"># pool preset (TOML)</span>
+[pools.foundry]
+url = "stratum+tcp://<span class="ph">pool.example.com</span>:3333"
+wallet = "prl1YOURADDRESS"
+worker = "rig1"</pre>
+      </div>
+      <div>
+        <h3 style="font-size:15px">miner-cpm90hx (CMP 90HX)</h3>
+        <pre class="cfg"><span class="c"># object authorize dialect, plain_proof field</span>
+./miner --pool stratum+tcp://<span class="ph">pool.example.com</span>:3333 \
+  --wallet prl1YOURADDRESS --worker cmp1</pre>
+      </div>
+    </div>
+    <div class="apibox">
+      <label for="apiUrl" style="font-size:13px;color:var(--dim)">Pool API:</label>
+      <input id="apiUrl" placeholder="https://pool.example.com/api">
+      <button id="apiSave">Use this backend</button>
+      <button id="apiReset" title="Back to same-origin">Reset</button>
+    </div>
+  </section>
+</div>
+
+<footer><div class="wrap">
+  <div>Pearl Foundry · open source (MIT) · PPLNS · 1% fee default ·
+    <a href="https://github.com/Kshot3000/Pearl-Muse-24-7-Ai-builder" target="_blank" rel="noopener">GitHub</a></div>
+  <div>⛏️ Donations: <code class="addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+    · <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a></div>
+</div></footer>
+
+<script>
+"use strict";
+/* Pearl Foundry dashboard. Talks to the pool API; falls back to labeled demo data. */
+const $ = (id) => document.getElementById(id);
+const store = {
+  get api() { return localStorage.getItem("pearlFoundryApi") || ""; },
+  set api(v) { v ? localStorage.setItem("pearlFoundryApi", v) : localStorage.removeItem("pearlFoundryApi"); },
+};
+function apiBase() {
+  const q = new URLSearchParams(location.search).get("api");
+  const base = (q || store.api || location.origin).replace(/\/$/, "");
+  return base;
+}
+async function get(path) {
+  const r = await fetch(apiBase() + path, { cache: "no-store" });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  return r.json();
+}
+const fmtInt = (n) => Number(n || 0).toLocaleString("en-US");
+const trunc = (a) => a && a.length > 18 ? a.slice(0, 10) + "…" + a.slice(-6) : (a || "—");
+const timeAgo = (ts) => {
+  if (!ts) return "—";
+  const s = Math.max(0, Math.floor(Date.now() / 1000 - ts / 1000));
+  if (s < 60) return s + "s ago";
+  if (s < 3600) return Math.floor(s / 60) + "m ago";
+  return Math.floor(s / 3600) + "h ago";
+};
+const hashrate = (h) => {
+  if (!h || h <= 0) return "—";
+  const units = ["H/s", "kH/s", "MH/s", "GH/s"];
+  let v = h, u = 0;
+  while (v >= 1000 && u < units.length - 1) { v /= 1000; u++; }
+  return v.toFixed(2) + " " + units[u];
+};
+
+let demo = false;
+const DEMO = {
+  pool: { uptimeSec: 86400, minersOnline: 3, connections: 41, height: 120042, templateSource: "demo",
+          certVersion: 3, network: "mainnet", activeDiffs: [1024, 888888], sharesValid: 1204,
+          sharesInvalid: 7, sharesStale: 11, sharesDuplicate: 2, blocksFound: 1 },
+  payouts: { windowShares: 1204, windowMax: 1000000, poolFeePct: 1, blocksFound: 1, miners: 3,
+             rounds: [{ height: 120041, reward: "230549524009", fee: "2305495240", finder: "prl1demo…", payouts: [] }] },
+  miners: [
+    { wallet: "prl1demo0000000000000000000000000000000000000000", worker: "rig1", solo: false, dialect: "hero",
+      diff: 888888, sharesValid: 812, sharesInvalid: 3, lastShareAt: Date.now() - 8000, estHashrate: 59259 },
+    { wallet: "prl1demo1111111111111111111111111111111111111111", worker: "cmp1", solo: false, dialect: "kryptex",
+      diff: 2097152, sharesValid: 301, sharesInvalid: 1, lastShareAt: Date.now() - 22000, estHashrate: 139810 },
+    { wallet: "prl1demo2222222222222222222222222222222222222222", worker: "solo1", solo: true, dialect: "hero",
+      diff: 1024, sharesValid: 91, sharesInvalid: 3, lastShareAt: Date.now() - 61000, estHashrate: 68 },
+  ],
+  balances: [
+    { wallet: "prl1demo0000000000000000000000000000000000000000", unpaidPRL: "12.45019302", paidPRL: "0", blocks: 0 },
+    { wallet: "prl1demo1111111111111111111111111111111111111111", unpaidPRL: "4.11882011", paidPRL: "0", blocks: 1 },
+  ],
+};
+
+function renderStats(pool, payouts) {
+  const cards = [
+    ["Block height", fmtInt(pool.height), pool.templateSource === "synthetic-demo" ? "demo templates" : (pool.templateSource || "—")],
+    ["Miners online", fmtInt(pool.minersOnline), fmtInt(pool.connections) + " connections total"],
+    ["Shares accepted", fmtInt(pool.sharesValid), fmtInt(pool.sharesInvalid) + " invalid · " + fmtInt(pool.sharesStale) + " stale"],
+    ["Blocks found", fmtInt(pool.blocksFound), (payouts.poolFeePct ?? 1) + "% pool fee · PPLNS"],
+    ["PPLNS window", fmtInt(payouts.windowShares), "of " + fmtInt(payouts.windowMax) + " shares"],
+    ["Uptime", Math.floor((pool.uptimeSec || 0) / 3600) + "h", "cert v" + (pool.certVersion ?? 3) + " · " + (pool.network || "")],
+  ];
+  $("statGrid").innerHTML = cards.map(([k, v, s]) =>
+    `<div class="card"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join("");
+}
+
+function renderMiners(miners) {
+  $("minerSub").textContent = miners.length + " connected";
+  if (!miners.length) { $("minerTable").innerHTML = `<div class="empty">No miners connected yet. See “Connect your miner” below.</div>`; return; }
+  const rows = miners.map((m) => `<tr><td class="addr" title="${m.wallet}">${trunc(m.wallet)}</td>
+    <td>${m.worker || "—"} ${m.solo ? '<span class="tag solo">solo</span>' : ""}</td>
+    <td>${m.dialect || "—"}</td><td>${fmtInt(m.diff)}</td><td>${fmtInt(m.sharesValid)}</td>
+    <td>${fmtInt(m.sharesInvalid)}</td><td>${hashrate(m.estHashrate)}</td><td>${timeAgo(m.lastShareAt)}</td></tr>`).join("");
+  $("minerTable").innerHTML = `<table><thead><tr><th>Wallet</th><th>Worker</th><th>Dialect</th><th>Diff</th>
+    <th>Valid</th><th>Invalid</th><th>Est. rate</th><th>Last share</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function renderRounds(rounds) {
+  if (!rounds || !rounds.length) { $("roundList").innerHTML = `<div class="empty">No blocks found yet.</div>`; return; }
+  $("roundList").innerHTML = `<table><thead><tr><th>Height</th><th>Reward</th><th>Fee</th><th>Miners paid</th></tr></thead><tbody>` +
+    rounds.map((r) => `<tr><td>${r.height}</td><td>${(Number(r.reward) / 1e8).toFixed(4)} PRL</td>
+      <td>${(Number(r.fee) / 1e8).toFixed(4)}</td><td>${(r.payouts || []).length}</td></tr>`).join("") + `</tbody></table>`;
+}
+
+function renderBalances(balances) {
+  if (!balances || !balances.length) { $("balanceList").innerHTML = `<div class="empty">No balances yet — shares earn PPLNS weight once miners connect.</div>`; return; }
+  $("balanceList").innerHTML = `<table><thead><tr><th>Wallet</th><th>Unpaid</th><th>Paid</th><th>Blocks</th></tr></thead><tbody>` +
+    balances.map((b) => `<tr><td class="addr" title="${b.wallet}">${trunc(b.wallet)}</td>
+      <td>${b.unpaidPRL} PRL</td><td>${b.paidPRL} PRL</td><td>${b.blocks}</td></tr>`).join("") + `</tbody></table>`;
+}
+
+function setConn(live, label) {
+  $("dot").className = "dot" + (live ? " live" : "");
+  $("connLabel").textContent = label;
+  $("demoBanner").classList.toggle("show", !live);
+  demo = !live;
+}
+
+async function refresh() {
+  try {
+    const [stats, miners, balances] = await Promise.all([
+      get("/api/stats"), get("/api/miners"), get("/api/balances"),
+    ]);
+    setConn(true, "LIVE · " + apiBase());
+    renderStats(stats.pool, stats.payouts);
+    renderMiners(miners.miners || []);
+    renderRounds(stats.payouts.rounds || []);
+    renderBalances(balances.balances || []);
+    try {
+      const cfg = await get("/api/config");
+      const host = new URL(apiBase()).hostname;
+      document.querySelectorAll(".ph").forEach((el) => el.textContent = host);
+      $("hostLine").textContent = host + ":" + (cfg.stratumPort || 3333);
+    } catch { /* keep placeholders */ }
+  } catch (e) {
+    setConn(false, "DEMO — backend unreachable");
+    renderStats(DEMO.pool, DEMO.payouts);
+    renderMiners(DEMO.miners);
+    renderRounds(DEMO.payouts.rounds);
+    renderBalances(DEMO.balances);
+  }
+}
+
+$("apiSave").onclick = () => { store.api = $("apiUrl").value.trim(); refresh(); };
+$("apiReset").onclick = () => { store.api = ""; $("apiUrl").value = ""; refresh(); };
+$("apiUrl").value = store.api || "";
+refresh();
+setInterval(refresh, 10000);
+</script>
+</body>
+</html>

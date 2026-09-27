@@ -1,0 +1,37 @@
+{
+  "api": {
+    "host": "127.0.0.1",
+    "port": 8888
+  },
+  "donation": "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d",
+  "minPayoutPRL": "1",
+  "networkId": "mainnet",
+  "payouts": {
+    "finderBonusPct": 0.0,
+    "poolFeePct": 1.0,
+    "windowShares": 1000000
+  },
+  "pool": {
+    "certVersion": 3,
+    "initialDiff": 2097152,
+    "jobIntervalSec": 25,
+    "maxDiff": 1099511627776,
+    "minDiff": 1024,
+    "vardiffTargetSec": 15
+  },
+  "stratum": {
+    "host": "0.0.0.0",
+    "port": 3333,
+    "tls": null
+  },
+  "template": {
+    "certVersion": 3,
+    "mode": "synthetic",
+    "networkDiff": 65536,
+    "startHeight": 120000
+  },
+  "verifier": {
+    "timeoutMs": 60000,
+    "workers": 2
+  }
+}
