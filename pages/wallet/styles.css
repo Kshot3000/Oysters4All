@@ -15,8 +15,8 @@
   --ink-2: #9dabC4;
   --ink-3: #64708a;
   --silver: #d7dee9;
-  --iris: linear-gradient(135deg, #4f7cff 0%, #8b5cf6 52%, #2dd4bf 100%);
-  --iris-soft: linear-gradient(135deg, rgba(79,124,255,.22), rgba(139,92,246,.22), rgba(45,212,191,.22));
+  --iris: linear-gradient(135deg, #4f7cff 0%, #7d9fd1 52%, #dfe9f6 100%);
+  --iris-soft: linear-gradient(135deg, rgba(79,124,255,.22), rgba(125,159,209,.22), rgba(223,233,246,.22));
   --ok: #34d399;
   --bad: #fb7185;
   --warn: #fbbf24;
@@ -35,7 +35,7 @@ body {
   margin: 0;
   background:
     radial-gradient(120% 60% at 50% -10%, rgba(79,124,255,.14), transparent 60%),
-    radial-gradient(100% 50% at 50% 110%, rgba(45,212,191,.08), transparent 60%),
+    radial-gradient(100% 50% at 50% 110%, rgba(160,190,225,.08), transparent 60%),
     linear-gradient(180deg, var(--bg1), var(--bg0) 70%);
   background-attachment: fixed;
   color: var(--ink);
