@@ -30,18 +30,45 @@ suite — no placeholders.
 
 ## Data sources (all GET, read-only, unauthenticated)
 
-| Feed | Endpoint | Used for |
-|---|---|---|
-| Blockbook | `https://blockbook.pearlresearch.ai/api/v2` | `/status`, `/address/<addr>?details=basic\|txs` |
-| CoinEx | `https://api.coinex.com/v2/spot/ticker?market=PRLUSDT` | PRL/USDT price |
+| Feed | Endpoint | Used for | In-browser? |
+|---|---|---|---|
+| CoinGecko | `https://api.coingecko.com/api/v3/coins/pearl-2` (id `pearl-2`, symbol PRL) | PRL/USD price, 24h change/high/low/volume, mcap rank | ✅ CORS-open, works directly |
+| Blockbook | `https://blockbook.pearlresearch.ai/api/v2` | `/status`, `/address/<addr>?details=basic\|txs` | ❌ no CORS headers — needs `proxy.mjs` |
+| CoinEx (alternate) | `https://api.coinex.com/v2/spot/ticker?market=PEARLUSDT` | PRL/USDT single-exchange price | ❌ no CORS headers — needs `proxy.mjs` |
 
-The CoinEx price is a **single-exchange** price, labeled as such — not a market
-index. The UI stamps every card with its source and fetch time; unreachable
-backends produce honest error states instead of invented numbers.
+> **Market-name trap:** Pearl (the L1) trades on CoinEx as **PEARLUSDT** —
+> `PRLUSDT` is a different token (this was caught and fixed after real-browser
+> QA: the first version briefly priced the wrong market). CoinGecko aggregates
+> across exchanges (SafeTrade, BigONE, CoinEx…) and is the default source.
+
+The CoinGecko price is an **aggregate**, labeled as such. The UI stamps every
+card with its source and fetch time; unreachable backends produce honest error
+states instead of invented numbers.
 
 Address validation: Pearl addresses are **bech32m (BIP-350), witness v1+ only**
 (verified against upstream `node/btcutil/address.go` `decodeSegWitAddress` —
 v0 and non-bech32m encodings are rejected; HRPs `prl`/`tprl`/`rprl`).
+
+## Live chain data in your browser (CORS)
+
+The blockbook API and CoinEx ticker don't send CORS headers, so browsers refuse
+direct reads (server-side tools like `curl` work fine — they don't enforce
+CORS). Two options:
+
+1. **Price only:** the default CoinGecko source works with zero setup.
+2. **Full live data (chain status, balances, transactions):** run the bundled
+   zero-dependency proxy, then point the blockbook base URL at it:
+
+   ```sh
+   cd pages/pulse
+   node proxy.mjs          # listens on http://127.0.0.1:8787
+   ```
+
+   In Pearl Pulse → Settings set **Blockbook API base** to
+   `http://127.0.0.1:8787/blockbook` (and optionally the CoinEx base to
+   `http://127.0.0.1:8787/coinex` for the alternate price source). Save — the
+   app fetches through the proxy with CORS headers added. Everything stays on
+   your machine; the proxy only forwards your own GET requests.
 
 ## Security
 
@@ -51,12 +78,15 @@ addresses, labels, and cached balances.
 
 ## Tests
 
-`node --test tests/verify.mjs` — 25/25 green: address validation vectors
+`node --test tests/verify.mjs` — 28/28 green: address validation vectors
 (valid mainnet P2TR, uppercase, whitespace, mixed-case, checksum mutation,
 witness-v0 rejection, Bitcoin HRP rejection, base58 rejection, tprl/rprl,
 oversize program), money formatting, `timeAgo`, live-captured blockbook
-status/address fixtures (2026-09-27), live-captured CoinEx ticker fixture
-(changePct math), per-address received/sent/net/direction, portfolio totals.
+status/address fixtures (2026-09-27), live-captured CoinEx **PEARLUSDT** ticker
+fixture (changePct math) and CoinGecko `pearl-2` fixture, per-address
+received/sent/net/direction, portfolio totals. Plus `node proxy.mjs`
+smoke-tested locally (blockbook status/address + CoinEx through the proxy,
+`access-control-allow-origin: *` present).
 
 ## Support the build
 

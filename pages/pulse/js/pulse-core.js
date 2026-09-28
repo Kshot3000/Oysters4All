@@ -313,12 +313,14 @@ export function txDirection(tx, address) {
 }
 
 // ---------------------------------------------------------------------------
-// CoinEx ticker parsing (public, unauthenticated: /v2/spot/ticker?market=PRLUSDT)
+// CoinEx ticker parsing (public, unauthenticated: /v2/spot/ticker?market=PEARLUSDT)
 // ---------------------------------------------------------------------------
 
 /**
  * Parse CoinEx v2 ticker payload → {market, last, open, high, low, volume,
  * value, changePct, source}.
+ * NOTE: Pearl (the L1) trades on CoinEx as PEARLUSDT — PRLUSDT is a different
+ * token. Verified 2026-09-27: PEARLUSDT last $1.418 vs PRLUSDT $0.119.
  */
 export function parseTickerPayload(j) {
   if (!j || j.code !== 0 || !Array.isArray(j.data) || j.data.length === 0) {
@@ -343,6 +345,47 @@ export function parseTickerPayload(j) {
     changePct: ((last - open) / open) * 100,
     source: 'CoinEx',
   };
+}
+
+/**
+ * Parse CoinGecko /api/v3/coins/{id} (CORS-open, aggregated spot price) →
+ * {market, last, changePct, high, low, volumeUsd, mcapUsd, mcapRank,
+ *  lastUpdated, source, coinId}.
+ * Pearl (the L1) is CoinGecko id "pearl-2" (symbol PRL) — NOT the unrelated
+ * tokens that share the name.
+ */
+export function parseCoinGeckoPayload(j) {
+  const md = j && j.market_data;
+  if (!md) throw new Error('missing market_data in CoinGecko payload');
+  const last = Number(md.current_price && md.current_price.usd);
+  if (!Number.isFinite(last) || last <= 0) {
+    throw new Error('CoinGecko payload missing a usable USD price');
+  }
+  const num = (o, k) => (o && Number.isFinite(Number(o[k])) ? Number(o[k]) : null);
+  return {
+    market: 'PRL/USD',
+    last,
+    changePct: num(md, 'price_change_percentage_24h'),
+    high: num(md.high_24h, 'usd'),
+    low: num(md.low_24h, 'usd'),
+    volumeUsd: num(md.total_volume, 'usd'),
+    mcapUsd: num(md.market_cap, 'usd'),
+    mcapRank: md.market_cap_rank ?? null,
+    lastUpdated: md.last_updated || null,
+    source: 'CoinGecko',
+    coinId: j.id || 'pearl-2',
+  };
+}
+
+/** Compact USD: 4882235 -> "$4.88M". */
+export function fmtCompactUsd(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return '—';
+  const abs = Math.abs(v);
+  if (abs >= 1e9) return '$' + (v / 1e9).toFixed(2) + 'B';
+  if (abs >= 1e6) return '$' + (v / 1e6).toFixed(2) + 'M';
+  if (abs >= 1e3) return '$' + (v / 1e3).toFixed(1) + 'K';
+  return '$' + v.toFixed(2);
 }
 
 // ---------------------------------------------------------------------------

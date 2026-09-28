@@ -3,26 +3,32 @@
  *
  * Data sources (all GET, read-only, unauthenticated):
  *  - blockbook.pearlresearch.ai/api/v2  — chain status, address balances, txs
- *  - api.coinex.com/v2/spot/ticker?market=PRLUSDT — PRL/USDT price
+ *  - api.coingecko.com/api/v3/coins/pearl-2 — PRL/USD price (default, CORS-open)
+ *  - api.coinex.com/v2/spot/ticker?market=PEARLUSDT — alternate price (needs proxy)
  * Addresses stored in localStorage only. Nothing here signs or broadcasts.
  */
 import {
   validatePearlAddress,
-  fmtPRL, fmtUSD, grainsUsd,
+  fmtPRL, fmtUSD, grainsUsd, fmtCompactUsd,
   shortHash, shortAddress, timeAgo,
   parseStatusPayload, parseAddressPayload,
   txReceived, txSent, txNet, txDirection,
-  parseTickerPayload,
+  parseTickerPayload, parseCoinGeckoPayload,
   portfolioTotal, fundedCount,
 } from './pulse-core.js';
 
 const LS_KEY = 'pearlPulse.v1';
 const DONATE = 'prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d';
+const PROXY_HINT = 'Browsers block cross-origin reads to this API (it sends no CORS headers). ' +
+  'For full live data, run the bundled proxy — `node proxy.mjs` in the pages/pulse folder — ' +
+  'then set the blockbook base URL in Settings to http://127.0.0.1:8787/blockbook.';
 
 const DEFAULTS = {
   watchlist: [], // [{addr, label, addedAt}]
   settings: {
     blockbook: 'https://blockbook.pearlresearch.ai',
+    priceSource: 'coingecko', // 'coingecko' | 'coinex'
+    coingecko: 'https://api.coingecko.com',
     coinex: 'https://api.coinex.com',
     refreshSec: 120,
     demo: false,
@@ -129,9 +135,9 @@ async function loadNetwork() {
     fetchedNow($('net-fetched'), 'blockbook /api/v2/status');
     clearAlert('net');
   } catch (e) {
-    errEl.textContent = 'Chain status unavailable: ' + e.message + '. Is the blockbook API reachable?';
+    errEl.textContent = 'Chain status unavailable: ' + e.message + '. ' + PROXY_HINT;
     errEl.classList.remove('hidden');
-    alert('net', 'warn', '⚠ Could not reach the blockbook API — network card is stale. Check Settings or try demo mode.');
+    alert('net', 'warn', '⚠ Could not reach the blockbook API — network card is stale. ' + PROXY_HINT);
   }
 }
 
@@ -140,27 +146,51 @@ async function loadMarket() {
   const errEl = $('market-err');
   errEl.classList.add('hidden');
   try {
-    const t = parseTickerPayload(
-      await fetchJSON(`${state.settings.coinex.replace(/\/+$/, '')}/v2/spot/ticker?market=PRLUSDT`)
-    );
-    lastPrice = t.last;
+    let view;
+    if (state.settings.priceSource === 'coinex') {
+      // Pearl (the L1) is PEARLUSDT on CoinEx — PRLUSDT is a different token.
+      const t = parseTickerPayload(
+        await fetchJSON(`${state.settings.coinex.replace(/\/+$/, '')}/v2/spot/ticker?market=PEARLUSDT`)
+      );
+      view = {
+        last: t.last, changePct: t.changePct,
+        highText: '$' + Number(t.high).toFixed(4), lowText: '$' + Number(t.low).toFixed(4),
+        volText: Number(t.volume).toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' PRL',
+        src: 'CoinEx PEARLUSDT', fetched: 'CoinEx /v2/spot/ticker?market=PEARLUSDT',
+      };
+    } else {
+      // Default: CoinGecko aggregates across exchanges and is CORS-open, so it
+      // works directly in the browser. Pearl (the L1) is id "pearl-2".
+      const p = parseCoinGeckoPayload(
+        await fetchJSON(`${state.settings.coingecko.replace(/\/+$/, '')}/api/v3/coins/pearl-2?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false`)
+      );
+      view = {
+        last: p.last, changePct: p.changePct,
+        highText: p.high !== null ? '$' + p.high.toFixed(2) : '—',
+        lowText: p.low !== null ? '$' + p.low.toFixed(2) : '—',
+        volText: fmtCompactUsd(p.volumeUsd) + ' (24h)',
+        src: 'CoinGecko · PRL/USD' + (p.mcapRank ? ` · mcap #${p.mcapRank}` : ''),
+        fetched: 'CoinGecko /api/v3/coins/pearl-2',
+      };
+    }
+    lastPrice = view.last;
     lastPriceAt = new Date();
-    $('market-last').textContent = '$' + t.last.toLocaleString('en-US', { maximumFractionDigits: 6 });
+    $('market-last').textContent = '$' + view.last.toLocaleString('en-US', { maximumFractionDigits: 6 });
     const chg = $('market-change');
-    const cls = t.changePct >= 0 ? 'up' : 'down';
-    const arrow = t.changePct >= 0 ? '▲' : '▼';
-    chg.innerHTML = `<span class="${cls}">${arrow} ${Math.abs(t.changePct).toFixed(2)}%</span> 24h` + demoTag();
-    $('market-high').textContent = '$' + Number(t.high).toFixed(4);
-    $('market-low').textContent = '$' + Number(t.low).toFixed(4);
-    $('market-vol').textContent = Number(t.volume).toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' PRL';
-    $('market-src').textContent = 'CoinEx PRLUSDT';
-    fetchedNow($('market-fetched'), 'CoinEx /v2/spot/ticker');
+    const cls = view.changePct >= 0 ? 'up' : 'down';
+    const arrow = view.changePct >= 0 ? '▲' : '▼';
+    chg.innerHTML = `<span class="${cls}">${arrow} ${Math.abs(view.changePct).toFixed(2)}%</span> 24h` + demoTag();
+    $('market-high').textContent = view.highText;
+    $('market-low').textContent = view.lowText;
+    $('market-vol').textContent = view.volText;
+    $('market-src').textContent = view.src;
+    fetchedNow($('market-fetched'), view.fetched);
     clearAlert('mkt');
   } catch (e) {
     errEl.textContent = 'Price unavailable: ' + e.message + '. Portfolio USD values are paused.';
     errEl.classList.remove('hidden');
     lastPrice = null;
-    alert('mkt', 'warn', '⚠ Could not reach the CoinEx ticker — price card is stale.');
+    alert('mkt', 'warn', '⚠ Could not reach the price feed — price card is stale. Try the other price source in Settings.');
   }
 }
 
@@ -181,7 +211,7 @@ async function loadWatchlist() {
     } catch (e) {
       if (!rec) {
         alert('addr-' + w.addr.slice(0, 12), 'warn',
-          `⚠ Could not load ${shortAddress(w.addr)}: ${e.message}. Showing last cached values, if any.`);
+          `⚠ Could not load ${shortAddress(w.addr)}: ${e.message}. ${PROXY_HINT}`);
       }
     }
     recs.push({ w, rec });
@@ -284,7 +314,16 @@ async function loadTxs(addr) {
 
 // ---------------------------------------------------------------- demo fixtures
 const DEMO_STATUS = { blockbook: { coin: 'Pearl', network: 'PRL', version: 'devel', gitCommit: '81f52f2', syncMode: true, initialSync: false, inSync: true, bestHeight: 120142, lastBlockTime: '2026-09-28T02:50:31.614380827Z', inSyncMempool: true, lastMempoolTime: '2026-09-28T02:56:27.324757227Z', mempoolSize: 25, decimals: 8 } };
-const DEMO_TICKER = { code: 0, data: [{ close: '0.119', high: '0.125607', last: '0.119', low: '0.118999', market: 'PRLUSDT', open: '0.122', period: 86400, value: '2468.66539790194772', volume: '20561.93671831' }], message: 'OK' };
+const DEMO_COINGECKO = {
+  id: 'pearl-2', symbol: 'prl', name: 'Pearl',
+  market_data: {
+    current_price: { usd: 1.41 },
+    price_change_percentage_24h: -1.4059,
+    high_24h: { usd: 1.74 }, low_24h: { usd: 1.41 },
+    total_volume: { usd: 4882235 }, market_cap: { usd: 461809989 },
+    market_cap_rank: 120, last_updated: '2026-09-28T03:06:40.000Z',
+  },
+};
 const DEMO_ADDR = { page: 1, totalPages: 3, address: DONATE, balance: '265588747897', totalReceived: '265588747897', totalSent: '0', unconfirmedBalance: '0', unconfirmedTxs: 0, txs: 64, transactions: [] };
 
 // ---------------------------------------------------------------- refresh orchestration
@@ -299,14 +338,14 @@ async function refreshAll() {
     $('network-src').textContent = 'blockbook';
     fetchedNow($('net-fetched'), 'demo fixture');
 
-    const t = parseTickerPayload(DEMO_TICKER);
-    lastPrice = t.last;
-    $('market-last').textContent = '$' + t.last;
-    $('market-change').innerHTML = `<span class="down">▼ ${Math.abs(t.changePct).toFixed(2)}%</span> 24h` + demoTag();
-    $('market-high').textContent = '$' + t.high.toFixed(4);
-    $('market-low').textContent = '$' + t.low.toFixed(4);
-    $('market-vol').textContent = Number(t.volume).toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' PRL';
-    $('market-src').textContent = 'CoinEx PRLUSDT';
+    const p = parseCoinGeckoPayload(DEMO_COINGECKO);
+    lastPrice = p.last;
+    $('market-last').textContent = '$' + p.last;
+    $('market-change').innerHTML = `<span class="down">▼ ${Math.abs(p.changePct).toFixed(2)}%</span> 24h` + demoTag();
+    $('market-high').textContent = '$' + p.high.toFixed(2);
+    $('market-low').textContent = '$' + p.low.toFixed(2);
+    $('market-vol').textContent = fmtCompactUsd(p.volumeUsd) + ' (24h)';
+    $('market-src').textContent = 'CoinGecko · PRL/USD';
     fetchedNow($('market-fetched'), 'demo fixture');
 
     if (!state.watchlist.some((w) => w.addr === DONATE)) {
@@ -334,6 +373,8 @@ function armAutoRefresh() {
 // ---------------------------------------------------------------- events
 function init() {
   $('set-blockbook').value = state.settings.blockbook;
+  $('set-pricesource').value = state.settings.priceSource;
+  $('set-coingecko').value = state.settings.coingecko;
   $('set-coinex').value = state.settings.coinex;
   $('set-refresh').value = state.settings.refreshSec;
   $('set-demo').checked = !!state.settings.demo;
@@ -397,6 +438,8 @@ function init() {
 
   $('btn-save-settings').addEventListener('click', () => {
     state.settings.blockbook = $('set-blockbook').value.trim() || DEFAULTS.settings.blockbook;
+    state.settings.priceSource = $('set-pricesource').value === 'coinex' ? 'coinex' : 'coingecko';
+    state.settings.coingecko = $('set-coingecko').value.trim() || DEFAULTS.settings.coingecko;
     state.settings.coinex = $('set-coinex').value.trim() || DEFAULTS.settings.coinex;
     state.settings.refreshSec = Math.max(0, Math.min(3600, Number($('set-refresh').value) || 0));
     state.settings.demo = $('set-demo').checked;

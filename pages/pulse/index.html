@@ -22,7 +22,7 @@
     <nav class="topnav">
       <a href="../">← Hub</a>
       <a href="https://blockbook.pearlresearch.ai" target="_blank" rel="noopener">Blockbook</a>
-      <a href="https://www.coinex.com/en/exchange/prl-usdt" target="_blank" rel="noopener">PRL/USDT</a>
+      <a href="https://www.coinex.com/en/exchange/pearl-usdt" target="_blank" rel="noopener">PEARL/USDT</a>
     </nav>
   </div>
 </header>
@@ -132,6 +132,15 @@
       <label>Blockbook API base
         <input id="set-blockbook" type="url" spellcheck="false">
       </label>
+      <label>Price source
+        <select id="set-pricesource">
+          <option value="coingecko">CoinGecko (aggregated, works in-browser)</option>
+          <option value="coinex">CoinEx PEARLUSDT (needs proxy in-browser)</option>
+        </select>
+      </label>
+      <label>CoinGecko API base
+        <input id="set-coingecko" type="url" spellcheck="false">
+      </label>
       <label>CoinEx API base
         <input id="set-coinex" type="url" spellcheck="false">
       </label>
@@ -147,9 +156,14 @@
     </div>
     <p class="muted">Data sources: chain state &amp; address balances from the public
       <a href="https://blockbook.pearlresearch.ai" target="_blank" rel="noopener">blockbook.pearlresearch.ai</a>
-      API (Trezor blockbook fork, read-only); PRL/USDT price from the public
-      <a href="https://www.coinex.com/en/exchange/prl-usdt" target="_blank" rel="noopener">CoinEx</a>
-      ticker (unauthenticated, single-exchange price — not a market index).</p>
+      API (Trezor blockbook fork, read-only); PRL/USD price from CoinGecko
+      (id <code>pearl-2</code>, aggregated across exchanges, CORS-open — works
+      directly in your browser; CoinEx <code>PEARLUSDT</code> is available as an
+      alternate source in Settings).
+      <strong>Browser note:</strong> the blockbook API sends no CORS headers, so
+      browsers block direct reads — run the bundled <code>node proxy.mjs</code>
+      (see README) and point the blockbook base URL at
+      <code>http://127.0.0.1:8787/blockbook</code> for full live chain data.</p>
   </section>
 </main>
 

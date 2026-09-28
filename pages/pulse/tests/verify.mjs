@@ -1,8 +1,9 @@
 /**
  * Pearl Pulse core tests — `node --test tests/verify.mjs` (zero deps).
- * Vectors: live API payloads captured 2026-09-27 (blockbook
- * https://blockbook.pearlresearch.ai, CoinEx /v2/spot/ticker?market=PRLUSDT)
- * and bech32m vectors ported from the wallet-helper's verified codec.
+ * Vectors: live API payloads captured 2026-09-27/28 (blockbook
+ * https://blockbook.pearlresearch.ai, CoinEx /v2/spot/ticker?market=PEARLUSDT,
+ * CoinGecko /api/v3/coins/pearl-2) and bech32m vectors ported from the
+ * wallet-helper's verified codec.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -25,6 +26,8 @@ import {
   txNet,
   txDirection,
   parseTickerPayload,
+  parseCoinGeckoPayload,
+  fmtCompactUsd,
   portfolioTotal,
   fundedCount,
 } from '../js/pulse-core.js';
@@ -205,32 +208,78 @@ test('tx direction for receive-only and send-only', () => {
 });
 
 // ---------------------------------------------------------------- CoinEx ticker
+// Pearl (the L1) is PEARLUSDT on CoinEx — PRLUSDT is a different token.
+// Fixture: real payload 2026-09-27 (last 1.41811703, open 1.30887023).
 const TICKER_FIXTURE = {
   code: 0,
   data: [{
-    close: '0.119', high: '0.125607', last: '0.119', low: '0.118999',
-    market: 'PRLUSDT', open: '0.122', period: 86400,
-    value: '2468.66539790194772', volume: '20561.93671831',
-    volume_buy: '17107.06761112', volume_sell: '2118.12211005',
+    close: '1.41811703', high: '1.50300433', last: '1.41811703',
+    low: '1.2704545', market: 'PEARLUSDT', open: '1.30887023', period: 86400,
+    value: '5186.49', volume: '3658.39003884',
+    volume_buy: '2118.12', volume_sell: '1540.27',
   }],
   message: 'OK',
 };
 
-test('parseTickerPayload — live CoinEx fixture 2026-09-27', () => {
+test('parseTickerPayload — live CoinEx PEARLUSDT fixture 2026-09-27', () => {
   const t = parseTickerPayload(TICKER_FIXTURE);
-  assert.equal(t.market, 'PRLUSDT');
-  assert.equal(t.last, 0.119);
-  assert.equal(t.high, 0.125607);
-  assert.equal(t.low, 0.118999);
-  assert.equal(t.volume, 20561.93671831);
-  // (0.119 - 0.122) / 0.122 * 100 ≈ -2.459016
-  assert.ok(Math.abs(t.changePct - -2.459016) < 1e-6, `changePct was ${t.changePct}`);
+  assert.equal(t.market, 'PEARLUSDT');
+  assert.equal(t.last, 1.41811703);
+  assert.equal(t.high, 1.50300433);
+  assert.equal(t.low, 1.2704545);
+  assert.equal(t.volume, 3658.39003884);
+  // (1.41811703 - 1.30887023) / 1.30887023 * 100 ≈ 8.3465
+  assert.ok(Math.abs(t.changePct - 8.3465) < 1e-3, `changePct was ${t.changePct}`);
   assert.equal(t.source, 'CoinEx');
 });
 
 test('parseTickerPayload rejects error payloads', () => {
   assert.throws(() => parseTickerPayload({ code: 1, data: [], message: 'x' }), /unexpected/);
   assert.throws(() => parseTickerPayload({ code: 0, data: [{ last: '0', open: '0' }] }), /last\/open/);
+});
+
+// ---------------------------------------------------------------- CoinGecko
+// Pearl (the L1) is CoinGecko id "pearl-2" (symbol PRL). Fixture: real
+// /api/v3/coins/pearl-2 payload 2026-09-27.
+const COINGECKO_FIXTURE = {
+  id: 'pearl-2', symbol: 'prl', name: 'Pearl',
+  market_data: {
+    current_price: { usd: 1.41 },
+    price_change_percentage_24h: -1.4059,
+    high_24h: { usd: 1.74 },
+    low_24h: { usd: 1.41 },
+    total_volume: { usd: 4882235 },
+    market_cap: { usd: 461809989 },
+    market_cap_rank: 120,
+    last_updated: '2026-09-28T03:06:40.000Z',
+  },
+};
+
+test('parseCoinGeckoPayload — live pearl-2 fixture 2026-09-27', () => {
+  const p = parseCoinGeckoPayload(COINGECKO_FIXTURE);
+  assert.equal(p.market, 'PRL/USD');
+  assert.equal(p.last, 1.41);
+  assert.equal(p.changePct, -1.4059);
+  assert.equal(p.high, 1.74);
+  assert.equal(p.low, 1.41);
+  assert.equal(p.volumeUsd, 4882235);
+  assert.equal(p.mcapUsd, 461809989);
+  assert.equal(p.mcapRank, 120);
+  assert.equal(p.source, 'CoinGecko');
+  assert.equal(p.coinId, 'pearl-2');
+});
+
+test('parseCoinGeckoPayload rejects payloads without a price', () => {
+  assert.throws(() => parseCoinGeckoPayload({}), /market_data/);
+  assert.throws(() => parseCoinGeckoPayload({ market_data: { current_price: {} } }), /USD price/);
+});
+
+test('fmtCompactUsd', () => {
+  assert.equal(fmtCompactUsd(4882235), '$4.88M');
+  assert.equal(fmtCompactUsd(461809989), '$461.81M');
+  assert.equal(fmtCompactUsd(1500), '$1.5K');
+  assert.equal(fmtCompactUsd(42), '$42.00');
+  assert.equal(fmtCompactUsd(NaN), '—');
 });
 
 // ---------------------------------------------------------------- portfolio math

@@ -88,7 +88,7 @@ body {
 .btn.danger { border-color: rgba(255,107,107,.5); color: #ffb3b3; }
 .btn.danger:hover { background: rgba(255,107,107,.12); color: #fff; }
 .add-row { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0 4px; }
-input[type="text"], input[type="url"], input[type="number"] {
+input[type="text"], input[type="url"], input[type="number"], select {
   background: #020d12; border: 1px solid var(--line); color: var(--ink);
   border-radius: 9px; padding: 10px 12px; font-size: 14px; font-family: var(--mono);
 }
