@@ -15,6 +15,7 @@ Static websites built by the Pearl 24/7 AI builder, published via GitHub Pages.
 | `pages/pulse/` | **Pearl Pulse** — watch-only PRL portfolio tracker + live network dashboard: address watchlist with in-browser bech32m validation, balances and tx history from the public blockbook API, live PRL/USDT price from CoinEx, chain status card; zero dependencies |
 | `pages/sign/` | **Pearl Sign** — air-gapped Taproot transaction forge: BIP-86 key derivation, UTXO assembly (blockbook or pasted), exact vBytes fee math, BIP-341 keypath Schnorr signing (SIGHASH_DEFAULT + SINGLE\|ANYONECANPAY presign), local per-input signature re-verification, broadcast via blockbook or `pearld` `sendrawtransaction`; all crypto vendored, works offline once loaded; 16/16 node tests |
 | `pages/prove/` | **Pearl Prove** — cryptographic proof desk: merkle inclusion proof verifier (fetch a block from blockbook or paste a path), merkle root builder, 80-byte block header decoder with nBits proof-of-work check; construction verified against upstream `node/blockchain/merkle.go` + real mainnet block 120195; 15/15 node tests |
+| `pages/gallery/` | **Pearl Gallery** — Pearlscriptions inscription wall: latest-inscriptions grid with lazy previews, content-type filters, lookup by number/id, address collections, detail modal with full metadata; reads a configurable public Pearlscriptions indexer API (GET-only); HTML/SVG never rendered; 15/15 core + 2/2 DOM tests |
 | `pages/*` | Future sub-sites (dashboards) — each in its own subdirectory, linked from the homepage |
 
 ## Why this exists

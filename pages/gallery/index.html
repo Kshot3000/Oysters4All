@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Gallery — Pearlscriptions Inscription Wall</title>
+<meta name="description" content="The gallery wall for Pearlscriptions: browse on-chain Pearl inscriptions — images, text, audio and video — from any public Pearlscriptions indexer API.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <p class="kicker">Pearlscriptions · on-chain artifacts</p>
+    <h1>Pearl Gallery</h1>
+    <p class="lede">Every inscription on the Pearl chain, hung on one wall. Images, text,
+    audio and video — fetched live from a public Pearlscriptions indexer API
+    you point the gallery at. No wallet, no keys, nothing leaves your browser.</p>
+    <div class="conn" id="conn">indexer: unconfigured</div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="card api-card">
+    <h2>Indexer API</h2>
+    <p class="muted" id="api-hint">The API base URL is saved in this browser's localStorage only.
+    The API must allow CORS from this page's origin. Reference:
+    <a href="https://github.com/Pearlscriptions/indexer">Pearlscriptions/indexer</a> (MIT).</p>
+    <div class="row">
+      <input id="api-url" class="grow mono" type="url" placeholder="https://your-indexer.example" autocomplete="off" spellcheck="false">
+      <button id="api-save" class="btn">Connect</button>
+      <button id="api-clear" class="btn ghost">Clear</button>
+    </div>
+  </section>
+
+  <section class="card hidden" id="status">
+    <h2>Indexer status</h2>
+    <div class="stats" id="status-stats"></div>
+  </section>
+
+  <nav class="tabs" role="tablist" aria-label="gallery views">
+    <button class="tab active" data-tab="wall" role="tab">The wall</button>
+    <button class="tab" data-tab="lookup" role="tab">Look up</button>
+    <button class="tab" data-tab="collection" role="tab">Collection</button>
+  </nav>
+
+  <section class="tabpanel" id="panel-wall" role="tabpanel">
+    <div class="wall-head">
+      <h2 id="wall-title">The wall — latest inscriptions</h2>
+      <div class="filters" role="group" aria-label="content type filter">
+        <button class="fchip active" data-f="all">All</button>
+        <button class="fchip" data-f="images">Images</button>
+        <button class="fchip" data-f="text">Text</button>
+        <button class="fchip" data-f="media">Audio &amp; video</button>
+        <button class="fchip" data-f="other">Other</button>
+      </div>
+    </div>
+    <p class="muted" id="wall-count"></p>
+    <div class="wall" id="wall"></div>
+    <div class="center">
+      <p class="muted" id="wall-note"></p>
+      <button id="wall-more" class="btn" style="display:none">Hang more →</button>
+    </div>
+  </section>
+
+  <section class="tabpanel hidden" id="panel-lookup" role="tabpanel">
+    <div class="card">
+      <h2>Find one inscription</h2>
+      <p class="muted">Enter a canonical inscription number (e.g. <code class="mono">42</code>)
+      or an inscription id. Numbers are looked up by paging the ordered list; ids
+      are fetched directly.</p>
+      <div class="row">
+        <input id="lookup-q" class="grow mono" placeholder="42 or inscription id…" autocomplete="off" spellcheck="false">
+        <button id="lookup-go" class="btn">Open</button>
+      </div>
+      <div id="lookup-out" class="mt"></div>
+    </div>
+  </section>
+
+  <section class="tabpanel hidden" id="panel-collection" role="tabpanel">
+    <div class="card">
+      <h2>An address's collection</h2>
+      <p class="muted">Show every inscription currently owned by a Pearl address
+      (<code class="mono">/addresses/:address/inscriptions</code>).</p>
+      <div class="row">
+        <input id="coll-addr" class="grow mono" placeholder="prl1p…" autocomplete="off" spellcheck="false">
+        <button id="coll-go" class="btn">View collection</button>
+      </div>
+      <div id="coll-out" class="mt"></div>
+    </div>
+  </section>
+
+  <section class="card about">
+    <h2>About the wall</h2>
+    <p>Pearlscriptions are Ordinals-style inscriptions on Pearl's Taproot-only chain —
+    witness-envelope artifacts with canonical zero-based numbering. This gallery reads
+    them through the read-only
+    <a href="https://github.com/Pearlscriptions/indexer/blob/HEAD/docs/api-contract.md">indexer API contract</a>
+    (GET-only): <code class="mono">/inscriptions</code>,
+    <code class="mono">/inscriptions/:id</code>,
+    <code class="mono">/inscriptions/:id/content</code>,
+    <code class="mono">/inscriptions/:id/location</code>,
+    <code class="mono">/addresses/:address/inscriptions</code>.</p>
+    <p class="muted">Safety first: only raster images, audio and video are rendered inline.
+    HTML and SVG are <em>never</em> executed — they're shown as text or hex. Oversize
+    content (&gt;8&nbsp;MB) is never previewed. Previews load lazily as frames scroll into view.</p>
+  </section>
+</main>
+
+<dialog id="detail" class="detail" aria-label="inscription detail"></dialog>
+
+<footer class="wrap foot">
+  <p class="muted">Built by <a href="https://x.com/kshot9000">@kshot9000</a> ·
+  <a href="https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/">Pearl builder hub</a></p>
+  <div class="donate">
+    <span class="muted">Support the builder — tips in PRL:</span>
+    <code class="addr" id="donate-addr" title="Click to copy"></code>
+    <span class="muted" id="donate-msg"></span>
+  </div>
+</footer>
+
+<script src="js/gallery-core.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
