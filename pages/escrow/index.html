@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Escrow — Bonded Taproot 2-of-3 Escrow for PRL</title>
+<meta name="description" content="Pearl Escrow: lock PRL in a Taproot 2-of-3 escrow between buyer, seller and arbiter, with a timelocked refund path. All crypto runs locally in your browser.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="11" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="16" cy="16" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 1v5M16 26v5M1 16h5M26 16h5" stroke="currentColor" stroke-width="2"/></svg>
+    <div>
+      <h1>Pearl Escrow</h1>
+      <p class="tagline">Bonded Taproot 2-of-3 escrow for PRL</p>
+    </div>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-step="parties" class="active">1 · Parties</button>
+    <button data-step="contract" >2 · Contract</button>
+    <button data-step="spend">3 · Spend</button>
+    <button data-step="broadcast">4 · Broadcast</button>
+  </nav>
+</header>
+
+<main>
+  <!-- STEP 1: PARTIES -->
+  <section id="step-parties" class="panel active">
+    <h2>The parties</h2>
+    <p class="lede">Three keys seal the bond: <strong>buyer</strong>, <strong>seller</strong> and <strong>arbiter</strong>.
+    Any two of the three can release the funds. If they never agree, the <strong>refund key</strong> can sweep
+    everything back after the timelock. Paste a 64-hex x-only pubkey or a 12/24-word mnemonic per party —
+    mnemonics never leave this page.</p>
+    <div class="form-grid">
+      <label>Network
+        <select id="network">
+          <option value="mainnet" selected>Mainnet (prl…)</option>
+          <option value="testnet">Testnet (tprl…)</option>
+        </select>
+      </label>
+      <label class="wide">Blockbook API
+        <input id="blockbook" type="url" spellcheck="false">
+      </label>
+    </div>
+    <div class="party-grid">
+      <div class="party-card" data-role="buyer">
+        <h3>Buyer <span class="role-note">funds the escrow · default refund key</span></h3>
+        <textarea id="key-buyer" rows="2" spellcheck="false" placeholder="64-hex x-only pubkey or 12/24-word mnemonic"></textarea>
+        <div class="row"><button class="btn ghost gen-key" data-for="key-buyer">Generate fresh key</button><span class="key-ok" id="ok-buyer"></span></div>
+      </div>
+      <div class="party-card" data-role="seller">
+        <h3>Seller <span class="role-note">receives on release</span></h3>
+        <textarea id="key-seller" rows="2" spellcheck="false" placeholder="64-hex x-only pubkey or 12/24-word mnemonic"></textarea>
+        <div class="row"><button class="btn ghost gen-key" data-for="key-seller">Generate fresh key</button><span class="key-ok" id="ok-seller"></span></div>
+      </div>
+      <div class="party-card" data-role="arbiter">
+        <h3>Arbiter <span class="role-note">breaks ties, never unilateral</span></h3>
+        <textarea id="key-arbiter" rows="2" spellcheck="false" placeholder="64-hex x-only pubkey or 12/24-word mnemonic"></textarea>
+        <div class="row"><button class="btn ghost gen-key" data-for="key-arbiter">Generate fresh key</button><span class="key-ok" id="ok-arbiter"></span></div>
+      </div>
+    </div>
+    <div class="form-grid">
+      <label class="wide">Refund key <span class="hint-inline">(defaults to the buyer)</span>
+        <div class="row">
+          <input id="key-refund" type="text" spellcheck="false" placeholder="64-hex x-only pubkey or mnemonic — leave blank to use the buyer">
+          <button id="refund-is-buyer" class="btn ghost">Use buyer</button>
+        </div>
+      </label>
+      <label>Refund unlocks at block height
+        <div class="row">
+          <input id="lock-height" type="number" min="1" step="1" placeholder="e.g. 125000">
+          <button id="lock-plus-week" class="btn ghost" title="Set to current height + 3120 blocks (~1 week)">+1 week</button>
+        </div>
+      </label>
+      <label>Chain height <span class="hint-inline">(from blockbook)</span>
+        <div class="row">
+          <input id="chain-height" type="number" min="1" step="1" placeholder="—">
+          <button id="fetch-height" class="btn ghost">Fetch</button>
+        </div>
+      </label>
+    </div>
+    <div id="parties-error" class="error" hidden></div>
+    <div class="row end"><button id="to-contract" class="btn primary">Draft the contract →</button></div>
+  </section>
+
+  <!-- STEP 2: CONTRACT -->
+  <section id="step-contract" class="panel">
+    <h2>The contract</h2>
+    <p class="lede">The escrow address commits to both spending paths. Verify the scripts before anyone funds it —
+    the address is fully determined by the three keys, the refund key and the lock height.</p>
+    <div class="contract-card">
+      <div class="addr-row">
+        <div>
+          <div class="field-label">Escrow address</div>
+          <code id="escrow-address" class="addr"></code>
+        </div>
+        <canvas id="escrow-qr" width="132" height="132" title="Escrow address QR"></canvas>
+      </div>
+      <div class="row"><button id="copy-address" class="btn ghost">Copy address</button><span id="funding-status" class="funding"></span></div>
+      <h3>Spending paths</h3>
+      <div class="leaf">
+        <h4>Leaf 0 · Release <span class="tag">2-of-3</span></h4>
+        <code id="release-asm" class="asm"></code>
+      </div>
+      <div class="leaf">
+        <h4>Leaf 1 · Refund <span class="tag">timelocked</span></h4>
+        <code id="refund-asm" class="asm"></code>
+      </div>
+      <h3>Taptree</h3>
+      <dl class="kv">
+        <div><dt>Internal key</dt><dd><code id="kv-internal"></code> <span class="hint-inline">(buyer — keypath spend is impossible for anyone)</span></dd></div>
+        <div><dt>Release leaf hash</dt><dd><code id="kv-leaf0"></code></dd></div>
+        <div><dt>Refund leaf hash</dt><dd><code id="kv-leaf1"></code></dd></div>
+        <div><dt>Merkle root</dt><dd><code id="kv-root"></code></dd></div>
+      </dl>
+      <h3>Control blocks <span class="hint-inline">(each party should keep these)</span></h3>
+      <div class="form-grid">
+        <label>Release control block (65 B)<div class="row"><input id="cb-release" readonly><button class="btn ghost copy-btn" data-for="cb-release">Copy</button></div></label>
+        <label>Refund control block (65 B)<div class="row"><input id="cb-refund" readonly><button class="btn ghost copy-btn" data-for="cb-refund">Copy</button></div></label>
+      </div>
+    </div>
+    <h3>Funding</h3>
+    <div class="row">
+      <button id="check-funding" class="btn primary">Check funding</button>
+      <button id="manual-utxo" class="btn ghost">Enter UTXO manually</button>
+    </div>
+    <div id="utxo-list" class="utxo-list"></div>
+    <div id="contract-error" class="error" hidden></div>
+    <div class="row end"><button id="to-spend" class="btn primary" disabled>Continue to spend →</button></div>
+  </section>
+
+  <!-- STEP 3: SPEND -->
+  <section id="step-spend" class="panel">
+    <h2>Spend the escrow</h2>
+    <p class="lede">Two ways out. <strong>Release</strong> pays the seller (and change back to the buyer) with any two
+    of the three signatures. <strong>Refund</strong> returns everything to the refund key after the timelock —
+    one signature, no quorum.</p>
+    <div class="mode-cards">
+      <button class="mode-card selected" data-mode="release"><span class="op-name">Release</span><span class="op-desc">2-of-3 signatures → seller + buyer change</span></button>
+      <button class="mode-card" data-mode="refund"><span class="op-name">Refund</span><span class="op-desc">refund key alone, after block <span id="refund-height-echo">—</span></span></button>
+    </div>
+    <div id="spend-release-form" class="form-grid">
+      <label>Seller payout address (P2TR)
+        <input id="pay-seller-addr" spellcheck="false" placeholder="prl1p…">
+      </label>
+      <label>Seller amount (PRL)
+        <input id="pay-seller-amt" type="number" min="0" step="0.00000001" placeholder="e.g. 4.5">
+      </label>
+      <label>Buyer change address (P2TR)
+        <input id="pay-buyer-addr" spellcheck="false" placeholder="defaults to buyer's key">
+      </label>
+      <label>Fee rate (grains/vB)
+        <div class="row"><input id="fee-rate" type="number" min="1" step="1" value="5"><button id="fee-fetch" class="btn ghost">Use network rate</button></div>
+      </label>
+    </div>
+    <div id="spend-refund-form" class="form-grid" hidden>
+      <label class="wide">Refund destination (P2TR)
+        <input id="refund-dest" spellcheck="false" placeholder="defaults to the refund key">
+      </label>
+      <div class="wide"><span id="refund-lock-status" class="lock-status"></span></div>
+    </div>
+    <div class="row"><button id="build-plan" class="btn primary">Build spending plan</button></div>
+    <div id="spend-error" class="error" hidden></div>
+    <div id="plan-card" class="contract-card" hidden>
+      <h3>Spending plan</h3>
+      <dl class="kv">
+        <div><dt>Digest to sign</dt><dd><code id="plan-digest" class="digest"></code> <button class="btn ghost copy-btn" data-for="plan-digest">Copy</button></dd></div>
+        <div><dt>Outputs</dt><dd id="plan-outputs"></dd></div>
+        <div><dt>Fee</dt><dd id="plan-fee"></dd></div>
+      </dl>
+      <p class="hint">Each signer copies the <strong>digest to sign</strong> to their own device, signs it with their key,
+      and sends back the 64-byte signature. Signatures are useless without this exact transaction.</p>
+      <div id="sig-slots"></div>
+      <div class="row"><button id="assemble" class="btn primary" disabled>Verify &amp; assemble transaction</button></div>
+      <div id="assemble-error" class="error" hidden></div>
+    </div>
+  </section>
+
+  <!-- STEP 4: BROADCAST -->
+  <section id="step-broadcast" class="panel">
+    <h2>Broadcast</h2>
+    <p class="lede">The fully-signed transaction. Every signature was verified locally before assembly —
+    what you broadcast is exactly what the signers approved.</p>
+    <dl class="kv">
+      <div><dt>TXID</dt><dd><code id="final-txid" class="digest"></code></dd></div>
+      <div><dt>vBytes</dt><dd id="final-vbytes"></dd></div>
+    </dl>
+    <label>Signed transaction hex
+      <textarea id="final-hex" rows="6" readonly spellcheck="false"></textarea>
+    </label>
+    <div class="row">
+      <button id="copy-hex" class="btn ghost">Copy hex</button>
+      <button id="broadcast" class="btn primary">Broadcast via blockbook</button>
+    </div>
+    <div id="broadcast-error" class="error" hidden></div>
+    <div id="broadcast-ok" class="ok" hidden></div>
+  </section>
+</main>
+
+<footer>
+  <p>Pearl Escrow · bonded Taproot 2-of-3 escrow for the Pearl blockchain ·
+  <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a></p>
+  <p class="donate">Support the build — <code id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+  <button class="btn ghost copy-btn" data-for="donate-addr">Copy</button></p>
+  <p class="hint">Experimental software. Review every transaction before broadcasting. Escrow contracts are only as
+  trustworthy as the arbiter you choose.</p>
+</footer>
+
+<script src="qrcode.min.js?v=1"></script>
+<script src="pearl-escrow.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
