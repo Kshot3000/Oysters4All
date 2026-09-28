@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Prove — Cryptographic Proof Desk for Pearl (PRL)</title>
+<meta name="description" content="Pearl Prove: verify Bitcoin-style merkle inclusion proofs for Pearl (PRL) transactions, decode 80-byte block headers and check proof-of-work, and build merkle roots. 100% client-side.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar-in">
+    <a class="brand" href="../">
+      <span class="pearl-glyph" aria-hidden="true">◈</span>
+      <span class="brand-name">Pearl&nbsp;Prove</span>
+      <span class="brand-tag">cryptographic proof desk</span>
+    </a>
+    <nav class="topnav">
+      <a href="../">Apps</a>
+      <a href="../market/">Bazaar</a>
+      <a href="../sign/">Sign</a>
+      <a href="../explorer/">Explorer</a>
+      <span class="net-badge">mainnet</span>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <h1>Don't trust the block. <span class="accent">Prove the transaction.</span></h1>
+    <p class="lede">Pearl Prove is the proof desk for Pearl (PRL): it checks
+      <em>cryptographic</em> inclusion — that a transaction really sits inside a block's
+      merkle tree — decodes 80-byte block headers and verifies proof-of-work against the
+      nBits target, and builds merkle roots from transaction lists. Everything runs in
+      this page; the SHA-256 implementation is vendored and cross-tested.</p>
+    <div class="honest-note">
+      <strong>What this proves — and what it doesn't.</strong> A valid inclusion proof
+      shows a transaction is committed to by a block header. It does not prove that header
+      came from the chain you care about: fetch headers from a blockbook or
+      <code>pearld</code> node <em>you</em> trust, and check confirmations against your
+      own tip.
+    </div>
+  </section>
+
+  <nav class="tabs" role="tablist" aria-label="Proof tools">
+    <button class="tab active" data-tab="inclusion" role="tab" aria-selected="true">Inclusion proof</button>
+    <button class="tab" data-tab="root" role="tab" aria-selected="false">Root builder</button>
+    <button class="tab" data-tab="header" role="tab" aria-selected="false">Header inspector</button>
+  </nav>
+
+  <!-- TAB 1: INCLUSION -->
+  <section class="panel" data-panel="inclusion">
+    <h2>Inclusion proof</h2>
+    <p class="muted">Two ways in: fetch a block and let the page build the proof for you,
+      or paste a proof someone handed you and check it against a header's merkle root.</p>
+
+    <div class="mode-switch">
+      <button class="btn mode active" data-mode="fetch">Fetch block &amp; build proof</button>
+      <button class="btn mode" data-mode="paste">Verify a pasted proof</button>
+    </div>
+
+    <div id="modeFetch">
+      <div class="grid2">
+        <div>
+          <label>Blockbook endpoint
+            <input id="bbBase" spellcheck="false" value="https://blockbook.pearlresearch.ai/api/v2">
+          </label>
+          <div class="row">
+            <label style="flex:1">Block height
+              <input id="blkHeight" inputmode="numeric" placeholder="e.g. 120195">
+            </label>
+            <label style="flex:1.4">…or block hash
+              <input id="blkHash" spellcheck="false" placeholder="64 hex chars">
+            </label>
+          </div>
+          <label>Transaction ID to prove
+            <input id="proveTxid" spellcheck="false" placeholder="64 hex chars">
+          </label>
+          <div class="row">
+            <button id="btnProve" class="btn primary">Build &amp; verify proof</button>
+            <button id="btnTryDemo" class="btn" title="Runs the whole flow on a known Pearl mainnet block">Try the demo block (120195)</button>
+          </div>
+          <p class="muted small">Large blocks fetch every page of the tx list from blockbook.
+            Blocks above ~5,000 transactions are refused — paste a proof instead.</p>
+        </div>
+        <div>
+          <h3>Proof walk</h3>
+          <div id="proofWalk" class="walk"><p class="muted">Nothing proved yet.</p></div>
+        </div>
+      </div>
+      <div id="proveVerdict" class="verdict" hidden></div>
+    </div>
+
+    <div id="modePaste" hidden>
+      <div class="grid2">
+        <div>
+          <label>Transaction ID
+            <input id="ppTxid" spellcheck="false" placeholder="64 hex chars">
+          </label>
+          <label>Expected merkle root (from the block header)
+            <input id="ppRoot" spellcheck="false" placeholder="64 hex chars">
+          </label>
+          <label>Merkle path — one step per line, <code>L</code>/<code>R</code> + sibling hash, leaf up
+            <textarea id="ppPath" rows="8" spellcheck="false" placeholder="R 3a4f…c1&#10;L 9b22…7e&#10;# lines starting with # are ignored"></textarea>
+          </label>
+          <div class="row">
+            <button id="btnVerifyPaste" class="btn primary">Verify proof</button>
+            <button id="btnLoadFixture" class="btn" title="Loads a real proof from Pearl mainnet block 120195">Load real example</button>
+          </div>
+        </div>
+        <div>
+          <h3>What the path says</h3>
+          <div id="pasteWalk" class="walk"><p class="muted">Nothing checked yet.</p></div>
+        </div>
+      </div>
+      <div id="pasteVerdict" class="verdict" hidden></div>
+    </div>
+  </section>
+
+  <!-- TAB 2: ROOT BUILDER -->
+  <section class="panel" data-panel="root" hidden>
+    <h2>Merkle root builder</h2>
+    <p class="muted">Paste the ordered transaction list of a block (display-order txids,
+      whitespace or comma separated) and compute its merkle root — the value a block
+      header must commit to. Optionally generate the inclusion path for one txid.</p>
+    <label>Transaction IDs, in block order
+      <textarea id="rbTxids" rows="10" spellcheck="false" placeholder="txid&#10;txid&#10;…"></textarea>
+    </label>
+    <label>Also build the proof for this txid (optional)
+      <input id="rbProveTx" spellcheck="false" placeholder="64 hex chars — must be in the list">
+    </label>
+    <div class="row">
+      <button id="btnBuildRoot" class="btn primary">Compute root</button>
+    </div>
+    <div id="rootOut" class="resultbox" hidden></div>
+  </section>
+
+  <!-- TAB 3: HEADER -->
+  <section class="panel" data-panel="header" hidden>
+    <h2>Header inspector</h2>
+    <p class="muted">Paste an 80-byte block header in hex
+      (<code>pearld</code>: <code>prlctl getblockheader --verbose=false &lt;hash&gt;</code>)
+      to decode its fields and check whether its hash meets the nBits proof-of-work target.</p>
+    <label>Raw header hex (160 chars)
+      <textarea id="hdrHex" rows="4" spellcheck="false" placeholder="01000000…"></textarea>
+    </label>
+    <div class="row">
+      <button id="btnDecode" class="btn primary">Decode &amp; check work</button>
+    </div>
+    <div id="headerOut" class="resultbox" hidden></div>
+  </section>
+
+  <section class="method">
+    <h2>How the math works</h2>
+    <div class="grid3">
+      <div class="card"><h3>1 · Hash</h3><p>Every tree node is <code>double-SHA256(left ‖ right)</code> on the
+        <em>internal</em> (little-endian) byte order. Txids are shown big-endian; the page flips them before hashing — the most common hand-rolled-prover bug.</p></div>
+      <div class="card"><h3>2 · Odd rule</h3><p>A lone node is hashed <em>with itself</em>, exactly as
+        <code>node/blockchain/merkle.go</code> does upstream. This is why the proof for the
+        last tx of an odd block starts with the tx's own hash on the right.</p></div>
+      <div class="card"><h3>3 · Verify</h3><p>Walk the path from the leaf: at each step hash
+        <code>sibling ‖ running</code> (sibling left) or <code>running ‖ sibling</code>
+        (sibling right). If the final digest equals the header's merkle root, the
+        transaction is committed — no trust in the prover required.</p></div>
+    </div>
+    <p class="muted small">Construction verified against upstream <code>BuildMerkleTreeStore</code>
+      (master @ 3fe2267) and empirically: recomputing the root from all 40 txids of Pearl
+      mainnet block 120195 reproduces the chain's merkle root byte-for-byte
+      (<code>tests/fixture-120195.json</code>).</p>
+  </section>
+
+  <footer class="sitefoot">
+    <div class="foot-grid">
+      <div>
+        <strong>Pearl Prove</strong> — the cryptographic proof desk for Pearl (PRL).<br>
+        <span class="muted">Built by <a href="https://x.com/kshot9000">@kshot9000</a> ·
+          <a href="https://github.com/Kshot3000/Pearl-Muse-24-7-Ai-builder">Pearl-Muse-24-7-Ai-builder</a></span>
+      </div>
+      <div class="donate">
+        <span class="muted">Support the build — tip PRL:</span>
+        <code class="addr" id="donateAddr" title="Click to copy">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+        <span class="copied" id="copiedMsg" hidden>copied ✓</span>
+      </div>
+    </div>
+  </footer>
+</main>
+
+<script src="js/prove-core.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
