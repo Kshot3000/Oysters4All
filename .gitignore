@@ -6,3 +6,5 @@ dist/
 pool-server/verifier/target/
 pool-server/data/
 pool-server/config.json
+artifacts/
+cache/
