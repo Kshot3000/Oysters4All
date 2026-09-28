@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Etch — PRL-20 Inscription Composer</title>
+<meta name="description" content="Pearl Etch: compose PRL-20 deploy/mint/transfer inscriptions, build and sign the Taproot commit/reveal transaction pair, and broadcast. All crypto runs locally in your browser.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg class="chisel" viewBox="0 0 32 32" aria-hidden="true"><path d="M6 26 L18 14 L22 18 L10 30 Z M19 13 L21 7 L25 5 L27 9 L23 15 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="24" cy="24" r="2.5" fill="currentColor"/></svg>
+    <div>
+      <h1>Pearl Etch</h1>
+      <p class="tagline">Engrave PRL-20 inscriptions into Pearl</p>
+    </div>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-step="compose" class="active">1 · Compose</button>
+    <button data-step="key">2 · Key</button>
+    <button data-step="commit">3 · Commit</button>
+    <button data-step="reveal">4 · Reveal</button>
+    <button data-step="done">5 · Done</button>
+  </nav>
+</header>
+
+<main>
+  <!-- STEP 1: COMPOSE -->
+  <section id="step-compose" class="panel active">
+    <h2>Compose the inscription</h2>
+    <p class="lede">Build PRL-20 <code>deploy</code>, <code>mint</code> and <code>transfer</code> operations.
+    Every field is validated against the PRL-20 v0 spec before it can be engraved — bad JSON never reaches the chain.</p>
+    <div class="op-cards">
+      <button class="op-card" data-op="deploy"><span class="op-name">Deploy</span><span class="op-desc">Launch a new PRL-20 token</span></button>
+      <button class="op-card selected" data-op="mint"><span class="op-name">Mint</span><span class="op-desc">Mint tokens of a deployed ticker</span></button>
+      <button class="op-card" data-op="transfer"><span class="op-name">Transfer</span><span class="op-desc">Create a transferable lot</span></button>
+    </div>
+    <div class="form-grid" id="op-form"></div>
+    <div class="row">
+      <button id="add-op" class="btn primary">Engrave into batch ↓</button>
+      <button id="preset-prls" class="btn ghost" title="Fill the official PRLS launch parameters">PRLS preset</button>
+    </div>
+    <div id="op-error" class="error" hidden></div>
+    <h3>Batch <span id="batch-count" class="count">0</span></h3>
+    <p class="hint">Multiple envelopes can share one reveal: pure mint batches consolidate to a single owner output; mixed batches map each envelope to its own owner output (per the PRL-20 v0 spec).</p>
+    <ul id="batch-list" class="batch-list"></ul>
+    <div class="row end">
+      <button id="to-key" class="btn primary" disabled>Continue to key →</button>
+    </div>
+  </section>
+
+  <!-- STEP 2: KEY -->
+  <section id="step-key" class="panel">
+    <h2>Key &amp; network</h2>
+    <p class="lede">Etch signs both transactions locally — your key never leaves this page. Generate a fresh key or import your own.</p>
+    <div class="form-grid">
+      <label>Network
+        <select id="network">
+          <option value="mainnet" selected>Mainnet (prl…)</option>
+          <option value="testnet">Testnet (tprl…)</option>
+        </select>
+      </label>
+      <label>Key source
+        <select id="key-source">
+          <option value="generate">Generate new mnemonic</option>
+          <option value="mnemonic">Import mnemonic</option>
+          <option value="wif">Import WIF</option>
+        </select>
+      </label>
+    </div>
+    <div id="key-input-wrap" class="form-grid" hidden>
+      <label class="wide">Mnemonic / WIF
+        <textarea id="key-input" rows="2" placeholder="abandon abandon …  /  WIF…"></textarea>
+      </label>
+    </div>
+    <div class="row">
+      <button id="make-key" class="btn primary">Create key</button>
+      <button id="new-key" class="btn ghost">New random key</button>
+    </div>
+    <div id="key-error" class="error" hidden></div>
+    <div id="key-card" class="key-card" hidden>
+      <div><span class="k">Address</span><code id="key-address"></code></div>
+      <div><span class="k">Mnemonic</span><code id="key-mnemonic" class="secret"></code>
+        <button id="reveal-mnemonic" class="btn tiny ghost">show</button></div>
+      <p class="warn">Back up the mnemonic before funding this address. Anyone with it controls the funds and the inscriptions.</p>
+    </div>
+    <h3>Chain access</h3>
+    <div class="form-grid">
+      <label class="wide">Blockbook endpoint
+        <input id="blockbook" type="url" placeholder="https://blockbook.pearlresearch.ai">
+      </label>
+    </div>
+    <p class="hint">Used to fetch UTXOs, fee rates and broadcast. Defaults to the public Pearl blockbook on mainnet. Read-only except the broadcasts you approve.</p>
+    <div class="row end">
+      <button id="to-commit" class="btn primary" disabled>Continue to commit →</button>
+    </div>
+  </section>
+
+  <!-- STEP 3: COMMIT -->
+  <section id="step-commit" class="panel">
+    <h2>Commit transaction</h2>
+    <p class="lede">The commit locks funds at a Taproot address that commits to your inscription script. The reveal spends it on the next step.</p>
+    <div id="commit-plan" class="plan" hidden></div>
+    <h3>Funding</h3>
+    <div class="row">
+      <button id="fetch-utxos" class="btn">Fetch UTXOs for my address</button>
+    </div>
+    <div class="form-grid">
+      <label class="wide">…or paste UTXOs (one per line: <code>txid:vout:value</code> in grains)
+        <textarea id="utxo-paste" rows="3" placeholder="a3f1…:0:250000000"></textarea>
+      </label>
+    </div>
+    <div id="utxo-list" class="utxo-list"></div>
+    <h3>Fee rate <span id="fee-readout" class="count"></span></h3>
+    <div class="row">
+      <input id="fee-slider" type="range" min="1" max="100" value="5">
+      <button id="fee-auto" class="btn ghost">auto</button>
+    </div>
+    <div id="commit-error" class="error" hidden></div>
+    <div class="row">
+      <button id="build-commit" class="btn primary" disabled>Build &amp; sign commit</button>
+    </div>
+    <div id="commit-result" class="result" hidden>
+      <div><span class="k">Commit txid</span><code id="commit-txid"></code></div>
+      <div><span class="k">Fee paid</span><code id="commit-fee"></code></div>
+      <label>Signed commit hex <textarea id="commit-hex" rows="4" readonly></textarea></label>
+      <div class="row">
+        <button id="broadcast-commit" class="btn primary">Broadcast commit</button>
+        <button id="copy-commit" class="btn ghost">Copy hex</button>
+      </div>
+      <div id="commit-broadcast" class="ok" hidden></div>
+    </div>
+    <div class="row end">
+      <button id="to-reveal" class="btn primary" disabled>Continue to reveal →</button>
+    </div>
+  </section>
+
+  <!-- STEP 4: REVEAL -->
+  <section id="step-reveal" class="panel">
+    <h2>Reveal transaction</h2>
+    <p class="lede">Spends the commit output through the Taproot script path, publishing your inscription envelopes on-chain.</p>
+    <div class="form-grid">
+      <label>Commit txid
+        <input id="reveal-commit-txid" placeholder="…">
+      </label>
+      <label>Commit vout
+        <input id="reveal-commit-vout" value="0" inputmode="numeric">
+      </label>
+    </div>
+    <div class="row">
+      <button id="detect-commit" class="btn ghost">Detect from commit address</button>
+    </div>
+    <div id="reveal-plan" class="plan" hidden></div>
+    <div id="reveal-error" class="error" hidden></div>
+    <div class="row">
+      <button id="build-reveal" class="btn primary">Build &amp; sign reveal</button>
+    </div>
+    <div id="reveal-result" class="result" hidden>
+      <div><span class="k">Reveal txid</span><code id="reveal-txid"></code></div>
+      <div><span class="k">Fee paid</span><code id="reveal-fee"></code></div>
+      <label>Signed reveal hex <textarea id="reveal-hex" rows="4" readonly></textarea></label>
+      <div class="row">
+        <button id="broadcast-reveal" class="btn primary">Broadcast reveal</button>
+        <button id="copy-reveal" class="btn ghost">Copy hex</button>
+        <button id="verify-reveal" class="btn ghost">Parse like an indexer</button>
+      </div>
+      <div id="reveal-broadcast" class="ok" hidden></div>
+      <div id="reveal-verify" class="verify" hidden></div>
+    </div>
+    <div class="row end">
+      <button id="to-done" class="btn primary" disabled>Finish →</button>
+    </div>
+  </section>
+
+  <!-- STEP 5: DONE -->
+  <section id="step-done" class="panel">
+    <h2>Inscription engraved</h2>
+    <div id="done-summary" class="plan"></div>
+    <div class="row">
+      <a id="done-gallery" class="btn ghost" href="../gallery/" target="_blank" rel="noopener">View in Pearl Gallery</a>
+      <a id="done-explorer" class="btn ghost" href="../explorer/" target="_blank" rel="noopener">Open block explorer</a>
+      <button id="restart" class="btn">Engrave another</button>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="donate">
+    <span>Tip the build</span>
+    <code id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+    <button id="copy-donate" class="btn tiny ghost">copy</button>
+  </div>
+  <div class="meta">
+    <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a>
+    <span>·</span>
+    <a href="https://github.com/Kshot3000/Pearl-Muse-24-7-Ai-builder" target="_blank" rel="noopener">Pearl-Muse-24-7-Ai-builder</a>
+  </div>
+</footer>
+
+<script src="pearl-etch.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>

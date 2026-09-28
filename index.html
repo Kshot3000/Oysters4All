@@ -29,6 +29,7 @@
         <a href="pages/sign/">Sign</a>
         <a href="pages/prove/">Prove</a>
         <a href="pages/gallery/">Gallery</a>
+        <a href="pages/etch/">Etch</a>
         <a href="pages/pool/">Mining pool</a>
         <a href="pages/wallet/">Wallet</a>
         <a href="pages/mining/">Mining calc</a>
@@ -238,6 +239,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Prove — Proof Desk <span class="badge">new</span></h3>
             <p>The cryptographic proof desk — verify merkle inclusion proofs for Pearl transactions against block headers, build merkle roots from txid lists, and decode 80-byte block headers with a real proof-of-work target check. Construction verified against upstream and a real mainnet block.</p>
             <div class="card-links"><a href="pages/prove/">Open Pearl Prove →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Etch — Inscription Composer <span class="badge">new</span></h3>
+            <p>Engrave PRL-20 inscriptions into Pearl — compose deploy, mint and transfer operations with strict spec validation, then build and sign the Taproot commit/reveal transaction pair locally. Batch mints share one reveal; the PRLS launch fee is added automatically. Witnesses self-verify like an indexer would parse them.</p>
+            <div class="card-links"><a href="pages/etch/">Open Pearl Etch →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Gallery — Inscription Wall <span class="badge">new</span></h3>
