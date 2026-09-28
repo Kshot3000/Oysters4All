@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Pulse — Live PRL Portfolio &amp; Network Dashboard</title>
+<meta name="description" content="Pearl Pulse: a watch-only, read-only PRL portfolio tracker and live Pearl network dashboard. Balances from the public blockbook API, PRL/USDT price from CoinEx. No keys ever touched.">
+<link rel="stylesheet" href="pulse.css">
+</head>
+<body>
+<div class="abyss" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">◈</span>
+      <div>
+        <h1>Pearl Pulse</h1>
+        <p class="tagline">Live PRL portfolio &amp; network dashboard — watch-only, read-only</p>
+      </div>
+    </div>
+    <nav class="topnav">
+      <a href="../">← Hub</a>
+      <a href="https://blockbook.pearlresearch.ai" target="_blank" rel="noopener">Blockbook</a>
+      <a href="https://www.coinex.com/en/exchange/prl-usdt" target="_blank" rel="noopener">PRL/USDT</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="alerts" class="alerts" role="status" aria-live="polite"></div>
+
+  <section class="cards" aria-label="Live overview">
+    <article class="card glow" id="networth-card">
+      <header class="card-head">
+        <h2>Portfolio</h2>
+        <span class="src" id="networth-src">local</span>
+      </header>
+      <div class="big-num" id="networth-prl">—</div>
+      <div class="big-sub" id="networth-usd">—</div>
+      <dl class="stat-grid">
+        <div><dt>Watched</dt><dd id="stat-watched">0</dd></div>
+        <div><dt>Funded</dt><dd id="stat-funded">0</dd></div>
+        <div><dt>Total txs</dt><dd id="stat-txs">—</dd></div>
+      </dl>
+    </article>
+
+    <article class="card" id="market-card">
+      <header class="card-head">
+        <h2>PRL / USDT</h2>
+        <span class="src" id="market-src">CoinEx</span>
+      </header>
+      <div class="big-num" id="market-last">—</div>
+      <div class="big-sub" id="market-change">—</div>
+      <dl class="stat-grid">
+        <div><dt>24h high</dt><dd id="market-high">—</dd></div>
+        <div><dt>24h low</dt><dd id="market-low">—</dd></div>
+        <div><dt>24h vol</dt><dd id="market-vol">—</dd></div>
+      </dl>
+      <p class="fetched" id="market-fetched">—</p>
+      <p class="err hidden" id="market-err"></p>
+    </article>
+
+    <article class="card" id="network-card">
+      <header class="card-head">
+        <h2>Network</h2>
+        <span class="src" id="network-src">blockbook</span>
+      </header>
+      <div class="big-num" id="net-height">—</div>
+      <div class="big-sub" id="net-sync">—</div>
+      <dl class="stat-grid">
+        <div><dt>Mempool</dt><dd id="net-mempool">—</dd></div>
+        <div><dt>Last block</dt><dd id="net-lastblock">—</dd></div>
+        <div><dt>Backend</dt><dd id="net-version">—</dd></div>
+      </dl>
+      <p class="fetched" id="net-fetched">—</p>
+      <p class="err hidden" id="net-err"></p>
+    </article>
+  </section>
+
+  <section class="panel" aria-label="Watchlist">
+    <header class="panel-head">
+      <h2>Watchlist</h2>
+      <div class="panel-actions">
+        <button id="btn-refresh" class="btn" type="button">↻ Refresh all</button>
+      </div>
+    </header>
+    <p class="muted">Paste any <code>prl1…</code> address. Validated in-browser (bech32m, witness v1+ — the same rules <code>pearld</code> enforces). Addresses are stored only in your browser's localStorage. Nothing is signed or broadcast here.</p>
+    <form id="add-form" class="add-row" autocomplete="off">
+      <input id="addr-input" type="text" inputmode="text" spellcheck="false"
+             placeholder="prl1p…" aria-label="Pearl address to watch">
+      <input id="label-input" type="text" maxlength="40" placeholder="Label (optional)" aria-label="Address label">
+      <button class="btn primary" type="submit">Watch</button>
+    </form>
+    <p class="err hidden" id="add-err" role="alert"></p>
+    <div class="table-scroll">
+      <table class="watch-table" id="watch-table">
+        <thead>
+          <tr><th>Address</th><th>Balance</th><th>USD</th><th>Txs</th><th>Received</th><th>Sent</th><th></th></tr>
+        </thead>
+        <tbody id="watch-body">
+          <tr class="empty-row"><td colspan="7">No addresses watched yet — add one above.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel" id="tx-panel" aria-label="Recent transactions">
+    <header class="panel-head">
+      <h2>Recent transactions <span class="muted" id="tx-for"></span></h2>
+      <div class="panel-actions">
+        <a class="btn hidden" id="tx-explorer-link" href="#" target="_blank" rel="noopener">Open in blockbook ↗</a>
+      </div>
+    </header>
+    <p class="muted" id="tx-hint">Click “txs” on any watched address to inspect its latest transactions.</p>
+    <div class="table-scroll">
+      <table class="tx-table" id="tx-table">
+        <thead>
+          <tr><th>Tx</th><th>Time</th><th>Direction</th><th>Received</th><th>Sent</th><th>Net</th><th>Fee</th><th>Confs</th></tr>
+        </thead>
+        <tbody id="tx-body">
+          <tr class="empty-row"><td colspan="8">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="err hidden" id="tx-err"></p>
+  </section>
+
+  <section class="panel" aria-label="Settings">
+    <header class="panel-head"><h2>Settings</h2></header>
+    <div class="settings-grid">
+      <label>Blockbook API base
+        <input id="set-blockbook" type="url" spellcheck="false">
+      </label>
+      <label>CoinEx API base
+        <input id="set-coinex" type="url" spellcheck="false">
+      </label>
+      <label>Auto-refresh (seconds, 0 = off)
+        <input id="set-refresh" type="number" min="0" max="3600" step="30">
+      </label>
+      <label class="check"><input id="set-demo" type="checkbox"> Demo mode (fixtures, clearly labeled)</label>
+    </div>
+    <div class="panel-actions">
+      <button id="btn-save-settings" class="btn primary" type="button">Save settings</button>
+      <button id="btn-export" class="btn" type="button">Export watchlist (JSON)</button>
+      <button id="btn-clear" class="btn danger" type="button">Clear all local data</button>
+    </div>
+    <p class="muted">Data sources: chain state &amp; address balances from the public
+      <a href="https://blockbook.pearlresearch.ai" target="_blank" rel="noopener">blockbook.pearlresearch.ai</a>
+      API (Trezor blockbook fork, read-only); PRL/USDT price from the public
+      <a href="https://www.coinex.com/en/exchange/prl-usdt" target="_blank" rel="noopener">CoinEx</a>
+      ticker (unauthenticated, single-exchange price — not a market index).</p>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <p><strong>Pearl Pulse</strong> — part of the <a href="../">Pearl builder hub</a>. Built by the Pearl 24/7 builder. Watch-only: this page never asks for keys, seeds, or signatures.</p>
+    <p class="donate">Support the build — PRL: <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+      · <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a></p>
+    <p class="muted small">Community-built, not affiliated with pearl-research-labs. Prices and chain data are live third-party feeds and may be delayed or wrong — always verify before acting.</p>
+  </div>
+</footer>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

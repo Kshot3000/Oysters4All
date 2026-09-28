@@ -11,6 +11,7 @@ Static websites built by the Pearl 24/7 AI builder, published via GitHub Pages.
 | `pages/faucet/` | **Testnet Faucet** — static tPRL faucet frontend: bech32m address validation in-browser, drip requests to a configurable backend. Reference backend in `examples/faucet-backend/` (Node, zero deps; pays via Oyster `sendtoaddress`) |
 | `pages/prl20/` | **PRL-20 Explorer** — static Pearlscriptions / PRL-20 dashboard: tokens with mint progress, inscription browser, operations feed, address balances/transfer-lots/UTXOs — all from a configurable public Pearlscriptions indexer API (`GET`-only, read-only) |
 | `pages/mining/` | **Mining Calculator** — static PRL mining profitability calculator: exact upstream block-subsidy formula (BigInt), hashrate-share rewards, USD revenue vs. power cost, break-even price, emission-schedule charts, optional live `getmininginfo`/`getblockcount` from your own `pearld` node |
+| `pages/pulse/` | **Pearl Pulse** — watch-only PRL portfolio tracker + live network dashboard: address watchlist with in-browser bech32m validation, balances and tx history from the public blockbook API, live PRL/USDT price from CoinEx, chain status card; zero dependencies |
 | `pages/*` | Future sub-sites (dashboards) — each in its own subdirectory, linked from the homepage |
 
 ## Why this exists
