@@ -1,5 +1,5 @@
-/* Pearl Etch bundle (window.PearlEtch) — built with esbuild from src/index.js. Do not edit by hand; run `node build.mjs`. */
-var PearlEtch = (() => {
+/* Pearl Notary bundle (window.PearlNotary) — built with esbuild from src/index.js. Do not edit by hand; run `node build.mjs`. */
+var PearlNotary = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
   var __getOwnPropNames = Object.getOwnPropertyNames;
@@ -18,36 +18,38 @@ var PearlEtch = (() => {
   };
   var __toCommonJS = (mod2) => __copyProps(__defProp({}, "__esModule", { value: true }), mod2);
 
-  // etch/src/index.js
+  // notary/src/index.js
   var index_exports = {};
   __export(index_exports, {
     CARRIER_VALUE_GRAINS: () => CARRIER_VALUE_GRAINS,
     DUST_GRAIN: () => DUST_GRAIN,
     GRAIN_PER_PRL: () => GRAIN_PER_PRL,
     NETWORKS: () => NETWORKS,
-    PRLS: () => PRLS,
-    PRLS_FEE_RECIPIENT: () => PRLS_FEE_RECIPIENT,
-    addressToProgram: () => addressToProgram,
+    NOTARY_MARKER: () => NOTARY_MARKER,
+    NOTARY_VERSION: () => NOTARY_VERSION,
+    addressToProgram: () => addressToProgram2,
     broadcastTx: () => broadcastTx,
-    buildBatchInscriptionScript: () => buildBatchInscriptionScript,
     buildCommitTx: () => buildCommitTx,
+    buildNotaryScript: () => buildNotaryScript,
     buildRevealTxSigned: () => buildRevealTxSigned,
+    buildSealCertificate: () => buildSealCertificate,
     bytesToHex: () => bytesToHex,
-    composeOperation: () => composeOperation,
+    composeNotarization: () => composeNotarization,
     extractEnvelopes: () => extractEnvelopes,
     fetchFeeRateGrainsPerVByte: () => fetchFeeRateGrainsPerVByte,
     fetchUtxos: () => fetchUtxos,
+    hashDocument: () => hashDocument,
     hexToBytes: () => hexToBytes,
     newMnemonic: () => newMnemonic,
-    planInscription: () => planInscription,
-    prlsFeeProgram: () => prlsFeeProgram,
+    planNotarization: () => planNotarization,
     schnorr: () => schnorr,
-    validatePrl20Json: () => validatePrl20Json,
+    sha256: () => sha2562,
+    validateNotaryRecord: () => validateNotaryRecord,
+    verifyNotarizationOnChain: () => verifyNotarizationOnChain,
+    verifyNotarizationWitness: () => verifyNotarizationWitness,
     verifyRevealWitness: () => verifyRevealWitness,
     walletFromMnemonic: () => walletFromMnemonic,
-    walletFromPriv: () => walletFromPriv,
-    walletFromWIF: () => walletFromWIF,
-    witnessOfInput: () => witnessOfInput
+    walletFromWIF: () => walletFromWIF
   });
 
   // sign/lib/noble-hashes/crypto.js
@@ -5838,38 +5840,7 @@ zoo`.split("\n");
       0
     );
   }
-  var OP_CHECKSIG = 172;
-  var OP_FALSE = 0;
-  var OP_IF = 99;
-  var OP_ENDIF = 104;
   var TAPLEAF_VERSION = 192;
-  function pushData(data) {
-    const b = data instanceof Uint8Array ? data : utf8ToBytes(String(data));
-    if (b.length === 0) return [OP_FALSE];
-    if (b.length <= 75) return [b.length, ...b];
-    if (b.length <= 255) return [76, b.length, ...b];
-    if (b.length <= 520) return [77, b.length & 255, b.length >> 8 & 255, ...b];
-    throw new Error("push exceeds 520 bytes");
-  }
-  function buildInscriptionScript(internalXOnly, jsonBytes) {
-    if (!(internalXOnly instanceof Uint8Array) || internalXOnly.length !== 32) throw new Error("internal key must be 32 bytes");
-    const body = jsonBytes instanceof Uint8Array ? jsonBytes : utf8ToBytes(jsonBytes);
-    if (body.length === 0) throw new Error("empty inscription body");
-    const chunks = [];
-    for (let i = 0; i < body.length; i += 520) chunks.push(body.slice(i, i + 520));
-    const script = [
-      ...pushData(internalXOnly),
-      OP_CHECKSIG,
-      OP_FALSE,
-      OP_IF,
-      ...pushData(utf8ToBytes("prl-20")),
-      ...pushData(utf8ToBytes("application/json")),
-      ...pushData(new Uint8Array(0))
-    ];
-    for (const c of chunks) script.push(...pushData(c));
-    script.push(OP_ENDIF);
-    return Uint8Array.from(script);
-  }
   function tapLeafHash(script) {
     const pre = Uint8Array.from([TAPLEAF_VERSION, ...varint(script.length), ...script]);
     return taggedHash2("TapLeaf", pre);
@@ -5967,149 +5938,6 @@ zoo`.split("\n");
     full.push(...varint(3), ...varint(sig.length), ...sig, ...varint(script.length), ...script, ...varint(controlBlock.length), ...controlBlock, ...u32le(0));
     return { txid, hex: bytesToHex(Uint8Array.from(full)), digest: bytesToHex(digest), sig: bytesToHex(sig) };
   }
-  var INTEGER_STRING = /^(0|[1-9][0-9]*)$/;
-  var TICKER_PATTERN = /^[a-z0-9]{1,16}$/;
-  function findDuplicateTopLevelKeys(raw) {
-    const keys = [];
-    let i = 0;
-    const n = raw.length;
-    const skipWs = () => {
-      while (i < n && /\s/.test(raw[i])) i++;
-    };
-    const skipString = () => {
-      let j = i + 1;
-      while (j < n) {
-        const ch = raw[j];
-        if (ch === "\\") {
-          j += 2;
-          continue;
-        }
-        if (ch === '"') break;
-        j++;
-      }
-      i = j + 1;
-    };
-    const skipValue = () => {
-      skipWs();
-      if (raw[i] === '"') {
-        skipString();
-        return;
-      }
-      if (raw[i] === "{" || raw[i] === "[") {
-        const open = raw[i], close = open === "{" ? "}" : "]";
-        let d = 0;
-        while (i < n) {
-          const ch = raw[i];
-          if (ch === '"') {
-            skipString();
-            continue;
-          }
-          if (ch === open) d++;
-          if (ch === close) {
-            d--;
-            if (d === 0) {
-              i++;
-              return;
-            }
-          }
-          i++;
-        }
-        return;
-      }
-      while (i < n && raw[i] !== "," && raw[i] !== "}") i++;
-    };
-    skipWs();
-    if (raw[i] !== "{") return [];
-    i++;
-    skipWs();
-    while (i < n && raw[i] !== "}") {
-      skipWs();
-      if (raw[i] !== '"') {
-        i++;
-        continue;
-      }
-      const ks = i + 1;
-      skipString();
-      let key;
-      try {
-        key = JSON.parse(raw.slice(ks - 1, i));
-      } catch {
-        key = null;
-      }
-      skipWs();
-      if (raw[i] === ":") {
-        if (key !== null) keys.push(key);
-        i++;
-        skipValue();
-        skipWs();
-        if (raw[i] === ",") i++;
-      }
-    }
-    const seen = /* @__PURE__ */ new Set(), dups = [];
-    for (const k of keys) {
-      if (seen.has(k)) dups.push(k);
-      else seen.add(k);
-    }
-    return [...new Set(dups)];
-  }
-  function validatePrl20Json(rawJson, op) {
-    const errors = [];
-    if (!["deploy", "mint", "transfer"].includes(op)) throw new Error(`unsupported op: ${op}`);
-    const dups = findDuplicateTopLevelKeys(rawJson);
-    if (dups.length) errors.push(`duplicate field: ${dups[0]}`);
-    let p;
-    try {
-      p = JSON.parse(rawJson);
-    } catch {
-      return { ok: false, errors: ["not valid JSON"] };
-    }
-    if (!p || typeof p !== "object" || Array.isArray(p)) return { ok: false, errors: ["payload must be a JSON object"] };
-    const need = op === "deploy" ? ["p", "op", "tick", "max", "lim", "dec"] : ["p", "op", "tick", "amt"];
-    for (const k of Object.keys(p)) if (!need.includes(k)) errors.push(`unknown field: ${k}`);
-    for (const k of need) if (!(k in p)) errors.push(`missing field: ${k}`);
-    if (p.p !== "prl-20") errors.push('p must be "prl-20"');
-    if (p.op !== op) errors.push(`op must be "${op}"`);
-    const tick = String(p.tick ?? "").toLowerCase();
-    if (!TICKER_PATTERN.test(tick)) errors.push("tick must be 1-16 lowercase letters/digits");
-    const ints = op === "deploy" ? ["max", "lim", "dec"] : ["amt"];
-    for (const f of ints) {
-      if (typeof p[f] !== "string" || !INTEGER_STRING.test(p[f])) errors.push(`${f} must be a canonical integer string (no leading zeros)`);
-    }
-    if (errors.length) return { ok: false, errors };
-    if (op === "deploy") {
-      const max = BigInt(p.max), lim = BigInt(p.lim), dec = Number(p.dec);
-      if (max <= 0n) errors.push("max must be > 0");
-      if (lim <= 0n) errors.push("lim must be > 0");
-      if (lim > max) errors.push("lim must be <= max");
-      if (!Number.isInteger(dec) || dec < 0 || dec > 18) errors.push("dec must be 0-18");
-      if (tick === PRLS.tick && (p.max !== PRLS.max || p.lim !== PRLS.lim || p.dec !== PRLS.dec))
-        errors.push("prls deploy must use the exact launch params (max 2100000000, lim 100000, dec 18)");
-    } else {
-      if (BigInt(p.amt) <= 0n) errors.push("amt must be > 0");
-    }
-    return { ok: errors.length === 0, errors, tick };
-  }
-  function buildDeployJson({ tick, max, lim, dec }) {
-    const t = String(tick).toLowerCase();
-    const raw = JSON.stringify({ p: "prl-20", op: "deploy", tick: t, max: String(max), lim: String(lim), dec: String(dec) });
-    const v = validatePrl20Json(raw, "deploy");
-    if (!v.ok) throw new Error("invalid deploy: " + v.errors.join("; "));
-    return raw;
-  }
-  function buildMintJson({ tick, amt }) {
-    const t = String(tick).toLowerCase();
-    const raw = JSON.stringify({ p: "prl-20", op: "mint", tick: t, amt: String(amt) });
-    const v = validatePrl20Json(raw, "mint");
-    if (!v.ok) throw new Error("invalid mint: " + v.errors.join("; "));
-    return raw;
-  }
-  function buildTransferJson({ tick, amt }) {
-    const t = String(tick).toLowerCase();
-    const raw = JSON.stringify({ p: "prl-20", op: "transfer", tick: t, amt: String(amt) });
-    const v = validatePrl20Json(raw, "transfer");
-    if (!v.ok) throw new Error("invalid transfer: " + v.errors.join("; "));
-    return raw;
-  }
   async function bbFetch(base, path, opts = {}) {
     const res = await fetch(base.replace(/\/$/, "") + path, opts);
     if (!res.ok) throw new Error(`blockbook ${res.status} on ${path}`);
@@ -6159,95 +5987,9 @@ zoo`.split("\n");
   }
 
   // etch/src/etch-core.js
-  var PRLS_FEE_RECIPIENT = "prl1ppmla838yflfcsm5vr6lfgvfclf4fgn3puja70cke4wqqkl6vflaq3cn7ea";
-  function prlsFeeProgram() {
-    const d = decodeBech32m(PRLS_FEE_RECIPIENT);
-    if (d.version !== 1 || d.program.length !== 32) throw new Error("PRLS fee recipient is not a v1 taproot address");
-    return d.program;
-  }
-  function composeOperation(op, params) {
-    let json;
-    if (op === "deploy") json = buildDeployJson(params);
-    else if (op === "mint") json = buildMintJson(params);
-    else if (op === "transfer") json = buildTransferJson(params);
-    else throw new Error(`unsupported op: ${op}`);
-    const v = validatePrl20Json(json, op);
-    return { op, tick: v.tick, json, bytes: utf8ToBytes(json) };
-  }
-  function splitSingleScript(script) {
-    if (!(script instanceof Uint8Array) || script.length < 40) throw new Error("bad inscription script");
-    if (script[0] !== 32) throw new Error("expected 32-byte key push at script start");
-    if (script[33] !== 172) throw new Error("expected OP_CHECKSIG after key");
-    if (script[34] !== 0 || script[35] !== 99) throw new Error("expected OP_FALSE OP_IF envelope start");
-    if (script[script.length - 1] !== 104) throw new Error("expected OP_ENDIF at script end");
-    return { prefix: script.slice(0, 34), envelope: script.slice(34) };
-  }
-  function buildBatchInscriptionScript(internalXOnly, bodies) {
-    if (!Array.isArray(bodies) || bodies.length === 0) throw new Error("need at least one envelope body");
-    const singles = bodies.map((b) => buildInscriptionScript(internalXOnly, b));
-    const { prefix } = splitSingleScript(singles[0]);
-    const parts = [prefix];
-    for (const s of singles) parts.push(splitSingleScript(s).envelope);
-    const total = parts.reduce((n, p) => n + p.length, 0);
-    const out = new Uint8Array(total);
-    let o = 0;
-    for (const p of parts) {
-      out.set(p, o);
-      o += p.length;
-    }
-    return out;
-  }
   function addressToProgram(address, network) {
     const d = decodeBech32m(address, network.hrp);
     return d.program;
-  }
-  var CARRIER_VALUE_GRAINS = 1e3;
-  function planInscription({ network, internalXOnly, ops, ownerAddress, feeRate, changeAddress }) {
-    if (!Array.isArray(ops) || ops.length === 0) throw new Error("no operations to inscribe");
-    if (!(internalXOnly instanceof Uint8Array) || internalXOnly.length !== 32) throw new Error("bad internal key");
-    const rate = Math.max(1, Math.ceil(Number(feeRate)));
-    if (!Number.isFinite(rate)) throw new Error("bad fee rate");
-    const envelopes = ops.map((o) => composeOperation(o.op, o.params));
-    const script = buildBatchInscriptionScript(internalXOnly, envelopes.map((e) => e.bytes));
-    const info = commitKeyInfo(network, internalXOnly, script);
-    const ownerProgram = addressToProgram(ownerAddress, network);
-    const changeProgram = addressToProgram(changeAddress, network);
-    const prlsMints = envelopes.filter((e) => e.op === "mint" && e.tick === PRLS.tick).length;
-    const allMint = envelopes.every((e) => e.op === "mint");
-    const ownerOutputs = allMint ? [{ program: ownerProgram, value: CARRIER_VALUE_GRAINS }] : envelopes.map(() => ({ program: ownerProgram, value: CARRIER_VALUE_GRAINS }));
-    const feeOutputs = [];
-    let prlsFeeNote = null;
-    if (prlsMints > 0) {
-      if (network.id === "mainnet") {
-        feeOutputs.push({ program: prlsFeeProgram(), value: prlsMints * PRLS.mintFeeGrain });
-      } else {
-        prlsFeeNote = "The PRLS fee recipient is configured for mainnet only \u2014 the fee output is skipped here, so these mints would NOT credit on mainnet indexers.";
-      }
-    }
-    const revealOutputs = [...ownerOutputs, ...feeOutputs];
-    const revealOutSum = revealOutputs.reduce((n, o) => n + o.value, 0);
-    const revealFee = revealTxVBytes(script.length, revealOutputs.length + 1) * rate;
-    const commitValue = revealOutSum + revealFee;
-    return {
-      network,
-      envelopes,
-      script,
-      scriptHex: bytesToHex(script),
-      leafHash: bytesToHex(tapLeafHash(script)),
-      merkleRoot: bytesToHex(info.merkleRoot),
-      commitAddress: info.commitAddress,
-      commitProgram: info.commitXOnly,
-      controlBlock: info.controlBlock,
-      controlBlockHex: bytesToHex(info.controlBlock),
-      ownerOutputs,
-      feeOutputs,
-      prlsMints,
-      prlsFeeNote,
-      revealFee,
-      commitValue,
-      changeProgram,
-      feeRate: rate
-    };
   }
   function buildCommitTx({ network, fundingInputs, commitProgram, commitValue, changeProgram, feeRate }) {
     if (!Array.isArray(fundingInputs) || fundingInputs.length === 0) throw new Error("no funding inputs");
@@ -6412,6 +6154,162 @@ zoo`.split("\n");
       }
     }
     throw new Error("no inscription envelopes found in reveal witness");
+  }
+
+  // notary/src/notary-core.js
+  function hashDocument(data) {
+    let bytes;
+    if (data instanceof Uint8Array) bytes = data;
+    else if (data instanceof ArrayBuffer) bytes = new Uint8Array(data);
+    else if (typeof data === "string") bytes = utf8ToBytes(data);
+    else throw new Error("hashDocument needs Uint8Array, ArrayBuffer, or string");
+    return bytesToHex(sha2562(bytes));
+  }
+  var NOTARY_MARKER = "prl-notary";
+  var NOTARY_VERSION = 1;
+  var MAX_FILENAME = 200;
+  var MAX_TITLE = 120;
+  var MAX_BY = 80;
+  var ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
+  var hasControl = (s) => [...s].some((c) => c < " " || c === "\x7F");
+  function composeNotarization({ hash, filename, size, ts, title, by }) {
+    if (typeof hash !== "string" || !/^[0-9a-f]{64}$/.test(hash))
+      throw new Error("hash must be 64 lowercase hex chars (SHA-256)");
+    if (typeof filename !== "string" || filename.length === 0 || filename.length > MAX_FILENAME)
+      throw new Error(`filename must be 1\u2013${MAX_FILENAME} chars`);
+    if (hasControl(filename)) throw new Error("filename must not contain control characters");
+    if (!Number.isInteger(size) || size < 0 || size > Number.MAX_SAFE_INTEGER)
+      throw new Error("size must be a non-negative integer");
+    if (typeof ts !== "string" || !ISO_RE.test(ts)) throw new Error("ts must be UTC ISO-8601 (\u2026Z)");
+    const t = Date.parse(ts);
+    if (!Number.isFinite(t)) throw new Error("ts does not parse");
+    if (t > Date.now() + 864e5) throw new Error("ts is in the future");
+    if (t < Date.UTC(2009, 0, 3)) throw new Error("ts predates blockchains");
+    if (title !== void 0 && title !== null && title !== "") {
+      if (typeof title !== "string" || title.length > MAX_TITLE) throw new Error(`title must be \u2264 ${MAX_TITLE} chars`);
+      if (hasControl(title)) throw new Error("title must not contain control characters");
+    }
+    if (by !== void 0 && by !== null && by !== "") {
+      if (typeof by !== "string" || by.length > MAX_BY) throw new Error(`by must be \u2264 ${MAX_BY} chars`);
+      if (hasControl(by)) throw new Error("by must not contain control characters");
+    }
+    const fields = { p: "prl-notary", v: NOTARY_VERSION, algo: "sha256", hash, filename, size, ts };
+    if (title) fields.title = title;
+    if (by) fields.by = by;
+    const json = JSON.stringify(fields);
+    return { json, bytes: utf8ToBytes(json), fields };
+  }
+  function validateNotaryRecord(obj) {
+    if (!obj || typeof obj !== "object" || Array.isArray(obj)) throw new Error("record must be an object");
+    const keys = Object.keys(obj);
+    const allowed = ["p", "v", "algo", "hash", "filename", "size", "ts", "title", "by"];
+    for (const k of keys) if (!allowed.includes(k)) throw new Error("unknown field: " + k);
+    if (obj.p !== "prl-notary") throw new Error('p must be "prl-notary"');
+    if (obj.v !== 1) throw new Error("v must be 1");
+    if (obj.algo !== "sha256") throw new Error('algo must be "sha256"');
+    composeNotarization(obj);
+    return obj;
+  }
+  var OP_CHECKSIG = 172;
+  var OP_FALSE = 0;
+  var OP_IF = 99;
+  var OP_ENDIF = 104;
+  function pushData(data) {
+    const b = data instanceof Uint8Array ? data : utf8ToBytes(String(data));
+    if (b.length === 0) return [OP_FALSE];
+    if (b.length <= 75) return [b.length, ...b];
+    if (b.length <= 255) return [76, b.length, ...b];
+    if (b.length <= 65535) return [77, b.length & 255, b.length >> 8 & 255, ...b];
+    return [78, b.length & 255, b.length >> 8 & 255, b.length >> 16 & 255, b.length >> 24 & 255, ...b];
+  }
+  function buildNotaryScript(internalXOnly, bodyBytes) {
+    if (!(internalXOnly instanceof Uint8Array) || internalXOnly.length !== 32)
+      throw new Error("internal key must be 32 bytes");
+    const body = bodyBytes instanceof Uint8Array ? bodyBytes : utf8ToBytes(String(bodyBytes));
+    if (body.length === 0) throw new Error("empty notary body");
+    const script = [
+      ...pushData(internalXOnly),
+      OP_CHECKSIG,
+      OP_FALSE,
+      OP_IF,
+      ...pushData(utf8ToBytes(NOTARY_MARKER)),
+      ...pushData(utf8ToBytes("application/json")),
+      ...pushData(new Uint8Array(0))
+    ];
+    for (let i = 0; i < body.length; i += 520) script.push(...pushData(body.slice(i, i + 520)));
+    script.push(OP_ENDIF);
+    return Uint8Array.from(script);
+  }
+  function addressToProgram2(address, network) {
+    const d = decodeBech32m(address, network.hrp);
+    if (d.version !== 1 || d.program.length !== 32) throw new Error("address is not a v1 taproot address");
+    return d.program;
+  }
+  var CARRIER_VALUE_GRAINS = 1e3;
+  function planNotarization({ network, internalXOnly, notary, ownerAddress, changeAddress, feeRate }) {
+    if (!(internalXOnly instanceof Uint8Array) || internalXOnly.length !== 32) throw new Error("bad internal key");
+    const rate = Math.max(1, Math.ceil(Number(feeRate)));
+    if (!Number.isFinite(rate)) throw new Error("bad fee rate");
+    const composed = typeof notary === "string" ? { json: notary, bytes: utf8ToBytes(notary) } : notary;
+    if (!composed || !(composed.bytes instanceof Uint8Array)) throw new Error("bad notarization");
+    const script = buildNotaryScript(internalXOnly, composed.bytes);
+    const info = commitKeyInfo(network, internalXOnly, script);
+    const ownerProgram = addressToProgram2(ownerAddress, network);
+    const changeProgram = addressToProgram2(changeAddress, network);
+    const ownerOutputs = [{ program: ownerProgram, value: CARRIER_VALUE_GRAINS }];
+    const feeOutputs = [];
+    const outSum = CARRIER_VALUE_GRAINS;
+    const revealFee = revealTxVBytes(script.length, ownerOutputs.length + 1) * rate;
+    const commitValue = outSum + revealFee;
+    return {
+      network,
+      envelope: composed,
+      script,
+      scriptHex: bytesToHex(script),
+      leafHash: bytesToHex(tapLeafHash(script)),
+      merkleRoot: bytesToHex(info.merkleRoot),
+      commitAddress: info.commitAddress,
+      commitProgram: info.commitXOnly,
+      controlBlock: info.controlBlock,
+      controlBlockHex: bytesToHex(info.controlBlock),
+      ownerOutputs,
+      feeOutputs,
+      revealFee,
+      commitValue,
+      changeProgram,
+      feeRate: rate
+    };
+  }
+  function verifyNotarizationWitness(revealHex, documentBytes) {
+    const envs = verifyRevealWitness(revealHex);
+    const env = envs.find((e) => e.marker === NOTARY_MARKER);
+    if (!env) throw new Error("no prl-notary envelope in this reveal");
+    const record = validateNotaryRecord(env.parsed);
+    const hash = hashDocument(documentBytes);
+    return { record, hash, match: hash === record.hash, marker: env.marker };
+  }
+  async function verifyNotarizationOnChain(blockbookUrl, revealTxid, documentBytes) {
+    if (!/^[0-9a-f]{64}$/i.test(revealTxid || "")) throw new Error("bad reveal txid");
+    const base = String(blockbookUrl).replace(/\/+$/, "");
+    const r = await fetch(`${base}/api/v2/tx/${revealTxid.toLowerCase()}`);
+    if (!r.ok) throw new Error(`blockbook tx lookup failed: HTTP ${r.status}`);
+    const tx = await r.json();
+    if (!tx.hex) throw new Error("blockbook did not return raw tx hex");
+    const v = verifyNotarizationWitness(tx.hex, documentBytes);
+    return { ...v, txid: tx.txid, blockHeight: tx.blockHeight ?? null, blockTime: tx.blockTime ?? null, confirmations: tx.confirmations ?? 0 };
+  }
+  function buildSealCertificate({ plan, commitTxid, revealTxid, blockHeight, blockTime }) {
+    const rec = plan.envelope.fields || validateNotaryRecord(JSON.parse(plan.envelope.json));
+    return {
+      app: "Pearl Notary",
+      network: plan.network.label,
+      record: rec,
+      envelope: { marker: NOTARY_MARKER, contentType: "application/json", leafHash: plan.leafHash, merkleRoot: plan.merkleRoot },
+      commit: { txid: commitTxid, address: plan.commitAddress },
+      reveal: { txid: revealTxid, blockHeight: blockHeight ?? null, blockTime: blockTime ?? null },
+      verify: "Re-hash the document with SHA-256 and compare to record.hash; fetch the reveal tx and check the prl-notary envelope.",
+      issuedAt: (/* @__PURE__ */ new Date()).toISOString()
+    };
   }
   return __toCommonJS(index_exports);
 })();

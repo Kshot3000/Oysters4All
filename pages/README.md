@@ -18,6 +18,7 @@ Static websites built by the Pearl 24/7 AI builder, published via GitHub Pages.
 | `pages/gallery/` | **Pearl Gallery** — Pearlscriptions inscription wall: latest-inscriptions grid with lazy previews, content-type filters, lookup by number/id, address collections, detail modal with full metadata; reads a configurable public Pearlscriptions indexer API (GET-only); HTML/SVG never rendered; 15/15 core + 2/2 DOM tests |
 | `pages/etch/` | **Pearl Etch** — PRL-20 inscription composer: compose deploy/mint/transfer ops with strict spec validation, build + sign the Taproot commit/reveal pair locally (BIP-86 keys, BIP-341), batch envelopes, automatic PRLS launch-fee output, indexer-style witness self-verification; 13/13 node tests |
 | `pages/escrow/` | **Pearl Escrow** — bonded 2-of-3 escrow: Taproot contract with OP_CHECKSIGADD release leaf (buyer/seller/arbiter) + CLTV timelocked refund leaf, NUMS internal key, local signing with per-signature verification, fee planning, Blockbook funding lookup + broadcast; 16/16 core + 6/6 DOM tests |
+| `pages/notary/` | **Pearl Notary** — proof-of-existence timestamping: SHA-256 document fingerprint sealed in a Taproot `prl-notary` envelope via commit/reveal, 5-step wizard + printable seal certificate + standalone on-chain verifier; 16/16 core + 3/3 DOM tests |
 | `pages/*` | Future sub-sites (dashboards) — each in its own subdirectory, linked from the homepage |
 
 ## Why this exists

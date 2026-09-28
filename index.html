@@ -31,6 +31,7 @@
         <a href="pages/gallery/">Gallery</a>
         <a href="pages/etch/">Etch</a>
         <a href="pages/escrow/">Escrow</a>
+        <a href="pages/notary/">Notary</a>
         <a href="pages/pool/">Mining pool</a>
         <a href="pages/wallet/">Wallet</a>
         <a href="pages/mining/">Mining calc</a>
@@ -250,6 +251,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Gallery — Inscription Wall <span class="badge">new</span></h3>
             <p>The gallery wall for Pearlscriptions — every on-chain inscription hung in brass frames: latest-inscriptions wall with lazy previews, content-type filters, lookup by number or id, address collections, and a detail view with full metadata. Reads any public Pearlscriptions indexer API; HTML and SVG are never executed.</p>
             <div class="card-links"><a href="pages/gallery/">Open Pearl Gallery →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Notary — Proof of Existence <span class="badge">new</span></h3>
+            <p>Seal any document's SHA-256 fingerprint into Pearl with a Taproot inscription — the chain is the witness. Five-step wizard (document → key → commit → reveal → seal) with a printable certificate, plus a standalone verifier that re-hashes and checks the on-chain envelope. Documents never leave your machine.</p>
+            <div class="card-links"><a href="pages/notary/">Open Pearl Notary →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Escrow — Bonded 2-of-3 Escrow <span class="badge">new</span></h3>

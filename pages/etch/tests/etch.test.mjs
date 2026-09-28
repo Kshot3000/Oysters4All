@@ -251,3 +251,14 @@ test("newMnemonic produces a valid wallet", () => {
   assert.ok(w.address.startsWith("prl1p"));
   assert.equal(w.internalXOnly.length, 32);
 });
+
+test("tokenizer survives 0x4e with high-bit length (signed-shift OOM regression)", () => {
+  // 2026-09-28: OP_PUSHDATA4 length decoded with signed `<< 24` wrapped
+  // negative on high-bit lengths (occurs naturally inside random Schnorr
+  // signatures, which extractEnvelopes scans as candidate leaves), driving
+  // the tokenizer offset hugely negative into an infinite OOM loop.
+  // Must terminate and yield no envelopes.
+  const hostile = new Uint8Array([0xa1, 0x74, 0xe4, 0x90, 0x92, 0xdd, 0xc5, 0x4e, 0x89, 0xe9, 0x0a, 0xfa, 0x3f, 0xdb, 0xcb, 0xc1]);
+  const envs = extractEnvelopes(hostile);
+  assert.deepEqual(envs, []);
+});

@@ -1,0 +1,112 @@
+/* Pearl Notary — notary-desk theme: deep ink, parchment, brass, wax seal. */
+:root {
+  --ink: #0b1322;
+  --ink-2: #101a30;
+  --parchment: #f2e8cf;
+  --parchment-dim: #e4d5b3;
+  --brass: #c9a227;
+  --brass-hi: #e8c85a;
+  --wax: #a33327;
+  --text: #e9e2d0;
+  --muted: #9aa3b5;
+  --ok: #7fb069;
+  --err: #e06c5b;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: radial-gradient(1200px 600px at 50% -10%, #16233d 0%, var(--ink) 60%);
+  color: var(--text); font-family: Georgia, 'Times New Roman', serif; min-height: 100vh;
+}
+.topbar {
+  display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between;
+  padding: 1rem 1.5rem; border-bottom: 2px solid var(--brass);
+  background: linear-gradient(180deg, rgba(201,162,39,.08), transparent);
+}
+.brand { display: flex; gap: .8rem; align-items: center; }
+.seal-mark { width: 44px; height: 44px; color: var(--brass); flex: none; }
+.brand h1 { margin: 0; font-size: 1.7rem; letter-spacing: .04em; color: var(--parchment); }
+.tagline { margin: .15rem 0 0; color: var(--muted); font-style: italic; font-size: .92rem; }
+.steps { display: flex; gap: .35rem; flex-wrap: wrap; }
+.steps button {
+  font-family: inherit; background: transparent; color: var(--muted);
+  border: 1px solid #2a3a5c; border-radius: 999px; padding: .42rem .8rem; cursor: pointer; font-size: .85rem;
+}
+.steps button.active { color: var(--ink); background: var(--brass); border-color: var(--brass); font-weight: bold; }
+.steps button.done { color: var(--brass-hi); border-color: var(--brass); }
+.steps button.verify-tab { border-style: dashed; }
+main { max-width: 860px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+.panel { display: none; }
+.panel.active { display: block; animation: fade .25s ease; }
+@keyframes fade { from { opacity: 0; transform: translateY(6px); } }
+h2 { color: var(--parchment); font-size: 1.5rem; margin: 0 0 .4rem; letter-spacing: .02em; }
+h3 { color: var(--brass-hi); font-size: 1.1rem; }
+.lede { color: var(--muted); font-style: italic; margin-top: 0; }
+.record-card, .seal-card {
+  background: var(--parchment); color: #2a2118; border-radius: 10px; padding: 1.1rem 1.2rem;
+  margin: 1rem 0; box-shadow: 0 6px 24px rgba(0,0,0,.45), inset 0 0 60px rgba(160,120,40,.12);
+  border: 1px solid var(--brass);
+}
+.seal-card { text-align: left; position: relative; }
+.seal-card h3 { color: #4a3a1c; margin-top: 0; text-align: center; letter-spacing: .05em; }
+.seal-stamp {
+  width: 64px; height: 64px; margin: 0 auto .6rem; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #c14a3a, var(--wax) 65%, #7c241b);
+  color: #f6e3c8; display: flex; align-items: center; justify-content: center;
+  font-size: 1.8rem; box-shadow: 0 3px 10px rgba(0,0,0,.4), inset 0 2px 5px rgba(255,255,255,.25);
+  border: 2px dashed rgba(246,227,200,.55);
+}
+.prow { display: flex; gap: .8rem; padding: .35rem 0; border-bottom: 1px dotted #b89b5e; align-items: baseline; flex-wrap: wrap; }
+.prow .k { min-width: 130px; font-weight: bold; color: #6b5320; font-variant: small-caps; letter-spacing: .04em; }
+.prow code { word-break: break-all; font-size: .85rem; }
+pre.json { background: #2a2118; color: var(--parchment); padding: .8rem; border-radius: 6px; overflow-x: auto; font-size: .82rem; }
+.dropzone {
+  border: 2px dashed var(--brass); border-radius: 10px; padding: 1.6rem; text-align: center;
+  margin: 1rem 0; cursor: pointer; transition: background .15s;
+}
+.dropzone:hover, .dropzone.over { background: rgba(201,162,39,.1); }
+.dz-main { font-size: 1.05rem; margin: 0 0 .3rem; }
+.filelink { color: var(--brass-hi); text-decoration: underline; cursor: pointer; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: .9rem; margin: 1rem 0; }
+label { display: flex; flex-direction: column; gap: .35rem; color: var(--parchment); font-size: .92rem; }
+input, select, textarea {
+  font-family: inherit; background: var(--ink-2); color: var(--text);
+  border: 1px solid #2a3a5c; border-radius: 6px; padding: .55rem .7rem; font-size: .95rem; width: 100%;
+}
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--brass); border-color: var(--brass); }
+textarea { resize: vertical; }
+.row { display: flex; gap: .6rem; flex-wrap: wrap; margin: .9rem 0; align-items: center; }
+.row.end { justify-content: flex-end; }
+.btn {
+  font-family: inherit; border: 1px solid var(--brass); background: transparent; color: var(--brass-hi);
+  border-radius: 6px; padding: .55rem 1rem; cursor: pointer; font-size: .92rem;
+}
+.btn:hover:not(:disabled) { background: rgba(201,162,39,.15); }
+.btn.primary { background: var(--brass); color: var(--ink); font-weight: bold; }
+.btn.primary:hover:not(:disabled) { background: var(--brass-hi); }
+.btn.ghost { border-color: #2a3a5c; color: var(--muted); }
+.btn.tiny { padding: .25rem .6rem; font-size: .8rem; }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.error { background: #3a1512; border: 1px solid var(--err); color: #f2b8ac; padding: .7rem .9rem; border-radius: 6px; margin: .8rem 0; }
+.ok { background: #16281a; border: 1px solid var(--ok); color: #c4e3b2; padding: .7rem .9rem; border-radius: 6px; margin: .8rem 0; }
+.ok pre { background: #0e1a10; color: #c4e3b2; padding: .6rem; border-radius: 4px; overflow-x: auto; }
+.hint { color: var(--muted); font-size: .85rem; font-style: italic; }
+.record-card .hint { color: #7a6435; }
+code { font-family: ui-monospace, Menlo, Consolas, monospace; }
+.blur { filter: blur(6px); user-select: none; }
+.blur.shown { filter: none; user-select: text; }
+.utxo-list { display: flex; flex-direction: column; gap: .4rem; margin: .6rem 0; }
+.utxo-list .u { display: flex; justify-content: space-between; background: var(--ink-2); border: 1px solid #2a3a5c; border-radius: 6px; padding: .5rem .7rem; }
+.count { color: var(--brass-hi); }
+footer { text-align: center; padding: 2rem 1rem; color: var(--muted); font-size: .85rem; border-top: 1px solid #2a3a5c; }
+footer a { color: var(--brass-hi); }
+#donate-addr { font-size: .75rem; }
+@media print {
+  .topbar, .row, footer, #steps { display: none; }
+  body { background: #fff; color: #000; }
+  .panel { display: none; }
+  #step-seal { display: block; }
+}
+@media (max-width: 640px) {
+  .topbar { padding: .8rem; }
+  .steps button { padding: .35rem .6rem; font-size: .78rem; }
+}

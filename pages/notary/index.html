@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Notary — Proof-of-Existence Timestamping on Pearl</title>
+<meta name="description" content="Pearl Notary: hash any document and seal its SHA-256 digest into Pearl with a Taproot inscription. Verify later — the chain is the witness. All crypto runs locally in your browser.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="16" cy="16" r="8.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M11 16.5 L15 20.5 L21.5 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div>
+      <h1>Pearl Notary</h1>
+      <p class="tagline">Seal any document's fingerprint into Pearl — the chain is the witness</p>
+    </div>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-step="document" class="active">1 · Document</button>
+    <button data-step="key">2 · Key</button>
+    <button data-step="commit">3 · Commit</button>
+    <button data-step="reveal">4 · Reveal</button>
+    <button data-step="seal">5 · Seal</button>
+    <button data-step="verify" class="verify-tab">Verify</button>
+  </nav>
+</header>
+
+<main>
+  <!-- STEP 1: DOCUMENT -->
+  <section id="step-document" class="panel active">
+    <h2>The document</h2>
+    <p class="lede">Drop a file or paste text. Its SHA-256 fingerprint is computed <b>on this machine</b> —
+    the document itself never leaves your browser. Only the fingerprint is engraved on-chain.</p>
+    <div id="dropzone" class="dropzone" tabindex="0">
+      <p class="dz-main">Drop a file here, or <label class="filelink">choose one<input type="file" id="file-input" hidden></label></p>
+      <p class="hint">or paste text below</p>
+    </div>
+    <textarea id="doc-text" rows="5" placeholder="…or paste the document text here"></textarea>
+    <div class="form-grid">
+      <label>Title (optional, ≤120 chars)<input id="doc-title" maxlength="120" placeholder="e.g. Loan agreement — final draft"></label>
+      <label>Notarized by (optional, ≤80 chars)<input id="doc-by" maxlength="80" placeholder="e.g. Alice"></label>
+      <label>Filename on record<input id="doc-filename" maxlength="200" value="document.txt"></label>
+    </div>
+    <div class="row">
+      <button id="seal-compose" class="btn primary">Compute fingerprint &amp; compose ↓</button>
+    </div>
+    <div id="doc-error" class="error" hidden></div>
+    <div id="doc-result" class="record-card" hidden>
+      <div class="prow"><span class="k">SHA-256</span><code id="doc-hash"></code></div>
+      <div class="prow"><span class="k">Size</span><span id="doc-size"></span></div>
+      <div class="prow"><span class="k">Envelope</span><pre id="doc-envelope" class="json"></pre></div>
+      <p class="hint">Envelope marker <code>prl-notary</code> — deliberately distinct from <code>prl-20</code>, so token indexers never mistake it for a token operation.</p>
+    </div>
+    <div class="row end">
+      <button id="to-key" class="btn primary" disabled>Continue to key →</button>
+    </div>
+  </section>
+
+  <!-- STEP 2: KEY -->
+  <section id="step-key" class="panel">
+    <h2>Key &amp; network</h2>
+    <p class="lede">Notary signs both transactions locally — your key never leaves this page. Generate a fresh key or import your own.</p>
+    <div class="form-grid">
+      <label>Network
+        <select id="network">
+          <option value="mainnet" selected>Mainnet (prl…)</option>
+          <option value="testnet">Testnet (tprl…)</option>
+        </select>
+      </label>
+      <label>Blockbook endpoint<input id="blockbook" spellcheck="false"></label>
+      <label>Key source
+        <select id="key-source">
+          <option value="generate" selected>Generate new (BIP-39)</option>
+          <option value="mnemonic">Import mnemonic</option>
+          <option value="wif">Import WIF</option>
+        </select>
+      </label>
+      <label id="key-input-wrap" hidden>Secret<input id="key-input" type="password" autocomplete="off" spellcheck="false"></label>
+    </div>
+    <div class="row">
+      <button id="make-key" class="btn primary">Create key</button>
+      <button id="new-key" class="btn ghost">New random key</button>
+    </div>
+    <div id="key-error" class="error" hidden></div>
+    <div id="key-card" class="record-card" hidden>
+      <div class="prow"><span class="k">Address</span><code id="key-address"></code></div>
+      <div class="prow"><span class="k">Mnemonic</span>
+        <span><code id="key-mnemonic" class="blur"></code>
+        <button id="reveal-mnemonic" class="btn tiny ghost">show</button></span>
+      </div>
+      <p class="hint">Fund this address with enough PRL for the commit (owner output + fees), then continue.</p>
+    </div>
+    <div class="row end">
+      <button id="to-commit" class="btn primary" disabled>Continue to commit →</button>
+    </div>
+  </section>
+
+  <!-- STEP 3: COMMIT -->
+  <section id="step-commit" class="panel">
+    <h2>Commit</h2>
+    <p class="lede">The commit transaction locks funds to the Taproot address that commits to your envelope — without revealing it yet.</p>
+    <div id="commit-plan" class="record-card" hidden></div>
+    <h3>Funding UTXOs</h3>
+    <div class="row">
+      <button id="fetch-utxos" class="btn">Fetch from blockbook</button>
+    </div>
+    <div id="utxo-list" class="utxo-list"></div>
+    <label>Paste UTXOs instead <span class="hint">(one <code>txid:vout:value</code> per line)</span>
+      <textarea id="utxo-paste" rows="3" spellcheck="false" placeholder="ab12…:0:250000"></textarea>
+    </label>
+    <div class="form-grid">
+      <label>Fee rate <span id="fee-readout" class="hint">5 grains/vB</span>
+        <input type="range" id="fee-slider" min="1" max="100" value="5">
+      </label>
+    </div>
+    <div class="row">
+      <button id="fee-auto" class="btn ghost">Auto fee from blockbook</button>
+      <button id="build-commit" class="btn primary" disabled>Build &amp; sign commit</button>
+    </div>
+    <div id="commit-error" class="error" hidden></div>
+    <div id="commit-result" class="record-card" hidden>
+      <div class="prow"><span class="k">Commit txid</span><code id="commit-txid"></code></div>
+      <div class="prow"><span class="k">Fee</span><span id="commit-fee"></span></div>
+      <label>Signed commit hex<textarea id="commit-hex" rows="4" readonly spellcheck="false"></textarea></label>
+      <div class="row">
+        <button id="copy-commit" class="btn ghost">Copy hex</button>
+        <button id="broadcast-commit" class="btn primary">Broadcast commit</button>
+      </div>
+      <div id="commit-broadcast" class="ok" hidden></div>
+    </div>
+    <div class="row end">
+      <button id="to-reveal" class="btn primary" disabled>Continue to reveal →</button>
+    </div>
+  </section>
+
+  <!-- STEP 4: REVEAL -->
+  <section id="step-reveal" class="panel">
+    <h2>Reveal</h2>
+    <p class="lede">Once the commit confirms, the reveal spends it via the script path and publishes your envelope on-chain.</p>
+    <div class="form-grid">
+      <label>Commit txid<input id="reveal-commit-txid" spellcheck="false" placeholder="64 hex chars"></label>
+      <label>Commit vout<input id="reveal-commit-vout" value="0" inputmode="numeric"></label>
+    </div>
+    <div class="row">
+      <button id="detect-commit" class="btn ghost">Detect commit UTXO</button>
+      <button id="build-reveal" class="btn primary">Build &amp; sign reveal</button>
+    </div>
+    <div id="reveal-error" class="error" hidden></div>
+    <div id="reveal-plan" class="record-card" hidden></div>
+    <div id="reveal-result" class="record-card" hidden>
+      <div class="prow"><span class="k">Reveal txid</span><code id="reveal-txid"></code></div>
+      <div class="prow"><span class="k">Fee</span><span id="reveal-fee"></span></div>
+      <label>Signed reveal hex<textarea id="reveal-hex" rows="4" readonly spellcheck="false"></textarea></label>
+      <div class="row">
+        <button id="copy-reveal" class="btn ghost">Copy hex</button>
+        <button id="verify-reveal" class="btn">Verify envelope (indexer-style)</button>
+        <button id="broadcast-reveal" class="btn primary">Broadcast reveal</button>
+      </div>
+      <div id="reveal-verify" class="ok" hidden></div>
+      <div id="reveal-broadcast" class="ok" hidden></div>
+    </div>
+    <div class="row end">
+      <button id="to-seal" class="btn primary" disabled>Continue to seal →</button>
+    </div>
+  </section>
+
+  <!-- STEP 5: SEAL -->
+  <section id="step-seal" class="panel">
+    <h2>The seal</h2>
+    <p class="lede">Your notarization is on-chain. This certificate is the audit trail — keep it with the document.</p>
+    <div class="seal-card">
+      <div class="seal-stamp" aria-hidden="true">✦</div>
+      <h3>Pearl Notary — Certificate of Existence</h3>
+      <div id="seal-body"></div>
+    </div>
+    <div class="row">
+      <button id="lookup-block" class="btn">Look up confirmation</button>
+      <button id="copy-cert" class="btn ghost">Copy certificate JSON</button>
+      <button id="download-cert" class="btn ghost">Download .json</button>
+      <button id="print-cert" class="btn ghost">Print</button>
+    </div>
+    <div id="seal-error" class="error" hidden></div>
+    <div class="row end">
+      <button id="restart" class="btn ghost">Notarize another document</button>
+    </div>
+  </section>
+
+  <!-- VERIFY -->
+  <section id="step-verify" class="panel">
+    <h2>Verify a notarization</h2>
+    <p class="lede">Give the verifier the document and the reveal txid. We re-hash the document, fetch the
+    reveal from blockbook, parse its witness exactly like an indexer would, and compare.</p>
+    <div class="form-grid">
+      <label>Blockbook endpoint<input id="v-blockbook" spellcheck="false"></label>
+      <label>Reveal txid<input id="v-txid" spellcheck="false" placeholder="64 hex chars"></label>
+    </div>
+    <div id="v-dropzone" class="dropzone" tabindex="0">
+      <p class="dz-main">Drop the document here, or <label class="filelink">choose one<input type="file" id="v-file-input" hidden></label></p>
+    </div>
+    <textarea id="v-text" rows="4" placeholder="…or paste the document text here"></textarea>
+    <div class="row">
+      <button id="v-run" class="btn primary">Verify</button>
+    </div>
+    <div id="v-error" class="error" hidden></div>
+    <div id="v-result" class="record-card" hidden></div>
+  </section>
+</main>
+
+<footer>
+  <p>Built by <a href="https://x.com/kshot9000">@kshot9000</a> for the Pearl ecosystem ·
+  <button id="copy-donate" class="btn tiny ghost" title="Copy donation address">Donate PRL</button>
+  <code id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code></p>
+  <p class="hint">Notary seals SHA-256 fingerprints into Pearl via Taproot commit/reveal. Documents never leave your machine. Nothing here is legal advice.</p>
+</footer>
+
+<script src="pearl-notary.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>

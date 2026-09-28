@@ -226,7 +226,18 @@ function tokenizeScript(script) {
     else if (op <= 75) { toks.push({ data: script.slice(i, i + op) }); i += op; }
     else if (op === 0x4c) { const n = script[i++]; toks.push({ data: script.slice(i, i + n) }); i += n; }
     else if (op === 0x4d) { const n = script[i] | (script[i + 1] << 8); i += 2; toks.push({ data: script.slice(i, i + n) }); i += n; }
-    else if (op === 0x4e) { const n = script[i] | (script[i + 1] << 8) | (script[i + 2] << 16) | (script[i + 3] << 24); i += 4; toks.push({ data: script.slice(i, i + n) }); i += n; }
+    else if (op === 0x4e) {
+      // NOTE (2026-09-28): the 4-byte push length MUST decode unsigned.
+      // `x << 24` is a signed int32 op in JS: a length with the high bit set
+      // (e.g. inside a random Schnorr signature, which extractEnvelopes scans
+      // as a candidate leaf) wrapped negative, drove `i` hugely negative, and
+      // looped forever allocating tokens until OOM. Caught by the Pearl Notary
+      // suite via a reveal whose sig contained 0x4e <high-bit length>.
+      const n = (script[i] | (script[i + 1] << 8) | (script[i + 2] << 16) | (script[i + 3] << 24)) >>> 0;
+      i += 4;
+      if (n > script.length - i) break; // corrupt push: stop, don't trust the length
+      toks.push({ data: script.slice(i, i + n) }); i += n;
+    }
     else toks.push({ opcode: op });
   }
   return toks;
@@ -280,8 +291,8 @@ function readVarint(b, o) {
   const f = b[o];
   if (f < 0xfd) return [f, 1];
   if (f === 0xfd) return [b[o + 1] | (b[o + 2] << 8), 3];
-  if (f === 0xfe) return [b[o + 1] | (b[o + 2] << 8) | (b[o + 3] << 16) | (b[o + 4] << 24), 5];
-  const lo = b[o + 1] | (b[o + 2] << 8) | (b[o + 3] << 16) | (b[o + 4] << 24);
+  if (f === 0xfe) return [(b[o + 1] | (b[o + 2] << 8) | (b[o + 3] << 16) | (b[o + 4] << 24)) >>> 0, 5];
+  const lo = (b[o + 1] | (b[o + 2] << 8) | (b[o + 3] << 16) | (b[o + 4] << 24)) >>> 0;
   return [lo, 9]; // high 32 bits ignored (values fit)
 }
 
