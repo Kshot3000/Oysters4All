@@ -16,9 +16,19 @@ const {
   fmtBytes, short, normalizeCard, inscriptionsQuery, parseLookup, findByNumber,
 } = window.__galleryCore || {};
 
+/* localStorage may be unavailable or throw (private mode, blocked site data,
+ * sandboxed iframes). Never let that kill the app: fall back to memory. */
+const memStore = {};
 const store = {
-  get api() { return (localStorage.getItem(LS_KEY) || "").replace(/\/+$/, ""); },
-  set api(v) { localStorage.setItem(LS_KEY, (v || "").trim().replace(/\/+$/, "")); },
+  get api() {
+    try { return (localStorage.getItem(LS_KEY) || "").replace(/\/+$/, ""); }
+    catch { return (memStore[LS_KEY] || "").replace(/\/+$/, ""); }
+  },
+  set api(v) {
+    const clean = (v || "").trim().replace(/\/+$/, "");
+    try { localStorage.setItem(LS_KEY, clean); } catch {}
+    memStore[LS_KEY] = clean;
+  },
 };
 
 function esc(s) {
@@ -381,6 +391,23 @@ function switchTab(name) {
 }
 
 /* ---------- boot ---------- */
+function safeBoot() {
+  try {
+    boot();
+  } catch (e) {
+    // Never leave the page silently dead: surface the failure where the
+    // operator can see it and keep the static content honest.
+    try {
+      const el = $("conn");
+      el.className = "conn err";
+      el.textContent = "gallery failed to start: " + String((e && e.message) || e);
+      $("wall").innerHTML = '<div class="empty">The gallery could not start in this browser (' +
+        esc(String((e && e.message) || e)) + '). The page content above is static.</div>';
+    } catch {}
+    if (typeof console !== "undefined" && console.error) console.error("[gallery] boot failed:", e);
+  }
+}
+
 function boot() {
   // gallery-core.js loads before this script and exposes window.__galleryCore
   $("api-url").value = store.api;
@@ -409,7 +436,7 @@ function boot() {
 }
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", boot);
+  document.addEventListener("DOMContentLoaded", safeBoot);
 } else {
-  boot();
+  safeBoot();
 }

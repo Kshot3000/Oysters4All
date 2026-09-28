@@ -131,6 +131,31 @@ test("gallery boots, connects, renders wall, filters, opens detail modal", async
   }
 });
 
+test("gallery survives hostile localStorage (throws on access)", async () => {
+  let JSDOM;
+  try { ({ JSDOM } = require("jsdom")); } catch { console.log("SKIP: jsdom not installed"); return; }
+  const html = readFileSync(join(HERE, "..", "index.html"), "utf8");
+  const core = readFileSync(join(HERE, "..", "js", "gallery-core.js"), "utf8");
+  const app = readFileSync(join(HERE, "..", "app.js"), "utf8");
+  const dom = new JSDOM(html, { url: "https://kshot3000.github.io/x/", runScripts: "outside-only" });
+  const { window } = dom;
+  try {
+    window.fetch = (...args) => fetch(...args);
+    window.IntersectionObserver = class { constructor() {} observe() {} unobserve() {} disconnect() {} };
+    // simulate blocked site data: every localStorage access throws
+    const bomb = () => { throw new Error("denied"); };
+    window.localStorage.getItem = bomb;
+    window.localStorage.setItem = bomb;
+    window.eval(core); window.eval(app);
+    await new Promise((r) => setTimeout(r, 100));
+    // boot survived: tabs still switch, footer address injected, honest state shown
+    window.document.querySelector('.tab[data-tab="lookup"]').click();
+    assert.ok(!window.document.getElementById("panel-lookup").classList.contains("hidden"), "lookup panel opens");
+    assert.match(window.document.getElementById("donate-addr").textContent, /prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d/);
+    assert.match(window.document.getElementById("api-hint").textContent, /Not connected/);
+  } finally { window.close(); }
+});
+
 test("gallery renders honest unconfigured state", async () => {
   let JSDOM;
   try { ({ JSDOM } = require("jsdom")); } catch { console.log("SKIP: jsdom not installed"); return; }
@@ -140,11 +165,11 @@ test("gallery renders honest unconfigured state", async () => {
   const dom = new JSDOM(html, { url: "https://kshot3000.github.io/x/", runScripts: "outside-only" });
   const { window } = dom;
   try {
-  window.fetch = (...args) => fetch(...args);
-  window.IntersectionObserver = class { constructor() {} observe() {} unobserve() {} disconnect() {} };
-  window.eval(core); window.eval(app); // boot runs via readyState/DOMContentLoaded
-  await new Promise((r) => setTimeout(r, 100));
-  assert.match(window.document.getElementById("conn").textContent, /unconfigured/);
-  assert.match(window.document.getElementById("wall").textContent, /Set the indexer API URL/);
+    window.fetch = (...args) => fetch(...args);
+    window.IntersectionObserver = class { constructor() {} observe() {} unobserve() {} disconnect() {} };
+    window.eval(core); window.eval(app); // boot runs via readyState/DOMContentLoaded
+    await new Promise((r) => setTimeout(r, 100));
+    assert.match(window.document.getElementById("conn").textContent, /unconfigured/);
+    assert.match(window.document.getElementById("wall").textContent, /Set the indexer API URL/);
   } finally { window.close(); }
 });
