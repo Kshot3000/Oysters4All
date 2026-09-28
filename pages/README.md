@@ -13,6 +13,7 @@ Static websites built by the Pearl 24/7 AI builder, published via GitHub Pages.
 | `pages/mining/` | **Mining Calculator** — static PRL mining profitability calculator: exact upstream block-subsidy formula (BigInt), hashrate-share rewards, USD revenue vs. power cost, break-even price, emission-schedule charts, optional live `getmininginfo`/`getblockcount` from your own `pearld` node |
 | `pages/rig/` | **Pearl Rig** — GPU mining profitability planner: wall-power fleet builder (sourced CMP 90HX preset), live PRL/USD price (CoinGecko default, CoinEx PEARLUSDT alternate via `proxy.mjs`), measured-output or TH/s-yield revenue models, pool fees, capex break-even, price-sensitivity table; exact upstream subsidy math (BigInt), 23/23 node tests |
 | `pages/pulse/` | **Pearl Pulse** — watch-only PRL portfolio tracker + live network dashboard: address watchlist with in-browser bech32m validation, balances and tx history from the public blockbook API, live PRL/USDT price from CoinEx, chain status card; zero dependencies |
+| `pages/sign/` | **Pearl Sign** — air-gapped Taproot transaction forge: BIP-86 key derivation, UTXO assembly (blockbook or pasted), exact vBytes fee math, BIP-341 keypath Schnorr signing (SIGHASH_DEFAULT + SINGLE\|ANYONECANPAY presign), local per-input signature re-verification, broadcast via blockbook or `pearld` `sendrawtransaction`; all crypto vendored, works offline once loaded; 16/16 node tests |
 | `pages/*` | Future sub-sites (dashboards) — each in its own subdirectory, linked from the homepage |
 
 ## Why this exists

@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Sign — Air-gapped Taproot Transaction Forge for Pearl (PRL)</title>
+<meta name="description" content="Pearl Sign: build, sign (BIP-341 keypath Schnorr), verify, and broadcast Pearl (PRL) Taproot transactions. Runs fully offline once loaded — all crypto vendored, nothing leaves your machine.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar-in">
+    <a class="brand" href="../">
+      <span class="pearl-glyph" aria-hidden="true">◉</span>
+      <span class="brand-name">Pearl&nbsp;Sign</span>
+      <span class="brand-tag">air-gapped transaction forge</span>
+    </a>
+    <nav class="topnav">
+      <a href="../">Apps</a>
+      <a href="../pages/market/">Bazaar</a>
+      <a href="../pages/wallet/">Vault</a>
+      <span class="net-badge" id="netBadge">mainnet</span>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <h1>Sign Pearl transactions <span class="accent">without trusting a server</span>.</h1>
+    <p class="lede">A five-step forge for Pearl (PRL) Taproot transactions: derive keys offline,
+      assemble coins, build the exact wire bytes, sign every input with BIP-341 keypath Schnorr,
+      <em>re-verify each signature locally</em> — then broadcast only when you're satisfied.
+      Everything runs in this page; the vendored crypto has no network calls.</p>
+    <div class="airgap-note">
+      <strong>Air-gap friendly.</strong> Once this page is loaded, it works with no internet:
+      save it to a USB stick, open it on an offline machine, and carry unsigned/signed hex
+      back and forth on paper or QR. The signing key never has to touch a networked device.
+    </div>
+  </section>
+
+  <ol class="steps" id="stepNav">
+    <li data-step="1" class="active"><span class="n">1</span> Key</li>
+    <li data-step="2"><span class="n">2</span> Coins</li>
+    <li data-step="3"><span class="n">3</span> Build</li>
+    <li data-step="4"><span class="n">4</span> Sign</li>
+    <li data-step="5"><span class="n">5</span> Broadcast</li>
+  </ol>
+
+  <!-- STEP 1: KEY -->
+  <section class="panel" data-panel="1">
+    <h2>1 · Key</h2>
+    <p class="muted">Derive your Pearl BIP-86 Taproot key, or go watch-only to build an unsigned transaction for signing elsewhere.</p>
+    <div class="grid2">
+      <div>
+        <label>Network
+          <select id="network">
+            <option value="mainnet">Mainnet (prl1…)</option>
+            <option value="testnet">Testnet (tprl1…)</option>
+          </select>
+        </label>
+        <label class="mode-row">Mode
+          <select id="keyMode">
+            <option value="mnemonic">Mnemonic (hot — signs in this browser)</option>
+            <option value="wif">WIF private key (hot — signs in this browser)</option>
+            <option value="watch">Watch-only (address only — no signing here)</option>
+          </select>
+        </label>
+        <div id="mnemonicBox">
+          <label>BIP-39 mnemonic
+            <textarea id="mnemonic" rows="2" spellcheck="false" placeholder="abandon abandon … about"></textarea>
+          </label>
+          <div class="row">
+            <button id="btnDerive" class="btn primary">Derive addresses</button>
+            <button id="btnGen" class="btn">Generate new</button>
+          </div>
+        </div>
+        <div id="wifBox" hidden>
+          <label>WIF private key
+            <input id="wif" type="password" spellcheck="false" placeholder="L… / K… (mainnet) · c… (testnet)">
+          </label>
+          <div class="row"><button id="btnDeriveWif" class="btn primary">Load key</button></div>
+        </div>
+        <div id="watchBox" hidden>
+          <label>Watch address (P2TR)
+            <input id="watchAddr" spellcheck="false" placeholder="prl1p…">
+          </label>
+          <div class="row"><button id="btnWatch" class="btn primary">Use watch-only</button></div>
+        </div>
+        <p class="warn" id="hotWarn" hidden>⚠ A key entered here lives in this browser tab's memory. For large amounts, prefer the air-gapped flow: build unsigned here in watch-only mode, sign on the offline machine.</p>
+      </div>
+      <div>
+        <h3>Derived receive addresses <span class="muted small">m/86'/coin'/0'/0/i</span></h3>
+        <div id="addrList" class="addr-list"><p class="muted">No key loaded yet.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 2: COINS -->
+  <section class="panel" data-panel="2" hidden>
+    <h2>2 · Coins</h2>
+    <p class="muted">Choose the UTXOs to spend. Fetch from a blockbook, or paste a list (one per line: <code>txid:vout value</code>, value in grains or <code>1.5 prl</code>).</p>
+    <div class="tabs">
+      <button class="tab active" data-utxotab="fetch">From blockbook</button>
+      <button class="tab" data-utxotab="paste">Paste list</button>
+    </div>
+    <div id="utxoFetch">
+      <div class="row">
+        <input id="utxoAddr" spellcheck="false" placeholder="prl1p… (defaults to selected address)">
+        <input id="bbBase" spellcheck="false" placeholder="blockbook base URL">
+        <button id="btnFetchUtxos" class="btn primary">Fetch UTXOs</button>
+      </div>
+      <p class="muted small">Mainnet default: <code>https://blockbook.pearlresearch.ai</code>. Testnet has no public blockbook — paste a list or point at your own.</p>
+    </div>
+    <div id="utxoPaste" hidden>
+      <textarea id="utxoText" rows="5" spellcheck="false" placeholder="aabb…0011:0 100000000&#10;ccdd…2233:1 1.5 prl"></textarea>
+      <div class="row"><button id="btnParseUtxos" class="btn primary">Load pasted UTXOs</button></div>
+    </div>
+    <div id="utxoMsg" class="msg" hidden></div>
+    <table class="utxo-table" id="utxoTable" hidden>
+      <thead><tr><th></th><th>Outpoint</th><th class="r">Value</th><th class="r">Conf</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p class="total-line" id="utxoTotal" hidden>Total selected: <strong></strong></p>
+  </section>
+
+  <!-- STEP 3: BUILD -->
+  <section class="panel" data-panel="3" hidden>
+    <h2>3 · Build</h2>
+    <p class="muted">Recipients, fee rate, and change. The forge computes exact vBytes with the audited P2TR size formula and refuses dust outputs.</p>
+    <div id="recipients"></div>
+    <div class="row"><button id="btnAddRecipient" class="btn">+ Add recipient</button></div>
+    <div class="grid2">
+      <div>
+        <label>Fee rate (grains/vB)
+          <span class="row"><input id="feeRate" type="number" min="1" step="1" value="10">
+          <button id="btnFeeEst" class="btn small">Fetch estimate</button></span>
+        </label>
+        <label>Change address
+          <input id="changeAddr" spellcheck="false" placeholder="defaults to a fresh derived address">
+        </label>
+      </div>
+      <div class="fee-card">
+        <div class="fee-row"><span>Inputs</span><strong id="fInputs">0</strong></div>
+        <div class="fee-row"><span>Outputs</span><strong id="fOutputs">0</strong></div>
+        <div class="fee-row"><span>Size</span><strong id="fVbytes">–</strong></div>
+        <div class="fee-row"><span>Fee</span><strong id="fFee">–</strong></div>
+        <div class="fee-row"><span>Change</span><strong id="fChange">–</strong></div>
+        <div class="fee-row total"><span>Total in → out</span><strong id="fTotal">–</strong></div>
+      </div>
+    </div>
+    <div class="row">
+      <button id="btnBuild" class="btn primary">Build unsigned transaction</button>
+    </div>
+    <div id="buildMsg" class="msg" hidden></div>
+    <div id="unsignedBox" hidden>
+      <h3>Unsigned transaction</h3>
+      <div class="row">
+        <button class="btn small" data-copy="unsignedHex">Copy hex</button>
+        <button class="btn small" data-dl="unsigned">Download .hex</button>
+      </div>
+      <textarea id="unsignedHex" class="hexbox" rows="4" readonly spellcheck="false"></textarea>
+      <details><summary>Decoded view</summary><pre id="unsignedDecoded" class="decoded"></pre></details>
+    </div>
+  </section>
+
+  <!-- STEP 4: SIGN -->
+  <section class="panel" data-panel="4" hidden>
+    <h2>4 · Sign</h2>
+    <p class="muted">Sign every input with your derived key, then the forge re-verifies each
+      signature against its tweaked output key <em>before</em> you broadcast. Nothing is trusted — not even this page.</p>
+    <div id="watchSignNote" class="msg warn" hidden>Watch-only mode: signing is disabled here. Carry the unsigned hex to your offline signer.</div>
+    <label>Sighash type
+      <select id="sighash">
+        <option value="0">SIGHASH_DEFAULT (0x00) — normal payment</option>
+        <option value="131">SIGHASH_SINGLE | ANYONECANPAY (0x83) — atomic-swap presign</option>
+      </select>
+    </label>
+    <p class="muted small">The 0x83 presign binds your input to the output at the same index only — the Bazaar
+      atomic-swap format. Anyone can add inputs/outputs around it.</p>
+    <div class="row">
+      <button id="btnSign" class="btn primary">Sign all inputs</button>
+      <button id="btnVerifyPasted" class="btn">Verify a pasted signed hex</button>
+    </div>
+    <div id="signMsg" class="msg" hidden></div>
+    <div id="sigResults" class="sig-results" hidden></div>
+    <div id="signedBox" hidden>
+      <h3>Signed transaction <span class="pill ok" id="verifyPill">all signatures verified</span></h3>
+      <div class="row">
+        <button class="btn small" data-copy="signedHex">Copy hex</button>
+        <button class="btn small" data-dl="signed">Download .hex</button>
+      </div>
+      <textarea id="signedHex" class="hexbox" rows="4" readonly spellcheck="false"></textarea>
+      <details><summary>Decoded view</summary><pre id="signedDecoded" class="decoded"></pre></details>
+    </div>
+    <div id="verifyPasteBox" hidden>
+      <h3>Verify any signed hex</h3>
+      <p class="muted small">Paste a signed transaction plus its prevouts (same <code>txid:vout value</code> format as step 2) to check every signature independently.</p>
+      <textarea id="verifyHex" class="hexbox" rows="4" spellcheck="false" placeholder="0200…"></textarea>
+      <textarea id="verifyPrevouts" rows="4" spellcheck="false" placeholder="aabb…0011:0 100000000"></textarea>
+      <div class="row"><button id="btnDoVerify" class="btn primary">Verify</button></div>
+      <div id="verifyPasteMsg" class="msg" hidden></div>
+      <div id="verifyPasteResults" class="sig-results" hidden></div>
+    </div>
+  </section>
+
+  <!-- STEP 5: BROADCAST -->
+  <section class="panel" data-panel="5" hidden>
+    <h2>5 · Broadcast</h2>
+    <p class="muted">Push the signed transaction to the Pearl network. The forge shows the exact node response — acceptance or rejection.</p>
+    <label>Broadcast via
+      <select id="bcMethod">
+        <option value="blockbook">Blockbook /api/sendtx (mainnet)</option>
+        <option value="pearld">My pearld node — sendrawtransaction (JSON-RPC)</option>
+      </select>
+    </label>
+    <div id="bcPearld" hidden>
+      <div class="row">
+        <input id="rpcEndpoint" spellcheck="false" placeholder="http://127.0.0.1:44107">
+        <input id="rpcUser" spellcheck="false" placeholder="rpcuser" autocomplete="off">
+        <input id="rpcPass" type="password" placeholder="rpcpassword" autocomplete="off">
+      </div>
+      <p class="muted small">Endpoint + credentials are stored only in this browser's localStorage — same pattern as the Pearl explorer page.</p>
+    </div>
+    <div class="row"><button id="btnBroadcast" class="btn primary">Broadcast signed transaction</button></div>
+    <div id="bcMsg" class="msg" hidden></div>
+    <div id="bcResult" hidden>
+      <h3>Broadcast result</h3>
+      <p>txid: <code id="bcTxid" class="txid"></code></p>
+      <p><a id="bcLink" href="#" target="_blank" rel="noopener">View on the Pearl explorer ↗</a></p>
+    </div>
+  </section>
+
+  <section class="panel limits">
+    <h2>Honest limits</h2>
+    <ul>
+      <li>Keypath spends only — P2TR addresses (<code>prl1p…</code>). Script-path and multisig are not supported in this version.</li>
+      <li>Fee estimates come from the blockbook you configure; if it's unreachable, enter a manual rate.</li>
+      <li>A "verified" signature proves the math checks out against the prevouts you supplied — it can't prove those prevouts are real or unspent. Confirm UTXOs against your own node before moving serious money.</li>
+      <li>Pasting a mnemonic or WIF into any browser makes it a hot key. The air-gapped flow (watch-only build here → sign offline) exists for a reason.</li>
+    </ul>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-in">
+    <p>Built for the Pearl (PRL) ecosystem · <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a></p>
+    <p class="donate">Tip the forge: <code id="donateAddr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+      <button class="btn small" data-copy="donateAddr">Copy</button></p>
+  </div>
+</footer>
+
+<script src="pearl-sign.bundle.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
