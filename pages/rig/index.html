@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Rig — GPU Mining Profitability Planner (PRL)</title>
+<meta name="description" content="Plan Pearl (PRL) GPU mining profitability: rig power, electricity, pool fees and live PRL price against the exact upstream block-subsidy formula.">
+<link rel="stylesheet" href="styles.css?v=1.0.0">
+</head>
+<body>
+<div class="embers" aria-hidden="true"><span class="ember e1"></span><span class="ember e2"></span><span class="ember e3"></span><span class="ember e4"></span><span class="ember e5"></span></div>
+
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <a class="brand" href="https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/">&#128059; Pearl <span>Rig</span></a>
+    <nav class="nav">
+      <a href="#price">Price</a>
+      <a href="#rig">Rig</a>
+      <a href="#model">Model</a>
+      <a href="#results">Results</a>
+      <a href="#sources">Sources</a>
+      <a href="https://github.com/Kshot3000/Pearl-Muse-24-7-Ai-builder/tree/main/pages/rig" target="_blank" rel="noopener">Source</a>
+    </nav>
+    <span class="conn" id="priceBadge" title="Price feed state">&#9679; price: manual</span>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <p class="eyebrow">Proof-of-Useful-Work &middot; GPU rig economics</p>
+    <h1>Pearl <span class="molten">Rig</span></h1>
+    <p class="lede">A profitability planner for PRL GPU mining. Feed it your rig's
+    wall power, your electricity rate and your pool's measured output — it prices
+    them against the <em>exact</em> block-subsidy formula from the Pearl node
+    source and the live PRL/USD market. No made-up hashrates, no fantasy yields:
+    every preset is sourced, every assumption is editable.</p>
+    <div class="hero-stats">
+      <div class="hero-stat"><span class="hs-label">Block target</span><span class="hs-value">3m 14s</span></div>
+      <div class="hero-stat"><span class="hs-label">Blocks / day</span><span class="hs-value" id="hsBlocksDay">—</span></div>
+      <div class="hero-stat"><span class="hs-label">Subsidy @ height <span id="hsHeight">—</span></span><span class="hs-value" id="hsSubsidy">—</span></div>
+      <div class="hero-stat"><span class="hs-label">Network emission / day</span><span class="hs-value" id="hsEmission">—</span></div>
+    </div>
+  </section>
+
+  <section id="price" class="card">
+    <h2><span class="sec-ico">&#128176;</span> PRL price</h2>
+    <p class="card-sub">Live price feeds the revenue math. CoinGecko aggregates across
+    exchanges and works in-browser; CoinEx needs a CORS proxy (same setup as Pearl Pulse).</p>
+    <div class="grid-2">
+      <div>
+        <div class="price-row">
+          <div class="price-big" id="priceBig">—</div>
+          <div class="price-meta"><span id="priceChg">—</span><span id="priceSrc">manual</span></div>
+        </div>
+        <div class="form-row">
+          <label for="priceSource">Source</label>
+          <select id="priceSource">
+            <option value="coingecko">CoinGecko · PRL/USD (auto)</option>
+            <option value="coinex">CoinEx · PEARLUSDT (needs proxy)</option>
+            <option value="manual">Manual</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="priceManual">Manual price (USD)</label>
+          <input id="priceManual" type="number" min="0" step="0.0001" placeholder="1.4000">
+        </div>
+        <div class="form-row">
+          <label for="proxyBase">CORS proxy base <span class="hint">(for CoinEx)</span></label>
+          <input id="proxyBase" type="url" placeholder="http://localhost:8787">
+        </div>
+        <button class="btn" id="refreshPrice">Refresh price</button>
+        <p class="note" id="priceNote"></p>
+      </div>
+      <div>
+        <h3>Chain height</h3>
+        <p class="card-sub">Subsidy falls as height climbs — set the tip your rig is mining on.</p>
+        <div class="form-row">
+          <label for="chainHeight">Block height</label>
+          <input id="chainHeight" type="number" min="1" step="1" value="120142">
+        </div>
+        <p class="note">Default 120,142 — last tip seen 2026-09-27. Update from your
+        <code>pearld</code> (<code>getblockcount</code>) or the Pearl explorer for a live figure.</p>
+        <div class="stat-mini"><span>Subsidy at this height</span><strong id="subsidyAt">—</strong></div>
+        <div class="stat-mini"><span>Daily network emission</span><strong id="emissionAt">—</strong></div>
+        <div class="stat-mini"><span>Coinbase maturity</span><strong>100 blocks</strong></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="rig" class="card">
+    <h2><span class="sec-ico">&#9881;</span> Your rig</h2>
+    <p class="card-sub">Wall power is the honest cost basis — measured at the wall, not
+    the GPU's spec sheet. Add each GPU model in your fleet.</p>
+    <table class="fleet" id="fleetTable">
+      <thead><tr><th>GPU model</th><th>Count</th><th>Wall W each</th><th>Total W</th><th></th></tr></thead>
+      <tbody id="fleetBody"></tbody>
+      <tfoot><tr><td colspan="3">Fleet total</td><td id="fleetTotal">0 W</td><td></td></tr></tfoot>
+    </table>
+    <div class="add-row">
+      <select id="gpuPreset" aria-label="GPU preset">
+        <option value="custom">Custom GPU…</option>
+        <option value="cmp90hx">CMP 90HX — 180 W measured (sourced)</option>
+      </select>
+      <input id="gpuName" type="text" placeholder="GPU model" maxlength="40">
+      <input id="gpuCount" type="number" min="1" step="1" value="1" aria-label="Count">
+      <input id="gpuWatts" type="number" min="1" step="1" placeholder="W each" aria-label="Watts each">
+      <button class="btn" id="addGpu">Add</button>
+    </div>
+    <p class="note" id="presetNote"></p>
+  </section>
+
+  <section id="model" class="card">
+    <h2><span class="sec-ico">&#9888;</span> Revenue model</h2>
+    <div class="mode-tabs" role="tablist">
+      <button class="mode-tab active" id="tabMeasured" role="tab" aria-selected="true">Measured output <span class="rec">recommended</span></button>
+      <button class="mode-tab" id="tabYield" role="tab" aria-selected="false">Estimate from TH/s</button>
+    </div>
+    <div id="paneMeasured" class="pane">
+      <p class="card-sub">The honest number: your pool dashboard's 24h+ average payout.
+      Everything else is modeling.</p>
+      <div class="form-row">
+        <label for="prlPerDay">PRL earned / day <span class="hint">(pool dashboard, 24h+ avg)</span></label>
+        <input id="prlPerDay" type="number" min="0" step="0.01" value="1.90">
+      </div>
+    </div>
+    <div id="paneYield" class="pane hidden">
+      <p class="card-sub">Credited TH/s × a community-reported yield factor. Factors drift
+      with difficulty and subsidy — recalibrate against your pool.</p>
+      <div class="form-row">
+        <label for="creditedThs">Credited TH/s <span class="hint">(pool-reported)</span></label>
+        <input id="creditedThs" type="number" min="0" step="0.1" value="80">
+      </div>
+      <div class="form-row">
+        <label for="yieldFactor">PRL / TH / day</label>
+        <input id="yieldFactor" type="number" min="0" step="0.0001" value="0.0241">
+      </div>
+      <p class="note">Preset 0.0241: spark-pearl-miner <code>docs/en/VIABILITY.md</code>
+      snapshot (2026-09-26, hashrate.no-derived, gross of fees). At 80 TH/s that is
+      1.928 PRL/day — inside the doc's reported 1.85–1.94 window.</p>
+    </div>
+    <div class="grid-3">
+      <div class="form-row">
+        <label for="poolFee">Pool fee %</label>
+        <input id="poolFee" type="number" min="0" max="100" step="0.1" value="1">
+      </div>
+      <div class="form-row">
+        <label for="kwhRate">Electricity $ / kWh</label>
+        <input id="kwhRate" type="number" min="0" step="0.001" value="0.12">
+      </div>
+      <div class="form-row">
+        <label for="capex">Hardware capex $ <span class="hint">(for break-even)</span></label>
+        <input id="capex" type="number" min="0" step="10" value="0" placeholder="0 = skip">
+      </div>
+    </div>
+  </section>
+
+  <section id="results" class="card results">
+    <h2><span class="sec-ico">&#128200;</span> Results</h2>
+    <div class="result-grid">
+      <div class="result"><span class="r-label">Gross revenue / day</span><span class="r-value" id="rGross">—</span><span class="r-sub" id="rGrossPrl">—</span></div>
+      <div class="result"><span class="r-label">Pool fees / day</span><span class="r-value dim" id="rFee">—</span></div>
+      <div class="result"><span class="r-label">Power cost / day</span><span class="r-value dim" id="rPower">—</span><span class="r-sub" id="rPowerKwh">—</span></div>
+      <div class="result hot"><span class="r-label">Net profit / day</span><span class="r-value" id="rNet">—</span><span class="r-sub" id="rMargin">—</span></div>
+      <div class="result"><span class="r-label">Net / month</span><span class="r-value" id="rMonth">—</span></div>
+      <div class="result"><span class="r-label">Net / year</span><span class="r-value" id="rYear">—</span></div>
+      <div class="result"><span class="r-label">Break-even</span><span class="r-value" id="rBreak">—</span><span class="r-sub" id="rBreakSub">—</span></div>
+      <div class="result"><span class="r-label">Power share of revenue</span><span class="r-value" id="rPowerShare">—</span></div>
+    </div>
+    <h3>Price sensitivity <span class="hint">(net $/day at other PRL prices)</span></h3>
+    <table class="sens" id="sensTable">
+      <thead><tr><th>PRL price</th><th>−50%</th><th>−25%</th><th>current</th><th>+25%</th><th>+50%</th></tr></thead>
+      <tbody><tr id="sensRow"><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr></tbody>
+    </table>
+    <p class="note">Sensitivity holds output, fees, power and capex fixed — only the
+    PRL price moves. Mining is volatile: this is a planning aid, not financial advice.</p>
+  </section>
+
+  <section id="sources" class="card">
+    <h2><span class="sec-ico">&#128214;</span> Sources &amp; honest limits</h2>
+    <ul class="src-list">
+      <li><strong>Emission math</strong> — exact replica of <code>CalcBlockSubsidy</code> in
+        <code>node/blockchain/validate.go</code>
+        (pearl-research-labs/pearl @ 3fe2267): total supply 2.1B PRL, emission
+        constant 650,226 blocks, 194 s block target, 100-block coinbase maturity.
+        Verified against upstream <code>emission_test.go</code> vectors in the test suite.</li>
+      <li><strong>CMP 90HX preset</strong> — 180 W/GPU wall (179.47 / 179.55 W sampled),
+        2-card rig 358–360 W, from
+        <code>docs/rig-benchmarks.md</code> in chernuha-dev/miner-cpm90hx-pearl (2026-09-27).
+        Its 5-minute pool comparison (Forge 7 accepted shares vs 1) is explicitly labeled
+        noisy by the author — use it for power, not yield.</li>
+      <li><strong>Yield preset 0.0241 PRL/TH/day</strong> — spark-pearl-miner
+        <code>docs/en/VIABILITY.md</code> (2026-09-26), derived from hashrate.no;
+        cross-checks against their reported 80 TH/s → 1.85–1.94 PRL/day (HeroMiners).
+        Drifts with difficulty and subsidy.</li>
+      <li><strong>Price</strong> — CoinGecko <code>pearl-2</code> (aggregated spot,
+        CORS-open) by default; CoinEx <code>PEARLUSDT</code> alternate (the L1's real
+        market — <code>PRLUSDT</code> is a different token).</li>
+      <li><strong>Limits</strong> — no network hashrate or difficulty feed is modeled;
+        measured pool output is always more reliable than TH/s estimates. Difficulty
+        retargets and the falling subsidy both erode yield over time; this planner
+        snapshots today. Estimating rewards from hashrate instead?
+        <a href="../mining/">The mining calculator</a> covers the reward side.</li>
+    </ul>
+  </section>
+
+  <footer class="footer">
+    <p>Built for the Pearl (PRL) mining community &middot;
+      <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a></p>
+    <p class="donate">Support the build: <code id="donateAddr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+      <button class="btn small" id="copyDonate">Copy</button></p>
+  </footer>
+</main>
+
+<script type="module" src="js/app.js?v=1.0.0"></script>
+</body>
+</html>
