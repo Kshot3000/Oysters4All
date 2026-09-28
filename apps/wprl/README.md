@@ -74,6 +74,45 @@ npx hardhat compile
 npx hardhat test        # 23 tests, all green on the in-process EVM
 ```
 
+## Backend operator (Phase 2)
+
+`backend/` — the off-chain half of the bridge (Node, ethers v6, zero web
+framework):
+
+- **`operator.js`** — main loop. Deposit watcher: polls `pearld`
+  `searchrawtransactions(vault)` (requires `--addrindex` + `--txindex`),
+  verifies each tx (vault outputs + 0.25% fee output to Kyle's PRL address +
+  `wprl:<evm-address>` OP_RETURN + confirmations), then calls
+  `bridge.mintDeposit`. Withdrawal watcher: polls `WithdrawRequested` events
+  from the deploy block and calls Oyster `sendtoaddress` exactly once per
+  nonce. Too-young deposits are parked in `pearl:pending` and re-checked by
+  txid; the Base cursor never enters the freshest 2 blocks (reorg margin).
+- **`reserves-api.js`** — `GET /reserves` (vault grains vs wPRL supply,
+  backing ratio in bps, fee addresses) and `GET /health`. Reports what the
+  chains say; never invents numbers.
+- **`convert.js`** — exact BigInt math (1 grain = 1e10 wei); RPC decimal
+  amounts parsed from strings (never floats), with scientific-notation
+  expansion for tiny values.
+- **`config.js`** — env-driven, validated; **refuses Base mainnet (8453)
+  without `WPRL_MAINNET_APPROVED=kyle-approved`** (only set after Kyle's
+  explicit written go-ahead). Startup cross-checks the deployed bridge
+  (chain id, fee bps, fee recipient, token, `WEI_PER_GRAIN`, pause state,
+  `OPERATOR_ROLE`).
+- Secrets live in env/secret-manager only — never in git (`.env` ignored).
+
+```bash
+cd backend
+npm install
+cp .env.example .env   # fill in RPC URLs, contract addresses, operator key
+npm test               # 41 unit tests, all offline
+node test/e2e-local.mjs  # full operator+contracts run on a local Hardhat chain
+npm start              # the operator loop
+npm run api            # proof-of-reserves API on :8080
+```
+
+See `backend/README.md` for the deposit protocol and runbook, and
+`BUILD-LOG.md` for the timestamped build record.
+
 ## Deployment (later, with Kyle — NOT done in Phase 1)
 
 1. Deploy `WPRL` with admin = Kyle's EVM address.
