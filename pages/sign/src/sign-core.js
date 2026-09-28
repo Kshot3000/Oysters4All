@@ -276,31 +276,42 @@ export function selectCoins(utxos, targetGrains, feeRateGrainsPerVByte, nOut) {
 
 /** Minimal pearld JSON-RPC client (basic auth). Endpoint like http://127.0.0.1:44107 */
 export async function pearldRpc(endpoint, user, pass, method, params = []) {
-  const res = await fetch(endpoint.replace(/\/$/, ""), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": "Basic " + btoa(`${user}:${pass}`),
-    },
-    body: JSON.stringify({ jsonrpc: "1.0", id: "pearl-sign", method, params }),
-  });
+  let res;
+  try {
+    res = await fetch(endpoint.replace(/\/$/, ""), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Basic " + btoa(`${user}:${pass}`),
+      },
+      body: JSON.stringify({ jsonrpc: "1.0", id: "pearl-sign", method, params }),
+    });
+  } catch (e) {
+    throw new Error(`pearld unreachable at ${endpoint} — is the node running with RPC enabled? (${e.message})`);
+  }
   const j = await res.json().catch(() => ({}));
-  if (j.error) throw new Error(`pearld ${method}: ${j.error.message || JSON.stringify(j.error)}`);
+  if (j.error) throw new Error(`pearld ${method} rejected: ${j.error.message || JSON.stringify(j.error)}`);
   return j.result;
 }
 
-/** Broadcast via blockbook /api/sendtx/ (verified pattern from the market app). */
+/** Broadcast via blockbook /api/sendtx/ (verified pattern from the market app).
+ *  Network failures say "unreachable" so they can't be mistaken for a node rejection. */
 export async function broadcastViaBlockbook(blockbookBase, hex) {
   const base = blockbookBase.replace(/\/$/, "");
-  const res = await fetch(base + "/api/sendtx/", {
-    method: "POST",
-    headers: { "Content-Type": "text/plain" },
-    body: hex,
-  });
-  const text = await res.text();
+  let res, text;
+  try {
+    res = await fetch(base + "/api/sendtx/", {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: hex,
+    });
+    text = await res.text();
+  } catch (e) {
+    throw new Error(`blockbook unreachable at ${base} — check the URL and your network connection (${e.message})`);
+  }
   let j = {};
   try { j = JSON.parse(text); } catch { /* non-JSON */ }
-  if (!res.ok || j.error) throw new Error("broadcast rejected: " + (j.error || `HTTP ${res.status}: ${text.slice(0, 160)}`));
+  if (!res.ok || j.error) throw new Error("node rejected the transaction: " + (j.error || `HTTP ${res.status}: ${text.slice(0, 160)}`));
   const txid = j.result ?? j.txid;
   if (!/^[0-9a-f]{64}$/i.test(txid || "")) throw new Error("unexpected broadcast response: " + text.slice(0, 160));
   return txid.toLowerCase();
@@ -308,7 +319,13 @@ export async function broadcastViaBlockbook(blockbookBase, hex) {
 
 /** Fetch UTXOs for an address from blockbook. */
 export async function fetchUtxos(blockbookBase, address) {
-  const res = await fetch(blockbookBase.replace(/\/$/, "") + `/api/v2/utxo/${address}`);
+  const base = blockbookBase.replace(/\/$/, "");
+  let res;
+  try {
+    res = await fetch(base + `/api/v2/utxo/${address}`);
+  } catch (e) {
+    throw new Error(`blockbook unreachable at ${base} — check the URL and your network connection (${e.message})`);
+  }
   if (!res.ok) throw new Error(`blockbook ${res.status} on /api/v2/utxo`);
   const list = await res.json();
   if (!Array.isArray(list)) throw new Error("unexpected utxo response");
@@ -319,7 +336,13 @@ export async function fetchUtxos(blockbookBase, address) {
 
 /** Fee rate in grains/vByte from blockbook estimatefee (PRL/kB → grains/vB). */
 export async function fetchFeeRate(blockbookBase, blocks = 2) {
-  const res = await fetch(blockbookBase.replace(/\/$/, "") + `/api/v2/estimatefee/${blocks}`);
+  const base = blockbookBase.replace(/\/$/, "");
+  let res;
+  try {
+    res = await fetch(base + `/api/v2/estimatefee/${blocks}`);
+  } catch (e) {
+    throw new Error(`blockbook unreachable at ${base} — check the URL and your network connection (${e.message})`);
+  }
   const r = await res.json().catch(() => ({}));
   const perKb = Number(r.result ?? r);
   if (!Number.isFinite(perKb) || perKb <= 0) throw new Error("fee estimate unavailable");

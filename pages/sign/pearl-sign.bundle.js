@@ -6410,38 +6410,54 @@ zoo`.split("\n");
     throw new Error(`insufficient funds: have ${fmtPRL(total)} PRL, need ${fmtPRL(target)} PRL + fee`);
   }
   async function pearldRpc(endpoint, user, pass, method, params = []) {
-    const res = await fetch(endpoint.replace(/\/$/, ""), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Basic " + btoa(`${user}:${pass}`)
-      },
-      body: JSON.stringify({ jsonrpc: "1.0", id: "pearl-sign", method, params })
-    });
+    let res;
+    try {
+      res = await fetch(endpoint.replace(/\/$/, ""), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Basic " + btoa(`${user}:${pass}`)
+        },
+        body: JSON.stringify({ jsonrpc: "1.0", id: "pearl-sign", method, params })
+      });
+    } catch (e) {
+      throw new Error(`pearld unreachable at ${endpoint} \u2014 is the node running with RPC enabled? (${e.message})`);
+    }
     const j = await res.json().catch(() => ({}));
-    if (j.error) throw new Error(`pearld ${method}: ${j.error.message || JSON.stringify(j.error)}`);
+    if (j.error) throw new Error(`pearld ${method} rejected: ${j.error.message || JSON.stringify(j.error)}`);
     return j.result;
   }
   async function broadcastViaBlockbook(blockbookBase, hex) {
     const base = blockbookBase.replace(/\/$/, "");
-    const res = await fetch(base + "/api/sendtx/", {
-      method: "POST",
-      headers: { "Content-Type": "text/plain" },
-      body: hex
-    });
-    const text = await res.text();
+    let res, text;
+    try {
+      res = await fetch(base + "/api/sendtx/", {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: hex
+      });
+      text = await res.text();
+    } catch (e) {
+      throw new Error(`blockbook unreachable at ${base} \u2014 check the URL and your network connection (${e.message})`);
+    }
     let j = {};
     try {
       j = JSON.parse(text);
     } catch {
     }
-    if (!res.ok || j.error) throw new Error("broadcast rejected: " + (j.error || `HTTP ${res.status}: ${text.slice(0, 160)}`));
+    if (!res.ok || j.error) throw new Error("node rejected the transaction: " + (j.error || `HTTP ${res.status}: ${text.slice(0, 160)}`));
     const txid = j.result ?? j.txid;
     if (!/^[0-9a-f]{64}$/i.test(txid || "")) throw new Error("unexpected broadcast response: " + text.slice(0, 160));
     return txid.toLowerCase();
   }
   async function fetchFeeRate(blockbookBase, blocks = 2) {
-    const res = await fetch(blockbookBase.replace(/\/$/, "") + `/api/v2/estimatefee/${blocks}`);
+    const base = blockbookBase.replace(/\/$/, "");
+    let res;
+    try {
+      res = await fetch(base + `/api/v2/estimatefee/${blocks}`);
+    } catch (e) {
+      throw new Error(`blockbook unreachable at ${base} \u2014 check the URL and your network connection (${e.message})`);
+    }
     const r = await res.json().catch(() => ({}));
     const perKb = Number(r.result ?? r);
     if (!Number.isFinite(perKb) || perKb <= 0) throw new Error("fee estimate unavailable");

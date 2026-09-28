@@ -205,3 +205,19 @@ test("UTXO list with optional address decodes spk", async () => {
   assert.equal(describeSpk(u.spk, NETWORKS.mainnet).address, VEC.mainnet.addr0);
   assert.throws(() => parseUtxoList(line), /network needed/);
 });
+
+test("RPC helpers distinguish unreachable endpoints from rejections", async () => {
+  const core = await import("../src/sign-core.js");
+  await assert.rejects(
+    () => core.fetchUtxos("http://127.0.0.1:1", "prl1pabc"),
+    /unreachable/
+  );
+  await assert.rejects(
+    () => core.broadcastViaBlockbook("http://127.0.0.1:1", "00"),
+    /unreachable/
+  );
+  await assert.rejects(
+    () => core.pearldRpc("http://127.0.0.1:1", "u", "p", "getblockcount"),
+    /unreachable/
+  );
+});
