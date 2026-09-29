@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Watch — PRL Watchtower &amp; Alert Desk</title>
+<meta name="description" content="Pearl Watch: the lighthouse watchtower for PRL. Watch Taproot addresses over GET-only Blockbook reads, fire alert rules on incoming payments, balance crossings and confirmation milestones, and track any txid's confirmations. Read-only — no keys, ever.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 44'%3E%3Crect x='15' y='10' width='10' height='5' rx='1' fill='none' stroke='%23ffd166' stroke-width='2'/%3E%3Cpath d='M16 40 V14 L20 6 L24 14 V40' fill='none' stroke='%23e8eef7' stroke-width='3'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<div class="nightsky" aria-hidden="true"><i class="beam"></i><i class="stars"></i></div>
+
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 40 44" aria-hidden="true">
+      <path d="M16 40 V14 L20 6 L24 14 V40" fill="none" stroke="#e8eef7" stroke-width="2.4"/>
+      <rect x="15" y="10" width="10" height="5" rx="1" fill="none" stroke="#ffd166" stroke-width="1.8"/>
+      <circle cx="20" cy="12.5" r="1.6" fill="#ffd166"/>
+      <path d="M20 12.5 L38 6 M20 12.5 L38 19" stroke="#ffd166" stroke-width="1.4" opacity=".75"/>
+      <path d="M6 42 H34" stroke="#7df0c8" stroke-width="1.6"/>
+      <path d="M8 42 q4 -4 8 0 t8 0 t8 0" fill="none" stroke="#4aa3c7" stroke-width="1.2" opacity=".8"/>
+    </svg>
+    <div>
+      <h1>Pearl Watch</h1>
+      <p class="tagline">the lighthouse — a watchtower for PRL · read-only, no keys, ever</p>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs" aria-label="Watchtower sections">
+    <button data-tab="watchlist" id="tb-watchlist" class="active" type="button">1 · Watchlist</button>
+    <button data-tab="beacon" id="tb-beacon" type="button">2 · Beacon</button>
+    <button data-tab="rules" id="tb-rules" type="button">3 · Rules</button>
+    <button data-tab="events" id="tb-events" type="button">4 · Events <span class="pill" id="ev-count">0</span></button>
+    <button data-tab="track" id="tb-track" type="button">5 · Track</button>
+  </nav>
+</header>
+
+<main>
+  <section class="limits" aria-label="Honest limits">
+    <h2>Honest limits — read before trusting the lamp</h2>
+    <ul>
+      <li><strong>Read-only, forever.</strong> Pearl Watch never asks for keys, seeds, or passwords. It only <em>watches</em> public addresses.</li>
+      <li><strong>Blockbook is third-party.</strong> Balances, txs and confirmations come from a Blockbook server you choose (default: <code>https://blockbook.pearlresearch.ai</code>). It is convenience data, not consensus — verify anything that matters against your own <code>pearld</code>.</li>
+      <li><strong>Polling only.</strong> This page polls on a timer you set. It cannot push alerts to your phone and it only watches while the tab is open (a closed tab sees nothing).</li>
+      <li><strong>Amounts are heuristics.</strong> Incoming/outgoing attribution reads Blockbook's vin/vout address lists; totals are grain-exact math on that third-party data.</li>
+      <li><strong>No smart contracts on Pearl.</strong> Rules fire in your browser; nothing on-chain enforces them.</li>
+      <li><strong>Watchlist lives in this browser</strong> (localStorage). Export it before switching devices.</li>
+    </ul>
+  </section>
+
+  <section class="netbar" aria-label="Network and backend">
+    <label>Network
+      <select id="net">
+        <option value="mainnet" selected>Mainnet (prl1…)</option>
+        <option value="testnet">Testnet (tprl1…)</option>
+      </select>
+    </label>
+    <label class="grow">Blockbook base URL
+      <input id="bb-url" type="text" inputmode="url" placeholder="https://blockbook.pearlresearch.ai" spellcheck="false">
+    </label>
+    <button id="bb-save" type="button">Save backend</button>
+    <span id="bb-status" class="status" role="status">backend: not checked</span>
+  </section>
+
+  <!-- 1 · WATCHLIST -->
+  <section class="tab active" id="tab-watchlist" aria-label="Watchlist">
+    <div class="panel">
+      <h2>Watchlist <span class="hint">public addresses only — never a key</span></h2>
+      <div class="row">
+        <input id="w-addr" class="grow mono" type="text" placeholder="prl1…" spellcheck="false" autocomplete="off">
+        <input id="w-label" type="text" placeholder="label (optional)" maxlength="80">
+        <button id="w-add" type="button" class="primary">Add to watch</button>
+      </div>
+      <p class="err" id="w-err" hidden></p>
+      <div class="row small">
+        <button id="w-export" type="button">Export watchlist JSON</button>
+        <button id="w-import-btn" type="button">Import JSON…</button>
+        <input id="w-import" type="file" accept="application/json,.json" hidden>
+        <button id="w-clear" type="button" class="danger">Clear watchlist</button>
+        <span class="spacer"></span>
+        <span id="w-count" class="dim"></span>
+      </div>
+      <table class="tbl" id="w-table">
+        <thead><tr><th>Label</th><th>Address</th><th class="num">Balance</th><th class="num">Received</th><th class="num">Sent</th><th class="num">Txs</th><th>Last seen</th><th></th></tr></thead>
+        <tbody id="w-tbody"><tr class="empty"><td colspan="8">No addresses yet. Add one above — the lamp only watches what you point it at.</td></tr></tbody>
+      </table>
+      <p class="dim" id="w-note">Balances fill in after the next beacon sweep (tab 2) or a manual refresh.</p>
+      <div class="row"><button id="w-refresh" type="button">Refresh balances now</button><span id="w-ref-status" class="dim"></span></div>
+    </div>
+  </section>
+
+  <!-- 2 · BEACON -->
+  <section class="tab" id="tab-beacon" aria-label="Beacon polling">
+    <div class="panel">
+      <h2>Beacon <span class="hint">the sweeping light — GET-only polls</span></h2>
+      <div class="row">
+        <label>Poll every
+          <select id="b-interval">
+            <option value="15000">15 s</option>
+            <option value="30000">30 s</option>
+            <option value="60000" selected>1 min</option>
+            <option value="300000">5 min</option>
+            <option value="0">off</option>
+          </select>
+        </label>
+        <button id="b-toggle" type="button" class="primary">Start beacon</button>
+        <button id="b-sweep" type="button">Sweep once now</button>
+        <span class="spacer"></span>
+        <span id="b-tip" class="dim">chain tip: —</span>
+      </div>
+      <div class="row">
+        <label class="check"><input type="checkbox" id="b-notify"> Browser notifications on new events</label>
+        <label class="check"><input type="checkbox" id="b-sound"> Sound ping on new events</label>
+      </div>
+      <p class="err" id="b-err" hidden></p>
+      <div class="lamp" id="lamp" aria-hidden="true"><i></i></div>
+      <table class="tbl" id="b-table">
+        <thead><tr><th>Address</th><th class="num">Balance</th><th>New txs this sweep</th><th>Scanned at</th><th>Status</th></tr></thead>
+        <tbody id="b-tbody"><tr class="empty"><td colspan="5">Beacon idle. Start it to sweep the watchlist.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 3 · RULES -->
+  <section class="tab" id="tab-rules" aria-label="Alert rules">
+    <div class="panel">
+      <h2>Alert rules <span class="hint">edge-triggered — they fire once per crossing</span></h2>
+      <div class="ruleform">
+        <label>Kind
+          <select id="r-kind">
+            <option value="incoming">Incoming ≥ amount</option>
+            <option value="outgoing">Outgoing ≥ amount</option>
+            <option value="balance-above">Balance crosses above</option>
+            <option value="balance-below">Balance crosses below</option>
+            <option value="tx-confirmed">Txid reaches N confirmations</option>
+          </select>
+        </label>
+        <label class="grow" id="r-addr-wrap">Address
+          <input id="r-addr" class="mono" type="text" placeholder="prl1…" spellcheck="false" autocomplete="off">
+        </label>
+        <label id="r-txid-wrap" hidden>Txid
+          <input id="r-txid" class="mono" type="text" placeholder="64 hex chars" spellcheck="false" autocomplete="off">
+        </label>
+        <label id="r-amt-wrap">Amount (PRL)
+          <input id="r-amt" type="text" inputmode="decimal" placeholder="0.5">
+        </label>
+        <label id="r-conf-wrap" hidden>Confirmations
+          <input id="r-conf" type="text" inputmode="numeric" placeholder="6">
+        </label>
+        <label>Label
+          <input id="r-label" type="text" placeholder="optional" maxlength="120">
+        </label>
+        <button id="r-add" type="button" class="primary">Add rule</button>
+      </div>
+      <p class="err" id="r-err" hidden></p>
+      <table class="tbl" id="r-table">
+        <thead><tr><th></th><th>Rule</th><th>Target</th><th>Condition</th><th>Last fired</th><th></th></tr></thead>
+        <tbody id="r-tbody"><tr class="empty"><td colspan="6">No rules. A watchtower with no rules is just a nice view.</td></tr></tbody>
+      </table>
+      <p class="dim">Balance-crossing rules re-arm after the balance moves back across. Confirmation rules re-arm if a reorg drops the count back under target. Rules fire only while the beacon sweeps (or a manual refresh runs).</p>
+    </div>
+  </section>
+
+  <!-- 4 · EVENTS -->
+  <section class="tab" id="tab-events" aria-label="Event log">
+    <div class="panel">
+      <h2>Event log <span class="hint">the keeper's journal</span></h2>
+      <div class="row">
+        <select id="e-filter">
+          <option value="">all kinds</option>
+          <option value="incoming">incoming</option>
+          <option value="outgoing">outgoing</option>
+          <option value="balance-above">balance above</option>
+          <option value="balance-below">balance below</option>
+          <option value="tx-confirmed">tx confirmed</option>
+        </select>
+        <button id="e-csv" type="button">Export CSV</button>
+        <button id="e-json" type="button">Export JSON</button>
+        <span class="spacer"></span>
+        <button id="e-clear" type="button" class="danger">Clear log</button>
+      </div>
+      <table class="tbl" id="e-table">
+        <thead><tr><th>Time (UTC)</th><th>Kind</th><th>Detail</th><th class="num">Amount</th><th class="num">Conf</th><th>Txid</th></tr></thead>
+        <tbody id="e-tbody"><tr class="empty"><td colspan="6">Quiet seas. Events appear here when rules fire.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 5 · TRACK -->
+  <section class="tab" id="tab-track" aria-label="Confirmation tracker">
+    <div class="panel">
+      <h2>Confirmation tracker <span class="hint">watch one txid land</span></h2>
+      <div class="row">
+        <input id="t-txid" class="grow mono" type="text" placeholder="64-hex-char txid" spellcheck="false" autocomplete="off">
+        <label>Target
+          <input id="t-target" type="text" inputmode="numeric" value="6" size="4">
+        </label>
+        <button id="t-watch" type="button" class="primary">Track</button>
+        <button id="t-stop" type="button" hidden>Stop</button>
+      </div>
+      <p class="err" id="t-err" hidden></p>
+      <div id="t-out" hidden>
+        <div class="meter"><i id="t-bar"></i></div>
+        <p id="t-line" class="big"></p>
+        <p class="dim" id="t-meta"></p>
+      </div>
+      <p class="dim">Polls the same Blockbook backend on the beacon interval. Unconfirmed or unknown txids are reported honestly — never guessed.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> · Pearl builder fleet · tips: <code class="addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code></p>
+  <p class="dim">Pearl Watch is read-only and unaffiliated with the Pearl team. Verify anything that matters against your own pearld.</p>
+</footer>
+
+<script src="pearl-watch.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
