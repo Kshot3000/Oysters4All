@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Covenant — m-of-n Taproot Multisig Vaults for PRL</title>
+<meta name="description" content="Pearl Covenant: forge m-of-n Taproot multisig vaults on Pearl, coordinate air-gapped cosigner signing rounds, and finalize spends. All crypto runs locally in your browser.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="12" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="16" cy="16" r="12" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="3 3" transform="rotate(15 16 16)"/><circle cx="16" cy="16" r="3.5" fill="currentColor"/><path d="M16 0v4M16 28v4M0 16h4M28 16h4" stroke="currentColor" stroke-width="2"/></svg>
+    <div>
+      <h1>Pearl Covenant</h1>
+      <p class="tagline">m-of-n Taproot multisig vaults for PRL</p>
+    </div>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-step="covenant" class="active">1 · Covenant</button>
+    <button data-step="vault">2 · Vault</button>
+    <button data-step="spend">3 · Spend</button>
+    <button data-step="sign">4 · Sign</button>
+  </nav>
+</header>
+
+<main>
+  <!-- STEP 1: COVENANT -->
+  <section id="step-covenant" class="panel active">
+    <h2>Forge the covenant</h2>
+    <p class="lede">Up to 16 cosigner keys seal one Taproot vault. Any <strong>m of the n</strong> can move the
+    funds — no single key is ever enough, and there is no keypath backdoor: the internal key is a
+    nothing-up-my-sleeve point nobody controls. Paste a 64-hex x-only pubkey or a 12/24-word mnemonic per
+    cosigner; mnemonics and private keys never leave this page and are never written to disk.</p>
+    <div class="form-grid">
+      <label>Network
+        <select id="network">
+          <option value="mainnet" selected>Mainnet (prl…)</option>
+          <option value="testnet">Testnet (tprl…)</option>
+        </select>
+      </label>
+      <label>Threshold (m)
+        <select id="m-select"></select>
+      </label>
+      <label>Cosigners (n)
+        <select id="n-select"></select>
+      </label>
+      <label class="wide">Blockbook API
+        <input id="blockbook" type="url" spellcheck="false">
+      </label>
+    </div>
+    <div id="cosigner-fields" class="party-grid"></div>
+    <div class="row">
+      <button class="btn primary" id="forge-btn">Forge covenant</button>
+      <span class="error" id="forge-error" hidden></span>
+    </div>
+    <div id="covenant-preview" hidden>
+      <h3>Vault address</h3>
+      <div class="addr-row">
+        <code id="cov-address" class="addr"></code>
+        <button class="btn ghost copy-btn" data-for="cov-address">Copy</button>
+      </div>
+      <div class="qr-wrap"><div id="cov-qr"></div><p class="hint">Fund this address. Nothing moves without m signatures.</p></div>
+      <h3>Cosigners</h3>
+      <table class="keys"><thead><tr><th>#</th><th>x-only pubkey</th><th>Source</th><th>This device</th></tr></thead>
+      <tbody id="cov-keys-table"></tbody></table>
+      <h3>Descriptor <span class="hint">— share this to let anyone re-derive the exact vault</span></h3>
+      <div class="addr-row">
+        <code id="cov-descriptor" class="addr small"></code>
+        <button class="btn ghost copy-btn" data-for="cov-descriptor">Copy</button>
+      </div>
+      <details><summary>Script (for review)</summary><code id="cov-asm" class="asm"></code></details>
+      <div class="row">
+        <button class="btn ghost" id="save-covenant">Save covenant on this device</button>
+      </div>
+      <h3>Load a covenant</h3>
+      <textarea id="descriptor-input" rows="2" spellcheck="false" placeholder="covenant:v1:prl:2-of-3:…"></textarea>
+      <div class="row"><button class="btn ghost" id="load-btn">Load from descriptor</button></div>
+    </div>
+  </section>
+
+  <!-- STEP 2: VAULT -->
+  <section id="step-vault" class="panel">
+    <h2>The vault</h2>
+    <p class="lede">Fund the covenant address, then pick a UTXO to spend. Each signing round spends
+    <strong>one UTXO</strong> — a complete, independently verifiable transaction.</p>
+    <div class="addr-row">
+      <code id="vault-address" class="addr"></code>
+      <button class="btn ghost copy-btn" data-for="vault-address">Copy</button>
+    </div>
+    <div class="qr-wrap"><div id="vault-qr"></div></div>
+    <div class="row">
+      <button class="btn primary" id="refresh-utxos">Refresh UTXOs</button>
+      <span id="vault-balance" class="balance"></span>
+      <span class="error" id="vault-error" hidden></span>
+    </div>
+    <table class="keys"><thead><tr><th></th><th>txid</th><th>vout</th><th>Value (PRL)</th><th>Confs</th></tr></thead>
+    <tbody id="utxo-rows"><tr><td colspan="5" class="hint">No UTXOs loaded yet.</td></tr></tbody></table>
+    <h3>Add a UTXO manually <span class="hint">— for air-gapped use</span></h3>
+    <div class="form-grid">
+      <label class="wide">txid <input id="m-txid" spellcheck="false" placeholder="64-hex transaction id"></label>
+      <label>vout <input id="m-vout" type="number" min="0" value="0"></label>
+      <label>Value (PRL) <input id="m-value" type="number" min="0" step="any"></label>
+    </div>
+    <div class="row">
+      <button class="btn ghost" id="add-utxo">Add UTXO</button>
+      <button class="btn primary" id="spend-utxo-btn" disabled>Spend selected UTXO →</button>
+    </div>
+  </section>
+
+  <!-- STEP 3: SPEND -->
+  <section id="step-spend" class="panel">
+    <h2>Build a signing round</h2>
+    <p class="lede">The round is a tamper-evident JSON payload: the unsigned spend, the covenant descriptor,
+    and the collected partial signatures. Pass it to cosigners by copy/paste, QR, or file — each signs locally.</p>
+    <p id="spend-utxo-info" class="hint">No UTXO selected — pick one in the Vault step.</p>
+    <div id="payments"></div>
+    <div class="row"><button class="btn ghost" id="add-payment">+ Add payment</button></div>
+    <div class="form-grid">
+      <label>Fee rate (grains/vB)
+        <input id="fee-rate" type="number" min="1" step="any" value="10">
+      </label>
+      <label class="wide">Memo (optional, stays local)
+        <input id="memo" maxlength="200" placeholder="e.g. vault payout #1">
+      </label>
+    </div>
+    <div class="row">
+      <button class="btn ghost" id="fee-estimate-btn">Fetch fee estimate</button>
+      <button class="btn primary" id="build-round">Build signing round</button>
+      <span class="error" id="round-error" hidden></span>
+    </div>
+    <div id="round-out" hidden>
+      <h3>Round</h3>
+      <div id="round-summary" class="summary"></div>
+      <textarea id="round-json" rows="8" spellcheck="false" readonly></textarea>
+      <div class="row">
+        <button class="btn ghost copy-btn" data-for="round-json">Copy JSON</button>
+        <button class="btn ghost" id="download-round">Download .json</button>
+        <button class="btn primary" id="to-sign-btn">Continue to Sign →</button>
+      </div>
+      <div class="qr-wrap"><div id="round-qr"></div><p class="hint">Cosigners scan this to import the round.</p></div>
+    </div>
+  </section>
+
+  <!-- STEP 4: SIGN -->
+  <section id="step-sign" class="panel">
+    <h2>Sign &amp; finalize</h2>
+    <p class="lede">Import a round, verify it independently, add signatures. Every signature is checked against
+    the round digest before it is accepted. Finalizing needs <strong>m of n</strong>.</p>
+    <textarea id="sign-round-input" rows="6" spellcheck="false" placeholder='Paste the signing-round JSON here'></textarea>
+    <div class="row">
+      <button class="btn primary" id="verify-round">Verify round</button>
+      <span class="error" id="sign-error" hidden></span>
+    </div>
+    <div id="sign-work" hidden>
+      <h3>Round summary</h3>
+      <div id="round-status" class="summary"></div>
+      <div class="quorum"><div id="quorum-bar"></div></div>
+      <p id="quorum-label" class="hint"></p>
+      <h3>Sign with a local key</h3>
+      <div class="form-grid">
+        <label class="wide">Key
+          <select id="sign-key-select"></select>
+        </label>
+      </div>
+      <p class="hint">Keys entered as mnemonics in the Covenant step are available here. Otherwise paste a
+      32-byte hex private key or a 12/24-word mnemonic:</p>
+      <textarea id="sign-key-input" rows="2" spellcheck="false" placeholder="private key (hex) or mnemonic — never leaves this page"></textarea>
+      <div class="row"><button class="btn primary" id="sign-with-local">Add my signature</button></div>
+      <h3>Add a cosigner's signature</h3>
+      <div class="form-grid">
+        <label class="wide">Cosigner x-only pubkey <input id="cosig-key" spellcheck="false" placeholder="64-hex"></label>
+        <label class="wide">Signature (128 hex) <input id="cosig-sig" spellcheck="false" placeholder="128-hex Schnorr signature"></label>
+      </div>
+      <div class="row"><button class="btn ghost" id="add-cosig">Import signature</button></div>
+      <h3>Finalize</h3>
+      <div class="row">
+        <button class="btn primary" id="finalize-btn">Finalize transaction</button>
+      </div>
+      <div id="final-out" hidden>
+        <p>txid: <code id="final-txid" class="addr small"></code></p>
+        <textarea id="final-hex" rows="6" spellcheck="false" readonly></textarea>
+        <div class="row">
+          <button class="btn ghost copy-btn" data-for="final-hex">Copy hex</button>
+          <button class="btn primary" id="broadcast-btn">Broadcast via Blockbook</button>
+        </div>
+        <div id="broadcast-ok" class="ok" hidden></div>
+        <div id="broadcast-error" class="error" hidden></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>Pearl Covenant · m-of-n Taproot multisig vaults for the Pearl blockchain ·
+  <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a></p>
+  <p class="donate">Support the build — <code id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+  <button class="btn ghost copy-btn" data-for="donate-addr">Copy</button></p>
+  <p class="hint">Experimental software. Review every transaction before broadcasting. A multisig is only as
+  trustworthy as the cosigners you choose — verify the descriptor out of band before funding.</p>
+</footer>
+
+<script src="qrcode.min.js?v=1"></script>
+<script src="pearl-covenant.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
