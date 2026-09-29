@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>wPRL — Wrapped Pearl (Pearl PoUW L1) · Bridge to Base</title>
+<meta name="description" content="wPRL — the wrapped ERC-20 of native PRL (Pearl Proof-of-Useful-Work L1) for Base. Custodial 1:1 bridge, 0.25% fee each way, public proof-of-reserves. Testnet only.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='26' fill='%230b1020'/%3E%3Ccircle cx='32' cy='32' r='18' fill='none' stroke='%237dd3fc' stroke-width='4'/%3E%3Ccircle cx='25' cy='25' r='5' fill='%23e0f2fe'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css?v=1">
+<script src="config.js?v=1" defer></script>
+<script src="app.js?v=1" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js" defer></script>
+</head>
+<body>
+<canvas id="pearlfield" aria-hidden="true"></canvas>
+
+<header class="topbar">
+  <a class="brand" href="#top">
+    <span class="brand-orb" aria-hidden="true"></span>
+    <span class="brand-name">wPRL</span>
+    <span class="brand-sub">Wrapped Pearl · Pearl PoUW L1</span>
+  </a>
+  <nav class="topnav">
+    <a href="#bridge">Bridge</a>
+    <a href="#reserves">Reserves</a>
+    <a href="#fees">Fees</a>
+    <a href="#faq">FAQ</a>
+  </nav>
+  <span class="testnet-pill" title="Mainnet deployment needs Kyle's written go-ahead + audit + legal">TESTNET ONLY · Base Sepolia</span>
+</header>
+
+<main id="top">
+  <!-- ============ HERO ============ -->
+  <section class="hero">
+    <p class="eyebrow">ERC-20 · Base (chain 8453 target)</p>
+    <h1>wPRL <span class="thin">— Wrapped Pearl</span></h1>
+    <p class="lede">
+      The wrapped ERC-20 of native <strong>PRL</strong> — the token of the
+      <strong>Pearl Proof-of-Useful-Work L1</strong> (<span class="mono">pearl-research-labs/pearl</span>).
+      Lock PRL in the custodial vault, get wPRL 1:1 on Base. Burn wPRL, get your PRL back.
+    </p>
+    <p class="lede small dim">
+      This wraps <em>the Pearl L1's native PRL</em> — not Oyster Pearl, not Perle on Solana,
+      not any other "PRL". Always verify the contract address against the official deployment record.
+    </p>
+    <div class="hero-cta">
+      <a class="btn primary" href="#bridge">Bridge PRL → wPRL</a>
+      <a class="btn ghost" href="#reserves">Proof of reserves</a>
+    </div>
+    <div class="hero-stats">
+      <div class="stat"><span class="stat-k">Peg</span><span class="stat-v">1 wPRL = 1 PRL</span></div>
+      <div class="stat"><span class="stat-k">Fee</span><span class="stat-v">0.25% each way</span></div>
+      <div class="stat"><span class="stat-k">Model</span><span class="stat-v">Custodial (wBTC-style)</span></div>
+      <div class="stat"><span class="stat-k">Status</span><span class="stat-v warn">Testnet only</span></div>
+    </div>
+  </section>
+
+  <!-- ============ BRIDGE ============ -->
+  <section id="bridge" class="panel">
+    <h2>Bridge</h2>
+    <p class="dim">Two directions. The Pearl chain has no smart contracts (Taproot-only), so the
+    bridge custodies native PRL in a vault and the operator mints wPRL 1:1 on Base — the wBTC model.</p>
+
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-tab="deposit" role="tab" aria-selected="true">Pearl → Base <span class="tab-sub">deposit PRL, receive wPRL</span></button>
+      <button class="tab" data-tab="withdraw" role="tab" aria-selected="false">Base → Pearl <span class="tab-sub">burn wPRL, release PRL</span></button>
+    </div>
+
+    <!-- ---- Deposit tab ---- -->
+    <div class="tabbody active" id="tab-deposit" role="tabpanel">
+      <div class="grid2">
+        <div class="card">
+          <h3>1 · Tell us where to send your wPRL</h3>
+          <label class="field">
+            <span>Your Base (EVM) receive address</span>
+            <input id="dep-evm" class="mono" type="text" placeholder="0x…" spellcheck="false" autocomplete="off">
+          </label>
+          <p class="hint" id="dep-evm-hint">This address is embedded in your deposit's OP_RETURN memo.</p>
+          <label class="field">
+            <span>Amount to wrap (PRL)</span>
+            <input id="dep-amount" class="mono" type="text" inputmode="decimal" placeholder="e.g. 10" spellcheck="false" autocomplete="off">
+          </label>
+          <p class="hint">Minimum 0.001 PRL. Sub-grain dust is truncated by the 1 grain = 10<sup>10</sup> wei conversion.</p>
+          <div id="dep-error" class="error hidden" role="alert"></div>
+        </div>
+        <div class="card glow">
+          <h3>2 · Send this exact Pearl transaction</h3>
+          <div id="dep-instructions" class="dim">Enter an amount and a valid 0x address to generate your deposit instructions.</div>
+          <ol id="dep-steps" class="steps hidden">
+            <li>
+              <div class="step-head"><strong>Send <span id="dep-total-prl" class="mono"></span> PRL total</strong>
+              <button class="copy" data-copy="dep-total-prl">copy</button></div>
+              <p class="dim small">Split into <strong>two outputs</strong> in one transaction:</p>
+              <ul class="outputs">
+                <li><span class="out-label">Vault</span>
+                  <code id="dep-vault" class="mono addr"></code>
+                  <button class="copy" data-copy="dep-vault">copy</button>
+                  <span class="out-amt mono" id="dep-vault-amt"></span></li>
+                <li><span class="out-label">Fee 0.25%</span>
+                  <code id="dep-fee-addr" class="mono addr"></code>
+                  <button class="copy" data-copy="dep-fee-addr">copy</button>
+                  <span class="out-amt mono" id="dep-fee-amt"></span></li>
+              </ul>
+            </li>
+            <li>
+              <div class="step-head"><strong>Add OP_RETURN memo</strong>
+              <button class="copy" data-copy="dep-memo">copy</button></div>
+              <p class="dim small">UTF-8, exactly:</p>
+              <code id="dep-memo" class="mono block"></code>
+            </li>
+            <li>
+              <strong>Wait for 6 confirmations.</strong>
+              <p class="dim small">The operator verifies the vault output, the fee output and the memo, then mints
+              exactly <span id="dep-mint" class="mono"></span> wPRL to your address. Deposits missing the fee or the
+              memo are <em>not</em> auto-minted — they are held in the vault for manual review.</p>
+            </li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- Withdraw tab ---- -->
+    <div class="tabbody" id="tab-withdraw" role="tabpanel">
+      <div class="grid2">
+        <div class="card">
+          <h3>Plan your unwrap</h3>
+          <label class="field">
+            <span>wPRL to burn</span>
+            <input id="wd-amount" class="mono" type="text" inputmode="decimal" placeholder="e.g. 5" spellcheck="false" autocomplete="off">
+          </label>
+          <label class="field">
+            <span>Pearl address to receive PRL</span>
+            <input id="wd-prl" class="mono" type="text" placeholder="prl1…" spellcheck="false" autocomplete="off">
+          </label>
+          <p class="hint" id="wd-prl-hint">Must be a <span class="mono">prl1…</span> address — pasting an EVM address is rejected on-chain.</p>
+          <div id="wd-error" class="error hidden" role="alert"></div>
+          <div id="wd-quote" class="quote hidden">
+            <div class="qrow"><span>Burn</span><strong class="mono" id="wd-q-burn"></strong></div>
+            <div class="qrow"><span>Fee (0.25%, in wPRL, on-chain)</span><strong class="mono" id="wd-q-fee"></strong></div>
+            <div class="qrow total"><span>You receive on Pearl</span><strong class="mono" id="wd-q-net"></strong></div>
+            <p class="dim small">The operator releases the net PRL from the vault after the burn confirms. Fee math is
+            integer division, exactly as the contract computes it: <span class="mono">fee = amount × 25 / 10000</span>.</p>
+          </div>
+        </div>
+        <div class="card glow">
+          <h3>Execute on Base</h3>
+          <div id="wd-live" class="hidden">
+            <p class="dim small">Contract is configured. Connect a Base Sepolia wallet to call
+            <span class="mono">requestWithdraw</span> directly.</p>
+            <button id="wd-connect" class="btn primary">Connect wallet &amp; burn</button>
+            <p class="dim small" id="wd-txstatus"></p>
+          </div>
+          <div id="wd-pending">
+            <p class="notice">The wPRL contracts are <strong>not deployed yet</strong> — testnet deployment is pending.
+            Nothing here can move funds today, and nothing will until the deployment record below is filled in.</p>
+            <p class="dim small">When live, unwrapping calls
+            <span class="mono">WPRLBridge.requestWithdraw(amountWei, prlRecipient)</span>: the 0.25% fee is taken
+            in wPRL to the fee address on-chain, the rest is burned, and the operator releases net PRL to your
+            <span class="mono">prl1…</span> address.</p>
+          </div>
+          <h4>Deployment record</h4>
+          <dl class="deploy">
+            <div><dt>Network</dt><dd id="cfg-network">—</dd></div>
+            <div><dt>wPRL token</dt><dd class="mono" id="cfg-token">not deployed</dd></div>
+            <div><dt>Bridge</dt><dd class="mono" id="cfg-bridge">not deployed</dd></div>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ RESERVES ============ -->
+  <section id="reserves" class="panel">
+    <h2>Proof of reserves</h2>
+    <p class="dim">Live numbers from the bridge operator's <span class="mono">/reserves</span> API — vault grain balance
+    on the Pearl chain vs wPRL total supply on Base. The API reports what the chains say; it never invents numbers.</p>
+    <div id="reserves-card" class="card">
+      <div id="res-loading" class="dim">Contacting the operator API…</div>
+      <div id="res-live" class="hidden">
+        <div class="res-grid">
+          <div class="res-cell"><span class="res-k">Vault balance (Pearl)</span><strong class="mono" id="res-vault"></strong></div>
+          <div class="res-cell"><span class="res-k">wPRL supply (Base)</span><strong class="mono" id="res-supply"></strong></div>
+          <div class="res-cell"><span class="res-k">Backing ratio</span><strong class="mono" id="res-ratio"></strong></div>
+          <div class="res-cell"><span class="res-k">Status</span><strong id="res-status"></strong></div>
+        </div>
+        <div class="bar"><div id="res-bar" class="bar-fill"></div></div>
+        <p class="dim small">Checked <span id="res-checked" class="mono"></span> · backing = vault grains × 10000 / supply grains
+        · 10000 = exactly 1:1. Fee addresses: <span class="mono" id="res-fee-prl"></span> ·
+        <span class="mono" id="res-fee-evm"></span></p>
+      </div>
+      <div id="res-offline" class="hidden">
+        <p class="notice" id="res-offline-msg">The operator API isn't published yet — reserves are <strong>unavailable</strong>, not zero.
+        This dashboard shows real numbers only once the bridge operator is running.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FEES ============ -->
+  <section id="fees" class="panel">
+    <h2>Fee schedule</h2>
+    <p class="dim">One number, defined once as <span class="mono">BRIDGE_FEE_BPS = 25</span> (denominator 10,000).
+    No other fees exist in the contracts.</p>
+    <div class="card">
+      <table class="fees">
+        <thead><tr><th>Direction</th><th>Fee</th><th>How it's taken</th><th>Goes to</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Pearl → Base <span class="dim">(deposit)</span></td>
+            <td><strong>0.25%</strong></td>
+            <td>You add a <strong>separate fee output</strong> in your deposit tx, ≥ ceil(amount × 0.25%)</td>
+            <td><code class="mono addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code></td>
+          </tr>
+          <tr>
+            <td>Base → Pearl <span class="dim">(withdraw)</span></td>
+            <td><strong>0.25%</strong></td>
+            <td>Taken <strong>on-chain in wPRL</strong> by <span class="mono">requestWithdraw</span></td>
+            <td><code class="mono addr">0x4b6f3BC697D9dAF3e8dE182aEc56eD208B9087f1</code></td>
+          </tr>
+        </tbody>
+      </table>
+      <h4>Exact unit conversion</h4>
+      <p class="dim small">Pearl's smallest unit is the <strong>grain</strong>
+      (upstream <span class="mono">node/btcutil/const.go</span>: 1 PRL = 100,000,000 grains).
+      wPRL is 18 decimals, so <strong>1 grain = 10<sup>10</sup> wei, exactly</strong>
+      (<span class="mono">grains → wei: × 10<sup>10</sup></span>;
+      <span class="mono">wei → grains: ÷ 10<sup>10</sup></span>, sub-grain dust truncated).</p>
+    </div>
+  </section>
+
+  <!-- ============ FAQ ============ -->
+  <section id="faq" class="panel">
+    <h2>FAQ</h2>
+    <div class="faq">
+      <details open>
+        <summary>How does the bridge work?</summary>
+        <p>The Pearl L1 is Taproot-only with no smart contracts, so wPRL follows the wBTC model: you send native PRL
+        to the operator's vault (plus a 0.25% fee output, plus an OP_RETURN memo naming your Base address). After 6
+        confirmations the operator verifies the tx and calls <span class="mono">mintDeposit</span> on the Base bridge
+        contract, minting you exactly 1 wPRL per PRL. To unwrap, you call
+        <span class="mono">requestWithdraw</span>: 0.25% goes to the fee address on-chain, the rest burns, and the
+        operator releases the net PRL to your <span class="mono">prl1…</span> address.</p>
+      </details>
+      <details>
+        <summary>Is this trustless?</summary>
+        <p><strong>No — it is custodial, like wBTC.</strong> The backing PRL sits in the operator's vault off-chain,
+        and you trust the operator to hold 1:1 backing and release PRL on burns. Mitigations: immutable fee
+        recipient, per-txid replay protection, on-chain supply accounting, a public proof-of-reserves dashboard,
+        an admin pause brake, and (planned) multisig operator keys plus a professional audit before any mainnet.</p>
+      </details>
+      <details>
+        <summary>Which "PRL" is this?</summary>
+        <p><strong>Only</strong> the native token of the Pearl Proof-of-Useful-Work L1
+        (<span class="mono">pearl-research-labs/pearl</span>). It is not Oyster Pearl, not Perle on Solana, and not
+        any copycat "PRL". The branding on this page says which PRL everywhere for exactly that reason.</p>
+      </details>
+      <details>
+        <summary>Why testnet only?</summary>
+        <p>The contracts, operator and this site are built and tested, but no audit, custody setup or legal review
+        has happened yet. Until those are done — and Kyle gives explicit written go-ahead — everything targets
+        <strong>Base Sepolia</strong> and no real funds should be used. Mainnet deployment is a deliberate,
+        announced event, not a quiet config flip.</p>
+      </details>
+      <details>
+        <summary>What if my deposit is missing the fee output or the memo?</summary>
+        <p>It is <strong>not</strong> auto-minted. Your PRL stays safe in the vault and the tx is logged for manual
+        review — the custodian can refund it. Double-check the generated instructions before sending.</p>
+      </details>
+      <details>
+        <summary>What does the operator run?</summary>
+        <p>Open-source Node operator: a Pearl deposit watcher (pearld <span class="mono">searchrawtransactions</span>,
+        needs <span class="mono">--addrindex</span>), a Base withdrawal watcher (idempotent per nonce, 2-block reorg
+        margin), and the <span class="mono">/reserves</span> API behind the dashboard above. Full source and runbook
+        in the repo.</p>
+      </details>
+    </div>
+  </section>
+
+  <!-- ============ FOOTER ============ -->
+  <footer>
+    <div class="attr">
+      <p><strong>Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a></strong>
+      · <a href="https://github.com/Kshot3000" target="_blank" rel="noopener">github.com/Kshot3000</a></p>
+      <p class="mono small">PRL (Pearl L1): prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</p>
+      <p class="mono small">EVM (Base): 0x4b6f3BC697D9dAF3e8dE182aEc56eD208B9087f1</p>
+      <p class="dim small">Source: <a href="https://github.com/Kshot3000/Pearl-Muse-24-7-Ai-builder" target="_blank" rel="noopener">github.com/Kshot3000/Pearl-Muse-24-7-Ai-builder</a>
+      (apps/wprl) · Testnet only — no audit yet, no real funds.</p>
+    </div>
+  </footer>
+</main>
+
+<div id="toast" class="toast hidden" role="status"></div>
+</body>
+</html>

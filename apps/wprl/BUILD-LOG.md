@@ -49,3 +49,39 @@ Timestamped record of every build/test/verify step. Times in America/Chicago.
   double-send, final supply 1.5025 wPRL with the 0.0025 fee in Kyle's address.
 - Committed + pushed to main. No mainnet activity; testnet deploy still pending
   with Kyle.
+
+## 2026-09-28 19:35 CDT — Phase 3: bridge website (web/)
+
+- Built `web/`: static Pearl-brand bridge site (dark, luminous pearl-glow,
+  animated particle canvas) — `index.html`, `styles.css`, `config.js` (public
+  config, placeholders, zero secrets), `app.js`, `test/app.test.mjs`.
+- Deposit tab: instruction generator — enter Base 0x address + PRL amount →
+  exact two-output breakdown (vault amount + ceil(0.25%) fee to Kyle's PRL
+  address), `wprl:<0x…>` OP_RETURN memo, copy buttons, 6-confirmation note,
+  min 0.001 PRL, dust rejected. Vault address shows honest "not published
+  yet" until the operator is configured.
+- Withdraw tab: unwrap planner — wPRL amount + prl1… recipient → on-chain fee
+  (floor, exactly the contract's integer division), net PRL, EVM-address
+  rejection in the prl1 field. Contract call (`requestWithdraw` via ethers)
+  renders only when a bridge address is configured; otherwise an honest
+  "not deployed yet" panel. No dead buttons.
+- Proof-of-reserves dashboard: fetches operator `/reserves` → vault PRL,
+  wPRL supply, backing ratio + bar, FULLY BACKED/UNDER-COLLATERALIZED badge,
+  fee addresses. Three honest states: live / not-published-yet /
+  unreachable — never fake numbers; auto-refresh 60s.
+- Fee schedule (0.25% each way, both fee addresses), FAQ (custodial trust
+  model, which-PRL disambiguation, testnet-only, deposit-protocol edge cases),
+  footer with full attribution (@kshot9000, both addresses, repo link).
+- `node --test web/test/`: **8/8 green** (exact fee math matches backend
+  deposit.js ceil + WPRLBridge floor; validation mirrors contract).
+- Real-browser QA via CDP (headless Chromium): **24/24 PASS** — deposit math
+  (10 PRL → 0.025 fee, 10.025 total, correct memo), dust rejection, withdraw
+  quote (5 wPRL → 4.9875 PRL net), EVM-in-prl1 rejection, reserves live
+  (25 PRL / 25 wPRL / 100.00% / FULLY BACKED) against a stub API, honest
+  offline state without it. Zero JS errors from our code (only 2 sandbox
+  CDN-load failures for ethers — no direct egress here; page degrades
+  gracefully, loads fine in production).
+- Screenshots verified visually (hero, bridge, reserves).
+- Still pending: `docs/` (architecture, trust model, fee economics, Aerodrome
+  plan, audit checklist, TEAM-HANDOFF.md) — next phase. No outreach sent
+  (package not yet complete per the handoff rule).

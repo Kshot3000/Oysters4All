@@ -1,0 +1,1 @@
+{"description":"wPRL bridge site (static). type:commonjs so node --test can require() app.js's pure helpers.","name":"wprl-web","private":true,"type":"commonjs"}

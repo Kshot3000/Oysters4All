@@ -113,6 +113,29 @@ npm run api            # proof-of-reserves API on :8080
 See `backend/README.md` for the deposit protocol and runbook, and
 `BUILD-LOG.md` for the timestamped build record.
 
+## Bridge website (Phase 3)
+
+`web/` — static Pearl-brand bridge site (deploy to GitHub Pages as-is):
+
+- **Bridge UI**: deposit instruction generator (Pearl → Base) with exact
+  two-output breakdown + `wprl:<0x…>` OP_RETURN memo; withdraw planner
+  (Base → Pearl) with on-chain fee quote and prl1… validation; the live
+  `requestWithdraw` wallet button appears only once a bridge contract is
+  configured — no dead buttons before testnet deploy.
+- **Proof-of-reserves dashboard**: reads the operator's `/reserves` API
+  (configure `reservesApiUrl` in `web/config.js`); honest
+  live/unpublished/unreachable states, never fake numbers.
+- Fee schedule, FAQ (custodial trust model, which-PRL, testnet-only),
+  footer with @kshot9000 + both fee addresses.
+- Pure math helpers unit-tested (`web/test/`, 8/8 green); full interaction
+  suite verified in headless Chromium via CDP (24/24 PASS, zero JS errors).
+
+```bash
+cd apps/wprl/web
+node --test test/     # pure-helper unit tests
+python3 -m http.server  # serve locally; set reservesApiUrl in config.js
+```
+
 ## Deployment (later, with Kyle — NOT done in Phase 1)
 
 1. Deploy `WPRL` with admin = Kyle's EVM address.
