@@ -37,6 +37,7 @@
         <a href="pages/vesting/">Vesting</a>
         <a href="pages/rain/">Rain</a>
         <a href="pages/stream/">Stream</a>
+        <a href="pages/raffle/">Raffle</a>
         <a href="pages/pool/">Mining pool</a>
         <a href="pages/wallet/">Wallet</a>
         <a href="pages/mining/">Mining calc</a>
@@ -281,6 +282,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Rain — Batch-Send PRL Airdrops <span class="badge">new</span></h3>
             <p>Make it rain — one funder key, one transaction, up to 250 recipients. Paste a recipient list (or import CSV), validate every Taproot address and dust rule, plan the exact fee with change back to the funder, then sign locally with per-signature re-verification before the hex is shown. Blockbook UTXO lookup or fully air-gapped paste mode. Keys never leave the page.</p>
             <div class="card-links"><a href="pages/rain/">Open Pearl Rain →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Raffle — Provably-Fair PRL Raffles <span class="badge">new</span></h3>
+            <p>The lottery vault — commit to a prize, a future settlement block, and weighted entries in a tamper-evident descriptor you must publish before the settlement block. Draw winners from the settlement block hash with a hand-verifiable SHA-256 derivation (1–3 prize rounds), verify anyone's draw standalone with a loud refusal on tampered entries, and export an exact payout plan as CSV plus pearl: payment QRs. Honest scope: the page never moves PRL — prize custody stays with the organizer.</p>
+            <div class="card-links"><a href="pages/raffle/">Open Pearl Raffle →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Notary — Proof of Existence <span class="badge">new</span></h3>

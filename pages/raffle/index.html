@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Raffle — Provably-Fair PRL Raffle Manager</title>
+<meta name="description" content="Pearl Raffle: provably-fair PRL raffles. Commit to prize, settlement block and entries in a tamper-evident descriptor, draw winners from the settlement block hash with a hand-verifiable SHA-256 derivation, verify anyone's draw standalone, and export an exact payout plan. No PRL ever moves through this page.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<div class="vault-glow" aria-hidden="true"><span class="orb o1"></span><span class="orb o2"></span><span class="orb o3"></span></div>
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="16" cy="16" r="4" fill="currentColor"/><path d="M16 3v5M16 24v5M3 16h5M24 16h5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+    <div>
+      <h1>Pearl Raffle</h1>
+      <p class="tagline">provably-fair PRL raffles · the lottery vault</p>
+    </div>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-step="forge" class="active">1 · Forge</button>
+    <button data-step="track" class="">2 · Track</button>
+    <button data-step="draw" class="">3 · Draw</button>
+    <button data-step="verify" class="">4 · Verify</button>
+    <button data-step="payout" class="">5 · Payout</button>
+  </nav>
+</header>
+
+<main>
+  <!-- STEP 1: FORGE -->
+  <section id="step-forge" class="panel active">
+    <h2>Forge the raffle</h2>
+    <p class="lede">The organizer commits to the <strong>prize</strong>, the <strong>settlement block</strong>
+      (a future block whose hash is the unpredictable beacon), and the <strong>weighted entries</strong>.
+      The descriptor is tamper-evident: changing anything after forging changes the hash.
+      <strong class="moves-real">Publish the descriptor before the settlement block</strong> — that is what
+      makes the draw provably fair.</p>
+    <div class="form-grid">
+      <label>Network
+        <select id="network">
+          <option value="mainnet" selected>Mainnet (prl…)</option>
+          <option value="testnet">Testnet (tprl…)</option>
+        </select>
+      </label>
+      <label>Prize (PRL)
+        <input id="forge-prize" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="e.g. 25 (decimals ok)">
+      </label>
+      <label>Settlement block height (future)
+        <input id="forge-height" type="number" min="1" step="1" autocomplete="off" placeholder="e.g. 120500">
+      </label>
+      <label class="wide">Blockbook endpoint (reads the chain tip so the app can prove the settlement block is in the future)
+        <input id="forge-blockbook" type="text" autocomplete="off" spellcheck="false" placeholder="https://blockbook.pearlresearch.ai">
+      </label>
+    </div>
+    <div class="row">
+      <button id="forge-tip" class="ghost">Read current tip from Blockbook</button>
+      <label class="inline">or enter tip manually <input id="forge-tip-manual" type="number" min="0" step="1" placeholder="current height"></label>
+    </div>
+    <p class="hint" id="forge-tip-out" hidden></p>
+    <h3>Entries — one <code>&lt;address&gt; &lt;tickets&gt;</code> per line</h3>
+    <p class="hint">Tickets are whole entry counts (weights). Commas work too. Lines starting with
+      <code>#</code> are ignored. Duplicate addresses merge. Every address must be a Pearl v1
+      Taproot address (<code>prl1p…</code>).</p>
+    <div class="grid2">
+      <div>
+        <label>Paste list
+          <textarea id="forge-entries" rows="10" spellcheck="false" placeholder="prl1p… 10&#10;prl1p…,5&#10;# ignored"></textarea>
+        </label>
+        <div class="row">
+          <button id="forge-parse" class="ghost">Validate entries</button>
+          <button id="forge-sample" class="ghost">Load sample</button>
+        </div>
+        <label>Or import a CSV file
+          <input id="forge-file" type="file" accept=".csv,.txt,text/csv,text/plain">
+        </label>
+        <p id="forge-entries-error" class="err" hidden></p>
+      </div>
+      <div>
+        <h4>Validated</h4>
+        <p class="hint" id="forge-entries-summary">No list validated yet.</p>
+        <div id="forge-entries-table-wrap" class="table-wrap" hidden>
+          <table class="rtable">
+            <thead><tr><th>#</th><th>Address</th><th class="num">Tickets</th></tr></thead>
+            <tbody id="forge-entries-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="row">
+      <button id="forge-button" class="primary">Forge raffle</button>
+    </div>
+    <p class="err" id="forge-error" hidden></p>
+    <div id="forge-out" hidden>
+      <h3>Raffle forged</h3>
+      <div class="kv"><span>Descriptor</span></div>
+      <textarea id="forge-descriptor" rows="3" readonly spellcheck="false"></textarea>
+      <div class="row">
+        <button class="copy-btn" data-for="forge-descriptor">Copy</button>
+        <button id="forge-download" class="ghost">Download JSON</button>
+      </div>
+      <h3>Commitment — publish this <em>before</em> the settlement block</h3>
+      <p class="hint">Post the descriptor (or the commitment below) publicly — X, Discord, the event page —
+        <strong>before block <span id="forge-commit-height"></span> is mined</strong>. Anyone can then
+        re-verify the draw with the entries you publish. A commitment that appears only after the
+        settlement block proves nothing.</p>
+      <div class="kv"><span>Descriptor hash (SHA-256)</span><code id="forge-dhash"></code></div>
+      <label>Publishable commitment
+        <textarea id="forge-publish" rows="3" readonly spellcheck="false"></textarea>
+      </label>
+      <div class="row">
+        <button class="copy-btn" data-for="forge-publish">Copy</button>
+      </div>
+      <p class="hint">Forged <span id="forge-forged-at"></span> · prize <strong id="forge-prize-out"></strong> · <span id="forge-count-out"></span></p>
+    </div>
+  </section>
+
+  <!-- STEP 2: TRACK -->
+  <section id="step-track" class="panel">
+    <h2>Track the raffle</h2>
+    <p class="lede">Reload a descriptor to re-derive it, re-check the entry commitment, and count down to the
+      settlement block. Once the settlement block is mined, grab its hash for the draw.</p>
+    <div class="form-grid">
+      <label class="wide">Raffle descriptor
+        <textarea id="track-descriptor" rows="3" spellcheck="false" placeholder="raffle:v1:prl:…"></textarea>
+      </label>
+      <label class="wide">Entry list (to re-check the commitment — paste the same lines you forged)
+        <textarea id="track-entries" rows="5" spellcheck="false" placeholder="optional · <address> <tickets> per line"></textarea>
+      </label>
+      <label class="wide">Blockbook endpoint
+        <input id="track-blockbook" type="text" autocomplete="off" spellcheck="false" placeholder="https://blockbook.pearlresearch.ai">
+      </label>
+    </div>
+    <div class="row">
+      <button id="track-load" class="primary">Load raffle</button>
+      <button id="track-scan" class="ghost">Scan tip + settlement block</button>
+    </div>
+    <p class="err" id="track-error" hidden></p>
+    <div id="track-out" hidden>
+      <dl class="review" id="track-fields"></dl>
+      <p class="hint" id="track-commit" hidden></p>
+      <div class="dashboard">
+        <div class="stat"><span class="stat-label">Chain tip</span><span class="stat-value" id="track-tip">—</span></div>
+        <div class="stat"><span class="stat-label">Blocks to settlement</span><span class="stat-value" id="track-left">—</span></div>
+        <div class="stat"><span class="stat-label">≈ time left</span><span class="stat-value" id="track-eta">—</span></div>
+        <div class="stat"><span class="stat-label">Settlement block hash</span><span class="stat-value small" id="track-sethash">—</span></div>
+      </div>
+      <div class="row">
+        <button id="track-carry" class="primary">Carry to Draw →</button>
+      </div>
+      <h4>Air-gapped path — paste the settlement block hash by hand</h4>
+      <label class="wide">Settlement block hash (64 hex)
+        <input id="track-hash-manual" type="text" autocomplete="off" spellcheck="false" placeholder="aa… (64 hex)">
+      </label>
+      <div class="row">
+        <button id="track-manual-carry" class="ghost">Use this hash for the draw →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 3: DRAW -->
+  <section id="step-draw" class="panel">
+    <h2>Draw the winners</h2>
+    <p class="lede">With the settlement block hash in hand, the draw is a pure function:
+      <code>winnerIndex = uint256(SHA-256("raffle-draw:v1:⟨descriptorHash⟩:⟨blockHash⟩:⟨round⟩")) mod totalTickets</code>,
+      mapped onto the weighted ticket ranges. No secrets, no randomness you must trust —
+      <strong>anyone can redo every step by hand</strong>.</p>
+    <div class="form-grid">
+      <label class="wide">Raffle descriptor
+        <textarea id="draw-descriptor" rows="3" spellcheck="false" placeholder="raffle:v1:prl:…"></textarea>
+      </label>
+      <label class="wide">Entry list (must reproduce the descriptor's entriesHash exactly)
+        <textarea id="draw-entries" rows="5" spellcheck="false" placeholder="<address> <tickets> per line"></textarea>
+      </label>
+      <label class="wide">Settlement block hash (64 hex)
+        <input id="draw-blockhash" type="text" autocomplete="off" spellcheck="false" placeholder="aa… (64 hex)">
+      </label>
+      <label>Prize rounds (1–3; later rounds exclude earlier winners)
+        <select id="draw-rounds">
+          <option value="1" selected>1 round</option>
+          <option value="2">2 rounds</option>
+          <option value="3">3 rounds</option>
+        </select>
+      </label>
+    </div>
+    <div class="row">
+      <button id="draw-run" class="primary">Run the draw</button>
+    </div>
+    <p class="err" id="draw-error" hidden></p>
+    <div id="draw-out" hidden>
+      <h3>Winners</h3>
+      <div id="draw-winners" class="winner-cards"></div>
+      <h3>Full derivation (re-verify by hand)</h3>
+      <div id="draw-derivation"></div>
+      <div class="row">
+        <button id="draw-carry-verify" class="ghost">Open in Verify →</button>
+        <button id="draw-carry-payout" class="primary">Build payout plan →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 4: VERIFY -->
+  <section id="step-verify" class="panel">
+    <h2>Verify a draw</h2>
+    <p class="lede">The standalone verifier. Paste anyone's descriptor, their entry list, and the settlement
+      block hash — the app recomputes the commitment and the full draw locally.
+      <strong>If the entries were altered after forging, verification refuses loudly.</strong></p>
+    <div class="form-grid">
+      <label class="wide">Raffle descriptor
+        <textarea id="verify-descriptor" rows="3" spellcheck="false" placeholder="raffle:v1:prl:…"></textarea>
+      </label>
+      <label class="wide">Entry list as published by the organizer
+        <textarea id="verify-entries" rows="5" spellcheck="false" placeholder="<address> <tickets> per line"></textarea>
+      </label>
+      <label class="wide">Settlement block hash (64 hex)
+        <input id="verify-blockhash" type="text" autocomplete="off" spellcheck="false" placeholder="aa… (64 hex)">
+      </label>
+      <label>Prize rounds
+        <select id="verify-rounds">
+          <option value="1" selected>1 round</option>
+          <option value="2">2 rounds</option>
+          <option value="3">3 rounds</option>
+        </select>
+      </label>
+    </div>
+    <div class="row">
+      <button id="verify-run" class="primary">Verify draw</button>
+    </div>
+    <p class="err" id="verify-error" hidden></p>
+    <div id="verify-out" hidden>
+      <div id="verify-verdict" class="verdict"></div>
+      <h3>Recomputed derivation</h3>
+      <div id="verify-detail"></div>
+    </div>
+  </section>
+
+  <!-- STEP 5: PAYOUT -->
+  <section id="step-payout" class="panel">
+    <h2>Payout plan</h2>
+    <p class="lede"><strong class="moves-real">Honest scope: this page never moves PRL.</strong>
+      Prize custody stays with the organizer — the plan below splits the exact prize across the round
+      winners (remainder grains go to round 1), and exports a CSV plus <code>pearl:</code> payment
+      URIs with QR codes so you can pay out from your own wallet.</p>
+    <div class="form-grid">
+      <label class="wide">Raffle descriptor (for the exact prize amount)
+        <textarea id="payout-descriptor" rows="2" spellcheck="false" placeholder="raffle:v1:prl:…"></textarea>
+      </label>
+      <label class="wide">Winners — one address per line, in round order
+        <textarea id="payout-winners" rows="4" spellcheck="false" placeholder="prl1p… (round 1)&#10;prl1p… (round 2)"></textarea>
+      </label>
+    </div>
+    <div class="row">
+      <button id="payout-build" class="primary">Build payout plan</button>
+      <button id="payout-csv" class="ghost" disabled>Download CSV</button>
+    </div>
+    <p class="err" id="payout-error" hidden></p>
+    <div id="payout-out" hidden>
+      <h3>Payout plan — total <span id="payout-total"></span></h3>
+      <div id="payout-rows" class="payout-cards"></div>
+      <p class="fineprint">Pay each row from your wallet (scan the QR or copy the
+        <code>pearl:</code> URI). Totals are exact to the grain — the rows always sum to the prize.</p>
+    </div>
+  </section>
+
+  <section id="honest-limits" class="panel limits">
+    <h2>Honest limits</h2>
+    <ul>
+      <li><strong>No PRL ever moves through this page.</strong> It forges commitments, draws winners, verifies draws,
+        and plans payouts — prize custody and the actual sends stay with the organizer's own wallet.</li>
+      <li>Fairness is a commitment protocol, not code: Pearl has no smart contracts, so nothing on-chain enforces
+        the draw. The guarantee is that <strong>the descriptor must be published before the settlement block</strong>
+        — anyone can then check the entriesHash and redo the SHA-256 draw by hand. A commitment that appears only
+        after the settlement block proves nothing.</li>
+      <li>The beacon is only as unpredictable as the settlement block. Use a block far enough out that no
+        entrant (including the organizer) can influence or predict its hash; the app enforces a ≥ 4-block lead at forge time.</li>
+      <li>Blockbook is a third-party read source. For the draw that decides real money, confirm the settlement
+        block hash with your own <code>pearld</code> node (<code>getblockhash</code>) or a Blockbook you trust —
+        the air-gapped paste path exists for exactly this.</li>
+      <li>No draw runs without the settlement block hash and a matching entry list. If either is missing or
+        tampered, the app <strong>refuses</strong> — it never invents a winner.</li>
+      <li>Block countdowns assume the 194-second target block time; real block times vary.</li>
+    </ul>
+  </section>
+</main>
+
+<footer>
+  <p>Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> for the Pearl ecosystem · All hashing runs locally in your browser — nothing is sent anywhere except the Blockbook lookups you trigger.</p>
+  <p>Donations: <code id="donate">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code> <button class="copy-btn" data-for="donate">Copy</button></p>
+</footer>
+
+<script src="qrcode.min.js?v=1"></script>
+<script src="pearl-raffle.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
