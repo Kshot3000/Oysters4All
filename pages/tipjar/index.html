@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Tipjar — PRL Donation Widget Generator</title>
+<meta name="description" content="Generate an embeddable PRL tip jar for your website: configure the address, presets and theme, copy the self-contained snippet, and watch tips land live.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<div class="nacre-sky" aria-hidden="true">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<header class="top">
+  <a class="crumb" href="../">← Pearl apps</a>
+  <h1><span class="pearl-dot" aria-hidden="true"></span> Pearl Tipjar</h1>
+  <p class="sub">The tip-jar forge — configure a PRL donation widget, preview it live, copy one self-contained snippet onto your own site, and watch the grains roll in. The widget only ever reads the chain: it can never move funds.</p>
+</header>
+
+<main>
+  <section class="panel" id="wizard-panel">
+    <h2>1 · Configure your jar</h2>
+    <p id="tj-error" class="error" hidden></p>
+
+    <label class="field">
+      <span>Recipient address <small>(prl1… mainnet or tprl1… testnet — validated bech32m, witness v1)</small></span>
+      <input id="tj-address" class="mono" spellcheck="false" autocomplete="off"
+        placeholder="prl1p…">
+    </label>
+
+    <div class="grid">
+      <label class="field">
+        <span>Jar title <small>(max 60 chars)</small></span>
+        <input id="tj-title" maxlength="60" value="Support the Pearl builder" spellcheck="false">
+      </label>
+      <label class="field">
+        <span>Goal <small>(PRL — optional, blank = no goal)</small></span>
+        <input id="tj-goal" inputmode="decimal" placeholder="e.g. 100" spellcheck="false">
+      </label>
+      <label class="field">
+        <span>Poll interval <small>(seconds, 15–300)</small></span>
+        <input id="tj-poll" type="number" min="15" max="300" value="30" class="num">
+      </label>
+      <label class="field">
+        <span>Blockbook <small>(GET-only reads)</small></span>
+        <input id="tj-blockbook" type="url" value="https://blockbook.pearlresearch.ai" spellcheck="false">
+      </label>
+    </div>
+
+    <div class="field">
+      <span class="flabel">Amount presets <small>(1–4, exact PRL — below the 0.00001 PRL dust floor is refused)</small></span>
+      <div class="presets">
+        <input id="tj-p0" class="num" inputmode="decimal" value="0.5" spellcheck="false">
+        <input id="tj-p1" class="num" inputmode="decimal" value="1" spellcheck="false">
+        <input id="tj-p2" class="num" inputmode="decimal" value="2.5" spellcheck="false">
+        <input id="tj-p3" class="num" inputmode="decimal" value="5" spellcheck="false">
+      </div>
+    </div>
+
+    <div class="field">
+      <span class="flabel">Theme</span>
+      <div class="themes" id="tj-themes">
+        <label class="theme-card" data-theme="harbor-lantern">
+          <input type="radio" name="tj-theme" value="harbor-lantern" checked>
+          <span class="swatch sw-harbor"></span>
+          <span class="tname">Harbor Lantern</span>
+          <span class="tblurb">Amber glass glow</span>
+        </label>
+        <label class="theme-card" data-theme="deep-abyss">
+          <input type="radio" name="tj-theme" value="deep-abyss">
+          <span class="swatch sw-abyss"></span>
+          <span class="tname">Deep Abyss</span>
+          <span class="tblurb">Indigo / teal bioluminescence</span>
+        </label>
+        <label class="theme-card" data-theme="ember-forge">
+          <input type="radio" name="tj-theme" value="ember-forge">
+          <span class="swatch sw-ember"></span>
+          <span class="tname">Ember Forge</span>
+          <span class="tblurb">Crimson / charcoal sparks</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="tj-generate" class="btn primary" type="button">Generate jar →</button>
+    </div>
+    <p class="note">The default jar points at the builder's donation address — replace it with your own <span class="mono">prl1…</span> address to collect your own tips.</p>
+  </section>
+
+  <section class="panel" id="preview-panel" hidden>
+    <h2>2 · Live preview <small class="dim">— this is the real widget, polling Blockbook now</small></h2>
+    <div id="tj-preview"></div>
+  </section>
+
+  <section class="panel" id="snippet-panel" hidden>
+    <h2>3 · Copy the snippet</h2>
+    <p class="note">One block: a mount <span class="mono">&lt;div&gt;</span>, the jar config as JSON, and the self-contained widget script. No external JS or CSS — only your Blockbook URL is fetched at runtime. Paste it into any HTML page and it works.</p>
+    <textarea id="tj-snippet" rows="10" readonly spellcheck="false"></textarea>
+    <div class="actions">
+      <button id="tj-copy-snippet" class="btn primary" type="button">Copy snippet</button>
+      <span class="copied" id="tj-snippet-copied" hidden>copied ✓</span>
+    </div>
+  </section>
+
+  <section class="panel" id="descriptor-panel" hidden>
+    <h2>4 · Tamper-evident descriptor</h2>
+    <p class="note">The descriptor commits to your exact jar config (SHA-256 of the canonical JSON). Publish it next to your snippet — anyone can re-verify the config against it.</p>
+    <p class="descriptor mono" id="tj-descriptor"></p>
+    <div class="actions">
+      <button id="tj-copy-desc" class="btn" type="button">Copy descriptor</button>
+      <button id="tj-copy-config" class="btn" type="button">Copy canonical config JSON</button>
+    </div>
+
+    <h3 class="sub-h">Standalone verifier</h3>
+    <p class="note">Paste any config JSON + descriptor. If a single character was altered after forging, verification <strong>loudly refuses</strong>.</p>
+    <label class="field">
+      <span>Config JSON</span>
+      <textarea id="tj-v-config" rows="4" spellcheck="false" placeholder='{"address":"prl1…",…}'></textarea>
+    </label>
+    <label class="field">
+      <span>Descriptor</span>
+      <input id="tj-v-desc" class="mono" spellcheck="false" placeholder="tipjar:v1:…">
+    </label>
+    <div class="actions">
+      <button id="tj-verify" class="btn primary" type="button">Verify</button>
+    </div>
+    <div id="tj-verify-result" class="verify" hidden></div>
+  </section>
+
+  <section class="panel" id="listen-panel">
+    <h2>Listen mode <small class="dim">— watch any jar address live</small></h2>
+    <p class="note">Uses the current wizard config (generate first, or it watches the default jar). Start listening to see the jar fill, confetti on new tips, the tip feed, and totals — plus CSV export of every detected tip.</p>
+    <div class="actions">
+      <button id="tj-listen-start" class="btn primary" type="button">Start listening</button>
+      <button id="tj-listen-stop" class="btn" type="button" disabled>Stop</button>
+      <button id="tj-listen-csv" class="btn" type="button" disabled>Export tips CSV</button>
+    </div>
+    <div id="tj-listen" class="listen-mount"></div>
+  </section>
+
+  <section class="panel honesty">
+    <h2>Honest limits</h2>
+    <ul>
+      <li><strong>Read-only, always.</strong> The widget and this page issue GET-only Blockbook reads. Neither can move funds, sign, or broadcast — tipping happens in the visitor's own wallet via the <span class="mono">pearl:</span> URI / QR.</li>
+      <li><strong>Tips count at 1+ confirmations.</strong> Unconfirmed mempool transactions are not shown as tips.</li>
+      <li><strong>Dust is not a tip.</strong> Outputs below 1,000 grains (0.00001 PRL) are ignored — they're uneconomical to ever spend and would let anyone spam the jar feed for free.</li>
+      <li><strong>Polling cadence.</strong> Default every 30 seconds, configurable 15–300s. Be courteous to public Blockbook instances: longer intervals on high-traffic pages.</li>
+      <li><strong>No background notifications.</strong> When the tab or page is closed, polling stops — tips that land while you're away appear on the next poll.</li>
+      <li><strong>New-tip detection is per page load.</strong> Seen transaction IDs are tracked in page memory. The first successful poll is a silent baseline (existing tips show as history, no confetti); only tips arriving after that get the confetti burst. Reloading the page re-baselines.</li>
+      <li><strong>Descriptor ≠ signature.</strong> The <span class="mono">tipjar:v1:</span> descriptor proves the config wasn't altered after forging; it doesn't prove who forged it.</li>
+    </ul>
+  </section>
+</main>
+
+<footer>
+  <p>Built by the Pearl 24/7 builder · <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a></p>
+  <p class="donate">Donate PRL: <span class="mono" id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</span> <button id="copy-donate" class="btn small" type="button">Copy</button></p>
+  <p class="dim">Community-built, not an official pearl-research-labs property. Keys never leave your browser.</p>
+</footer>
+
+<script src="pearl-tipjar.bundle.js?v=1"></script>
+<script src="qrcode.min.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>

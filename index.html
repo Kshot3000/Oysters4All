@@ -43,6 +43,7 @@
         <a href="pages/legacy/">Legacy</a>
         <a href="pages/vanity/">Vanity</a>
         <a href="pages/recover/">Recover</a>
+        <a href="pages/tipjar/">Tipjar</a>
         <a href="pages/pool/">Mining pool</a>
         <a href="pages/wallet/">Wallet</a>
         <a href="pages/mining/">Mining calc</a>
@@ -317,6 +318,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Recover — PRL Seed Recovery Scanner <span class="badge">new</span></h3>
             <p>The rescue beacon — paste a BIP-39 seed and scan every BIP-86 Taproot address it can generate (m/86'/{coin}'/{account}'/{change}/{index}, mainnet prl1… and testnet tprl1…) with GET-only Blockbook reads, standard 20-address gap limit, exact grain math, and CSV export. Discovery only: the page never signs, never broadcasts, and the lock button wipes the seed from memory; sweep found funds in Pearl Sign.</p>
             <div class="card-links"><a href="pages/recover/">Open Pearl Recover →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Tipjar — PRL Donation Widget Generator <span class="badge">new</span></h3>
+            <p>The tip-jar forge — configure a PRL donation widget (recipient address, 1–4 amount presets, optional goal, three original themes), preview it live, and copy one self-contained snippet onto your own site. The widget polls Blockbook GET-only and renders an animated glass jar filling with glowing grains, confetti on new tips, a tip feed, goal progress, and pearl: QR for the active preset — plus tamper-evident tipjar:v1: descriptors and a listen mode with CSV export. Read-only: it never moves funds.</p>
+            <div class="card-links"><a href="pages/tipjar/">Open Pearl Tipjar →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Notary — Proof of Existence <span class="badge">new</span></h3>
