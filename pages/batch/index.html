@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Batch — PRL Batch Payments Studio</title>
+<meta name="description" content="Pearl Batch: the freight terminal for PRL. Dispatch one Taproot transaction to up to 250 recipients — manifest, freight, review, sign, broadcast. Unsigned-bundle export/import for air-gapped signing, per-signature re-verification, grain-exact fee math. All crypto runs locally in your browser.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<div class="yard" aria-hidden="true"><i class="g1"></i><i class="g2"></i><i class="g3"></i></div>
+
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 40 40" aria-hidden="true">
+      <rect x="6" y="14" width="28" height="14" rx="1.5" fill="none" stroke="#ffb52e" stroke-width="2"/>
+      <path d="M6 18 H34 M6 22 H34 M6 26 H34" stroke="#ffb52e" stroke-width="1" opacity=".55"/>
+      <rect x="11" y="8" width="4" height="6" fill="none" stroke="#f4f7fb" stroke-width="1.6"/>
+      <rect x="25" y="8" width="4" height="6" fill="none" stroke="#f4f7fb" stroke-width="1.6"/>
+      <circle cx="13" cy="31" r="2" fill="none" stroke="#f4f7fb" stroke-width="1.6"/>
+      <circle cx="27" cy="31" r="2" fill="none" stroke="#f4f7fb" stroke-width="1.6"/>
+    </svg>
+    <div>
+      <h1>Pearl Batch</h1>
+      <p class="tagline">the freight terminal — batch PRL dispatch on Taproot · no smart contracts</p>
+    </div>
+  </div>
+  <nav class="steps" id="steps" aria-label="Dispatch steps">
+    <button data-step="manifest" id="st-manifest" class="active" type="button">1 · Recipients</button>
+    <button data-step="freight" id="st-freight" type="button">2 · Fund</button>
+    <button data-step="review" id="st-review" type="button">3 · Review</button>
+    <button data-step="sign" id="st-sign" type="button">4 · Sign</button>
+    <button data-step="broadcast" id="st-broadcast" type="button">5 · Broadcast</button>
+  </nav>
+</header>
+
+<main>
+  <section class="limits" aria-label="Honest limits">
+    <h2>Honest limits — read before any real PRL moves</h2>
+    <ul>
+      <li><strong>One transaction, one sender key.</strong> Every input must be spendable by the single sender key you sign with. Multi-sender batches are not supported — split them.</li>
+      <li><strong>Dust is refused, never rounded.</strong> Any recipient under 546 grains stops the manifest with a loud error. Change under 546 grains is absorbed into the miner fee and disclosed on the review screen — never silently dropped.</li>
+      <li><strong>Memos are off-chain labels.</strong> They ride along in the unsigned bundle for your bookkeeping and are verified by the fingerprint — they never appear on-chain. Pearl has no smart contracts and no memo field.</li>
+      <li><strong>The unsigned bundle commits to the final txid.</strong> Under segwit rules the txid covers only the non-witness data, so the bundle's fingerprint and txid survive signing unchanged. Import re-verifies everything and refuses loudly on any mismatch — always pair a bundle with its fingerprint.</li>
+      <li><strong>Blockbook is read-only until the single broadcast POST.</strong> UTXO scans, fee estimates and tracking are GET-only against the endpoint you configure. If it is unreachable, the page says so — it never presents guesses as data.</li>
+      <li><strong>Secrets stay in this page.</strong> Keys you paste live in page memory only, are wiped automatically after signing, and are never written to storage or sent anywhere. Verify every address and amount out of band — start on testnet.</li>
+    </ul>
+  </section>
+
+  <section class="config-strip" aria-label="Configuration">
+    <label>Network
+      <select id="network">
+        <option value="mainnet" selected>Mainnet (prl…)</option>
+        <option value="testnet">Testnet (tprl…)</option>
+      </select>
+    </label>
+    <label class="wide">Blockbook API <span class="hintline">GET-only reads; saved in this browser only</span>
+      <input id="blockbook" type="url" spellcheck="false" placeholder="https://blockbook.pearlresearch.ai">
+    </label>
+    <label>Fee rate <span class="unit">grains/vB</span>
+      <input id="feerate" type="number" min="1" step="1" value="20">
+    </label>
+    <button class="btn ghost" id="fee-estimate" type="button">Estimate fee</button>
+    <button class="btn danger-ghost" id="wipe" type="button">Wipe keys</button>
+    <span class="cfg-msg" id="cfg-msg"></span>
+    <span class="cfg-msg" id="wipe-msg"></span>
+  </section>
+
+  <!-- STEP 1: MANIFEST -->
+  <section id="step-manifest" class="panel active" aria-label="Recipients">
+    <h2>Recipients <span class="sub">manifest — load the cargo</span></h2>
+    <p class="lede">Paste one recipient per line — <code>&lt;address&gt;, &lt;amount&gt;</code>, optional memo — or import a CSV. Every address is bech32m-validated, every amount is dust-checked, duplicates merge into one output when merging is on. Nothing moves on this step.</p>
+    <label class="wide">Recipient manifest
+      <textarea id="m-text" rows="8" spellcheck="false" placeholder="prl1p…, 1.25, Q3 vendor payout&#10;prl1p…, 500000 grains"></textarea>
+    </label>
+    <div class="rowbtns">
+      <label class="check"><input type="checkbox" id="m-merge" checked> Merge duplicate addresses into one output</label>
+    </div>
+    <div class="rowbtns">
+      <button class="btn ghost" id="m-sample" type="button">Load sample</button>
+      <button class="btn ghost" id="m-import" type="button">Import CSV file</button>
+      <input type="file" id="m-file" accept=".csv,.txt" hidden>
+      <button class="btn primary" id="m-parse" type="button">Validate manifest</button>
+    </div>
+    <p class="err" id="m-err" hidden></p>
+    <div class="card" id="m-out" hidden>
+      <h3>Cargo manifest <span class="stamp ok" id="m-stamp">VALIDATED</span></h3>
+      <dl class="kv">
+        <div><dt>Recipients</dt><dd id="m-count"></dd></div>
+        <div><dt>Total dispatch</dt><dd id="m-total"></dd></div>
+        <div><dt>Duplicates merged</dt><dd id="m-merged"></dd></div>
+      </dl>
+      <div class="tablewrap"><table class="manifest">
+        <thead><tr><th>#</th><th>Address</th><th>Amount</th><th>Memo</th></tr></thead>
+        <tbody id="m-tbody"></tbody>
+      </table></div>
+      <div class="rowbtns">
+        <button class="btn ghost" id="m-copy" type="button">Copy manifest</button>
+        <button class="btn primary" id="m-next" type="button">Stage freight →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 2: FUND -->
+  <section id="step-freight" class="panel" aria-label="Fund" hidden>
+    <h2>Fund <span class="sub">freight — load the inputs</span></h2>
+    <p class="lede">Point at the sender's <strong>prl1…/tprl1… address</strong>, pull its UTXOs over Blockbook (GET-only) or paste them air-gapped, then pick inputs by hand or let the auto-loader take the largest first. Running totals update live.</p>
+    <div class="grid2">
+      <label class="wide">Sender PRL address <span class="hintline">must match the key you will sign with</span>
+        <input id="f-sender" spellcheck="false" placeholder="prl1p…">
+      </label>
+      <div class="rowbtns wide">
+        <button class="btn ghost" id="f-fetch" type="button">Fetch UTXOs (Blockbook)</button>
+        <span class="cfg-msg" id="f-fetch-msg"></span>
+      </div>
+      <label class="wide">…or paste UTXOs <span class="hintline">one per line: <code>txid:vout value [prl|grains] [address]</code> — air-gapped</span>
+        <textarea id="f-paste" rows="4" spellcheck="false" placeholder="ab12…:0 150000000"></textarea>
+      </label>
+      <div class="rowbtns wide">
+        <button class="btn ghost" id="f-parse-paste" type="button">Load pasted UTXOs</button>
+      </div>
+    </div>
+    <p class="err" id="f-err" hidden></p>
+    <div class="card" id="f-out" hidden>
+      <h3>Freight ledger</h3>
+      <div class="rowbtns">
+        <label class="check"><input type="checkbox" id="f-auto" checked> Auto-load: largest-first coin selection</label>
+        <button class="btn ghost" id="f-all" type="button">Select all</button>
+        <button class="btn ghost" id="f-none" type="button">Select none</button>
+      </div>
+      <div class="tablewrap"><table class="manifest">
+        <thead><tr><th></th><th>#</th><th>TXID</th><th>vout</th><th>Value</th><th>Conf</th></tr></thead>
+        <tbody id="f-tbody"></tbody>
+      </table></div>
+      <h3>Running totals</h3>
+      <dl class="kv" id="f-totals"></dl>
+      <p class="err" id="f-cover-err" hidden></p>
+      <div class="rowbtns">
+        <button class="btn primary" id="f-next" type="button">Review dispatch →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 3: REVIEW -->
+  <section id="step-review" class="panel" aria-label="Review" hidden>
+    <h2>Dispatch review <span class="sub">check the bill of lading</span></h2>
+    <p class="lede">The full breakdown before anything is signed. Fee comes from the exact vB formula — <code>fee = keypathTxVBytes(nIn, nOut) × rate</code>, grain-exact. If the numbers don't balance to the grain, the plan is refused.</p>
+    <p class="refusal" id="r-refusal" hidden></p>
+    <div class="card" id="r-out" hidden>
+      <h3>Bill of lading <span class="stamp warn" id="r-stamp">UNSEALED</span></h3>
+      <dl class="kv" id="r-summary"></dl>
+      <h4>Recipients <span class="count" id="r-rcount"></span></h4>
+      <div class="tablewrap"><table class="manifest">
+        <thead><tr><th>#</th><th>Address</th><th>Amount</th><th>Memo</th></tr></thead>
+        <tbody id="r-tbody"></tbody>
+      </table></div>
+      <h4>Inputs <span class="count" id="r-icount"></span></h4>
+      <div class="tablewrap"><table class="manifest">
+        <thead><tr><th>#</th><th>TXID</th><th>vout</th><th>Value</th></tr></thead>
+        <tbody id="r-itbody"></tbody>
+      </table></div>
+      <h4>Fee math</h4>
+      <dl class="kv" id="r-fee"></dl>
+      <p class="note" id="r-dust-note" hidden></p>
+      <label class="check big"><input type="checkbox" id="r-confirm"> I verified every recipient address and amount out of band. Dispatch exactly this plan.</label>
+      <div class="rowbtns">
+        <button class="btn ghost" id="r-export" type="button">Export unsigned bundle</button>
+        <button class="btn primary" id="r-next" type="button" disabled>Continue to sign →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 4: SIGN -->
+  <section id="step-sign" class="panel" aria-label="Sign" hidden>
+    <h2>Sign <span class="sub">seal the container</span></h2>
+    <p class="lede">Export the unsigned bundle to sign on an air-gapped machine, or sign here. The key must derive the sender address or signing is refused — and every Schnorr signature is re-verified locally before the hex is shown. The key is wiped from memory the moment signing succeeds.</p>
+    <div class="grid2">
+      <div class="card">
+        <h3>Unsigned bundle</h3>
+        <dl class="kv"><div><dt>Fingerprint</dt><dd><code id="s-fp"></code></dd></div>
+        <div><dt>Unsigned txid</dt><dd><code id="s-unsigned-txid" class="mono-sm"></code></dd></div></dl>
+        <label class="wide">Bundle JSON <span class="hintline">carry this to the signing machine</span>
+          <textarea id="s-bundle" rows="6" readonly spellcheck="false"></textarea>
+        </label>
+        <div class="rowbtns">
+          <button class="btn ghost" data-copy="s-bundle" type="button">Copy bundle</button>
+          <button class="btn ghost" id="s-download" type="button">Download .json</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Import a bundle</h3>
+        <p class="lede">Paste a bundle exported elsewhere — it is fully re-verified (fingerprint, unsigned-txid digest, fee, vBytes) before anything loads.</p>
+        <label class="wide">Bundle JSON
+          <textarea id="s-import" rows="4" spellcheck="false" placeholder='{"bundle":"pearl-batch-unsigned:v1:",…}'></textarea>
+        </label>
+        <label class="wide">Expected fingerprint <span class="hintline">from the exporting side — loud refusal on mismatch</span>
+          <input id="s-import-fp" spellcheck="false" placeholder="(optional but recommended)">
+        </label>
+        <div class="rowbtns"><button class="btn ghost" id="s-import-btn" type="button">Verify &amp; load bundle</button></div>
+        <p class="err" id="s-import-err" hidden></p>
+        <p class="okmsg" id="s-import-ok" hidden></p>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Local signing</h3>
+      <div class="grid2">
+        <label class="wide">Sender secret <span class="hintline">12/24-word mnemonic · WIF · 64-hex · xprv/tprv — never leaves this page</span>
+          <input id="s-key" type="password" spellcheck="false" autocomplete="off" placeholder="paste secret">
+        </label>
+        <div class="rowbtns wide">
+          <button class="btn ghost" id="s-gen" type="button">Generate fresh sender key</button>
+          <button class="btn primary" id="s-sign" type="button">Sign dispatch</button>
+          <span class="cfg-msg" id="s-key-addr"></span>
+        </div>
+      </div>
+      <p class="err" id="s-err" hidden></p>
+      <p class="keyout" id="s-key-out" hidden></p>
+      <div class="card inset" id="s-out" hidden>
+        <h3>Sealed <span class="stamp ok">SIGNED · N/N VERIFIED</span></h3>
+        <dl class="kv">
+          <div><dt>Signatures</dt><dd id="s-verify"></dd></div>
+          <div><dt>TXID</dt><dd><code id="s-txid" class="mono-sm"></code></dd></div>
+        </dl>
+        <label class="wide">Signed hex <span class="hintline">key already wiped — this hex is safe to carry</span>
+          <textarea id="s-hex" rows="5" readonly spellcheck="false"></textarea>
+        </label>
+        <div class="rowbtns">
+          <button class="btn ghost" data-copy="s-txid" type="button">Copy txid</button>
+          <button class="btn ghost" data-copy="s-hex" type="button">Copy hex</button>
+          <button class="btn primary" id="s-next" type="button">Continue to broadcast →</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 5: BROADCAST -->
+  <section id="step-broadcast" class="panel" aria-label="Broadcast" hidden>
+    <h2>Broadcast <span class="sub">release the shipment</span></h2>
+    <p class="lede">Two explicit confirmations stand between the signed hex and the network. After broadcast, the page tracks the txid and verifies every recipient output on-chain.</p>
+    <div class="card" id="b-ready" hidden>
+      <h3>Ready to release</h3>
+      <dl class="kv">
+        <div><dt>TXID</dt><dd><code id="b-txid" class="mono-sm"></code></dd></div>
+        <div><dt>Recipients</dt><dd id="b-nrecip"></dd></div>
+        <div><dt>Total out</dt><dd id="b-total"></dd></div>
+        <div><dt>Fee</dt><dd id="b-fee"></dd></div>
+      </dl>
+      <label class="check big"><input type="checkbox" id="b-confirm"> I confirm broadcasting this exact transaction to Pearl <span id="b-net"></span>. Real PRL will move.</label>
+      <div class="rowbtns">
+        <button class="btn primary" id="b-send" type="button" disabled>Broadcast via Blockbook</button>
+      </div>
+      <p class="err" id="b-err" hidden></p>
+      <div class="inset" id="b-pearld">
+        <h4>…or via your own pearld</h4>
+        <p class="hintline">Run this against your node's RPC (port 44107) — nothing here touches your node.</p>
+        <pre id="b-pearld-cmd" class="cmd"></pre>
+        <button class="btn ghost" data-copy="b-pearld-cmd" type="button">Copy command</button>
+      </div>
+    </div>
+    <div class="card" id="b-track" hidden>
+      <h3>Tracking <span class="stamp ok" id="b-stamp">BROADCAST</span></h3>
+      <dl class="kv" id="b-track-kv"></dl>
+      <div class="rowbtns">
+        <button class="btn ghost" id="b-track-start" type="button">Start tracking</button>
+        <button class="btn ghost" id="b-track-stop" type="button">Stop</button>
+        <span class="cfg-msg" id="b-track-msg"></span>
+      </div>
+      <div class="card inset" id="b-verify-out" hidden>
+        <h4 id="b-verdict"></h4>
+        <dl class="kv" id="b-verify-kv"></dl>
+        <p class="err" id="b-verify-notes" hidden></p>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Standalone txid verifier</h3>
+      <p class="lede">Check any batch txid against its manifest — no keys, no signing, read-only.</p>
+      <div class="grid2">
+        <label class="wide">TXID
+          <input id="v-txid" spellcheck="false" placeholder="64 hex chars">
+        </label>
+        <label class="wide">Expected sender address
+          <input id="v-sender" spellcheck="false" placeholder="prl1p…">
+        </label>
+        <label class="wide">Expected manifest <span class="hintline">same format as step 1 — amounts must match exactly</span>
+          <textarea id="v-manifest" rows="4" spellcheck="false" placeholder="prl1p…, 1.25"></textarea>
+        </label>
+        <div class="rowbtns wide"><button class="btn primary" id="v-run" type="button">Verify txid</button></div>
+      </div>
+      <p class="err" id="v-err" hidden></p>
+      <div class="card inset" id="v-out" hidden>
+        <h4 id="v-verdict"></h4>
+        <dl class="kv" id="v-kv"></dl>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="foot-inner">
+    <p class="foot-brand">Pearl Batch — the freight terminal · built for the Pearl blockchain (PRL)</p>
+    <p>Builder: <a href="https://x.com/kshot9000">@kshot9000</a> · PRL donations: <code id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code> <button class="btn ghost sm" data-copy="donate-addr" type="button">Copy</button></p>
+    <p class="foot-note">Non-custodial. No smart contracts. All cryptography runs locally in your browser via the audited Pearl Sign core — keys never leave this page. Verify every address and amount out of band.</p>
+  </div>
+</footer>
+
+<script src="pearl-batch.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
