@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Tax — PRL Capital-Gains Desk</title>
+<meta name="description" content="Read-only PRL tax desk: import history via Blockbook, classify every movement, supply PRL/USD prices, and get a grain-exact FIFO capital-gains report. The page never holds keys.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="masthead">
+  <div class="container masthead-inner">
+    <div>
+      <p class="eyebrow">Pearl · PRL tax desk</p>
+      <h1>Pearl Tax</h1>
+      <p class="lede">A read-only capital-gains ledger for PRL. Import your history, classify every movement, supply your own PRL/USD prices — the engine matches disposals against acquisitions with grain-exact FIFO math and refuses to guess.</p>
+    </div>
+    <div class="masthead-seal" aria-hidden="true">§</div>
+  </div>
+  <nav class="container tabs" aria-label="Workflow">
+    <button class="tab active" data-tab="addresses" type="button"><span class="n">1</span> Addresses</button>
+    <button class="tab" data-tab="import" type="button"><span class="n">2</span> Import</button>
+    <button class="tab" data-tab="classify" type="button"><span class="n">3</span> Classify</button>
+    <button class="tab" data-tab="prices" type="button"><span class="n">4</span> Prices</button>
+    <button class="tab" data-tab="report" type="button"><span class="n">5</span> Report</button>
+    <button class="tab" data-tab="export" type="button"><span class="n">6</span> Export</button>
+  </nav>
+</header>
+
+<main class="container">
+
+  <!-- 1 ADDRESSES -->
+  <section id="tab-addresses" class="panel">
+    <h2>① Watched addresses</h2>
+    <p class="lede">Every address whose history belongs in this return — your wallets, your exchange deposit addresses, anywhere you held PRL. Validated in-browser as bech32m Taproot (<code>prl1…</code> / <code>tprl1…</code>). Nothing leaves this page.</p>
+    <div class="row">
+      <input id="tx-addr-input" class="input mono" type="text" placeholder="prl1…" autocomplete="off" spellcheck="false" aria-label="PRL address">
+      <input id="tx-addr-label" class="input" type="text" placeholder="Label (optional — e.g. cold wallet)" aria-label="Address label">
+      <button id="tx-addr-add" class="btn" type="button">Add address</button>
+    </div>
+    <p id="tx-addr-msg" class="msg" role="status"></p>
+    <ul id="tx-addr-list" class="addr-list"></ul>
+  </section>
+
+  <!-- 2 IMPORT -->
+  <section id="tab-import" class="panel" hidden>
+    <h2>② Import history</h2>
+    <p class="lede">Pull transactions with <strong>GET-only</strong> Blockbook reads — the page never sends anything but read requests. One entry per txid even if several watched addresses touched it.</p>
+    <div class="row">
+      <input id="tx-imp-blockbook" class="input mono" type="text" aria-label="Blockbook base URL">
+      <button id="tx-imp-fetch" class="btn" type="button">Fetch from Blockbook</button>
+    </div>
+    <p id="tx-imp-msg" class="msg" role="status"></p>
+    <div id="tx-imp-summary" class="summaryline"></div>
+
+    <h3>Opening balances</h3>
+    <p class="lede small">Held PRL <em>before</em> your earliest imported transaction? Add it here so FIFO never runs dry — date, amount, and the PRL/USD price that day.</p>
+    <div class="row">
+      <input id="tx-open-date" class="input" type="date" aria-label="Opening balance date">
+      <input id="tx-open-grains" class="input" type="text" placeholder="Amount (PRL)" aria-label="Opening balance amount in PRL">
+      <input id="tx-open-price" class="input" type="text" placeholder="PRL/USD that day" aria-label="PRL USD price on opening date">
+      <button id="tx-open-add" class="btn" type="button">Add opening lot</button>
+    </div>
+    <ul id="tx-open-list" class="addr-list"></ul>
+
+    <h3>Air-gapped paste</h3>
+    <p class="lede small">No network? Paste Blockbook <code>/api/v2/tx/…</code> JSON (one object or an array) — it is normalized exactly like a fetched tx. Input values must be present.</p>
+    <textarea id="tx-imp-paste" class="input mono" rows="4" placeholder='[{"txid":"…","blockHeight":…,"blockTime":…,"fees":"…","vin":[…],"vout":[…]}]' aria-label="Paste Blockbook transaction JSON"></textarea>
+    <div class="row"><button id="tx-imp-paste-add" class="btn" type="button">Normalize pasted JSON</button></div>
+
+    <h3>Imported transactions <span id="tx-imp-count" class="count"></span></h3>
+    <div class="tablewrap"><table class="ledger">
+      <thead><tr><th>Date</th><th>Txid</th><th>Kind</th><th class="amt">Net (PRL)</th><th class="amt">Fee (PRL)</th><th>Status</th></tr></thead>
+      <tbody id="tx-imp-txlist"></tbody>
+    </table></div>
+  </section>
+
+  <!-- 3 CLASSIFY -->
+  <section id="tab-classify" class="panel" hidden>
+    <h2>③ Classify every movement</h2>
+    <p class="lede">The report <strong>refuses to run</strong> until each transaction has a classification. Buys, mining rewards, gifts and transfers each carry different tax meaning — only you can say which is which.</p>
+    <div class="row">
+      <label class="check"><input id="tx-cls-unclass" type="checkbox"> show unclassified only</label>
+      <span id="tx-cls-count" class="count"></span>
+    </div>
+    <p id="tx-cls-msg" class="msg" role="status"></p>
+    <div id="tx-cls-list" class="classify-list"></div>
+  </section>
+
+  <!-- 4 PRICES -->
+  <section id="tab-prices" class="panel" hidden>
+    <h2>④ PRL/USD prices</h2>
+    <p class="lede">Every acquisition and disposal needs the PRL/USD price on its date. Add them by hand or paste a <code>date,price_usd</code> CSV. The engine uses the latest price on or before each transaction — and <strong>refuses</strong> to run while any needed price is missing.</p>
+    <div class="row">
+      <input id="tx-px-date" class="input" type="date" aria-label="Price date">
+      <input id="tx-px-price" class="input" type="text" placeholder="Price (USD per PRL)" aria-label="PRL USD price">
+      <button id="tx-px-add" class="btn" type="button">Add price</button>
+    </div>
+    <div class="row">
+      <textarea id="tx-px-csv" class="input mono" rows="4" placeholder="2024-01-01,1.36&#10;2024-06-01,1.52" aria-label="Price CSV"></textarea>
+    </div>
+    <div class="row"><button id="tx-px-csv-import" class="btn" type="button">Import price CSV</button></div>
+    <p id="tx-px-msg" class="msg" role="status"></p>
+    <ul id="tx-px-list" class="addr-list"></ul>
+  </section>
+
+  <!-- 5 REPORT -->
+  <section id="tab-report" class="panel" hidden>
+    <h2>⑤ Capital-gains report</h2>
+    <p class="lede">FIFO matching, grain-exact. Disposals split into short-term (≤ 365 days) and long-term lots. If anything is unclassified or a price is missing, the report refuses — loudly, with the exact gaps listed.</p>
+    <div class="row">
+      <label for="tx-rep-year">Tax year</label>
+      <select id="tx-rep-year" class="input"></select>
+      <button id="tx-rep-run" class="btn btn-primary" type="button">Run report</button>
+    </div>
+    <p id="tx-rep-msg" class="msg" role="status"></p>
+    <div id="tx-rep-summary" class="cards"></div>
+    <h3>Disposals</h3>
+    <div class="tablewrap"><table class="ledger">
+      <thead><tr><th>Acquired</th><th>Disposed</th><th>Description</th><th class="amt">Proceeds</th><th class="amt">Basis</th><th class="amt">Gain/Loss</th><th>Term</th></tr></thead>
+      <tbody id="tx-rep-table"></tbody>
+    </table></div>
+    <h3>Income (mining &amp; other PRL income, at fair market value)</h3>
+    <div class="tablewrap"><table class="ledger">
+      <thead><tr><th>Date</th><th>Type</th><th class="amt">Amount (PRL)</th><th class="amt">FMV (USD)</th><th>Txid</th></tr></thead>
+      <tbody id="tx-rep-income"></tbody>
+    </table></div>
+    <h3>Network fees (added to cost basis)</h3>
+    <div class="tablewrap"><table class="ledger">
+      <thead><tr><th>Date</th><th>Description</th><th class="amt">Fee (PRL)</th><th class="amt">Basis consumed</th></tr></thead>
+      <tbody id="tx-rep-fees"></tbody>
+    </table></div>
+  </section>
+
+  <!-- 6 EXPORT -->
+  <section id="tab-export" class="panel" hidden>
+    <h2>⑥ Export &amp; data control</h2>
+    <p class="lede">Everything lives in this browser's localStorage — nothing is uploaded anywhere. Take your reports and your working state with you, or wipe it.</p>
+    <div class="row">
+      <button id="tx-exp-csv-disp" class="btn" type="button">Download disposals CSV</button>
+      <button id="tx-exp-csv-income" class="btn" type="button">Download income CSV</button>
+      <button id="tx-exp-json" class="btn" type="button">Download full JSON</button>
+    </div>
+    <h3>Portable state</h3>
+    <div class="row"><button id="tx-exp-state-export" class="btn" type="button">Copy state JSON to clipboard</button></div>
+    <textarea id="tx-exp-state-import" class="input mono" rows="4" placeholder="Paste a previously exported state JSON, then Restore" aria-label="State JSON to restore"></textarea>
+    <div class="row"><button id="tx-exp-state-restore" class="btn" type="button">Restore state</button></div>
+    <h3 class="danger">Danger zone</h3>
+    <div class="row"><button id="tx-exp-wipe" class="btn btn-danger" type="button">Wipe all local data</button></div>
+    <p id="tx-exp-msg" class="msg" role="status"></p>
+  </section>
+
+  <!-- HONEST LIMITS -->
+  <section class="panel limits">
+    <h2>Honest limits</h2>
+    <ul>
+      <li><strong>Not tax advice.</strong> This is a bookkeeping aid. Crypto tax rules differ by jurisdiction and change — have a professional review the output before filing.</li>
+      <li><strong>FIFO only.</strong> No HIFO, LIFO, or specific identification. Every disposal consumes your oldest lots first.</li>
+      <li><strong>Prices are yours.</strong> There is no live price oracle; every USD figure derives from prices you entered. Wrong prices in, wrong gains out.</li>
+      <li><strong>Fees reduce the net.</strong> Network fees are disposed at zero proceeds — their basis reduces net gain / increases losses, and is also shown separately as “Fee basis consumed”.</li>
+      <li><strong>Gifts are simplified.</strong> Gifts received take fair-market-value basis at receipt; gifts given recognize no gain and claim no loss — the lots simply leave the books. Real carryover-basis rules may differ where you file.</li>
+      <li><strong>Transfers need their history.</strong> A transfer-in is booked at receipt-date FMV unless you set the original acquisition date — set it to preserve the true holding period. A transfer-out carries its basis to the other wallet with no taxable event here.</li>
+      <li><strong>Sends are netted; true mixes split.</strong> A send with change is modeled on its net outflow only — the change keeps its original lots. A tx co-signed by outside money is split into receive + send legs for you to classify.</li>
+      <li><strong>Unconfirmed transactions are excluded</strong> from the ledger and flagged in the import list.</li>
+      <li><strong>Read-only.</strong> The page never holds keys, never signs, never broadcasts. It cannot move your PRL.</li>
+    </ul>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <p>Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> · Pearl Tax is a bookkeeping aid, not tax advice.</p>
+    <p class="donate">PRL donations: <code id="tx-donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+      <button id="tx-copy-donate" class="btn btn-small" type="button">Copy</button></p>
+  </div>
+</footer>
+
+<script src="pearl-tax.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
