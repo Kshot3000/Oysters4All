@@ -85,3 +85,51 @@ Timestamped record of every build/test/verify step. Times in America/Chicago.
 - Still pending: `docs/` (architecture, trust model, fee economics, Aerodrome
   plan, audit checklist, TEAM-HANDOFF.md) — next phase. No outreach sent
   (package not yet complete per the handoff rule).
+
+## 2026-09-28 20:05 CDT — Phase 4: docs/ (complete package)
+
+- Built `docs/`: 6 documents, all carrying the full attribution block
+  (@kshot9000, both addresses, repo link — verified present in every file):
+  `01-architecture.md` (system design, exact grain↔wei conversion, fee flow,
+  security decisions, test coverage), `02-trust-model.md` (plain-language
+  custodial disclosure, wBTC comparison, honest risk list, copycat
+  disambiguation), `03-fee-economics.md` (0.25% each way, ceil-deposit /
+  floor-withdraw rounding parity with contracts+backend, worked examples,
+  operator cost model), `04-aerodrome-launch-plan.md` (wPRL/USDC Slipstream
+  pool, 12-week bribe program funded by bridge fees, anti-mercenary
+  measures, peg-defense SLA, kill criteria; Aerodrome ve(3,3)/gauge/bribe
+  mechanics verified against current sources 2026-09-28), `05-audit-checklist.md`
+  (honest status column: contracts/backend/web ✅ tested; audit, multisig
+  custody, HSM keys, monitoring, legal all ⬜ NOT DONE — mainnet gated),
+  `TEAM-HANDOFF.md` (proposal for pearl-research-labs: what was built, what
+  "finish" means, suggested next steps).
+- Docs commit `f3ef018` pushed to main.
+- **THE SEND — package judged complete and excellent** (contracts 23/23,
+  backend 41/41 + e2e, web 8/8 + 24/24 browser QA, docs + handoff written):
+  - GitHub: proposal issue opened on pearl-research-labs/pearl (issues
+    enabled, no prior wPRL issue) → https://github.com/pearl-research-labs/pearl/issues/347
+    (OPEN, authored by Kshot3000, verified live via gh issue view). Full
+    attribution block included.
+  - X: post from @kshot9000 tagging @prlnet (team's X account, previously
+    verified live as Pearl Research Labs) + reply with attribution block —
+    delegated to browser task; URLs to be recorded here on completion.
+  - Other channels: researched — no verifiable official Pearl Discord /
+    Telegram / forum found (repo README has none; search results were
+    unrelated "Pearl"/"Perle" accounts and an unverifiable invite-link chat).
+    GitHub + X are the complete set of verified public channels.
+- Handoff rule: do NOT re-send on later runs — the issue and posts are live.
+  Later runs should only monitor for team replies.
+
+## 2026-09-28 20:05 CDT — THE SEND complete (verified)
+
+- X post (from @kshot9000, session verified, tagging @prlnet):
+  https://x.com/kshot9000/status/2104738220164706642 — posted verbatim,
+  preview card removed, URL text kept. HTTP 200 confirmed live.
+- X reply (attribution block: both addresses + issue link):
+  https://x.com/kshot9000/status/2104738317753536723 — posted verbatim
+  (GitHub preview card left attached per instructions). HTTP 200 confirmed.
+- GitHub issue: https://github.com/pearl-research-labs/pearl/issues/347
+  (OPEN, Kshot3000). Full proposal + attribution. Verified live.
+- No other verifiable official Pearl channels exist (researched 2026-09-28).
+- **Handoff DONE. Do not re-send on later runs.** Monitor for team replies
+  on issue #347 and the X thread instead.
