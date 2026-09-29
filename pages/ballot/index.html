@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Ballot — Off-Chain DAO Governance with Schnorr-Signed Ballots</title>
+<meta name="description" content="Pearl Ballot: off-chain DAO governance for Pearl (PRL). Draft a proposal in a tamper-evident pearl-ballot:v1: descriptor, vote with locally-signed BIP-340 Schnorr ballots bound to your prl1/tprl1 address, tally with full signature re-verification and a hand-verifiable derivation, and verify anyone's poll standalone. No PRL ever moves through this page.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<div class="hall-glow" aria-hidden="true"><span class="orb o1"></span><span class="orb o2"></span><span class="orb o3"></span><span class="rotunda" aria-hidden="true"></span></div>
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 48 48" aria-hidden="true">
+      <rect x="14" y="20" width="20" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="3"/>
+      <path d="M14 20 L24 8 L34 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/>
+      <rect x="20" y="26" width="8" height="6" rx="1" fill="currentColor"/>
+      <rect x="22" y="36" width="4" height="8" fill="currentColor"/>
+      <rect x="4" y="42" width="40" height="2.4" rx="1.2" fill="currentColor" opacity="0.55"/>
+    </svg>
+    <div>
+      <h1>Pearl Ballot</h1>
+      <p class="tagline">off-chain DAO governance · the civic hall</p>
+    </div>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-step="draft" class="active">1 · Draft</button>
+    <button data-step="publish">2 · Publish</button>
+    <button data-step="vote">3 · Vote</button>
+    <button data-step="tally">4 · Tally</button>
+    <button data-step="verify">5 · Verify</button>
+  </nav>
+</header>
+
+<main>
+  <!-- STEP 1: DRAFT -->
+  <section id="step-draft" class="panel active">
+    <h2>Draft the proposal</h2>
+    <p class="lede">The organizer commits to the <strong>proposal terms</strong>, the <strong>voting window</strong>
+      (start/end block heights) and the <strong>snapshot height</strong> in a tamper-evident descriptor.
+      <strong class="moves-real">Publish the descriptor before the voting window opens</strong> — that is what
+      makes the poll provably fair. Voting weight is the voter's PRL balance, read from Blockbook.</p>
+    <div class="form-grid">
+      <label>Network
+        <select id="bt-network">
+          <option value="mainnet" selected>Mainnet (prl…)</option>
+          <option value="testnet">Testnet (tprl…)</option>
+        </select>
+      </label>
+      <label class="wide">Proposal title
+        <input id="bt-title" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. Treasury grant: Harbor Node Relay">
+      </label>
+      <label class="wide">Description
+        <textarea id="bt-desc" rows="3" spellcheck="false" placeholder="What the vote decides, terms, links…"></textarea>
+      </label>
+      <label class="wide">Options — one per line (2–8)
+        <textarea id="bt-options" rows="4" spellcheck="false" placeholder="Yes, fund it&#10;No, decline"></textarea>
+      </label>
+      <label>Voting window start (block height, future)
+        <input id="bt-startH" type="number" min="1" step="1" autocomplete="off" placeholder="e.g. 120100">
+      </label>
+      <label>Voting window end (block height, after start)
+        <input id="bt-endH" type="number" min="1" step="1" autocomplete="off" placeholder="e.g. 120200">
+      </label>
+      <label>Snapshot height (voting-weight reference, ≤ start)
+        <input id="bt-snapshotH" type="number" min="1" step="1" autocomplete="off" placeholder="e.g. 120000">
+      </label>
+      <label>Nonce (hex, auto-generated)
+        <input id="bt-nonce" type="text" autocomplete="off" spellcheck="false">
+      </label>
+      <label class="wide">Blockbook endpoint (reads the chain tip so the app can prove the voting window is in the future)
+        <input id="bt-blockbook" type="text" autocomplete="off" spellcheck="false" placeholder="https://blockbook.pearlresearch.ai">
+      </label>
+    </div>
+    <div class="row">
+      <button id="bt-new-nonce" class="ghost">New nonce</button>
+      <button id="bt-tip" class="ghost">Read current tip from Blockbook</button>
+      <label class="inline">or enter tip manually <input id="bt-tip-manual" type="number" min="0" step="1" placeholder="current height"></label>
+    </div>
+    <p class="hint" id="bt-tip-out" hidden></p>
+    <div class="rules">
+      <h4>The voting rules (published with the descriptor)</h4>
+      <ul>
+        <li>One address, one ballot. A second ballot from the same address is flagged — <strong>first valid ballot wins</strong>.</li>
+        <li>Ballots are signed <strong>inside the voting window only</strong> (chain tip between start and end height).</li>
+        <li>Weight = the voter's <strong>current confirmed PRL balance</strong> from Blockbook, recorded in the signed ballot. The snapshot height is the organizer's enforcement reference (see Honest limits).</li>
+        <li>Every ballot signature is re-verified at tally time against the voter's address key. Wrong-key or tampered ballots are <strong>loudly refused</strong>.</li>
+        <li>Exact ties are reported as a TIE — the page refuses to pick a winner out of thin air.</li>
+      </ul>
+    </div>
+    <div class="row">
+      <button id="bt-draft" class="primary">Draft the proposal</button>
+    </div>
+    <p class="err" id="bt-error" hidden></p>
+    <div id="bt-out" hidden>
+      <h3>Proposal drafted</h3>
+      <p class="hint">Carry this descriptor to <strong>Publish</strong> (or copy it now) and publish it publicly <strong>before block <span id="bt-out-start"></span></strong>.</p>
+      <p class="desc-code"><code id="bt-descriptor"></code> <button class="copy-btn" data-for="bt-descriptor">Copy</button></p>
+      <div class="row">
+        <button id="bt-to-publish" class="primary">Continue to Publish →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 2: PUBLISH -->
+  <section id="step-publish" class="panel">
+    <h2>Publish the proposal</h2>
+    <p class="lede">This is the tamper-evident commitment. Post the descriptor <strong>and</strong> the proposal JSON
+      publicly (X, Discord, the DAO forum) <strong>before the voting window opens</strong>. Anyone can later
+      re-hash the proposal and prove it was never altered.</p>
+    <p class="err" id="bt-pub-error" hidden></p>
+    <div id="bt-pub-empty" class="hint-box">
+      <p>No drafted proposal in this session yet — draft one on step 1, or paste a published descriptor below to review its commitment.</p>
+      <label class="wide">Descriptor
+        <input id="bt-pub-descriptor" type="text" autocomplete="off" spellcheck="false" placeholder="pearl-ballot:v1:…">
+      </label>
+      <div class="row"><button id="bt-pub-load" class="ghost">Review descriptor</button></div>
+    </div>
+    <div id="bt-pub-out" hidden>
+      <h3>The commitment</h3>
+      <p class="desc-code"><code id="bt-pub-desc"></code> <button class="copy-btn" data-for="bt-pub-desc">Copy</button></p>
+      <dl class="kv">
+        <dt>descriptorHash</dt><dd><code id="bt-pub-dhash"></code></dd>
+        <dt>proposalHash</dt><dd><code id="bt-pub-phash"></code></dd>
+        <dt>optionsHash</dt><dd><code id="bt-pub-ohash"></code></dd>
+        <dt>window</dt><dd id="bt-pub-window"></dd>
+        <dt>snapshot height</dt><dd id="bt-pub-snap"></dd>
+      </dl>
+      <label>Proposal JSON (publish this alongside the descriptor)
+        <textarea id="bt-pub-json" rows="8" readonly spellcheck="false"></textarea>
+      </label>
+      <div class="row">
+        <button id="bt-pub-copy-json" class="ghost">Copy JSON</button>
+        <button id="bt-pub-download" class="ghost">Download proposal.json</button>
+      </div>
+      <div class="rules">
+        <h4>Publish checklist</h4>
+        <ul>
+          <li>Post the descriptor + proposal JSON where voters can find them (X, Discord, forum) <strong>before block <span id="bt-pub-start"></span></strong>.</li>
+          <li>A descriptor that appears only after the window opens proves nothing — voters check this.</li>
+          <li>After the window closes, anyone re-hashes the proposal JSON and compares it to the descriptor. Any edit changes <code>proposalHash</code>/<code>optionsHash</code>.</li>
+        </ul>
+      </div>
+      <div class="row"><button id="bt-pub-to-vote" class="primary">Continue to Vote →</button></div>
+    </div>
+  </section>
+
+  <!-- STEP 3: VOTE -->
+  <section id="step-vote" class="panel">
+    <h2>Cast a signed ballot</h2>
+    <p class="lede">Your ballot is signed <strong>locally, in this page</strong> — your key never leaves your browser.
+      Publish the signed ballot JSON publicly; the organizer collects ballots into the Tally step.</p>
+    <div class="form-grid">
+      <label class="wide">Descriptor (paste the published one)
+        <input id="bt-vote-descriptor" type="text" autocomplete="off" spellcheck="false" placeholder="pearl-ballot:v1:…">
+      </label>
+      <label class="wide">Proposal JSON (paste the published one — the page re-hashes it against the descriptor)
+        <textarea id="bt-vote-proposal" rows="5" spellcheck="false" placeholder='{"title":…,"description":…,"options":[…],"startH":…,"endH":…,"snapshotH":…}'></textarea>
+      </label>
+      <label class="wide">Your voter address (prl1… / tprl…)
+        <input id="bt-vote-addr" type="text" autocomplete="off" spellcheck="false" placeholder="prl1p…">
+      </label>
+      <label>Your choice
+        <select id="bt-vote-choice"><option value="">— load a proposal first —</option></select>
+      </label>
+      <label class="wide">Your key — WIF, 64-char hex, or BIP-39 mnemonic (in-memory only)
+        <textarea id="bt-vote-key" rows="2" autocomplete="off" spellcheck="false" placeholder="Paste WIF / hex / mnemonic — never stored, never sent"></textarea>
+      </label>
+    </div>
+    <div class="row">
+      <button id="bt-vote-load" class="ghost">Verify proposal + load choices</button>
+      <button id="bt-vote-tip" class="ghost">Read current tip from Blockbook</button>
+      <label class="inline">or enter tip manually <input id="bt-vote-tip-manual" type="number" min="0" step="1" placeholder="current height"></label>
+      <button id="bt-vote-wipe" class="danger">Wipe key</button>
+    </div>
+    <p class="hint" id="bt-vote-tip-out" hidden></p>
+    <p class="err" id="bt-vote-error" hidden></p>
+    <div id="bt-vote-proposal-out" hidden>
+      <h3>Proposal verified</h3>
+      <p class="desc-code"><code id="bt-vote-desc"></code></p>
+      <dl class="kv">
+        <dt>proposalHash</dt><dd id="bt-vote-phash">—</dd>
+        <dt>voting window</dt><dd id="bt-vote-window">—</dd>
+      </dl>
+    </div>
+    <div class="row">
+      <button id="bt-vote-sign" class="primary">Sign my ballot</button>
+    </div>
+    <div id="bt-vote-out" hidden>
+      <h3>Ballot signed</h3>
+      <p class="hint" id="bt-vote-weight"></p>
+      <p class="loud-ok">✓ Signature verifies against your address key (checked locally before display).</p>
+      <label>Signed ballot JSON — publish this publicly
+        <textarea id="bt-vote-json" rows="12" readonly spellcheck="false"></textarea>
+      </label>
+      <div class="row">
+        <button id="bt-vote-copy" class="ghost">Copy ballot JSON</button>
+        <button id="bt-vote-download" class="ghost">Download ballot.json</button>
+        <button id="bt-vote-wipe2" class="danger">Wipe key</button>
+      </div>
+      <p class="hint">Post this JSON where the organizer collects ballots (forum thread, Discord, X). The organizer imports it in the Tally step.</p>
+    </div>
+  </section>
+
+  <!-- STEP 4: TALLY -->
+  <section id="step-tally" class="panel">
+    <h2>Tally the ballots</h2>
+    <p class="lede">Import the published ballots. The page re-verifies <strong>every signature</strong> against the
+      descriptor and each voter's address key, then derives the result step-by-step. Invalid ballots are refused loudly.</p>
+    <div class="form-grid">
+      <label class="wide">Descriptor
+        <input id="bt-tally-descriptor" type="text" autocomplete="off" spellcheck="false" placeholder="pearl-ballot:v1:…">
+      </label>
+      <label class="wide">Proposal JSON (for option labels)
+        <textarea id="bt-tally-proposal" rows="4" spellcheck="false" placeholder='{"title":…,"options":[…],…}'></textarea>
+      </label>
+      <label class="wide">Ballots — paste one ballot JSON object or a JSON array
+        <textarea id="bt-tally-ballots" rows="6" spellcheck="false" placeholder='{"protocol":"pearl-ballot-ballot",…}'></textarea>
+      </label>
+    </div>
+    <div class="row">
+      <button id="bt-tally-add" class="ghost">Import ballots</button>
+      <button id="bt-tally-clear" class="ghost">Clear imported</button>
+      <label class="inline">or load a .json file <input id="bt-tally-file" type="file" accept="application/json,.json"></label>
+      <button id="bt-tally-tip" class="ghost">Read current tip from Blockbook</button>
+      <label class="inline">or enter tip manually <input id="bt-tally-tip-manual" type="number" min="0" step="1" placeholder="current height"></label>
+    </div>
+    <p class="hint" id="bt-tally-tip-out" hidden></p>
+    <p class="err" id="bt-tally-error" hidden></p>
+    <p class="hint" id="bt-tally-count">0 ballots imported.</p>
+    <div class="row"><button id="bt-tally-run" class="primary">Run the tally</button></div>
+    <div id="bt-tally-out" hidden>
+      <h3>The tally</h3>
+      <p class="hint" id="bt-tally-meta"></p>
+      <div id="bt-tally-totals" class="totals"></div>
+      <h4>Accepted ballots (signature re-verified)</h4>
+      <div class="table-wrap"><table id="bt-tally-table">
+        <thead><tr><th>#</th><th>Voter</th><th>Choice</th><th>Weight</th><th>ballotHash</th></tr></thead>
+        <tbody id="bt-tally-tbody"></tbody>
+      </table></div>
+      <div id="bt-tally-dups" hidden>
+        <h4 class="loud">⚠ Duplicate ballots rejected (first valid wins)</h4>
+        <ul id="bt-tally-dups-list"></ul>
+      </div>
+      <div id="bt-tally-rej" hidden>
+        <h4 class="loud">⚠ Rejected ballots</h4>
+        <ul id="bt-tally-rej-list"></ul>
+      </div>
+      <h4>Result record</h4>
+      <p class="desc-code"><code id="bt-tally-record"></code> <button class="copy-btn" data-for="bt-tally-record">Copy</button></p>
+      <p class="hint" id="bt-tally-winner"></p>
+      <div class="row">
+        <button id="bt-tally-csv" class="ghost">Download tally.csv</button>
+        <button id="bt-tally-json" class="ghost">Download tally.json</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 5: VERIFY -->
+  <section id="step-verify" class="panel">
+    <h2>Verify a poll (standalone)</h2>
+    <p class="lede">No trust in this page required. Paste the published proposal JSON and the ballots — the page
+      re-derives the descriptor from the proposal, re-verifies every signature, and re-tallies. Any tampering
+      gets a loud <strong>✗ NOT PROVEN</strong>.</p>
+    <div class="form-grid">
+      <label class="wide">Proposal JSON (as published)
+        <textarea id="bt-ver-proposal" rows="6" spellcheck="false" placeholder='{"title":…,"description":…,"options":[…],"startH":…,"endH":…,"snapshotH":…}'></textarea>
+      </label>
+      <label class="wide">Ballots (JSON array)
+        <textarea id="bt-ver-ballots" rows="6" spellcheck="false" placeholder='[{"protocol":"pearl-ballot-ballot",…}]'></textarea>
+      </label>
+    </div>
+    <div class="row"><button id="bt-ver-run" class="primary">Verify the poll</button></div>
+    <p class="err" id="bt-ver-error" hidden></p>
+    <div id="bt-ver-out" hidden>
+      <h3 id="bt-ver-head">Proven</h3>
+      <dl class="kv">
+        <dt>descriptor</dt><dd><code id="bt-ver-desc"></code></dd>
+        <dt>descriptorHash</dt><dd><code id="bt-ver-dhash"></code></dd>
+        <dt>valid ballots</dt><dd id="bt-ver-n"></dd>
+        <dt>rejected</dt><dd id="bt-ver-rej"></dd>
+        <dt>result record</dt><dd><code id="bt-ver-record"></code></dd>
+      </dl>
+      <div id="bt-ver-totals" class="totals"></div>
+    </div>
+  </section>
+
+  <!-- HONEST LIMITS -->
+  <section id="honest-limits" class="panel limits">
+    <h2>Honest limits</h2>
+    <ul>
+      <li><strong>No PRL ever moves through this page.</strong> It drafts proposals, signs ballots locally,
+        tallies signed ballots, and verifies polls — governance results are <strong>social consensus</strong>,
+        not on-chain execution. Pearl has no smart contracts; nothing on-chain enforces the outcome.</li>
+      <li>Fairness is a signed-ballot protocol, not code: the guarantee is that <strong>the descriptor must be
+        published before the voting window opens</strong> — anyone can then re-hash the proposal and re-verify
+        every ballot signature. A descriptor that appears only after the window opened proves nothing.</li>
+      <li><strong>Voting weight is the CURRENT confirmed balance</strong> from Blockbook, not a read at the
+        snapshot height — Blockbook does not expose historical address balances. Snapshot-height enforcement is
+        the organizer's job; the claimed snapshot height is recorded inside every signed ballot so anyone can
+        cross-check it against their own <code>pearld</code> node.</li>
+      <li>Ballot relay is manual: voters publish signed ballots publicly (forum, Discord, X) and the organizer
+        imports them. The page cannot prove <em>when</em> a pasted ballot was created — in-page signing refuses
+        out-of-window votes, but pasted ballots rely on the organizer's honest collection.</li>
+      <li>One address, one ballot — but nothing stops one person from voting under two different addresses. Know your voters.</li>
+      <li>Keys entered on the Vote step live in page memory only and are never stored or sent anywhere; use the Wipe button when done.</li>
+      <li>Blockbook is a third-party read source; for polls that decide real money, confirm heights and balances with your own
+        <code>pearld</code> node — the manual-tip paths exist for exactly this. Block countdowns assume the 194-second target block time.</li>
+      <li><strong>No real vote has been conducted through this page.</strong> All signatures and tallies were exercised in tests and headless-browser QA with synthetic keys.</li>
+    </ul>
+  </section>
+</main>
+
+<footer>
+  <p>Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> for the Pearl ecosystem · All hashing and signing runs locally in your browser — nothing is sent anywhere except the Blockbook lookups you trigger.</p>
+  <p>Donations: <code id="donate">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code> <button class="copy-btn" data-for="donate">Copy</button></p>
+</footer>
+
+<script src="pearl-ballot.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
