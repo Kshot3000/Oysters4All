@@ -34,6 +34,7 @@
         <a href="pages/notary/">Notary</a>
         <a href="pages/gift/">Gift</a>
         <a href="pages/covenant/">Covenant</a>
+        <a href="pages/vesting/">Vesting</a>
         <a href="pages/pool/">Mining pool</a>
         <a href="pages/wallet/">Wallet</a>
         <a href="pages/mining/">Mining calc</a>
@@ -263,6 +264,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Covenant — m-of-n Multisig Vaults <span class="badge">new</span></h3>
             <p>Forge m-of-n Taproot multisig vaults for PRL — up to 16 cosigners behind one CHECKSIGADD tapscript, sealed under a NUMS internal key so there is no keypath backdoor. Coordinate cosigner signing rounds as tamper-evident JSON: verify the round, sign locally, import cosigner signatures with per-signature verification, and finalize at quorum. Keys never leave the page.</p>
             <div class="card-links"><a href="pages/covenant/">Open Pearl Covenant →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Vesting — Timelocked PRL Vesting Schedules <span class="badge">new</span></h3>
+            <p>Non-custodial vesting on Taproot — lock PRL for a beneficiary in linear or custom-dated tranches, one Taproot address per tranche with an absolute OP_CHECKLOCKTIMEVERIFY claim leaf (plus an optional funder clawback leaf, only after maturity). NUMS internal key, so no keypath backdoor. Forge the schedule, track funding over Blockbook, and claim or claw back one locally-signed transaction per matured tranche. Keys never leave the page.</p>
+            <div class="card-links"><a href="pages/vesting/">Open Pearl Vesting →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Notary — Proof of Existence <span class="badge">new</span></h3>
