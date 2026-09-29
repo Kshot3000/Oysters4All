@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Recover — PRL Seed Recovery Scanner</title>
+<meta name="description" content="Scan your BIP-39 seed across BIP-86 Taproot derivation paths and find every used Pearl address. Discovery only — the page never signs or broadcasts.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<div class="beacon-sky" aria-hidden="true">
+  <div class="ring r1"></div>
+  <div class="ring r2"></div>
+  <div class="ring r3"></div>
+</div>
+
+<header class="top">
+  <a class="crumb" href="../">← Pearl apps</a>
+  <h1><span class="beacon-dot" aria-hidden="true"></span> Pearl Recover</h1>
+  <p class="sub">The rescue beacon — point your BIP-39 seed at the Pearl chain and find every address that ever held PRL. Discovery only: this page never signs, never broadcasts, and never stores your seed.</p>
+</header>
+
+<main>
+  <section class="panel" id="setup-panel">
+    <h2>Recovery settings</h2>
+    <p id="rc-error" class="error" hidden></p>
+
+    <label class="field">
+      <span>BIP-39 seed phrase <small>(12 or 24 words — stays in page memory only)</small></span>
+      <textarea id="rc-seed" rows="3" autocomplete="off" autocapitalize="off" spellcheck="false"
+        placeholder="abandon abandon abandon … about"></textarea>
+    </label>
+
+    <div class="grid">
+      <label class="field">
+        <span>Network</span>
+        <select id="rc-network">
+          <option value="mainnet" selected>Pearl mainnet (prl1…)</option>
+          <option value="testnet">Pearl testnet (tprl1…)</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Accounts <small>(BIP-86 account')</small></span>
+        <div class="row">
+          <input id="rc-acct-start" type="number" min="0" value="0" class="num">
+          <span class="to">to</span>
+          <input id="rc-acct-end" type="number" min="0" value="2" class="num">
+        </div>
+      </label>
+      <label class="field">
+        <span>Gap limit <small>(unused addresses before a chain stops)</small></span>
+        <input id="rc-gap" type="number" min="1" value="20" class="num">
+      </label>
+      <label class="field">
+        <span>Index cap <small>(hard stop per chain)</small></span>
+        <input id="rc-cap" type="number" min="1" value="1000" class="num">
+      </label>
+    </div>
+
+    <label class="field">
+      <span>Blockbook <small>(GET-only reads)</small></span>
+      <input id="rc-blockbook" type="url" value="https://blockbook.pearlresearch.ai" spellcheck="false">
+    </label>
+
+    <div class="actions">
+      <button id="rc-start" class="btn primary" type="button">Start scan</button>
+      <button id="rc-stop" class="btn" type="button" disabled>Stop</button>
+      <button id="rc-lock" class="btn ghost" type="button" title="Wipe the seed from page memory">🔒 Lock / wipe keys</button>
+    </div>
+    <p class="note" id="rc-note">BIP-39 passphrases are not scanned — only the plain mnemonic. Derivation: <span class="mono">m/86'/{coin}'/{account}'/{change}/{index}</span>.</p>
+  </section>
+
+  <section class="panel" id="progress-panel" hidden>
+    <h2>Scan progress</h2>
+    <div class="progress"><div id="rc-bar" class="bar"></div></div>
+    <p class="status" id="rc-status">Preparing…</p>
+  </section>
+
+  <section class="panel" id="results-panel" hidden>
+    <h2>Found funds</h2>
+    <div class="totals" id="rc-totals"></div>
+    <div class="actions">
+      <button id="rc-csv" class="btn" type="button">Download CSV</button>
+      <button id="rc-copy" class="btn" type="button">Copy all addresses</button>
+      <span class="copied" id="rc-copied" hidden>copied ✓</span>
+    </div>
+    <div class="table-wrap">
+      <table id="rc-table">
+        <thead>
+          <tr><th>Account</th><th>Chain</th><th>Index</th><th>Address</th><th>Txs</th><th>Balance</th></tr>
+        </thead>
+        <tbody id="rc-tbody"></tbody>
+      </table>
+    </div>
+    <p class="note" id="rc-empty" hidden>No used addresses found in the scanned range. If you expected funds, widen the account range or raise the index cap — or the seed may carry a BIP-39 passphrase, which this scanner does not cover.</p>
+  </section>
+
+  <section class="panel honesty">
+    <h2>Honest limits</h2>
+    <ul>
+      <li><strong>Discovery only.</strong> This page reads Blockbook and lists what it finds. It never signs, never builds transactions, never broadcasts.</li>
+      <li><strong>Sweep in Pearl Sign.</strong> To move found funds, import this same seed into <a href="../sign/">Pearl Sign</a> and spend from there.</li>
+      <li><strong>Your seed stays here.</strong> It lives in page memory, is never saved to disk or sent anywhere, and the 🔒 button wipes it instantly.</li>
+      <li><strong>Gap-limit caveat.</strong> A chain stops after 20 consecutive unused addresses (configurable). Funds past an unusually long gap won't be seen — raise the gap limit and re-scan if in doubt.</li>
+    </ul>
+  </section>
+</main>
+
+<footer>
+  <p>Built by the Pearl 24/7 builder · <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a></p>
+  <p class="donate">Donate PRL: <span class="mono" id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</span> <button id="copy-donate" class="btn small" type="button">Copy</button></p>
+  <p class="dim">Community-built, not an official pearl-research-labs property. Keys never leave your browser.</p>
+</footer>
+
+<script src="pearl-recover.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
