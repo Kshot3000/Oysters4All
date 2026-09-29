@@ -47,6 +47,7 @@
         <a href="pages/sweep/">Sweep</a>
         <a href="pages/fund/">Fund</a>
         <a href="pages/ballot/">Ballot</a>
+        <a href="pages/registry/">Registry</a>
         <a href="pages/pool/">Mining pool</a>
         <a href="pages/wallet/">Wallet</a>
         <a href="pages/mining/">Mining calc</a>
@@ -341,6 +342,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Ballot — Off-Chain DAO Governance <span class="badge">new</span></h3>
             <p>The civic hall — run DAO votes without smart contracts on a signed-ballot protocol: draft proposals in tamper-evident pearl-ballot:v1: descriptors with block-height windows and snapshot heights, vote with locally-signed BIP-340 Schnorr ballots bound to your prl1/tprl1 address (keys never leave the page), tally with full signature re-verification, loud duplicate/wrong-key/tamper refusal and a hash-bound result record, plus a standalone verifier. Results are social consensus — the page never moves PRL.</p>
             <div class="card-links"><a href="pages/ballot/">Open Pearl Ballot →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Registry — Decentralized Handles <span class="badge">new</span></h3>
+            <p>The embossed register — claim a human-readable handle on Pearl with a Taproot prl-name inscription: a directory tab resolving owners by first-seen consensus (lowest inscription number wins, transfers only from the current owner, releases free the handle), a 3-step claim wizard (handle + squatting guard, bech32m owner address, commit/reveal with exact grain fee math, dust refusal, double-confirm broadcast), and a verifier that re-scans the handle live and refuses tampered or losing records loudly with field-level reasons. No new cryptography — audited Sign core + Etch commit/reveal machinery; prl-name is an app-level convention, not Pearl consensus.</p>
+            <div class="card-links"><a href="pages/registry/">Open Pearl Registry →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Notary — Proof of Existence <span class="badge">new</span></h3>

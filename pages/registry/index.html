@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Registry — Claim Your Handle on Pearl</title>
+<meta name="description" content="Pearl Registry: claim a human-readable handle on Pearl (PRL) with a Taproot prl-name inscription — directory, claim wizard, and a tamper-loud verifier. Keys never leave your browser.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg class="plate" viewBox="0 0 48 32" aria-hidden="true">
+      <rect x="2" y="4" width="44" height="24" rx="4" fill="none" stroke="currentColor" stroke-width="2.5"/>
+      <circle cx="8" cy="10" r="1.6" fill="currentColor"/><circle cx="40" cy="10" r="1.6" fill="currentColor"/>
+      <circle cx="8" cy="22" r="1.6" fill="currentColor"/><circle cx="40" cy="22" r="1.6" fill="currentColor"/>
+      <text x="24" y="21" text-anchor="middle" font-size="10" font-family="Georgia, serif" fill="currentColor" letter-spacing="1">PR</text>
+    </svg>
+    <div>
+      <h1>Pearl Registry</h1>
+      <p class="tagline">The embossed register of Pearl handles</p>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs">
+    <button data-tab="directory" class="active">Directory</button>
+    <button data-tab="claim">Claim wizard</button>
+    <button data-tab="verify">Verifier</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ======================= DIRECTORY ======================= -->
+  <section id="tab-directory" class="panel active">
+    <h2>The register</h2>
+    <p class="lede">Every <code class="mono">prl-name</code> inscription the configured indexer knows about,
+    resolved to current owners by first-seen consensus: the lowest inscription number wins,
+    transfers only count from the current owner, releases free the handle for re-claim.</p>
+
+    <div class="config card">
+      <label>Indexer API base URL <span class="hint-inline">(GET-only reads — never configured by default; supply your own, per Gallery precedent)</span>
+        <input id="idx-base" class="mono" placeholder="https://indexer.example.com" autocomplete="off" spellcheck="false">
+      </label>
+      <label class="narrow">Max pages
+        <input id="idx-maxpages" class="mono" value="20" inputmode="numeric">
+      </label>
+      <div class="row">
+        <button id="idx-scan" class="btn primary">Scan the register</button>
+        <span id="idx-status" class="muted"></span>
+      </div>
+      <div id="idx-progress" class="progress" hidden><div id="idx-progress-fill"></div></div>
+      <p class="honest">The scan walks the indexer's asc-ordered <code class="mono">/inscriptions</code> list
+      (100/page, capped above) and is a <strong>sample of indexed data</strong> — it is only as complete as the
+      indexer you point it at. Ownership = first-seen <em>per that indexer's ordering</em>.</p>
+    </div>
+
+    <div class="config card">
+      <h3>Handle lookup</h3>
+      <div class="row">
+        <input id="dir-search" class="grow" placeholder="satoshi" autocomplete="off" spellcheck="false">
+        <button id="dir-lookup" class="btn">Look up</button>
+      </div>
+      <div id="dir-lookup-out"></div>
+    </div>
+
+    <h3>Entries <span id="dir-count" class="count">0</span></h3>
+    <div id="dir-results" class="register-list"></div>
+    <div id="dir-detail"></div>
+  </section>
+
+  <!-- ======================= CLAIM WIZARD ======================= -->
+  <section id="tab-claim" class="panel">
+    <h2>Claim a handle</h2>
+    <p class="lede">Three steps: pick a handle, name the owner address, then engrave the claim with a
+    Taproot commit/reveal inscription. Claiming costs real PRL in chain fees. Your key never leaves this page.</p>
+
+    <nav class="steps" id="cw-steps">
+      <button data-step="s1" class="active">1 · Handle</button>
+      <button data-step="s2">2 · Owner</button>
+      <button data-step="s3">3 · Commit &amp; reveal</button>
+    </nav>
+
+    <!-- STEP 1 -->
+    <div id="cw-s1" class="subpanel active">
+      <h3>Step 1 — choose your handle</h3>
+      <p class="muted">1–32 chars, <code class="mono">a–z 0–9 -</code>; no leading/trailing/double hyphens.
+      Normalization is lowercase-trim — <code class="mono">Satoshi</code> and <code class="mono">satoshi</code> are the same handle.</p>
+      <div class="row">
+        <input id="cw-handle" class="grow mono big" placeholder="satoshi" autocomplete="off" spellcheck="false" maxlength="40">
+        <button id="cw-check" class="btn">Check</button>
+      </div>
+      <div id="cw-handle-status"></div>
+      <div id="cw-squat" class="squat" hidden></div>
+      <div class="row end"><button id="cw-to2" class="btn primary" disabled>Continue →</button></div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div id="cw-s2" class="subpanel">
+      <h3>Step 2 — owner address &amp; network</h3>
+      <div class="form-grid">
+        <label>Owner address (receives the inscribed claim output)
+          <input id="cw-owner" class="mono" placeholder="prl1…" autocomplete="off" spellcheck="false">
+        </label>
+        <label class="narrow">Network
+          <select id="cw-network">
+            <option value="mainnet" selected>Mainnet (prl…)</option>
+            <option value="testnet">Testnet (tprl…)</option>
+          </select>
+        </label>
+        <label>Blockbook base URL (GET-only UTXO reads + broadcast)
+          <input id="cw-blockbook" class="mono" placeholder="https://blockbook.pearlresearch.ai" autocomplete="off" spellcheck="false">
+        </label>
+      </div>
+      <div id="cw-owner-status"></div>
+      <div class="row">
+        <button id="cw-back1" class="btn ghost">← Back</button>
+        <button id="cw-to3" class="btn primary" disabled>Continue →</button>
+      </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div id="cw-s3" class="subpanel">
+      <h3>Step 3 — key, fees, commit &amp; reveal</h3>
+      <div class="card">
+        <h4>Signing key (page memory only)</h4>
+        <div class="row">
+          <button id="cw-newkey" class="btn">Generate fresh key</button>
+          <input id="cw-wif" class="grow mono" type="password" placeholder="or paste WIF…" autocomplete="off" spellcheck="false">
+          <button id="cw-unlock" class="btn">Use key</button>
+          <button id="cw-lock" class="btn danger" disabled>Lock &amp; wipe</button>
+        </div>
+        <div id="cw-keystatus" class="muted"></div>
+      </div>
+      <div class="card">
+        <h4>Fees &amp; funding</h4>
+        <div class="row">
+          <label class="narrow">Fee rate (grains/vB)
+            <input id="cw-fee" class="mono" value="5" inputmode="numeric">
+          </label>
+          <button id="cw-fee-fetch" class="btn">Suggest from Blockbook</button>
+          <button id="cw-plan" class="btn primary" disabled>Build commit/reveal plan</button>
+        </div>
+        <div id="cw-utxos" class="muted"></div>
+        <div id="cw-plan-out"></div>
+      </div>
+      <div class="card">
+        <h4>Broadcast (double-confirmed, dust-refused)</h4>
+        <div class="row">
+          <button id="cw-commit-broadcast" class="btn" disabled>1 · Broadcast commit</button>
+          <button id="cw-reveal-broadcast" class="btn" disabled>2 · Broadcast reveal</button>
+        </div>
+        <div id="cw-result"></div>
+      </div>
+      <div class="card">
+        <h4>Standalone reveal-pair verifier</h4>
+        <p class="muted">Paste a commit + reveal hex pair (e.g. before broadcasting) — the envelope is
+        parsed the way an indexer would parse it, and the <code class="mono">prl-name</code> JSON is
+        schema-validated. Anything off is refused loudly.</p>
+        <label>Commit tx hex
+          <textarea id="pv-commit-hex" class="mono" rows="3" placeholder="0200…" spellcheck="false"></textarea>
+        </label>
+        <label>Reveal tx hex
+          <textarea id="pv-reveal-hex" class="mono" rows="3" placeholder="0200…" spellcheck="false"></textarea>
+        </label>
+        <div class="row"><button id="pv-run" class="btn">Verify pair</button></div>
+        <div id="pv-out"></div>
+      </div>
+      <div class="row"><button id="cw-back2" class="btn ghost">← Back</button></div>
+    </div>
+  </section>
+
+  <!-- ======================= VERIFIER ======================= -->
+  <section id="tab-verify" class="panel">
+    <h2>Verify a registration</h2>
+    <p class="lede">Paste an inscription id. The page fetches the inscription and its content from your
+    configured indexer, schema-validates the <code class="mono">prl-name</code> JSON, re-normalizes the handle,
+    and confirms first-seen ownership against a live directory re-scan of that handle. Tampered or
+    losing records are refused loudly, with exact field-level reasons.</p>
+    <div class="row">
+      <input id="v-id" class="grow mono" placeholder="inscription id (txid + i0)" autocomplete="off" spellcheck="false">
+      <button id="v-run" class="btn primary">Verify</button>
+    </div>
+    <div id="v-out"></div>
+  </section>
+
+  <!-- ======================= HONEST LIMITS ======================= -->
+  <aside class="limits card">
+    <h3>Registrar's notice — honest limits</h3>
+    <ul>
+      <li><strong>prl-name is an app-level convention, not Pearl consensus.</strong> Pearl has no smart
+      contracts; nothing on-chain enforces handle ownership. Two indexers can disagree.</li>
+      <li><strong>Ownership = first-seen per the indexer's ordering.</strong> Resolution depends entirely
+      on the indexer you configure (unconfigured by default — supply your own, per Gallery precedent).</li>
+      <li><strong>Claiming costs real PRL</strong> in commit/reveal chain fees. There is no refund.</li>
+      <li><strong>Never claim legal rights to a handle.</strong> A registry entry is a social signal, not a trademark.</li>
+      <li><strong>No squatting protection</strong> beyond first-seen. The wizard checks the last directory scan,
+      but someone else's inscription can land first.</li>
+    </ul>
+  </aside>
+
+  <footer class="footer">
+    <p>Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> ·
+    PRL: <code class="mono" id="donate">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+    <button id="copy-donate" class="btn ghost small">Copy</button></p>
+    <p class="muted">Pearl Registry — prl-name inscriptions on Pearl. Crypto: audited Sign core + Etch commit/reveal machinery; no new cryptography. No smart contracts on Pearl.</p>
+  </footer>
+</main>
+
+<script src="pearl-registry.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
