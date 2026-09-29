@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Gift — Paper Wallets & Gift Cards for PRL</title>
+<meta name="description" content="Pearl Gift: create beautiful printable PRL gift cards with BIP-86 paper wallets, and redeem them with a locally-signed sweep transaction. Keys never leave your browser.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="pearl-dot" aria-hidden="true"></span>
+    <div>
+      <strong>Pearl Gift</strong>
+      <span class="tagline">paper wallets &amp; gift cards for PRL</span>
+    </div>
+  </div>
+  <nav id="steps" class="steps">
+    <button data-step="create" class="active">1 · Create</button>
+    <button data-step="load">2 · Load</button>
+    <button data-step="card">3 · Card</button>
+    <button data-step="redeem">4 · Redeem</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ================= CREATE ================= -->
+  <section id="step-create" class="step active">
+    <h1>Give Pearl, beautifully</h1>
+    <p class="lede">Generate a fresh BIP-86 paper wallet, print it as a gift card, load it with PRL —
+      and the recipient redeems it with a one-click sweep. Everything is computed locally in your browser.</p>
+
+    <div class="grid2">
+      <div class="panel">
+        <h2>Key</h2>
+        <label>Key source
+          <select id="key-source">
+            <option value="generate" selected>Generate a fresh gift wallet</option>
+            <option value="mnemonic">Import mnemonic (12/24 words)</option>
+            <option value="wif">Import WIF private key</option>
+            <option value="priv">Import raw private key (hex)</option>
+          </select>
+        </label>
+        <div id="key-input-wrap" hidden>
+          <label>Paste secret
+            <textarea id="key-input" rows="3" spellcheck="false" placeholder="mnemonic, WIF, or 64-hex private key"></textarea>
+          </label>
+        </div>
+        <label>Network
+          <select id="network">
+            <option value="mainnet" selected>Mainnet (prl1…)</option>
+            <option value="testnet">Testnet (tprl1…)</option>
+          </select>
+        </label>
+        <label>Blockbook endpoint
+          <input id="blockbook" type="text" spellcheck="false">
+        </label>
+        <h2>Card</h2>
+        <label>Design</label>
+        <div class="designs" role="radiogroup" aria-label="Card design">
+          <button class="design-btn active" data-design="abyss"><span class="swatch sw-abyss"></span>Abyssal Pearl</button>
+          <button class="design-btn" data-design="rose"><span class="swatch sw-rose"></span>Rosé Mint</button>
+          <button class="design-btn" data-design="glacier"><span class="swatch sw-glacier"></span>Glacier</button>
+        </div>
+        <label>To <input id="gift-to" type="text" placeholder="Ada" maxlength="60"></label>
+        <label>From <input id="gift-from" type="text" placeholder="Bob" maxlength="60"></label>
+        <label>Message <input id="gift-message" type="text" placeholder="Happy birthday — welcome to Pearl." maxlength="120"></label>
+        <div class="row">
+          <button id="make-gift" class="primary">Generate gift wallet</button>
+          <button id="new-gift" class="ghost">↻ new random</button>
+        </div>
+        <p id="gift-error" class="error" hidden></p>
+      </div>
+
+      <div class="panel" id="gift-key-card" hidden>
+        <h2>Your gift wallet</h2>
+        <p class="warn">Treat the private key like cash. Anyone who sees it can spend the gift.
+          Keep it behind the fold until the card is printed and sealed.</p>
+        <div class="keyrow">
+          <div>
+            <div class="kv"><span>Address</span><code id="gift-address"></code></div>
+            <div class="kv"><span>Derivation</span><code id="gift-path"></code></div>
+            <div class="kv"><span>WIF</span><code id="gift-wif" class="secret">••••••••</code></div>
+            <div class="row">
+              <button id="reveal-secret" class="ghost">Reveal private key</button>
+              <button id="copy-address" class="ghost">Copy address</button>
+              <button id="copy-wif" class="ghost">Copy WIF</button>
+            </div>
+            <p id="gift-mnemonic-wrap" class="mnemonic" hidden>Mnemonic: <code id="gift-mnemonic"></code></p>
+          </div>
+          <div class="qrs">
+            <figure><canvas id="gift-address-qr" width="180" height="180"></canvas><figcaption>address</figcaption></figure>
+            <figure><canvas id="gift-wif-qr" width="180" height="180"></canvas><figcaption>private key (WIF)</figcaption></figure>
+          </div>
+        </div>
+        <button id="to-load" class="primary">Continue: load the card →</button>
+      </div>
+    </div>
+    <p class="fineprint">Keys are derived at <code>m/86'/coin'/1000'/0/0</code> — a dedicated gift account, so gift
+      keys never collide with your main wallet. Imported WIF/hex keys are used as-is (no derivation path).
+      No data leaves this page except the optional Blockbook lookups you trigger.</p>
+  </section>
+
+  <!-- ================= LOAD ================= -->
+  <section id="step-load" class="step">
+    <h1>Load the gift</h1>
+    <p class="lede">Send PRL to the card's address from any wallet. The card only exists on-chain once it is funded.</p>
+    <div class="panel load-panel">
+      <div class="load-left">
+        <canvas id="load-qr" width="240" height="240"></canvas>
+        <div class="row">
+          <button id="load-copy" class="ghost">Copy address</button>
+          <button id="check-funding" class="primary">Check funding</button>
+        </div>
+      </div>
+      <div class="load-right">
+        <div class="kv big"><span>Gift address</span><code id="load-address">—</code></div>
+        <div class="kv big"><span>Confirmed balance</span><strong id="load-balance">not checked</strong></div>
+        <p id="funding-error" class="error" hidden></p>
+        <p class="hint">Funding needs at least one confirmation before a redeem sweep will succeed.
+          The sweep fee is deducted automatically at redeem time — no separate fee wallet needed.</p>
+      </div>
+    </div>
+    <button id="to-card" class="primary">Continue: print the card →</button>
+  </section>
+
+  <!-- ================= CARD ================= -->
+  <section id="step-card" class="step">
+    <h1>Print the card</h1>
+    <p class="lede">Fold along the dashed line — the private key hides inside. Print, fold, seal, give.</p>
+    <div class="card-stage">
+      <div id="card-preview" class="gift-card design-abyss">
+        <div class="gc-front">
+          <div class="gc-orb" aria-hidden="true"></div>
+          <div class="gc-brand">PEARL&nbsp;GIFT</div>
+          <div class="gc-to">To <span id="card-to">—</span></div>
+          <div class="gc-message" id="card-message"></div>
+          <div class="gc-from">From <span id="card-from">—</span></div>
+          <div class="gc-addr"><span>Load &amp; redeem:</span><code id="card-address"></code></div>
+          <div class="gc-qr" id="card-address-qr"></div>
+        </div>
+        <div class="gc-fold" aria-hidden="true">✂ - - - fold here - - - ✂</div>
+        <div class="gc-back">
+          <div class="gc-warn">Fold to hide · whoever holds this key holds the gift</div>
+          <div class="gc-qr" id="card-wif-qr"></div>
+          <div class="gc-wif"><span>Private key (WIF)</span><code id="card-wif"></code></div>
+          <div class="gc-steps">Redeem: open <strong>pearl gift → redeem</strong>, paste the WIF, enter your
+            address, sweep. Keys never leave your device.</div>
+        </div>
+      </div>
+    </div>
+    <div class="row">
+      <button id="print-card" class="primary">🖨 Print card</button>
+      <button id="to-redeem" class="ghost">Skip to redeem →</button>
+    </div>
+    <p class="fineprint">Printing is best from a device you trust, with the printer's network features off.
+      For maximum security, generate the wallet on an offline computer and print directly.</p>
+  </section>
+
+  <!-- ================= REDEEM ================= -->
+  <section id="step-redeem" class="step">
+    <h1>Redeem a gift</h1>
+    <p class="lede">Paste the card's secret, sweep every grain to your address in one locally-signed transaction.</p>
+    <div class="grid2">
+      <div class="panel">
+        <h2>Card secret</h2>
+        <label>Paste mnemonic, WIF, or private key
+          <textarea id="redeem-secret" rows="3" spellcheck="false" placeholder="the WIF from inside the card"></textarea>
+        </label>
+        <div class="row">
+          <button id="redeem-derive" class="primary">Read card</button>
+        </div>
+        <p id="redeem-error" class="error" hidden></p>
+        <div id="redeem-card" hidden>
+          <div class="kv"><span>Gift address</span><code id="redeem-address"></code></div>
+          <label>UTXO source
+            <select id="utxo-mode">
+              <option value="blockbook" selected>Fetch from Blockbook</option>
+              <option value="manual">Paste manually (air-gapped)</option>
+            </select>
+          </label>
+          <div id="utxo-paste-wrap" hidden>
+            <label>Paste UTXOs — one per line: <code>txid:vout value</code> (grains), optional trailing address
+              <textarea id="utxo-paste" rows="3" spellcheck="false" placeholder="aa…aa:0 250000000"></textarea>
+            </label>
+          </div>
+          <div class="row">
+            <button id="redeem-fetch" class="primary">Find gift funds</button>
+          </div>
+          <p id="redeem-utxos" class="hint"></p>
+        </div>
+      </div>
+      <div class="panel" id="redeem-plan-panel" hidden>
+        <h2>Sweep</h2>
+        <label>Your receiving address <input id="redeem-recipient" type="text" spellcheck="false" placeholder="prl1p…"></label>
+        <label>Fee rate (grains/vB) <input id="fee-rate" type="number" min="1" step="1" value="5"></label>
+        <div class="row"><button id="redeem-plan" class="primary">Plan sweep</button></div>
+        <div id="plan-summary" class="plan" hidden></div>
+        <div class="row"><button id="build-sweep" class="primary" disabled>Build &amp; sign sweep</button></div>
+        <p id="sweep-error" class="error" hidden></p>
+        <div id="sweep-result" hidden>
+          <div class="kv"><span>TXID</span><code id="sweep-txid"></code></div>
+          <label>Signed transaction (hex)
+            <textarea id="sweep-hex" rows="4" readonly spellcheck="false"></textarea>
+          </label>
+          <p class="ok" id="sweep-verified">✓ every input signature verified locally before broadcast</p>
+          <div class="row">
+            <button id="broadcast-sweep" class="primary">Broadcast via Blockbook</button>
+          </div>
+          <p id="broadcast-error" class="error" hidden></p>
+          <p id="broadcast-ok" class="ok" hidden></p>
+        </div>
+      </div>
+    </div>
+    <p class="fineprint">The sweep spends <em>all</em> of the card's UTXOs to your address in one transaction.
+      Signing happens entirely on this device; only the finished transaction is ever broadcast.
+      Never redeem on a machine you don't trust — the secret you paste can move the funds.</p>
+  </section>
+</main>
+
+<footer>
+  <p>Built for the Pearl blockchain · <a href="https://x.com/kshot9000">@kshot9000</a></p>
+  <p>Tips: <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code></p>
+  <p class="fineprint">Pearl Gift is a client-side tool. It is not a custodian and cannot recover lost keys.</p>
+</footer>
+
+<script src="qrcode.min.js?v=1"></script>
+<script src="pearl-gift.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
