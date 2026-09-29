@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Vanity — Forge Your Own prl1p… Address</title>
+<meta name="description" content="Grind a custom Pearl Taproot vanity address in your browser: pick a prefix, run the forge across CPU threads, and claim a real keypair. Keys never leave the page.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="top">
+  <div class="seal">◈</div>
+  <h1>Pearl Vanity</h1>
+  <p class="tagline">The vanity forge — grind a <span class="mono">prl1p…</span> address with your name on it. Real keys, real math, your machine does the work.</p>
+</header>
+
+<div class="wrap">
+  <nav id="steps" aria-label="Vanity steps">
+    <button data-step="forge" class="active">1 · Forge</button>
+    <button data-step="grind">2 · Grind</button>
+    <button data-step="claim">3 · Claim</button>
+  </nav>
+
+  <!-- ============ STEP 1: FORGE ============ -->
+  <section class="step active" id="step-forge">
+    <div class="panel">
+      <h2>Design your address</h2>
+      <p class="lede">Every Pearl address starts with <span class="mono">prl1p</span>. You choose what comes next — the forge grinds random keys until the address opens with your prefix.</p>
+
+      <div class="field">
+        <label for="prefix">Prefix <span class="dim">(1–5 bech32 characters)</span></label>
+        <div class="prefix-row">
+          <span class="mono fixed">prl1p</span>
+          <input id="prefix" class="mono" maxlength="5" placeholder="pearl" autocomplete="off" spellcheck="false" aria-describedby="prefix-err">
+        </div>
+        <div id="prefix-err" class="err" role="alert" hidden></div>
+        <p class="hint">Alphabet: <span class="mono">qpzry9x8gf2tvdw0s3jn54khce6mua7l</span> — no <span class="mono">1 b i o</span>. Preview: <span class="mono" id="preview">prl1p…</span></p>
+      </div>
+
+      <div class="grid2">
+        <div class="field">
+          <label for="network">Network</label>
+          <select id="network">
+            <option value="mainnet" selected>Mainnet (prl1…)</option>
+            <option value="testnet">Testnet (tprl1…)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="threads">Forge threads <span class="dim">(1–8)</span></label>
+          <input id="threads" type="number" min="1" max="8" step="1" value="4">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Key source</label>
+        <div class="radios">
+          <label><input type="radio" name="mode" value="random" checked> <b>Fresh random key</b> <span class="dim">— each attempt is a brand-new secret. Not in any seed: back it up.</span></label>
+          <label><input type="radio" name="mode" value="bip86"> <b>From my seed (BIP-86)</b> <span class="dim">— grind addresses inside your wallet: <span class="mono">m/86'/coin'/account'/0/index</span>. Recoverable from seed + path.</span></label>
+        </div>
+      </div>
+
+      <div class="field" id="seed-box" hidden>
+        <label for="seed">BIP-39 mnemonic <span class="dim">(never leaves this page)</span></label>
+        <textarea id="seed" rows="2" placeholder="twelve or twenty-four words…" autocomplete="off" spellcheck="false"></textarea>
+        <div class="row">
+          <div class="field inline">
+            <label for="account">Account</label>
+            <input id="account" type="number" min="0" max="2147483647" value="0">
+          </div>
+          <button id="gen-seed" class="btn ghost" type="button">Generate fresh seed</button>
+        </div>
+        <div id="seed-err" class="err" role="alert" hidden></div>
+      </div>
+
+      <div class="field">
+        <label for="max-attempts">Stop after attempts <span class="dim">(0 = grind until found)</span></label>
+        <input id="max-attempts" type="number" min="0" step="1" value="0">
+      </div>
+
+      <div class="diff" id="diff-panel" aria-live="polite">
+        <h3>Forge math</h3>
+        <dl>
+          <div><dt>Expected attempts</dt><dd id="d-expected">—</dd></div>
+          <div><dt>At 5k addr/s</dt><dd id="d-5k">—</dd></div>
+          <div><dt>At 20k addr/s</dt><dd id="d-20k">—</dd></div>
+        </dl>
+        <p class="warn" id="d-warn" hidden></p>
+      </div>
+
+      <div class="actions">
+        <button id="to-grind" class="btn primary" type="button">Light the forge →</button>
+      </div>
+    </div>
+
+    <div class="panel ghost-panel">
+      <h3>How the forge works</h3>
+      <ol class="tight">
+        <li>Each attempt draws a secret key, computes its x-only public key (secp256k1), and encodes <span class="mono">bech32m(hrp, v1, key)</span>.</li>
+        <li>If the address opens with <span class="mono">prl1p</span> + your prefix, the key is yours.</li>
+        <li>The address <b>is</b> the public key — no tweak, no script. The secret signs keypath spends directly.</li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ============ STEP 2: GRIND ============ -->
+  <section class="step" id="step-grind">
+    <div class="panel">
+      <h2>Grinding <span class="mono" id="grind-target">prl1p…</span></h2>
+      <p class="lede" id="grind-sub">Lighting the forge…</p>
+      <div class="actions">
+        <button id="start" class="btn primary" type="button">Start grinding</button>
+        <button id="stop" class="btn danger" type="button" disabled>Stop</button>
+        <button id="back-forge" class="btn ghost" type="button">← Back to forge</button>
+      </div>
+      <div class="stats">
+        <div class="stat"><span class="k">Attempts</span><span class="v mono" id="s-attempts">0</span></div>
+        <div class="stat"><span class="k">Speed</span><span class="v mono" id="s-rate">0 addr/s</span></div>
+        <div class="stat"><span class="k">Elapsed</span><span class="v mono" id="s-elapsed">0s</span></div>
+        <div class="stat"><span class="k">Expected</span><span class="v mono" id="s-expected">—</span></div>
+        <div class="stat"><span class="k">Luck so far</span><span class="v mono" id="s-prob">0%</span></div>
+        <div class="stat"><span class="k">ETA (expected)</span><span class="v mono" id="s-eta">—</span></div>
+      </div>
+      <div class="threads" id="thread-bars" aria-label="Thread activity"></div>
+      <div class="log mono" id="grind-log" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- ============ STEP 3: CLAIM ============ -->
+  <section class="step" id="step-claim">
+    <div class="panel found">
+      <h2>⚒ Struck! Your vanity address</h2>
+      <p class="lede">The forge found it. This keypair is real — the address re-derived from the secret and matched your prefix before anything was shown.</p>
+      <div class="addr mono" id="r-address"></div>
+      <div class="row wrap-row">
+        <div id="r-qr" class="qr" aria-label="Address QR code"></div>
+        <div class="r-meta">
+          <dl>
+            <div><dt>Network</dt><dd id="r-network">—</dd></div>
+            <div><dt>Key source</dt><dd id="r-mode">—</dd></div>
+            <div><dt>Derivation path</dt><dd class="mono" id="r-path">—</dd></div>
+            <div><dt>Attempts it took</dt><dd class="mono" id="r-attempts">—</dd></div>
+            <div><dt>Integrity</dt><dd id="r-verify">—</dd></div>
+          </dl>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="copy-addr" class="btn" type="button">Copy address</button>
+        <button id="reveal" class="btn danger" type="button">Reveal private key</button>
+        <button id="export" class="btn ghost" type="button">Export JSON</button>
+        <button id="again" class="btn ghost" type="button">Grind another</button>
+      </div>
+      <div id="secrets" hidden>
+        <div class="field">
+          <label>Private key (hex) — <span class="dim">anyone with this spends your coins</span></label>
+          <div class="secret-row"><code class="mono" id="r-privhex"></code><button id="copy-privhex" class="btn small" type="button">Copy</button></div>
+        </div>
+        <div class="field">
+          <label>Private key (WIF) — <span class="dim">importable format</span></label>
+          <div class="secret-row"><code class="mono" id="r-wif"></code><button id="copy-wif" class="btn small" type="button">Copy</button></div>
+        </div>
+        <p class="warn">Back this key up <b>now</b> — then clear this page. A fresh-random vanity key exists nowhere else; lose it and the coins are gone forever.</p>
+      </div>
+    </div>
+
+    <div class="panel ghost-panel">
+      <h3>Before you fund it</h3>
+      <ul class="tight">
+        <li>Send a <b>tiny test amount</b> first, then spend it back, to prove you hold the key.</li>
+        <li>BIP-86 mode keys are recoverable from your seed + the path above; random-mode keys are not.</li>
+        <li>This page never sent your key anywhere — but your browser, extensions, and screenshots can see it. Treat the revealed key as exposed.</li>
+        <li>Grinding is probabilistic: the forge got lucky, not smart. Longer prefixes need exponentially more luck.</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="panel ghost-panel">
+    <h3>Honest limits</h3>
+    <ul class="tight">
+      <li>Vanity grinding is pure chance: expected attempts = 32<sup>n</sup>. A 5-character prefix averages 33.5M attempts — an overnight job, not a coffee break.</li>
+      <li>Browser grinding is slow next to GPU rigs; this forge is for short, fun prefixes.</li>
+      <li>A vanity address is exactly as secure as a random one — the prefix buys memorability, nothing else.</li>
+      <li>All crypto (secp256k1, bech32m, BIP-86) is vendored from the audited Pearl Sign core — no new cryptography, only key-generation loops.</li>
+    </ul>
+  </div>
+</div>
+
+<footer>
+  <p>Built by the Pearl 24/7 builder · <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a></p>
+  <p class="donate">Donate PRL: <span class="mono" id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</span> <button id="copy-donate" class="btn small" type="button">Copy</button></p>
+  <p class="dim">Community-built, not an official pearl-research-labs property. Keys never leave your browser.</p>
+</footer>
+
+<script src="qrcode.min.js?v=1"></script>
+<script src="pearl-vanity.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>

@@ -41,6 +41,7 @@
         <a href="pages/swap/">Swap</a>
         <a href="pages/auction/">Auction</a>
         <a href="pages/legacy/">Legacy</a>
+        <a href="pages/vanity/">Vanity</a>
         <a href="pages/pool/">Mining pool</a>
         <a href="pages/wallet/">Wallet</a>
         <a href="pages/mining/">Mining calc</a>
@@ -305,6 +306,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Legacy — PRL Inheritance Vault <span class="badge">new</span></h3>
             <p>The dead-man's switch — a two-leaf Taproot vault where the owner can always spend via a heartbeat leaf, and the heir can claim only after n blocks of inactivity via a CSV-timelocked leaf, all under a NUMS internal key with no keypath backdoor. Plan a vault from a mnemonic/WIF/hex key or watch-only, fund it, watch it with GET-only Blockbook scans that re-verify every UTXO's script on-chain, build the heir's single-UTXO claim or the owner's multi-input heartbeat refresh (same address, fresh UTXO, exact fee math, every signature re-verified), and verify anyone's descriptor standalone against its claimed address. Keys never leave the page; broadcast needs two explicit confirmations.</p>
             <div class="card-links"><a href="pages/legacy/">Open Pearl Legacy →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Vanity — Forge Your Own prl1p… Address <span class="badge">new</span></h3>
+            <p>The vanity forge — grind a custom Pearl Taproot address in your browser: pick a 1–5 character bech32 prefix, run up to 8 Web Worker threads with live rate/luck/ETA stats, and claim a real keypair whose address opens with prl1p + your prefix. Fresh random keys or BIP-86 grinding inside your own seed, every find re-derived from the secret before display, WIF export, and a live Schnorr proof the key controls the address. Keys never leave the page.</p>
+            <div class="card-links"><a href="pages/vanity/">Open Pearl Vanity →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Notary — Proof of Existence <span class="badge">new</span></h3>
