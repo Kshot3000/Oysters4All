@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Swap — Trustless PRL↔BTC Atomic Swaps</title>
+<meta name="description" content="Pearl Swap: trustless PRL↔BTC atomic swaps with Taproot hash+timelock contracts. Propose, lock, track, claim, refund — all crypto runs locally in your browser.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<div class="streams" aria-hidden="true"><i class="s1"></i><i class="s2"></i><i class="core"></i></div>
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 32 32" aria-hidden="true">
+      <path d="M2 10 L13 15 L2 20" fill="none" stroke="#4de3ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M30 10 L19 15 L30 20" fill="none" stroke="#ff4dd2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="16" cy="15" r="3.2" fill="#fff"/>
+      <circle cx="16" cy="15" r="6.5" fill="none" stroke="#fff" stroke-width="1" opacity=".5"/>
+      <path d="M16 22v6M8 26l3-3M24 26l-3-3" stroke="#8ba3c7" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+    <div>
+      <h1>Pearl Swap</h1>
+      <p class="tagline">trustless PRL↔BTC atomic swaps · Taproot hash+timelock</p>
+    </div>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-step="propose" class="active">1 · Propose</button>
+    <button data-step="lock">2 · Lock</button>
+    <button data-step="track">3 · Track</button>
+    <button data-step="claim">4 · Claim</button>
+    <button data-step="refund">5 · Refund</button>
+  </nav>
+</header>
+
+<main>
+  <section class="limits" id="limits">
+    <h2>Honest limits — read before real funds</h2>
+    <ul>
+      <li><strong>No real swaps were executed in testing</strong> — every flow below was verified with synthetic UTXOs only. The cryptography is real; the mainnet miles are not.</li>
+      <li><strong>The Bitcoin side is built by the counterparty's own tooling.</strong> This page never builds or signs Bitcoin transactions — it exports the exact BTC mirror template (scripts, parameters, step-by-step instructions) for independent reproduction.</li>
+      <li><strong>Needs live Blockbook + real funds.</strong> UTXO lookup, fee estimates, tip height and broadcast all go through the Blockbook endpoint you configure.</li>
+      <li><strong>The preimage is the money.</strong> Whoever reveals it claims the PRL. Generate it fresh per swap, back it up once, and clear secrets after the swap settles.</li>
+      <li><strong>Verify out of band.</strong> Both parties must independently re-derive the swap address from the shared spec and confirm the secret hash H before anyone funds anything.</li>
+    </ul>
+  </section>
+
+  <section class="config-strip">
+    <label>Network
+      <select id="network">
+        <option value="mainnet" selected>Mainnet (prl…)</option>
+        <option value="testnet">Testnet (tprl…)</option>
+      </select>
+    </label>
+    <label class="wide">Blockbook API
+      <input id="blockbook" type="url" spellcheck="false">
+    </label>
+  </section>
+
+  <!-- STEP 1: PROPOSE -->
+  <section id="step-propose" class="panel active">
+    <h2>Propose the swap</h2>
+    <p class="lede">Alice (PRL side, initiator) and Bob (BTC side) agree on amounts, the secret hash, and
+    two timelocks. This step forges the Pearl Taproot HTLC both sides can re-derive byte-for-byte —
+    <strong>no PRL moves here</strong>.</p>
+    <div class="form-grid">
+      <label>I am
+        <select id="p-role">
+          <option value="alice" selected>Alice — PRL side (initiator)</option>
+          <option value="bob">Bob — BTC side</option>
+        </select>
+      </label>
+      <label>Fee rate (grains/vB)
+        <input id="p-fee" type="number" min="1" step="any" value="10">
+      </label>
+      <label>PRL amount (Alice locks)
+        <input id="p-prl" type="number" min="0" step="any" placeholder="e.g. 1.5">
+      </label>
+      <label>BTC amount (Bob locks — coordination only)
+        <input id="p-btc" type="number" min="0" step="any" placeholder="e.g. 0.05">
+      </label>
+      <label>Alice's PRL refund — T1 (Pearl block height)
+        <input id="p-t1" type="number" min="1" step="1" placeholder="e.g. 121000">
+      </label>
+      <label>Bob's BTC refund deadline — T2 (Pearl block height)
+        <input id="p-t2" type="number" min="1" step="1" placeholder="e.g. 120500">
+      </label>
+    </div>
+    <p class="hint">T1 must be greater than T2, with a ≥144-block gap recommended. T1 is the absolute Pearl
+    height in the PRL refund leaf; T2 is the latest point (as a Pearl height) by which Bob's BTC refund may
+    become valid — the Lock step converts it to a Bitcoin height for the mirror template.</p>
+    <div class="form-grid">
+      <label class="wide">Alice's refund key <span class="hint">— 64-hex x-only pubkey or 12/24-word mnemonic</span>
+        <textarea id="p-alice-key" rows="2" spellcheck="false" placeholder="64-hex x-only pubkey or mnemonic"></textarea>
+      </label>
+      <label class="wide">Bob's claim key <span class="hint">— 64-hex x-only pubkey or 12/24-word mnemonic</span>
+        <textarea id="p-bob-key" rows="2" spellcheck="false" placeholder="64-hex x-only pubkey or mnemonic"></textarea>
+      </label>
+    </div>
+    <h3>Secret <span class="hint">— Alice generates the preimage; Bob works from the hash alone</span></h3>
+    <div class="row">
+      <button class="btn ghost" id="p-pre-gen">Generate fresh preimage</button>
+      <span class="hint">…or paste a 64-hex preimage below (Alice) / leave it empty and paste the hash (Bob).</span>
+    </div>
+    <div class="form-grid">
+      <label class="wide">Preimage (32 bytes — never share this)
+        <textarea id="p-pre" rows="2" spellcheck="false" placeholder="64-hex preimage (Alice only)"></textarea>
+      </label>
+      <label class="wide">Secret hash H = SHA-256(preimage) <span class="hint">— this is what gets shared</span>
+        <input id="p-hash" spellcheck="false" placeholder="64-hex (Bob pastes this)">
+      </label>
+    </div>
+    <p class="danger" id="p-pre-warn" hidden>⚠ This preimage controls the locked PRL. Back it up once, share only the hash, and clear it after the swap settles.</p>
+    <div class="row">
+      <button class="btn primary" id="propose-btn">Forge swap contract</button>
+      <span class="error" id="propose-error" hidden></span>
+    </div>
+    <div id="propose-out" hidden>
+      <h3>Swap address <span class="hint">— both parties must re-derive this independently</span></h3>
+      <div class="addr-row">
+        <code id="sw-address" class="addr"></code>
+        <button class="btn ghost copy-btn" data-for="sw-address">Copy</button>
+      </div>
+      <div class="qr-wrap"><div id="sw-qr"></div></div>
+      <div id="sw-warnings"></div>
+      <div id="sw-summary" class="summary"></div>
+      <h3>Descriptor <span class="hint">— compact coordination string</span></h3>
+      <div class="addr-row">
+        <code id="sw-descriptor" class="addr small"></code>
+        <button class="btn ghost copy-btn" data-for="sw-descriptor">Copy</button>
+      </div>
+      <h3>Shareable spec <span class="hint">— tamper-evident JSON; carries no preimage, no private keys</span></h3>
+      <textarea id="sw-json" rows="6" spellcheck="false" readonly></textarea>
+      <div class="row">
+        <button class="btn ghost copy-btn" data-for="sw-json">Copy JSON</button>
+        <button class="btn ghost" id="sw-download">Download .json</button>
+        <button class="btn primary" id="to-lock-btn">Continue to Lock →</button>
+      </div>
+      <details><summary>Contract scripts (for review)</summary>
+        <h4>Claim leaf — Bob's</h4><code id="sw-asm-claim" class="asm"></code>
+        <h4>Refund leaf — Alice's</h4><code id="sw-asm-refund" class="asm"></code>
+      </details>
+    </div>
+    <h3>Load a swap</h3>
+    <textarea id="load-spec" rows="3" spellcheck="false" placeholder='Paste the swap spec JSON here'></textarea>
+    <div class="row"><button class="btn ghost" id="load-spec-btn">Load + re-derive</button></div>
+  </section>
+
+  <!-- STEP 2: LOCK -->
+  <section id="step-lock" class="panel">
+    <h2>Lock the PRL</h2>
+    <p class="lede">Alice funds the swap address from her own wallet. The funding transaction is built and
+    signed <strong>locally</strong>; every signature is re-verified before the hex is shown. Broadcast is
+    explicit and confirmed — nothing leaves until you say so.</p>
+    <p class="danger">⚠ This step moves real PRL. Review the transaction before broadcasting.</p>
+    <textarea id="lock-spec" rows="3" spellcheck="false" placeholder="Swap spec JSON (carried over from Propose, or paste it)"></textarea>
+    <div class="row">
+      <button class="btn ghost" id="lock-load-btn">Load spec</button>
+      <span class="error" id="lock-error" hidden></span>
+    </div>
+    <div id="lock-summary" class="summary" hidden></div>
+    <div id="lock-work" hidden>
+      <h3>Funder key <span class="hint">— mnemonic (BIP-86), WIF, or 32-byte hex private key</span></h3>
+      <textarea id="lock-key" rows="2" spellcheck="false" placeholder="private key — never leaves this page"></textarea>
+      <div class="row"><button class="btn ghost" id="lock-derive-btn">Derive funder address</button></div>
+      <div class="addr-row"><code id="lock-address" class="addr"></code></div>
+      <h3>Funder UTXOs</h3>
+      <div class="row">
+        <button class="btn primary" id="lock-refresh">Refresh via Blockbook</button>
+        <span id="lock-balance" class="balance"></span>
+      </div>
+      <table class="keys"><thead><tr><th></th><th>txid</th><th>vout</th><th>Value (PRL)</th><th>Confs</th></tr></thead>
+      <tbody id="lock-utxo-rows"><tr><td colspan="5" class="hint">No UTXOs loaded yet.</td></tr></tbody></table>
+      <h4>Add a UTXO manually <span class="hint">— for air-gapped use; paste the prevout scriptPubKey for a belong-check</span></h4>
+      <div class="form-grid">
+        <label class="wide">txid <input id="lock-m-txid" spellcheck="false" placeholder="64-hex transaction id"></label>
+        <label>vout <input id="lock-m-vout" type="number" min="0" value="0"></label>
+        <label>Value (PRL) <input id="lock-m-value" type="number" min="0" step="any"></label>
+        <label class="wide">Prevout scriptPubKey (hex, optional — enables the belong-check)
+          <input id="lock-m-spk" spellcheck="false" placeholder="0014… / 5120…"></label>
+      </div>
+      <div class="row"><button class="btn ghost" id="lock-add-utxo">Add UTXO</button></div>
+      <h3>Build the funding transaction</h3>
+      <div class="form-grid">
+        <label>Fee rate (grains/vB)
+          <input id="lock-fee" type="number" min="1" step="any" value="10">
+        </label>
+      </div>
+      <div class="row">
+        <button class="btn ghost" id="lock-fee-btn">Fetch fee estimate</button>
+        <button class="btn primary" id="lock-build-btn">Build + sign lock tx</button>
+      </div>
+      <div id="lock-out" hidden>
+        <div id="lock-tx-summary" class="summary"></div>
+        <div id="lock-warnings"></div>
+        <p>txid: <code id="lock-txid" class="addr small"></code></p>
+        <textarea id="lock-hex" rows="6" spellcheck="false" readonly></textarea>
+        <div class="row">
+          <button class="btn ghost copy-btn" data-for="lock-hex">Copy hex</button>
+        </div>
+        <label class="confirm"><input type="checkbox" id="lock-confirm"> I understand this broadcasts a real PRL transaction that only the swap contract can release.</label>
+        <div class="row"><button class="btn primary" id="lock-broadcast-btn">Broadcast via Blockbook</button></div>
+        <div id="lock-ok" class="ok" hidden></div>
+        <div id="lock-bcast-error" class="error" hidden></div>
+      </div>
+      <h3>Bitcoin mirror template <span class="hint">— for Bob's side; Pearl Swap never builds BTC transactions</span></h3>
+      <p class="lede">Hand this to Bob. He reproduces the BTC HTLC below with his own Bitcoin tooling — the
+      claim leaf is byte-identical on both chains, and the template carries the exact parameters.</p>
+      <div class="form-grid">
+        <label>Bitcoin network
+          <select id="mirror-btc-network">
+            <option value="mainnet" selected>Bitcoin mainnet</option>
+            <option value="testnet">Bitcoin testnet</option>
+          </select>
+        </label>
+        <label>Bitcoin tip (optional)
+          <input id="mirror-btc-tip" type="number" min="1" step="1" placeholder="e.g. 870000">
+        </label>
+        <label>Pearl tip (optional)
+          <input id="mirror-pearl-tip" type="number" min="1" step="1" placeholder="e.g. 120000">
+        </label>
+      </div>
+      <div class="row"><button class="btn ghost" id="mirror-gen-btn">Generate mirror template</button></div>
+      <div id="mirror-out" hidden>
+        <div class="addr-row">
+          <code id="mirror-address" class="addr"></code>
+          <button class="btn ghost copy-btn" data-for="mirror-address">Copy</button>
+        </div>
+        <p class="hint" id="mirror-conversion"></p>
+        <details><summary>BTC scripts + counterparty instructions</summary>
+          <h4>Claim leaf (byte-identical on both chains)</h4><code id="mirror-claim-hex" class="asm"></code>
+          <h4>Refund leaf (Bob's BTC refund)</h4><code id="mirror-refund-hex" class="asm"></code>
+          <h4>Steps for Bob</h4><div id="mirror-steps" class="steps-list"></div>
+          <p class="hint" id="mirror-note"></p>
+        </details>
+        <div class="row"><button class="btn ghost copy-btn" data-for="mirror-text">Copy template text</button></div>
+        <textarea id="mirror-text" rows="8" spellcheck="false" readonly hidden></textarea>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 3: TRACK -->
+  <section id="step-track" class="panel">
+    <h2>Track the swap</h2>
+    <p class="lede">Watch the swap address: funding, Bob's claim (preimage revealed on-chain), or Alice's
+    refund after T1 — plus live countdowns to both timelocks.</p>
+    <textarea id="track-spec" rows="3" spellcheck="false" placeholder="Swap spec JSON"></textarea>
+    <div class="row">
+      <button class="btn ghost" id="track-load-btn">Load spec</button>
+      <span class="error" id="track-error" hidden></span>
+    </div>
+    <div id="track-work" hidden>
+      <div class="row">
+        <button class="btn primary" id="track-scan-btn">Scan via Blockbook</button>
+        <span id="track-tip" class="balance"></span>
+      </div>
+      <div id="track-state" class="summary"></div>
+      <div id="track-countdown" class="summary"></div>
+      <h3>Classify a spend <span class="hint">— paste any transaction spending the swap UTXO (works offline)</span></h3>
+      <textarea id="track-tx-hex" rows="4" spellcheck="false" placeholder="raw transaction hex"></textarea>
+      <div class="row">
+        <button class="btn ghost" id="track-classify-btn">Classify</button>
+        <button class="btn primary" id="track-to-claim-btn" hidden>Preimage found — go to Claim →</button>
+      </div>
+      <div id="track-classify-out" class="summary" hidden></div>
+    </div>
+  </section>
+
+  <!-- STEP 4: CLAIM -->
+  <section id="step-claim" class="panel">
+    <h2>Claim</h2>
+    <div class="claim-grid">
+      <div>
+        <h3>Bob's path — claim the PRL</h3>
+        <p class="lede">Bob spends the claim leaf, revealing the preimage on Pearl. Alice watches this
+        transaction to learn the preimage for the BTC side.</p>
+        <p class="danger">⚠ This step moves real PRL and reveals the secret.</p>
+        <textarea id="claim-spec" rows="3" spellcheck="false" placeholder="Swap spec JSON"></textarea>
+        <div class="row"><button class="btn ghost" id="claim-load-btn">Load spec</button></div>
+        <div id="claim-work" hidden>
+          <div class="form-grid">
+            <label>Swap UTXO txid <input id="claim-utxo-txid" spellcheck="false" placeholder="64-hex"></label>
+            <label>vout <input id="claim-utxo-vout" type="number" min="0" value="0"></label>
+            <label>UTXO value (PRL) <input id="claim-utxo-value" type="number" min="0" step="any"></label>
+            <label>Fee rate (grains/vB) <input id="claim-fee" type="number" min="1" step="any" value="10"></label>
+            <label class="wide">Preimage (64-hex) <input id="claim-pre" spellcheck="false"></label>
+            <label class="wide">Bob's key <span class="hint">— 32-byte hex private key or mnemonic</span>
+              <textarea id="claim-key" rows="2" spellcheck="false" placeholder="private key — never leaves this page"></textarea></label>
+            <label class="wide">Destination (P2TR address) <input id="claim-dest" spellcheck="false" placeholder="prl1p…"></label>
+          </div>
+          <div class="row">
+            <button class="btn primary" id="claim-build-btn">Build + sign claim tx</button>
+            <span class="error" id="claim-error" hidden></span>
+          </div>
+          <div id="claim-out" hidden>
+            <p>txid: <code id="claim-txid" class="addr small"></code></p>
+            <textarea id="claim-hex" rows="6" spellcheck="false" readonly></textarea>
+            <div class="row"><button class="btn ghost copy-btn" data-for="claim-hex">Copy hex</button></div>
+            <label class="confirm"><input type="checkbox" id="claim-confirm"> I understand this reveals the preimage on-chain and releases the PRL to the destination.</label>
+            <div class="row"><button class="btn primary" id="claim-broadcast-btn">Broadcast via Blockbook</button></div>
+            <div id="claim-ok" class="ok" hidden></div>
+            <div id="claim-bcast-error" class="error" hidden></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h3>Alice's path — extract the preimage</h3>
+        <p class="lede">Paste Bob's confirmed claim transaction. The page pulls the preimage out of the
+        witness so you can claim the BTC with your own Bitcoin tooling.</p>
+        <textarea id="alice-claim-hex" rows="4" spellcheck="false" placeholder="Bob's claim transaction hex"></textarea>
+        <div class="row">
+          <button class="btn primary" id="alice-extract-btn">Extract preimage</button>
+          <span class="error" id="alice-error" hidden></span>
+        </div>
+        <div id="alice-out" hidden>
+          <h4>Preimage</h4>
+          <div class="addr-row">
+            <code id="alice-pre" class="addr small"></code>
+            <button class="btn ghost copy-btn" data-for="alice-pre">Copy</button>
+          </div>
+          <h4>Claim the BTC</h4>
+          <div id="alice-btc-steps" class="steps-list"></div>
+          <p class="hint">Use your own Bitcoin wallet/tooling with the mirror template from the Lock step.
+          This page cannot build the Bitcoin claim transaction.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 5: REFUND -->
+  <section id="step-refund" class="panel">
+    <h2>Refund</h2>
+    <p class="lede">If Bob never claims, Alice reclaims the PRL after T1 through the refund leaf. The page
+    refuses to build the transaction before maturity — and the wire format hard-codes nLockTime = T1 with
+    input sequence 0xfffffffe.</p>
+    <p class="danger">⚠ This step moves real PRL.</p>
+    <textarea id="refund-spec" rows="3" spellcheck="false" placeholder="Swap spec JSON"></textarea>
+    <div class="row"><button class="btn ghost" id="refund-load-btn">Load spec</button></div>
+    <div id="refund-work" hidden>
+      <div class="form-grid">
+        <label>Swap UTXO txid <input id="refund-utxo-txid" spellcheck="false" placeholder="64-hex"></label>
+        <label>vout <input id="refund-utxo-vout" type="number" min="0" value="0"></label>
+        <label>UTXO value (PRL) <input id="refund-utxo-value" type="number" min="0" step="any"></label>
+        <label>Fee rate (grains/vB) <input id="refund-fee" type="number" min="1" step="any" value="10"></label>
+        <label>Current Pearl height
+          <input id="refund-height" type="number" min="0" step="1" placeholder="e.g. 121050">
+        </label>
+        <label class="wide">Alice's key <span class="hint">— 32-byte hex private key or mnemonic</span>
+          <textarea id="refund-key" rows="2" spellcheck="false" placeholder="private key — never leaves this page"></textarea></label>
+        <label class="wide">Destination (P2TR address) <input id="refund-dest" spellcheck="false" placeholder="prl1p…"></label>
+      </div>
+      <div class="row">
+        <button class="btn ghost" id="refund-tip-btn">Fetch current height</button>
+        <button class="btn primary" id="refund-build-btn">Build + sign refund tx</button>
+        <span class="error" id="refund-error" hidden></span>
+      </div>
+      <div id="refund-out" hidden>
+        <p>txid: <code id="refund-txid" class="addr small"></code></p>
+        <textarea id="refund-hex" rows="6" spellcheck="false" readonly></textarea>
+        <div class="row"><button class="btn ghost copy-btn" data-for="refund-hex">Copy hex</button></div>
+        <label class="confirm"><input type="checkbox" id="refund-confirm"> I understand this reclaims the locked PRL to the destination after T1.</label>
+        <div class="row"><button class="btn primary" id="refund-broadcast-btn">Broadcast via Blockbook</button></div>
+        <div id="refund-ok" class="ok" hidden></div>
+        <div id="refund-bcast-error" class="error" hidden></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>Pearl Swap · trustless PRL↔BTC atomic swaps on Taproot hash+timelock contracts ·
+  <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a></p>
+  <p class="donate">Support the build — <code id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+  <button class="btn ghost copy-btn" data-for="donate-addr">Copy</button></p>
+  <p class="hint">Experimental software. Atomic swaps move real funds on two chains — verify every address,
+  script, and timelock out of band with your counterparty before funding. Never reuse a preimage.</p>
+</footer>
+
+<script src="qrcode.min.js?v=1"></script>
+<script src="pearl-swap.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>

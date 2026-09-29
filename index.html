@@ -38,6 +38,7 @@
         <a href="pages/rain/">Rain</a>
         <a href="pages/stream/">Stream</a>
         <a href="pages/raffle/">Raffle</a>
+        <a href="pages/swap/">Swap</a>
         <a href="pages/pool/">Mining pool</a>
         <a href="pages/wallet/">Wallet</a>
         <a href="pages/mining/">Mining calc</a>
@@ -287,6 +288,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Raffle — Provably-Fair PRL Raffles <span class="badge">new</span></h3>
             <p>The lottery vault — commit to a prize, a future settlement block, and weighted entries in a tamper-evident descriptor you must publish before the settlement block. Draw winners from the settlement block hash with a hand-verifiable SHA-256 derivation (1–3 prize rounds), verify anyone's draw standalone with a loud refusal on tampered entries, and export an exact payout plan as CSV plus pearl: payment QRs. Honest scope: the page never moves PRL — prize custody stays with the organizer.</p>
             <div class="card-links"><a href="pages/raffle/">Open Pearl Raffle →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Swap — Trustless PRL ⇄ BTC Atomic Swaps <span class="badge">new</span></h3>
+            <p>The collision chamber — coordinate trustless PRL↔BTC atomic swaps over Taproot HTLCs. Alice locks PRL behind a hashlock/timelock script tree, Bob mirrors it with a byte-identical claim leaf on Bitcoin, Bob claims the PRL by revealing the preimage on-chain, and Alice reads it from his claim witness to take the BTC. Five steps: propose → lock → track → claim → refund, with T1&gt;T2 timelock guards, local signing, and per-signature re-verification. Keys never leave the page.</p>
+            <div class="card-links"><a href="pages/swap/">Open Pearl Swap →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Notary — Proof of Existence <span class="badge">new</span></h3>
