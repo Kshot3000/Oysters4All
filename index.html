@@ -35,6 +35,7 @@
         <a href="pages/gift/">Gift</a>
         <a href="pages/covenant/">Covenant</a>
         <a href="pages/vesting/">Vesting</a>
+        <a href="pages/rain/">Rain</a>
         <a href="pages/pool/">Mining pool</a>
         <a href="pages/wallet/">Wallet</a>
         <a href="pages/mining/">Mining calc</a>
@@ -269,6 +270,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Vesting — Timelocked PRL Vesting Schedules <span class="badge">new</span></h3>
             <p>Non-custodial vesting on Taproot — lock PRL for a beneficiary in linear or custom-dated tranches, one Taproot address per tranche with an absolute OP_CHECKLOCKTIMEVERIFY claim leaf (plus an optional funder clawback leaf, only after maturity). NUMS internal key, so no keypath backdoor. Forge the schedule, track funding over Blockbook, and claim or claw back one locally-signed transaction per matured tranche. Keys never leave the page.</p>
             <div class="card-links"><a href="pages/vesting/">Open Pearl Vesting →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Rain — Batch-Send PRL Airdrops <span class="badge">new</span></h3>
+            <p>Make it rain — one funder key, one transaction, up to 250 recipients. Paste a recipient list (or import CSV), validate every Taproot address and dust rule, plan the exact fee with change back to the funder, then sign locally with per-signature re-verification before the hex is shown. Blockbook UTXO lookup or fully air-gapped paste mode. Keys never leave the page.</p>
+            <div class="card-links"><a href="pages/rain/">Open Pearl Rain →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Notary — Proof of Existence <span class="badge">new</span></h3>

@@ -1,0 +1,135 @@
+/* Pearl Rain — storm aesthetic: deep indigo, silver rain, luminous drops.
+ * Dark Pearl brand family; the rain-storm motif is this app's personality. */
+:root {
+  --bg: #060814;
+  --bg2: #0a0e20;
+  --panel: #0d1330cc;
+  --line: #26305e;
+  --text: #e9eefc;
+  --dim: #a4b1d6;
+  --silver: #c9d4f2;
+  --rain: #8fb8ff;
+  --rain2: #5f7fe0;
+  --accent: #a9c4ff;
+  --ok: #7ce8a8;
+  --err: #ff8f8f;
+  --warn: #ffd9a0;
+  --radius: 14px;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; color: var(--text); font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  background:
+    radial-gradient(1200px 600px at 80% -10%, #141b3d 0%, transparent 60%),
+    radial-gradient(900px 500px at 10% 110%, #0d1430 0%, transparent 55%),
+    var(--bg);
+  min-height: 100vh;
+}
+/* falling-rain overlay */
+.storm {
+  position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: .5;
+  background-image: repeating-linear-gradient(100deg,
+    transparent 0 46px, #8fb8ff14 46px 48px, transparent 48px 96px);
+  animation: drift 9s linear infinite;
+}
+@keyframes drift { from { transform: translateY(-60px); } to { transform: translateY(60px); } }
+main, header, footer { position: relative; z-index: 1; }
+.topbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: .9rem 1.4rem; border-bottom: 1px solid var(--line);
+  background: #0a0e22ee; position: sticky; top: 0; z-index: 10; backdrop-filter: blur(8px);
+  flex-wrap: wrap;
+}
+.brand { display: flex; align-items: center; gap: .7rem; }
+.brand strong { font-size: 1.25rem; letter-spacing: .02em; }
+.tagline { display: block; color: var(--dim); font-size: .8rem; }
+.rain-dot {
+  width: 34px; height: 34px; border-radius: 50%;
+  background:
+    linear-gradient(180deg, transparent 55%, #8fb8ff 55%),
+    radial-gradient(circle at 35% 30%, #1b2350 0%, #0d1330 55%, #060814 100%);
+  background-size: 6px 8px, cover; background-repeat: repeat-x, no-repeat;
+  background-position: 0 8px, 0 0;
+  box-shadow: 0 0 18px #8fb8ff66, inset -4px -6px 10px #00000088;
+  border: 1px solid #8fb8ff44;
+}
+.steps { display: flex; gap: .4rem; flex-wrap: wrap; }
+.steps button {
+  background: transparent; border: 1px solid var(--line); color: var(--dim);
+  padding: .45rem .8rem; border-radius: 999px; cursor: pointer; font-size: .85rem;
+}
+.steps button.active { border-color: var(--rain); color: var(--rain); }
+.steps button.done { border-color: var(--ok); color: var(--ok); }
+main { max-width: 1080px; margin: 0 auto; padding: 2rem 1.4rem 4rem; }
+.step { display: none; }
+.step.active { display: block; animation: fade .25s ease; }
+@keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }
+h1 { font-size: 2rem; margin: .2rem 0 .6rem; letter-spacing: .01em; }
+.lede { color: var(--dim); max-width: 62ch; margin-top: 0; }
+.panel {
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 1.4rem; margin: 1rem 0;
+}
+.panel h2 { margin: 1.2rem 0 .6rem; font-size: 1.05rem; color: var(--rain); }
+.panel h2:first-child { margin-top: 0; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
+label { display: block; margin: .7rem 0; color: var(--dim); font-size: .9rem; }
+input[type=text], input[type=number], input[type=file], select, textarea {
+  width: 100%; margin-top: .3rem; padding: .6rem .7rem; border-radius: 8px;
+  border: 1px solid var(--line); background: #0a0f24; color: var(--text); font-size: .95rem;
+  font-family: inherit;
+}
+textarea { font-family: ui-monospace, "SF Mono", Menlo, monospace; resize: vertical; }
+code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .85rem;
+  background: #0a0f24; border: 1px solid var(--line); border-radius: 6px; padding: .25rem .5rem;
+  word-break: break-all;
+}
+button { font-family: inherit; }
+button.primary {
+  background: linear-gradient(135deg, var(--rain2), var(--rain)); color: #060a1a;
+  border: none; border-radius: 10px; padding: .65rem 1.2rem; font-weight: 700; cursor: pointer;
+  margin-top: .6rem;
+}
+button.primary:disabled { opacity: .4; cursor: not-allowed; }
+button.ghost {
+  background: transparent; border: 1px solid var(--line); color: var(--text);
+  border-radius: 10px; padding: .6rem 1rem; cursor: pointer; margin-top: .6rem;
+}
+button.ghost:hover { border-color: var(--rain); }
+.row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
+.error { color: var(--err); background: #3a142033; border: 1px solid #7a2d2d; padding: .6rem .8rem; border-radius: 8px; }
+.ok { color: var(--ok); }
+.hint { color: var(--dim); font-size: .9rem; }
+.danger {
+  color: var(--warn); background: #3a2a1033; border: 1px solid #7a5a2d;
+  padding: .7rem .9rem; border-radius: 8px; font-size: .92rem; max-width: 78ch;
+}
+.fineprint { color: var(--dim); font-size: .82rem; max-width: 70ch; }
+.kv { margin: .6rem 0; }
+.kv > span { display: block; color: var(--dim); font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .25rem; }
+.plan { background: #0a0f24; border: 1px solid var(--line); border-radius: 10px; padding: .9rem 1.1rem; margin: .8rem 0; }
+.plan .prow { display: flex; justify-content: space-between; padding: .2rem 0; gap: 1rem; }
+.plan .prow.total { border-top: 1px solid var(--line); margin-top: .4rem; padding-top: .5rem; font-weight: 700; color: var(--rain); }
+.plan .prow .n { color: var(--dim); }
+.table-wrap { max-height: 340px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+.rtable { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.rtable th, .rtable td { text-align: left; padding: .45rem .7rem; border-bottom: 1px solid var(--line); }
+.rtable th { color: var(--dim); font-weight: 600; position: sticky; top: 0; background: #0d1330; }
+.rtable .num { text-align: right; font-family: ui-monospace, Menlo, monospace; }
+.rtable td.addr { font-family: ui-monospace, Menlo, monospace; word-break: break-all; }
+.honest {
+  background: #0d1330aa; border: 1px dashed var(--line); border-radius: var(--radius);
+  padding: 1.2rem 1.4rem; margin-top: 2rem;
+}
+.honest h2 { margin: 0 0 .6rem; color: var(--rain); font-size: 1.05rem; }
+.honest ul { margin: 0; padding-left: 1.2rem; color: var(--dim); font-size: .9rem; }
+.honest li { margin: .35rem 0; }
+.honest strong { color: var(--text); }
+footer {
+  border-top: 1px solid var(--line); padding: 1.6rem 1.4rem; text-align: center;
+  color: var(--dim); font-size: .9rem;
+}
+footer a { color: var(--rain); }
+footer code { font-size: .8rem; }

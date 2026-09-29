@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Rain — Batch-Send PRL Airdrops</title>
+<meta name="description" content="Pearl Rain: rain PRL on many addresses in one locally-signed Taproot batch transaction. Paste recipients, plan exact fees, sign locally, broadcast via Blockbook. Keys never leave your browser.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="rain-dot" aria-hidden="true"></span>
+    <div>
+      <strong>Pearl Rain</strong>
+      <span class="tagline">batch-send PRL like weather</span>
+    </div>
+  </div>
+  <nav id="steps" class="steps">
+    <button data-step="funder" class="active">1 · Funder</button>
+    <button data-step="recipients">2 · Recipients</button>
+    <button data-step="plan">3 · Plan</button>
+    <button data-step="send">4 · Sign &amp; Send</button>
+  </nav>
+</header>
+
+<main>
+  <div class="storm" aria-hidden="true"></div>
+
+  <!-- ================= FUNDER ================= -->
+  <section id="step-funder" class="step active">
+    <h1>Make it rain</h1>
+    <p class="lede">One funder key, one transaction, up to 250 recipients — every output
+      settled in a single Taproot keypath spend. Everything is computed locally in your browser.</p>
+    <p class="danger">☔ This moves real PRL. Submitting the final transaction sends actual funds
+      that cannot be reversed. Test the flow with a throwaway wallet first.</p>
+
+    <div class="grid2">
+      <div class="panel">
+        <h2>Funder key</h2>
+        <label>Paste funder secret — mnemonic (12/24 words), WIF, or private key hex
+          <textarea id="fund-secret" rows="3" spellcheck="false" placeholder="the funder's mnemonic or WIF — never leaves this page"></textarea>
+        </label>
+        <label>Network
+          <select id="network">
+            <option value="mainnet" selected>Mainnet (prl1…)</option>
+            <option value="testnet">Testnet (tprl1…)</option>
+          </select>
+        </label>
+        <div class="row">
+          <button id="fund-derive" class="primary">Read funder</button>
+        </div>
+        <p id="fund-error" class="error" hidden></p>
+        <div id="fund-card" hidden>
+          <div class="kv"><span>Funder address</span><code id="fund-address"></code></div>
+          <div class="kv"><span>Derivation</span><code id="fund-path"></code></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Funder coins</h2>
+        <label>UTXO source
+          <select id="utxo-mode">
+            <option value="blockbook" selected>Fetch from Blockbook</option>
+            <option value="manual">Paste manually (air-gapped)</option>
+          </select>
+        </label>
+        <div id="utxo-bb-wrap">
+          <label>Blockbook endpoint
+            <input id="blockbook" type="text" spellcheck="false">
+          </label>
+        </div>
+        <div id="utxo-paste-wrap" hidden>
+          <label>Paste UTXOs — one per line: <code>txid:vout value</code> (grains), optional trailing address
+            <textarea id="utxo-paste" rows="3" spellcheck="false" placeholder="aa…aa:0 250000000"></textarea>
+          </label>
+        </div>
+        <label>Fee rate (grains/vB)
+          <input id="fee-rate" type="number" min="1" step="1" value="5">
+        </label>
+        <div class="row">
+          <button id="fund-fetch" class="primary">Find funder coins</button>
+        </div>
+        <p id="fund-utxos" class="hint"></p>
+        <p id="fetch-error" class="error" hidden></p>
+      </div>
+    </div>
+    <p class="fineprint">Mnemonics derive at <code>m/86'/coin'/0'/0/0</code> — your ordinary
+      wallet account. WIF/hex keys are used as-is. No data leaves this page except the Blockbook
+      lookups you trigger (address lookups, fee estimates, the final broadcast).</p>
+  </section>
+
+  <!-- ================= RECIPIENTS ================= -->
+  <section id="step-recipients" class="step">
+    <h1>Who gets rained on</h1>
+    <p class="lede">Paste one recipient per line — <code>&lt;address&gt; &lt;amount&gt;</code>
+      (PRL; decimals allowed). CSV works too. Duplicate addresses merge into a single output.</p>
+    <div class="grid2">
+      <div class="panel">
+        <h2>Recipient list</h2>
+        <label>Paste list
+          <textarea id="recip-list" rows="10" spellcheck="false" placeholder="prl1p… 1.25&#10;prl1p…,0.5&#10;# lines starting with # are ignored"></textarea>
+        </label>
+        <div class="row">
+          <button id="recip-parse" class="primary">Validate list</button>
+          <button id="recip-sample" class="ghost">⬇ sample CSV</button>
+        </div>
+        <label>Or import a CSV file
+          <input id="recip-file" type="file" accept=".csv,.txt,text/csv,text/plain">
+        </label>
+        <p id="recip-error" class="error" hidden></p>
+      </div>
+      <div class="panel">
+        <h2>Validated</h2>
+        <div id="recip-summary" class="hint">No list validated yet.</div>
+        <div id="recip-table-wrap" class="table-wrap" hidden>
+          <table class="rtable">
+            <thead><tr><th>#</th><th>Address</th><th class="num">PRL</th></tr></thead>
+            <tbody id="recip-table"></tbody>
+          </table>
+        </div>
+        <p class="fineprint">Every address must be a Pearl v1 Taproot address
+          (<code>prl1p…</code>); every amount must clear the 546-grain dust floor.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= PLAN ================= -->
+  <section id="step-plan" class="step">
+    <h1>Plan the storm</h1>
+    <p class="lede">Exact fee math up front: one transaction, N outputs, change back to the funder.
+      Nothing is signed until you approve the plan.</p>
+    <div class="panel">
+      <div class="row">
+        <button id="plan-button" class="primary">Compute plan</button>
+      </div>
+      <p id="plan-error" class="error" hidden></p>
+      <div id="plan-summary" class="plan" hidden></div>
+    </div>
+    <p class="fineprint">Fee = exact keypath vBytes × your fee rate. If the change would be dust,
+      the output is dropped and the remainder goes to the fee — never to a dust output.</p>
+  </section>
+
+  <!-- ================= SIGN & SEND ================= -->
+  <section id="step-send" class="step">
+    <h1>Sign &amp; send</h1>
+    <p class="danger">☔ Review carefully — broadcasting sends real PRL to every address above,
+      and it cannot be undone.</p>
+    <div class="panel">
+      <div class="row">
+        <button id="sign-button" class="primary" disabled>Build &amp; sign rain</button>
+      </div>
+      <p id="sign-error" class="error" hidden></p>
+      <div id="rain-result" hidden>
+        <div class="kv"><span>TXID</span><code id="rain-txid"></code></div>
+        <label>Signed transaction (hex)
+          <textarea id="rain-hex" rows="4" readonly spellcheck="false"></textarea>
+        </label>
+        <p class="ok" id="rain-verified">✓ every input signature verified locally before broadcast</p>
+        <div class="row">
+          <button id="broadcast-button" class="primary">⛈ Broadcast via Blockbook</button>
+          <button id="clear-secrets" class="ghost">Clear secrets from memory</button>
+        </div>
+        <p id="broadcast-error" class="error" hidden></p>
+        <p id="broadcast-ok" class="ok" hidden></p>
+      </div>
+    </div>
+    <p class="fineprint">Signing happens entirely on this device; each Schnorr signature is
+      re-verified against the funder's UTXOs before the hex is shown. Only the finished
+      transaction is ever broadcast. Use the air-gapped paste mode on a machine you trust.</p>
+  </section>
+
+  <section class="honest">
+    <h2>Honest limits</h2>
+    <ul>
+      <li>This tool moves <strong>real PRL</strong> when you broadcast. There is no undo.</li>
+      <li>Max <strong>250 recipients</strong> per transaction (relay standardness headroom).</li>
+      <li>Only Pearl v1 Taproot addresses (<code>prl1p…</code>) are accepted — no legacy formats exist on Pearl.</li>
+      <li>Amounts below 546 grains are rejected as dust; dust change is folded into the fee.</li>
+      <li>UTXO fetching and broadcast need a Blockbook endpoint you configure (mainnet default:
+        <code>https://blockbook.pearlresearch.ai</code>). The air-gapped paste mode never touches the network
+        until broadcast.</li>
+      <li>No send was executed during development — this page needs your funds and your explicit broadcast.</li>
+    </ul>
+  </section>
+</main>
+
+<footer>
+  <p>Built for the Pearl blockchain · <a href="https://x.com/kshot9000">@kshot9000</a></p>
+  <p>Tips: <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code></p>
+</footer>
+
+<script src="pearl-rain.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
