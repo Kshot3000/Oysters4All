@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Invoice — PRL Invoicing Studio</title>
+<meta name="description" content="Compose tamper-evident PRL invoices, share a payment QR, watch for payment on-chain, and issue hash-bound receipts. Receive-only: the page never spends.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="ledger-head">
+  <div class="ledger-rule"></div>
+  <h1><span class="seal">◈</span> Pearl Invoice</h1>
+  <p class="tagline">The invoicing ledger for the Pearl chain — compose, seal, receive, verify.</p>
+  <nav class="tabs">
+    <button id="inv-wiz-tab" class="tab active" type="button">📒 Invoice Studio</button>
+    <button id="inv-ver-tab" class="tab" type="button">🔍 Verify</button>
+  </nav>
+</header>
+
+<div id="inv-error" class="banner error" hidden></div>
+<div id="inv-toast" class="toast" hidden></div>
+
+<main id="inv-wizard">
+  <ol class="stepper">
+    <li><button id="inv-step-1" class="step active" type="button"><span class="n">1</span> Compose</button></li>
+    <li><button id="inv-step-2" class="step" type="button"><span class="n">2</span> Descriptor</button></li>
+    <li><button id="inv-step-3" class="step" type="button"><span class="n">3</span> Receive</button></li>
+    <li><button id="inv-step-4" class="step" type="button"><span class="n">4</span> Watch</button></li>
+    <li><button id="inv-step-5" class="step" type="button"><span class="n">5</span> Receipt</button></li>
+  </ol>
+
+  <!-- STEP 1: COMPOSE -->
+  <section id="inv-panel-1" class="paper">
+    <h2>① Compose the invoice</h2>
+    <p class="lede">Everything below is sealed into a tamper-evident descriptor in the next step. Amounts are grain-exact.</p>
+    <label class="field">Invoicee (who is being billed)
+      <input id="inv-invoicee" placeholder="e.g. Acme Studio" autocomplete="off">
+    </label>
+    <label class="field">Payer label (optional — who is expected to pay)
+      <input id="inv-payer" placeholder="e.g. Bob's Bakery" autocomplete="off">
+    </label>
+    <h3>Line items</h3>
+    <table class="items">
+      <thead><tr><th>Description</th><th class="amt">Amount (PRL)</th><th></th></tr></thead>
+      <tbody id="inv-items-tbody"></tbody>
+    </table>
+    <button id="inv-add-item" class="btn ghost" type="button">＋ Add line item</button>
+    <p id="inv-total-hint" class="hint"></p>
+    <div class="grid2">
+      <label class="field">Due date (optional)
+        <input id="inv-due" type="date">
+      </label>
+      <label class="field">Memo (optional)
+        <input id="inv-memo" placeholder="e.g. Website redesign — milestone 2" autocomplete="off">
+      </label>
+    </div>
+    <label class="field">Your receiving address <span class="dim">(prl1… or tprl1… — bech32m-validated)</span>
+      <input id="inv-address" class="mono" placeholder="prl1…" autocomplete="off" spellcheck="false">
+    </label>
+    <p class="note">Guards: empty line items are refused · totals under the 546-grain dust floor are refused · an invalid address is refused loudly.</p>
+    <button id="inv-build" class="btn gold" type="button">Seal invoice →</button>
+  </section>
+
+  <!-- STEP 2: DESCRIPTOR -->
+  <section id="inv-panel-2" class="paper" hidden>
+    <h2>② Tamper-evident descriptor</h2>
+    <p class="lede">Share this descriptor alongside the invoice. Anyone can re-hash the invoice JSON and prove it matches — edit one character and verification fails.</p>
+    <h3>Descriptor</h3>
+    <pre id="inv-descriptor" class="mono sealbox"></pre>
+    <p id="inv-desc-meta" class="dim"></p>
+    <div class="row">
+      <button id="inv-copy-desc" class="btn" type="button">⧉ Copy descriptor</button>
+      <button id="inv-copy-canon" class="btn" type="button">⧉ Copy canonical JSON</button>
+      <button id="inv-download" class="btn" type="button">⬇ Download commitment</button>
+    </div>
+    <details class="canon"><summary>Canonical invoice JSON (the hashed payload)</summary>
+      <pre id="inv-canonical" class="mono"></pre>
+      <p class="dim">SHA-256: <span id="inv-hash" class="mono"></span></p>
+    </details>
+    <h3>Publish checklist</h3>
+    <ul class="checklist">
+      <li>☐ Send the <b>descriptor</b> + canonical JSON to the payer</li>
+      <li>☐ Send the <b>receiving address</b> and the <b>exact PRL total</b> (Step 3 makes a QR)</li>
+      <li>☐ Tell the payer to pay the <b>exact amount in one or more txs</b> — partial payments are tracked</li>
+      <li>☐ Keep your own copy of the commitment file for your books</li>
+    </ul>
+    <h3>Optional: fresh per-invoice address <span class="dim">(from your own BIP-86 mnemonic)</span></h3>
+    <p class="note">Derives a fresh receiving address under your invoicing account <span class="mono">m/86'/{coin}'/9001'/0/&lt;index&gt;</span> using the audited Sign core. The mnemonic lives in page memory only — wipe it when done. Nothing is broadcast, ever.</p>
+    <label class="field">BIP-39 mnemonic (in-memory only)
+      <input id="inv-mnemonic" type="password" placeholder="12 or 24 words" autocomplete="off" spellcheck="false">
+    </label>
+    <div class="row">
+      <button id="inv-derive" class="btn" type="button">Derive fresh address (index 0)</button>
+      <button id="inv-wipe" class="btn danger" type="button">🧹 Wipe mnemonic</button>
+    </div>
+    <div id="inv-fresh-out" hidden>
+      <p>Fresh address: <span id="inv-fresh-addr" class="mono gold-ink"></span></p>
+      <p class="dim">Path: <span id="inv-fresh-path" class="mono"></span></p>
+      <button id="inv-use-fresh" class="btn gold" type="button">Re-seal invoice to this address</button>
+    </div>
+    <button id="inv-to-receive" class="btn gold" type="button">Continue to Receive →</button>
+  </section>
+
+  <!-- STEP 3: RECEIVE -->
+  <section id="inv-panel-3" class="paper" hidden>
+    <h2>③ Receive</h2>
+    <p class="lede">The payer scans this with any Pearl wallet. The amount is exact to the grain.</p>
+    <div class="qr-wrap"><div id="inv-qr" class="qr"></div></div>
+    <pre id="inv-uri" class="mono sealbox wrap"></pre>
+    <div class="row">
+      <button id="inv-copy-uri" class="btn" type="button">⧉ Copy payment URI</button>
+      <button id="inv-copy-addr" class="btn" type="button">⧉ Copy address</button>
+    </div>
+    <p>Pay to: <span id="inv-recv-addr" class="mono"></span></p>
+    <p>Amount due: <span id="inv-recv-total" class="gold-ink strong"></span></p>
+    <button id="inv-to-watch" class="btn gold" type="button">Watch for payment →</button>
+  </section>
+
+  <!-- STEP 4: WATCH -->
+  <section id="inv-panel-4" class="paper" hidden>
+    <h2>④ Watch for payment</h2>
+    <p class="lede">GET-only Blockbook reads. This page never signs, never broadcasts, never moves funds.</p>
+    <label class="field">Blockbook endpoint
+      <input id="inv-blockbook" class="mono" placeholder="https://blockbook.pearlresearch.ai" autocomplete="off" spellcheck="false">
+    </label>
+    <div class="row">
+      <button id="inv-refresh" class="btn gold" type="button">⟳ Scan now</button>
+      <label class="chk"><input id="inv-auto" type="checkbox"> auto-refresh every 20s</label>
+    </div>
+    <div id="inv-watch-state" class="watch-state">Not scanned yet.</div>
+    <table class="items">
+      <thead><tr><th>txid</th><th>Received</th><th>Confirmations</th></tr></thead>
+      <tbody id="inv-tx-tbody"><tr><td colspan="3" class="dim">No payments to this address yet.</td></tr></tbody>
+    </table>
+    <p id="inv-watch-note" class="dim"></p>
+    <h3>Air-gapped check</h3>
+    <p class="note">Paste a txid you obtained elsewhere — the page fetches only that one transaction and analyzes it against the invoice. No address scan.</p>
+    <div class="row">
+      <input id="inv-txid-paste" class="mono grow" placeholder="64-hex txid" autocomplete="off" spellcheck="false">
+      <button id="inv-check-txid" class="btn" type="button">Analyze txid</button>
+    </div>
+    <p id="inv-receipt-hint" class="hint"></p>
+    <button id="inv-to-receipt" class="btn gold" type="button" disabled>Issue receipt →</button>
+  </section>
+
+  <!-- STEP 5: RECEIPT -->
+  <section id="inv-panel-5" class="paper" hidden>
+    <h2>⑤ Receipt</h2>
+    <p class="lede">Once paid, stamp a hash-bound receipt: it ties the invoice hash to the settling txid and the exact grains paid.</p>
+    <button id="inv-issue-receipt" class="btn gold" type="button">🧾 Issue receipt</button>
+    <div id="inv-receipt-out" hidden>
+      <h3>Receipt record</h3>
+      <pre id="inv-receipt-str" class="mono sealbox wrap"></pre>
+      <p id="inv-receipt-meta" class="dim"></p>
+      <div class="row">
+        <button id="inv-export-json" class="btn" type="button">⬇ Export JSON</button>
+        <button id="inv-export-csv" class="btn" type="button">⬇ Export CSV</button>
+      </div>
+      <p class="note">Hand the receipt string to the payer together with the invoice descriptor — the Verify tab confirms both.</p>
+    </div>
+  </section>
+</main>
+
+<!-- VERIFY TAB -->
+<section id="inv-verify-wrap" class="paper" hidden>
+  <h2>🔍 Standalone verifier</h2>
+  <p class="lede">Paste a descriptor and the invoice JSON it claims to cover. The page re-hashes everything and rules <b>PROVEN</b> or <b>NOT PROVEN</b> — loudly.</p>
+  <label class="field">Descriptor
+    <textarea id="inv-ver-desc" class="mono" rows="3" placeholder="pearl-invoice:v1:…" spellcheck="false"></textarea>
+  </label>
+  <label class="field">Invoice JSON
+    <textarea id="inv-ver-json" class="mono" rows="8" placeholder='{"v":1,"invoicee":…}' spellcheck="false"></textarea>
+  </label>
+  <label class="field">Receipt (optional)
+    <textarea id="inv-ver-receipt" class="mono" rows="2" placeholder="pearl-invoice-receipt:v1:…" spellcheck="false"></textarea>
+  </label>
+  <div class="row">
+    <button id="inv-ver-fill" class="btn" type="button">Fill from current invoice</button>
+    <button id="inv-ver-run" class="btn gold" type="button">Verify</button>
+  </div>
+  <div id="inv-ver-out" hidden></div>
+</section>
+
+<section class="paper limits">
+  <h2>⚖ Honest limits</h2>
+  <ul>
+    <li><b>Receive-only.</b> This page never spends PRL and never needs the invoicer's keys. The mnemonic tool only derives <i>receiving</i> addresses.</li>
+    <li><b>No custody, no escrow.</b> Payment happens on-chain, peer to peer. The descriptor proves the invoice existed, not that anyone was paid.</li>
+    <li><b>Watch ≠ settlement.</b> 0-confirmation payments are shown flagged ⚠ unconfirmed. Wait for 1+ confirmations before treating an invoice as settled.</li>
+    <li><b>Blockbook is a third party.</b> The watch reads a Blockbook you configure; if it's down, stale, or lying, the page says so instead of inventing data.</li>
+    <li><b>Descriptors are commitments, not signatures.</b> They bind invoice content to a hash — they don't prove who issued the invoice.</li>
+    <li><b>Due dates are advisory.</b> They are sealed into the descriptor but nothing on-chain enforces them.</li>
+  </ul>
+</section>
+
+<footer class="ledger-foot">
+  <div class="ledger-rule"></div>
+  <p>Built by <a href="https://x.com/kshot9000">@kshot9000</a> · tips: <span id="donate-addr" class="mono"></span></p>
+  <p class="dim">Pearl Invoice · part of the Pearl builder family · receive-only, verified in a real browser</p>
+</footer>
+
+<script src="qrcode.min.js?v=1"></script>
+<script src="pearl-invoice.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>

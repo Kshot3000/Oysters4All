@@ -48,6 +48,7 @@
         <a href="pages/fund/">Fund</a>
         <a href="pages/ballot/">Ballot</a>
         <a href="pages/registry/">Registry</a>
+        <a href="pages/invoice/">Invoice</a>
         <a href="pages/pool/">Mining pool</a>
         <a href="pages/wallet/">Wallet</a>
         <a href="pages/mining/">Mining calc</a>
@@ -347,6 +348,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Registry — Decentralized Handles <span class="badge">new</span></h3>
             <p>The embossed register — claim a human-readable handle on Pearl with a Taproot prl-name inscription: a directory tab resolving owners by first-seen consensus (lowest inscription number wins, transfers only from the current owner, releases free the handle), a 3-step claim wizard (handle + squatting guard, bech32m owner address, commit/reveal with exact grain fee math, dust refusal, double-confirm broadcast), and a verifier that re-scans the handle live and refuses tampered or losing records loudly with field-level reasons. No new cryptography — audited Sign core + Etch commit/reveal machinery; prl-name is an app-level convention, not Pearl consensus.</p>
             <div class="card-links"><a href="pages/registry/">Open Pearl Registry →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Invoice — PRL Invoicing Studio <span class="badge">new</span></h3>
+            <p>The ledger book — compose grain-exact PRL invoices and seal them into tamper-evident pearl-invoice:v1: descriptors (SHA-256 over canonical JSON), share a pearl: payment QR for the exact total, watch for payment with GET-only Blockbook reads (unpaid / partial with exact grains remaining / paid / overpaid, plus an air-gapped paste-txid path), and issue hash-bound receipts with CSV/JSON export — plus a standalone verifier that rules PROVEN or NOT PROVEN. Receive-only: the page never spends, never needs keys; optional fresh per-invoice BIP-86 receiving addresses with a memory wipe.</p>
+            <div class="card-links"><a href="pages/invoice/">Open Pearl Invoice →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Notary — Proof of Existence <span class="badge">new</span></h3>
