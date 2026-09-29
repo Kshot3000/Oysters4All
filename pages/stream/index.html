@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Stream — continuous PRL payment streaming</title>
+<meta name="description" content="Pearl Stream: continuous PRL payment streaming on Taproot — fund a rate-based stream, watch it accrue live, batch-claim matured ticks in one transaction, or cancel and claw back unmatured ticks. All crypto runs locally in your browser.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<div class="aurora" aria-hidden="true"><span class="wave w1"></span><span class="wave w2"></span><span class="wave w3"></span></div>
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 32 32" aria-hidden="true"><path d="M4 10c5 0 5 3 10 3s5-3 10-3M4 16c5 0 5 3 10 3s5-3 10-3M4 22c5 0 5 3 10 3s5-3 10-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 4c3.5 4 5.5 7 5.5 10.5A5.5 5.5 0 0 1 16 20a5.5 5.5 0 0 1-5.5-5.5C10.5 11 12.5 8 16 4z" fill="currentColor" opacity="0.85"/></svg>
+    <div>
+      <h1>Pearl Stream</h1>
+      <p class="tagline">continuous PRL payment streaming</p>
+    </div>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-step="forge" class="active">1 · Forge</button>
+    <button data-step="track" class="">2 · Track</button>
+    <button data-step="claim" class="">3 · Claim</button>
+    <button data-step="cancel" class="">4 · Cancel</button>
+  </nav>
+</header>
+
+<main>
+  <!-- STEP 1: FORGE -->
+  <section id="step-forge" class="panel active">
+    <h2>Forge the stream</h2>
+    <p class="lede">A funder streams PRL to a beneficiary at a <strong>fixed rate</strong>. Each tick is its own
+    Taproot address that unlocks at <code>start + i × tick interval</code>
+    (<code>&lt;lock&gt; OP_CHECKLOCKTIMEVERIFY</code>). Optionally <strong>revocable</strong>: the funder can
+    claw back unmatured ticks later. Keys and secrets never leave this page.</p>
+    <div class="form-grid">
+      <label>Network
+        <select id="network">
+          <option value="mainnet" selected>Mainnet (prl…)</option>
+          <option value="testnet">Testnet (tprl…)</option>
+        </select>
+      </label>
+      <label class="wide">Beneficiary — PRL address, 64-hex x-only key, or 12/24-word mnemonic
+        <input id="beneficiary" type="text" autocomplete="off" spellcheck="false" placeholder="prl1p… (recommended) · 64-hex key · mnemonic">
+      </label>
+      <label class="wide">Funder — 64-hex x-only key or 12/24-word mnemonic
+        <input id="funder" type="text" autocomplete="off" spellcheck="false" placeholder="64-hex x-only key · mnemonic">
+      </label>
+      <label>Rate (PRL per tick)
+        <input id="rate" type="number" min="0" step="any" value="1">
+      </label>
+      <label>Tick interval
+        <input id="tick-value" type="number" min="1" step="any" value="7">
+      </label>
+      <label>Interval unit
+        <select id="tick-unit">
+          <option value="86400" selected>days</option>
+          <option value="3600">hours</option>
+          <option value="60">minutes</option>
+        </select>
+      </label>
+      <label>Start (first tick unlocks)
+        <input id="start" type="datetime-local">
+      </label>
+      <label>Ticks (1–256)
+        <input id="ticks" type="number" min="1" max="256" step="1" value="12">
+      </label>
+      <label class="check"><input id="revocable" type="checkbox" checked> Revocable — funder can cancel and claw back unmatured ticks</label>
+    </div>
+    <div class="form-grid">
+      <label class="wide">Blockbook endpoint (for funding scans, chain time, fee rates, broadcast)
+        <input id="blockbook" type="text" autocomplete="off" spellcheck="false" placeholder="https://…">
+      </label>
+    </div>
+    <div class="row">
+      <button id="forge" class="primary">Forge stream</button>
+      <button id="forge-sample" class="ghost">Load testnet demo values</button>
+    </div>
+    <p class="err" id="forge-err" hidden></p>
+    <div id="schedule-out" hidden>
+      <h3>Stream total: <span id="stream-total"></span> — fund each tick address</h3>
+      <p class="hint">Send exactly the rate to each tick address. The funder's wallet pays these as
+      ordinary PRL sends. Nothing streams until funded.</p>
+      <div id="tick-cards" class="cards"></div>
+      <h3>Stream descriptor</h3>
+      <p class="hint">Hand this to the beneficiary (or save it). Anyone can re-derive every tick address from it and
+      verify the funder funded the right ones — it is tamper-evident.</p>
+      <div class="row">
+        <textarea id="descriptor" rows="3" readonly spellcheck="false"></textarea>
+      </div>
+      <div class="row">
+        <button class="copy-btn" data-for="descriptor">Copy</button>
+        <button id="descriptor-qr-btn" class="ghost">Show QR</button>
+        <button id="descriptor-download" class="ghost">Download JSON</button>
+      </div>
+      <div id="descriptor-qr" class="qr"></div>
+      <div id="beneficiary-mode-note" class="note" hidden></div>
+    </div>
+  </section>
+
+  <!-- STEP 2: TRACK -->
+  <section id="step-track" class="panel">
+    <h2>Track the stream</h2>
+    <p class="lede">Paste a stream descriptor to re-derive every tick address, then scan funding and
+    maturity against Blockbook. The accrual dashboard shows what has streamed so far.</p>
+    <div class="form-grid">
+      <label class="wide">Stream descriptor
+        <textarea id="track-descriptor" rows="3" spellcheck="false" placeholder="stream:v1:prl:…"></textarea>
+      </label>
+    </div>
+    <div class="row">
+      <button id="track-load" class="primary">Load stream</button>
+      <button id="track-scan" class="ghost">Scan funding + maturity</button>
+    </div>
+    <p class="err" id="track-err" hidden></p>
+    <p class="hint" id="chain-time" hidden></p>
+    <div id="dashboard" class="dashboard" hidden>
+      <div class="stat"><span class="stat-label">Streamed so far</span><span class="stat-value" id="dash-streamed">—</span></div>
+      <div class="stat"><span class="stat-label">Claimable now</span><span class="stat-value" id="dash-claimable">—</span></div>
+      <div class="stat"><span class="stat-label">Remaining</span><span class="stat-value" id="dash-remaining">—</span></div>
+      <div class="stat"><span class="stat-label">Progress</span><span class="stat-value" id="dash-progress">—</span><div class="progress"><div class="progress-fill" id="dash-bar"></div></div></div>
+    </div>
+    <div id="track-out" class="cards"></div>
+  </section>
+
+  <!-- STEP 3: CLAIM -->
+  <section id="step-claim" class="panel">
+    <h2>Claim matured ticks — one transaction</h2>
+    <p class="lede"><strong class="moves-real">This step moves real PRL.</strong> The beneficiary imports their secret
+    (mnemonic or WIF — never stored, never sent anywhere), ticks the matured funded ticks to sweep, and builds
+    <strong>one</strong> batch-claim transaction. Exact fee math, every signature re-verified before broadcast.</p>
+    <div class="form-grid">
+      <label class="wide">Beneficiary secret — 12/24-word mnemonic or WIF
+        <input id="claim-secret" type="password" autocomplete="off" spellcheck="false" placeholder="mnemonic or WIF (in-memory only)">
+      </label>
+      <label class="wide">Destination PRL address
+        <input id="claim-dest" type="text" autocomplete="off" spellcheck="false" placeholder="prl1p…">
+      </label>
+      <label>Fee rate (grains/vB)
+        <input id="claim-feerate" type="number" min="1" step="any" placeholder="auto">
+      </label>
+    </div>
+    <h3>Ticks to sweep</h3>
+    <p class="hint">Matured, funded ticks are pre-ticked. For each ticked tick, supply its UTXO — scan via
+    Blockbook or paste <code>txid vout value</code> lines (matched to ticked ticks in order).</p>
+    <div class="row">
+      <button id="claim-scan" class="ghost">Scan UTXOs via Blockbook</button>
+    </div>
+    <div id="claim-ticks" class="tick-select"></div>
+    <label class="wide">Manual UTXOs — one <code>txid vout value</code> per line
+      <textarea id="claim-manual" rows="3" spellcheck="false" placeholder="ab12… 0 100000000"></textarea>
+    </label>
+    <div class="row">
+      <button id="claim-plan" class="primary">Plan batch claim</button>
+      <button id="claim-clear" class="ghost">Clear secret</button>
+    </div>
+    <p class="err" id="claim-err" hidden></p>
+    <div id="claim-review" hidden>
+      <h3>Review</h3>
+      <dl class="review" id="claim-review-dl"></dl>
+      <div class="row">
+        <button id="claim-sign" class="primary">Sign locally &amp; verify every signature</button>
+      </div>
+      <div id="claim-signed" hidden>
+        <h4>Signed transaction</h4>
+        <dl class="review" id="claim-signed-dl"></dl>
+        <textarea id="claim-hex" rows="4" readonly spellcheck="false"></textarea>
+        <div class="row">
+          <button class="copy-btn" data-for="claim-hex">Copy</button>
+          <button id="claim-broadcast" class="primary">Broadcast via Blockbook</button>
+        </div>
+        <p class="hint" id="claim-txid" hidden></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 4: CANCEL -->
+  <section id="step-cancel" class="panel">
+    <h2>Cancel stream — claw back unmatured ticks</h2>
+    <p class="lede"><strong class="moves-real">This step moves real PRL.</strong> On <strong>revocable</strong> streams the
+    funder sweeps <strong>unmatured</strong> ticks back in one transaction. Matured-but-unclaimed ticks stay
+    claimable by the beneficiary. The cancel transaction carries <code>nLockTime</code> = the last selected tick's
+    unlock, so it confirms only once that time passes — it pre-empts future claims, it does not claw back PRL today.</p>
+    <div class="form-grid">
+      <label class="wide">Funder secret — 12/24-word mnemonic or WIF
+        <input id="cancel-secret" type="password" autocomplete="off" spellcheck="false" placeholder="mnemonic or WIF (in-memory only)">
+      </label>
+      <label class="wide">Destination PRL address
+        <input id="cancel-dest" type="text" autocomplete="off" spellcheck="false" placeholder="prl1p…">
+      </label>
+      <label>Fee rate (grains/vB)
+        <input id="cancel-feerate" type="number" min="1" step="any" placeholder="auto">
+      </label>
+    </div>
+    <h3>Ticks to claw back</h3>
+    <p class="hint">Unmatured, funded ticks are pre-ticked. Supply each tick's UTXO the same way as claims.</p>
+    <div class="row">
+      <button id="cancel-scan" class="ghost">Scan UTXOs via Blockbook</button>
+    </div>
+    <div id="cancel-ticks" class="tick-select"></div>
+    <label class="wide">Manual UTXOs — one <code>txid vout value</code> per line
+      <textarea id="cancel-manual" rows="3" spellcheck="false" placeholder="ab12… 0 100000000"></textarea>
+    </label>
+    <div class="row">
+      <button id="cancel-plan" class="primary">Plan cancel</button>
+      <button id="cancel-clear" class="ghost">Clear secret</button>
+    </div>
+    <p class="err" id="cancel-err" hidden></p>
+    <div id="cancel-review" hidden>
+      <h3>Review</h3>
+      <dl class="review" id="cancel-review-dl"></dl>
+      <div class="row">
+        <button id="cancel-sign" class="primary">Sign locally &amp; verify every signature</button>
+      </div>
+      <div id="cancel-signed" hidden>
+        <h4>Signed transaction</h4>
+        <dl class="review" id="cancel-signed-dl"></dl>
+        <textarea id="cancel-hex" rows="4" readonly spellcheck="false"></textarea>
+        <div class="row">
+          <button class="copy-btn" data-for="cancel-hex">Copy</button>
+          <button id="cancel-broadcast" class="primary">Broadcast via Blockbook</button>
+        </div>
+        <p class="hint" id="cancel-txid" hidden></p>
+      </div>
+    </div>
+  </section>
+
+  <section id="honest-limits" class="panel limits">
+    <h2>Honest limits</h2>
+    <ul>
+      <li>Nothing streams until the funder actually sends PRL to each tick address — the stream is a plan until funded.</li>
+      <li>Maturity is read from Blockbook's latest block time (or your clock, labeled when it is). A claim broadcast before maturity will be rejected by the network.</li>
+      <li>Cancel sweeps only unmatured ticks and its transaction confirms only once the last selected tick's unlock passes — it pre-empts future claims, not today's funds.</li>
+      <li>Locks are unix timestamps; tick intervals are exact seconds. Test on testnet first. This is a streaming tool, not legal or tax advice.</li>
+    </ul>
+  </section>
+</main>
+
+<footer>
+  <p>Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> for the Pearl ecosystem · All cryptography runs locally in your browser — keys never leave this page.</p>
+  <p>Donations: <code id="donate">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code> <button class="copy-btn" data-for="donate">Copy</button></p>
+</footer>
+
+<script src="qrcode.min.js?v=1"></script>
+<script src="pearl-stream.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>

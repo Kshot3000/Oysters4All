@@ -36,6 +36,7 @@
         <a href="pages/covenant/">Covenant</a>
         <a href="pages/vesting/">Vesting</a>
         <a href="pages/rain/">Rain</a>
+        <a href="pages/stream/">Stream</a>
         <a href="pages/pool/">Mining pool</a>
         <a href="pages/wallet/">Wallet</a>
         <a href="pages/mining/">Mining calc</a>
@@ -270,6 +271,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Vesting — Timelocked PRL Vesting Schedules <span class="badge">new</span></h3>
             <p>Non-custodial vesting on Taproot — lock PRL for a beneficiary in linear or custom-dated tranches, one Taproot address per tranche with an absolute OP_CHECKLOCKTIMEVERIFY claim leaf (plus an optional funder clawback leaf, only after maturity). NUMS internal key, so no keypath backdoor. Forge the schedule, track funding over Blockbook, and claim or claw back one locally-signed transaction per matured tranche. Keys never leave the page.</p>
             <div class="card-links"><a href="pages/vesting/">Open Pearl Vesting →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Stream — Continuous PRL Payment Streaming <span class="badge">new</span></h3>
+            <p>Payroll-style PRL streaming on Taproot — a funder streams PRL to a beneficiary at a fixed rate, one P2TR address per tick unlocking at start + i × interval. Live accrual dashboard (streamed / claimable / remaining), ONE multi-input batch-claim transaction sweeping all matured ticks, and funder cancel clawing back unmatured ticks in a single tx. NUMS internal key, tamper-evident descriptors, local signing with per-signature re-verification. Keys never leave the page.</p>
+            <div class="card-links"><a href="pages/stream/">Open Pearl Stream →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Rain — Batch-Send PRL Airdrops <span class="badge">new</span></h3>
