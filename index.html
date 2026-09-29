@@ -45,6 +45,7 @@
         <a href="pages/recover/">Recover</a>
         <a href="pages/tipjar/">Tipjar</a>
         <a href="pages/sweep/">Sweep</a>
+        <a href="pages/fund/">Fund</a>
         <a href="pages/pool/">Mining pool</a>
         <a href="pages/wallet/">Wallet</a>
         <a href="pages/mining/">Mining calc</a>
@@ -329,6 +330,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Sweep — UTXO Consolidation Optimizer <span class="badge">new</span></h3>
             <p>The tidal refinery — analyze a Pearl Taproot address's UTXO health (dust / uneconomic / healthy, value-distribution histogram, consolidation-savings estimate), plan a consolidation with grain-exact fee math and a breakeven guard that loudly refuses value-destroying sweeps, sign locally with per-signature Schnorr re-verification, track the consolidation txid, and prove the sweep with a post-consolidation re-scan. Keys never leave the page.</p>
             <div class="card-links"><a href="pages/sweep/">Open Pearl Sweep →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Fund — Refundable Crowdfunding <span class="badge">new</span></h3>
+            <p>The harbor launch — launch refundable PRL crowdfunding campaigns on pure Taproot script: creators set recipient, goal and deadline; each backer gets a personal pledge address (release needs recipient + creator co-sign, refunds need only the backer after the deadline). Five steps (Launch → Pledge → Track → Release → Refund) with a two-party signing-round coordinator, tamper-evident descriptors with loud-refusal verification, GET-only Blockbook tracking, and local Schnorr signing with per-signature re-verification. Keys never leave the page.</p>
+            <div class="card-links"><a href="pages/fund/">Open Pearl Fund →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Notary — Proof of Existence <span class="badge">new</span></h3>

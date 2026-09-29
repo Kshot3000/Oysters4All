@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Fund — Refundable PRL Crowdfunding</title>
+<meta name="description" content="Pearl Fund: refundable PRL crowdfunding on Taproot. Creators launch campaigns, backers pledge to per-backer Taproot addresses, funds release only when recipient + creator co-sign, and every backer keeps a unilateral post-deadline refund. All crypto runs locally in your browser.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<div class="harbor" aria-hidden="true"><i class="w1"></i><i class="w2"></i><i class="w3"></i><i class="moon"></i></div>
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 32 32" aria-hidden="true">
+      <path d="M4 22 Q10 18 16 22 T28 22" fill="none" stroke="#e8c55a" stroke-width="1.6" stroke-linecap="round"/>
+      <path d="M7 25 Q12 22 16 25 T25 25" fill="none" stroke="#e8c55a" stroke-width="1.2" opacity=".6" stroke-linecap="round"/>
+      <path d="M16 4 L16 20 M16 6 L24 12 L16 18 Z" fill="none" stroke="#f2ead8" stroke-width="1.6" stroke-linejoin="round"/>
+      <path d="M8 21 L24 21 L21 26 L11 26 Z" fill="none" stroke="#e8c55a" stroke-width="1.6" stroke-linejoin="round"/>
+    </svg>
+    <div>
+      <h1>Pearl Fund</h1>
+      <p class="tagline">refundable PRL crowdfunding · Taproot, no smart contracts</p>
+    </div>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-step="launch" class="active">1 · Launch</button>
+    <button data-step="pledge">2 · Pledge</button>
+    <button data-step="track">3 · Track</button>
+    <button data-step="release">4 · Release</button>
+    <button data-step="refund">5 · Refund</button>
+  </nav>
+</header>
+
+<main>
+  <section class="limits" id="limits">
+    <h2>Honest limits — read before any real PRL moves</h2>
+    <ul>
+      <li><strong>"Goal met" is a social rule, not a cryptographic one.</strong> The release leaf is spendable the moment the <em>recipient</em> and the <em>creator</em> both sign — even before the goal is reached, even minutes after launch. This page's Release tab refuses to build below the goal, but nothing on-chain enforces that.</li>
+      <li><strong>The creator can refuse after the goal is met.</strong> Release needs the creator's signature too. If the creator withholds it, funds stay locked until the deadline — then every backer can refund unilaterally.</li>
+      <li><strong>Every backer keeps a unilateral post-deadline refund.</strong> After the tide turns (chain height ≥ deadline), any backer can take their pledge back alone with their own key. Nobody can stop a refund, and nobody needs permission.</li>
+      <li><strong>Descriptors have no checksum.</strong> A single flipped character can silently describe a <em>different</em> campaign. Always pair a descriptor with its fingerprint (shown on every card) — the verifier refuses loudly on any mismatch.</li>
+      <li><strong>Needs live Blockbook + real funds for the real thing.</strong> Funding scans, chain height, fee estimates and broadcast all go through the Blockbook endpoint you configure. No real campaigns were funded in testing — the cryptography is real; the mainnet miles are not.</li>
+      <li><strong>Secrets stay in this page.</strong> Keys you paste are kept in page memory only and wiped with the lock button. Verify every address and amount out of band before funding.</li>
+    </ul>
+  </section>
+
+  <section class="config-strip">
+    <label>Network
+      <select id="network">
+        <option value="mainnet" selected>Mainnet (prl…)</option>
+        <option value="testnet">Testnet (tprl…)</option>
+      </select>
+    </label>
+    <label class="wide">Blockbook API
+      <input id="blockbook" type="url" spellcheck="false" placeholder="https://blockbook.pearlresearch.ai">
+    </label>
+    <label>Fee rate <span class="unit">grains/vB</span>
+      <input id="feerate" type="number" min="1" step="1" value="20">
+    </label>
+    <button class="btn ghost" id="fee-estimate" type="button">Estimate fee</button>
+    <span class="cfg-msg" id="cfg-msg"></span>
+  </section>
+
+  <!-- STEP 1: LAUNCH -->
+  <section id="step-launch" class="panel active">
+    <h2>Launch a campaign <span class="sub">provision the ship</span></h2>
+    <p class="lede">Define the voyage: who receives the provisions (<em>recipient</em>), how much makes her fully provisioned (<em>goal</em>), and when the tide turns (<em>deadline height</em>). You sign as <em>creator</em> — your key co-signs every release.</p>
+    <div class="grid2">
+      <label>Recipient PRL address <span class="hintline">prl1… / tprl1… — receives the funds on release</span>
+        <input id="lc-recipient" spellcheck="false" placeholder="prl1p…">
+      </label>
+      <label>Goal <span class="unit">PRL</span> <span class="hintline">fully provisioned at this amount</span>
+        <input id="lc-goal" inputmode="decimal" placeholder="10">
+      </label>
+      <label>Deadline <span class="unit">block height</span> <span class="hintline">the tide turns here — refunds unlock after this height</span>
+        <input id="lc-deadline" inputmode="numeric" placeholder="900000">
+      </label>
+      <div class="rowbtns">
+        <button class="btn ghost" id="lc-fetch-height" type="button">Fetch chain height</button>
+        <button class="btn ghost" id="lc-plus-1440" type="button">+1440 blocks</button>
+        <span class="cfg-msg" id="lc-height-out"></span>
+      </div>
+      <label class="wide">Creator key <span class="hintline">mnemonic, WIF, hex or xprv — stays in this page; x-only keys are shown but cannot sign later</span>
+        <input id="lc-key" type="password" spellcheck="false" autocomplete="off" placeholder="abandon abandon …">
+      </label>
+      <div class="rowbtns">
+        <button class="btn ghost" id="lc-gen-key" type="button">Generate fresh creator key</button>
+        <button class="btn primary" id="lc-launch" type="button">Launch campaign</button>
+      </div>
+    </div>
+    <p class="err" id="lc-err" hidden></p>
+    <p class="keyout" id="lc-key-out" hidden></p>
+    <div class="card porthole" id="lc-out" hidden>
+      <h3>Campaign manifest</h3>
+      <dl class="kv" id="lc-summary"></dl>
+      <label>Campaign descriptor <span class="hintline">share this + the fingerprint — it has no checksum</span>
+        <textarea id="lc-desc" rows="3" readonly spellcheck="false"></textarea>
+      </label>
+      <div class="fp-row"><span>Fingerprint <code id="lc-fingerprint"></code></span>
+        <button class="btn ghost" data-copy="lc-desc" type="button">Copy descriptor</button>
+        <button class="btn ghost" data-copy="lc-fingerprint" type="button">Copy fingerprint</button>
+      </div>
+      <div class="qr" id="lc-qr"></div>
+    </div>
+  </section>
+
+  <!-- STEP 2: PLEDGE -->
+  <section id="step-pledge" class="panel">
+    <h2>Pledge <span class="sub">load provisions aboard</span></h2>
+    <p class="lede">Paste the campaign manifest. You get a <strong>personal pledge address</strong> — a Taproot output only you can refund and only recipient+creator can release. Fund it from your wallet afterwards; this page never moves funds on this step.</p>
+    <label class="wide">Campaign descriptor
+      <textarea id="pl-desc" rows="3" spellcheck="false" placeholder="pearlfund:v1:…"></textarea>
+    </label>
+    <div class="grid2">
+      <label>Expected fingerprint <span class="hintline">loud refusal on any mismatch — flipped characters cannot slip through</span>
+        <input id="pl-fingerprint" spellcheck="false" placeholder="(optional but recommended)">
+      </label>
+      <div class="rowbtns"><button class="btn primary" id="pl-load" type="button">Load campaign</button></div>
+    </div>
+    <p class="err" id="pl-err" hidden></p>
+    <div id="pl-campaign" hidden>
+      <dl class="kv" id="pl-summary"></dl>
+      <div class="grid2">
+        <label>Your backer key <span class="hintline">mnemonic, WIF, hex or xprv — your refund key</span>
+          <input id="pl-backer-key" type="password" spellcheck="false" autocomplete="off">
+        </label>
+        <div class="rowbtns"><button class="btn ghost" id="pl-gen-key" type="button">Generate fresh backer key</button></div>
+        <label>Pledge amount <span class="unit">PRL</span>
+          <input id="pl-amount" inputmode="decimal" placeholder="1.5">
+        </label>
+        <div class="rowbtns"><button class="btn primary" id="pl-derive" type="button">Derive my pledge address</button></div>
+      </div>
+      <p class="err" id="pl-err2" hidden></p>
+      <p class="keyout" id="pl-key-out" hidden></p>
+      <div class="card porthole" id="pl-out" hidden>
+        <h3>Your pledge berth</h3>
+        <label>Personal pledge address <span class="hintline">send PRL here from your wallet (e.g. Pearl Sign)</span>
+          <input id="pl-address" readonly spellcheck="false">
+        </label>
+        <label>Pledge descriptor
+          <textarea id="pl-pledge-desc" rows="3" readonly spellcheck="false"></textarea>
+        </label>
+        <div class="fp-row"><span>Fingerprint <code id="pl-pledge-fp"></code></span>
+          <button class="btn ghost" data-copy="pl-address" type="button">Copy address</button>
+          <button class="btn ghost" data-copy="pl-pledge-desc" type="button">Copy descriptor</button>
+        </div>
+        <div class="qr" id="pl-qr"></div>
+        <div class="rowbtns">
+          <button class="btn ghost" id="pl-verify" type="button">Re-verify address from descriptor</button>
+          <span class="cfg-msg" id="pl-verify-out"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 3: TRACK -->
+  <section id="step-track" class="panel">
+    <h2>Track <span class="sub">watch the harbor</span></h2>
+    <p class="lede">Load the manifest and every backer's pledge descriptor, then scan the chain. Totals, backer count, progress toward fully-provisioned, and the countdown to the tide turning — all from GET-only Blockbook reads.</p>
+    <label class="wide">Campaign descriptor
+      <textarea id="tr-desc" rows="2" spellcheck="false" placeholder="pearlfund:v1:…"></textarea>
+    </label>
+    <div class="grid2">
+      <label>Expected fingerprint
+        <input id="tr-fingerprint" spellcheck="false" placeholder="(optional but recommended)">
+      </label>
+      <div class="rowbtns"><button class="btn primary" id="tr-load" type="button">Load manifest</button></div>
+    </div>
+    <label class="wide">Pledge descriptors <span class="hintline">one per line — ask each backer for theirs</span>
+      <textarea id="tr-pledges" rows="4" spellcheck="false" placeholder="pearlfund:v1:…"></textarea>
+    </label>
+    <div class="rowbtns">
+      <button class="btn primary" id="tr-scan" type="button">Scan chain</button>
+      <span class="cfg-msg" id="tr-scan-msg"></span>
+    </div>
+    <p class="err" id="tr-err" hidden></p>
+    <div id="tr-out" hidden>
+      <div class="dash">
+        <div class="gauge"><span class="g-label">Pledged</span><strong id="tr-total">–</strong><span class="g-sub" id="tr-total-grains"></span></div>
+        <div class="gauge"><span class="g-label">Backers</span><strong id="tr-count">–</strong><span class="g-sub" id="tr-funded"></span></div>
+        <div class="gauge"><span class="g-label">Tide turns in</span><strong id="tr-blocks">–</strong><span class="g-sub" id="tr-deadline"></span></div>
+        <div class="gauge"><span class="g-label">Status</span><strong id="tr-status">–</strong><span class="g-sub" id="tr-goal-note"></span></div>
+      </div>
+      <div class="progress"><div class="bar" id="tr-bar"></div></div>
+      <table class="ledger"><thead><tr><th>Pledge address</th><th>Backer key</th><th>Funded</th></tr></thead>
+      <tbody id="tr-tbody"></tbody></table>
+    </div>
+  </section>
+
+  <!-- STEP 4: RELEASE -->
+  <section id="step-release" class="panel">
+    <h2>Release <span class="sub">sail the provisions out</span></h2>
+    <p class="lede">Sweep funded pledges to the recipient in <strong>one</strong> transaction. Both the recipient and the creator sign — signatures are collected as JSON and every one is re-verified on import. This tab builds a release only when the scanned total meets the goal (a UI rule, not a chain rule).</p>
+    <div class="gate" id="rl-gate" hidden>
+      <strong>⛔ Release is gated.</strong> <span id="rl-gate-text">Scan the campaign on the Track tab first — release builds only when pledged ≥ goal.</span>
+    </div>
+    <label class="wide">Campaign descriptor
+      <textarea id="rl-desc" rows="2" spellcheck="false" placeholder="pearlfund:v1:…"></textarea>
+    </label>
+    <label class="wide">Funded pledge descriptors <span class="hintline">one per line</span>
+      <textarea id="rl-pledges" rows="4" spellcheck="false"></textarea>
+    </label>
+    <div class="rowbtns">
+      <button class="btn primary" id="rl-load-scan" type="button">Load + scan funding</button>
+      <span class="cfg-msg" id="rl-scan-msg"></span>
+    </div>
+    <p class="err" id="rl-err" hidden></p>
+    <div id="rl-out" hidden>
+      <table class="ledger"><thead><tr><th><input type="checkbox" id="rl-toggle-all" checked></th><th>Pledge address</th><th>UTXO</th><th>Value</th></tr></thead>
+      <tbody id="rl-tbody"></tbody></table>
+      <div class="rowbtns"><button class="btn primary" id="rl-build" type="button">Build unsigned bundle</button></div>
+      <div class="card" id="rl-bundle-card" hidden>
+        <h3>Unsigned bundle <span class="sub">copy to the co-signer, or keep signing here</span></h3>
+        <dl class="kv" id="rl-bundle-summary"></dl>
+        <label>Bundle JSON
+          <textarea id="rl-bundle" rows="6" readonly spellcheck="false"></textarea>
+        </label>
+        <div class="rowbtns">
+          <button class="btn ghost" data-copy="rl-bundle" type="button">Copy bundle</button>
+        </div>
+        <label>Import a bundle <span class="hintline">paste the co-signer's JSON — every signature is re-verified</span>
+          <textarea id="rl-import" rows="4" spellcheck="false" placeholder='{"kind":"pearl-fund-release-bundle",…}'></textarea>
+        </label>
+        <div class="rowbtns"><button class="btn ghost" id="rl-import-btn" type="button">Import + verify bundle</button></div>
+        <p class="err" id="rl-err2" hidden></p>
+        <div class="grid2">
+          <label>Recipient key <span class="hintline">mnemonic / WIF / hex / xprv</span>
+            <input id="rl-recip-key" type="password" spellcheck="false" autocomplete="off">
+          </label>
+          <label>Creator key <span class="hintline">mnemonic / WIF / hex / xprv</span>
+            <input id="rl-creator-key" type="password" spellcheck="false" autocomplete="off">
+          </label>
+          <div class="rowbtns">
+            <button class="btn" id="rl-sign-recip" type="button">Sign as recipient</button>
+            <button class="btn" id="rl-sign-creator" type="button">Sign as creator</button>
+          </div>
+          <div class="rowbtns"><span class="cfg-msg" id="rl-status"></span></div>
+        </div>
+        <div class="rowbtns"><button class="btn primary" id="rl-finalize" type="button">Finalize + review transaction</button></div>
+        <div id="rl-review-wrap" hidden>
+          <dl class="kv" id="rl-review"></dl>
+          <label>Signed release transaction
+            <textarea id="rl-hex" rows="6" readonly spellcheck="false"></textarea>
+          </label>
+          <label class="confirm"><input type="checkbox" id="rl-confirm">
+            I re-verified the recipient address, the amount, and the fee above. Both signatures verified locally. Broadcast for real.</label>
+          <div class="rowbtns">
+            <button class="btn primary" id="rl-broadcast" type="button">Broadcast release</button>
+            <span class="cfg-msg" id="rl-txid"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 5: REFUND -->
+  <section id="step-refund" class="panel">
+    <h2>Refund <span class="sub">take your provisions home</span></h2>
+    <p class="lede">After the tide turns, any backer reclaims their pledge alone — one signature, no permission needed. The refund pays to <strong>your own backer key</strong>; there is no destination to get wrong. Before the deadline, this tab refuses loudly.</p>
+    <label class="wide">Pledge descriptor
+      <textarea id="rf-desc" rows="3" spellcheck="false" placeholder="pearlfund:v1:…"></textarea>
+    </label>
+    <div class="grid2">
+      <label>Expected fingerprint
+        <input id="rf-fingerprint" spellcheck="false" placeholder="(optional but recommended)">
+      </label>
+      <label>Your backer key <span class="hintline">the key that made this pledge</span>
+        <input id="rf-key" type="password" spellcheck="false" autocomplete="off">
+      </label>
+      <label>Chain height <span class="hintline">leave blank to read from Blockbook</span>
+        <input id="rf-height" inputmode="numeric" placeholder="auto">
+      </label>
+      <div class="rowbtns"><button class="btn primary" id="rf-load" type="button">Load pledge + scan UTXOs</button></div>
+    </div>
+    <p class="err" id="rf-err" hidden></p>
+    <div class="refusal" id="rf-refusal" hidden>
+      <strong>⛔ REFUND REFUSED — the tide has not turned.</strong>
+      <p id="rf-refusal-text"></p>
+    </div>
+    <div id="rf-out" hidden>
+      <dl class="kv" id="rf-summary"></dl>
+      <label>Pledge UTXO
+        <select id="rf-utxo"></select>
+      </label>
+      <div class="rowbtns"><button class="btn primary" id="rf-build" type="button">Build + sign refund</button></div>
+      <p class="err" id="rf-err2" hidden></p>
+      <div id="rf-review-wrap" hidden>
+        <dl class="kv" id="rf-review"></dl>
+        <label>Signed refund transaction <span class="hintline">nLockTime = deadline, nSequence = 0xfffffffe</span>
+          <textarea id="rf-hex" rows="6" readonly spellcheck="false"></textarea>
+        </label>
+        <label class="confirm"><input type="checkbox" id="rf-confirm">
+          I re-verified the refund amount and the fee above. My signature verified locally. Broadcast for real.</label>
+        <div class="rowbtns">
+          <button class="btn primary" id="rf-broadcast" type="button">Broadcast refund</button>
+          <span class="cfg-msg" id="rf-txid"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="lockbar">
+    <button class="btn ghost" id="wipe" type="button">🔒 Lock — wipe all keys from page memory</button>
+    <span class="cfg-msg" id="wipe-msg"></span>
+  </section>
+</main>
+
+<footer>
+  <p>Pearl Fund · refundable PRL crowdfunding on Taproot — release needs recipient + creator, refunds need only the backer ·
+  <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a></p>
+  <p class="donate">Support the build — <code id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+  <button class="btn ghost copy-btn" data-copy="donate-addr">Copy</button></p>
+  <p class="hint">Experimental software. Refundable crowdfunding moves real funds — verify every descriptor fingerprint, address, goal and deadline out of band before funding. Goal-met is a social rule, not a chain rule: recipient + creator can always co-sign early.</p>
+</footer>
+
+<script src="qrcode.min.js?v=1"></script>
+<script src="pearl-fund.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
