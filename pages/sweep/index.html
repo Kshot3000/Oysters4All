@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Sweep — UTXO Consolidation Optimizer</title>
+<meta name="description" content="Analyze a Pearl Taproot address's UTXO health, plan a dust/uneconomic-UTXO consolidation with exact fee math and breakeven refusal, sign locally, track, and verify.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<div class="current" aria-hidden="true">
+  <div class="drift d1"></div>
+  <div class="drift d2"></div>
+  <div class="drift d3"></div>
+  <div class="drift d4"></div>
+  <div class="drift d5"></div>
+  <div class="drift d6"></div>
+</div>
+
+<header class="top">
+  <a class="crumb" href="../">← Pearl apps</a>
+  <h1><span class="pearl-dot" aria-hidden="true"></span> Pearl Sweep</h1>
+  <p class="sub">The tidal refinery — analyze your UTXO health, plan a dust consolidation with grain-exact fee math, sign locally, and prove the sweep worked. Nothing is broadcast until you say so.</p>
+</header>
+
+<main>
+  <nav class="steps" aria-label="Sweep steps">
+    <button type="button" class="step active" id="sw-step-1" data-step="1"><span class="n">1</span> Analyze</button>
+    <button type="button" class="step" id="sw-step-2" data-step="2"><span class="n">2</span> Plan</button>
+    <button type="button" class="step" id="sw-step-3" data-step="3"><span class="n">3</span> Sign</button>
+    <button type="button" class="step" id="sw-step-4" data-step="4"><span class="n">4</span> Track</button>
+    <button type="button" class="step" id="sw-step-5" data-step="5"><span class="n">5</span> Verify</button>
+  </nav>
+
+  <p id="sw-error" class="error" hidden></p>
+
+  <!-- STEP 1: ANALYZE -->
+  <section class="panel" id="sw-panel-1">
+    <h2>Step 1 — Analyze the address</h2>
+    <label class="field">
+      <span>Pearl Taproot address <small>(prl1… mainnet or tprl1… testnet — watch-only, no key needed)</small></span>
+      <input id="sw-address" type="text" class="mono" autocomplete="off" spellcheck="false"
+        placeholder="prl1p…">
+    </label>
+    <div class="grid">
+      <label class="field">
+        <span>Network <small>(auto-detected from the address)</small></span>
+        <input id="sw-network-label" type="text" readonly class="mono" value="—">
+      </label>
+      <label class="field">
+        <span>Blockbook <small>(GET-only reads)</small></span>
+        <input id="sw-blockbook" type="url" value="https://blockbook.pearlresearch.ai" spellcheck="false">
+      </label>
+    </div>
+    <div class="actions">
+      <button id="sw-analyze" class="btn primary" type="button">Analyze UTXOs</button>
+    </div>
+    <p class="status" id="sw-analyze-status"></p>
+
+    <div id="sw-dash" hidden>
+      <div class="dash-grid">
+        <div class="stat"><span class="k">Balance</span><span class="v" id="sw-total">—</span><span class="k mono" id="sw-total-grains"></span></div>
+        <div class="stat"><span class="k">UTXOs</span><span class="v" id="sw-count">—</span></div>
+        <div class="stat dust"><span class="k">Dust &lt;546 gr</span><span class="v" id="sw-dust-count">—</span><span class="k mono" id="sw-dust-value"></span></div>
+        <div class="stat unecon"><span class="k">Uneconomic</span><span class="v" id="sw-unecon-count">—</span><span class="k mono" id="sw-unecon-value"></span></div>
+        <div class="stat healthy"><span class="k">Healthy</span><span class="v" id="sw-healthy-count">—</span></div>
+        <div class="stat save"><span class="k">Consolidation saves <small>(per future spend)</small></span><span class="v" id="sw-savings">—</span></div>
+      </div>
+      <h3>Value distribution</h3>
+      <div id="sw-hist" class="hist"></div>
+      <h3>UTXO list <small id="sw-fee-note"></small></h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Txid</th><th>Vout</th><th>Value</th><th>Conf</th><th>Health</th></tr></thead>
+          <tbody id="sw-utxo-tbody"></tbody>
+        </table>
+      </div>
+      <div class="actions">
+        <button id="sw-to-plan" class="btn primary" type="button">Continue to Plan →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 2: PLAN -->
+  <section class="panel" id="sw-panel-2" hidden>
+    <h2>Step 2 — Plan the consolidation</h2>
+    <fieldset class="strategy">
+      <legend>Strategy</legend>
+      <label><input type="radio" id="sw-strat-uneconomic" name="sw-strategy" value="uneconomic" checked> <strong>Sweep uneconomic</strong> — only dust + uneconomic UTXOs</label>
+      <label><input type="radio" id="sw-strat-threshold" name="sw-strategy" value="threshold"> <strong>Under threshold</strong> — every UTXO below a value you set</label>
+      <label><input type="radio" id="sw-strat-all" name="sw-strategy" value="all"> <strong>Consolidate all</strong> — everything into 1–N outputs</label>
+    </fieldset>
+    <div class="grid">
+      <label class="field">
+        <span>Threshold <small>(grains — only for "under threshold")</small></span>
+        <input id="sw-threshold" type="number" min="546" value="100000" class="num">
+      </label>
+      <label class="field">
+        <span>Output count <small>(1–16, split evenly)</small></span>
+        <input id="sw-noutputs" type="number" min="1" max="16" value="1" class="num">
+      </label>
+      <label class="field">
+        <span>Fee rate <small>(grains/vByte)</small></span>
+        <div class="row">
+          <input id="sw-feerate" type="text" value="1" class="num" spellcheck="false">
+          <button id="sw-estfee" class="btn" type="button" title="Ask Blockbook for a fee estimate">Use estimate</button>
+        </div>
+      </label>
+    </div>
+    <label class="field">
+      <span>Output target <small>(defaults to the analyzed address — or paste a fresh prl1…/tprl1… address)</small></span>
+      <input id="sw-target" type="text" class="mono" autocomplete="off" spellcheck="false">
+    </label>
+    <div class="actions">
+      <button id="sw-build-plan" class="btn primary" type="button">Build plan</button>
+    </div>
+
+    <div id="sw-refusal" class="refusal" hidden>
+      <h3>⛔ Consolidation refused</h3>
+      <p id="sw-refusal-text"></p>
+    </div>
+
+    <div id="sw-plan-out" hidden>
+      <h3>Fee math</h3>
+      <div class="math mono" id="sw-plan-math"></div>
+      <div id="sw-plan-warnings" class="warnings"></div>
+      <h3>Inputs <small>(uncheck any UTXO to drop it from the sweep)</small></h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>Txid</th><th>Vout</th><th>Value</th><th>Health</th></tr></thead>
+          <tbody id="sw-plan-tbody"></tbody>
+        </table>
+      </div>
+      <h3>Outputs</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Address</th><th>Value</th></tr></thead>
+          <tbody id="sw-plan-out-tbody"></tbody>
+        </table>
+      </div>
+      <div class="actions">
+        <button id="sw-to-sign" class="btn primary" type="button">Continue to Sign →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 3: SIGN -->
+  <section class="panel" id="sw-panel-3" hidden>
+    <h2>Step 3 — Sign locally</h2>
+    <p class="note">Paste the key that controls <span class="mono" id="sw-sign-addr"></span>. The page verifies the key derives <em>exactly</em> this address before signing anything, and re-verifies every Schnorr signature after signing. The key never leaves this page.</p>
+    <label class="field">
+      <span>Private key <small>(WIF, xprv/tprv, or 64-hex — in-memory only)</small></span>
+      <textarea id="sw-key" rows="3" autocomplete="off" autocapitalize="off" spellcheck="false"
+        placeholder="WIF … / xprv… / 64 hex chars"></textarea>
+    </label>
+    <div class="actions">
+      <button id="sw-sign" class="btn primary" type="button">Sign consolidation</button>
+      <button id="sw-wipe" class="btn ghost" type="button" title="Wipe the key from page memory">🧹 Wipe key</button>
+    </div>
+    <p class="status" id="sw-sign-status"></p>
+    <div id="sw-signed" hidden>
+      <p class="ok-line" id="sw-sign-ok"></p>
+      <p class="note" id="sw-key-note"></p>
+      <label class="field">
+        <span>Consolidation txid</span>
+        <input id="sw-txid" type="text" class="mono" readonly>
+      </label>
+      <label class="field">
+        <span>Signed raw transaction <small>(verify it anywhere before broadcasting)</small></span>
+        <textarea id="sw-hex" rows="4" class="mono" readonly spellcheck="false"></textarea>
+      </label>
+      <div class="actions">
+        <button id="sw-copy-hex" class="btn" type="button">Copy raw tx</button>
+        <span class="copied" id="sw-copied" hidden>copied ✓</span>
+      </div>
+      <label class="confirm">
+        <input type="checkbox" id="sw-confirm-final">
+        <span><strong>Broadcasting is final.</strong> This will spend the selected UTXOs and cannot be undone. I have checked the txid, outputs, and fee above.</span>
+      </label>
+      <div class="actions">
+        <button id="sw-broadcast" class="btn danger" type="button">Broadcast via Blockbook</button>
+      </div>
+      <p class="status" id="sw-broadcast-status"></p>
+    </div>
+  </section>
+
+  <!-- STEP 4: TRACK -->
+  <section class="panel" id="sw-panel-4" hidden>
+    <h2>Step 4 — Track the consolidation</h2>
+    <label class="field">
+      <span>Consolidation txid</span>
+      <input id="sw-track-txid" type="text" class="mono" autocomplete="off" spellcheck="false" placeholder="64 hex chars">
+    </label>
+    <div class="actions">
+      <button id="sw-track-start" class="btn primary" type="button">Watch</button>
+      <button id="sw-track-stop" class="btn" type="button" disabled>Stop</button>
+    </div>
+    <p class="status" id="sw-track-status"></p>
+    <div id="sw-track-out" hidden>
+      <div class="dash-grid">
+        <div class="stat"><span class="k">Confirmations</span><span class="v" id="sw-tr-conf">—</span></div>
+        <div class="stat"><span class="k">Inputs swept</span><span class="v" id="sw-tr-in">—</span></div>
+        <div class="stat"><span class="k">Value in</span><span class="v" id="sw-tr-inval">—</span></div>
+        <div class="stat"><span class="k">Value out</span><span class="v" id="sw-tr-outval">—</span></div>
+        <div class="stat"><span class="k">Fee paid</span><span class="v" id="sw-tr-fee">—</span></div>
+        <div class="stat"><span class="k">Block</span><span class="v mono" id="sw-tr-block">—</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 5: VERIFY -->
+  <section class="panel" id="sw-panel-5" hidden>
+    <h2>Step 5 — Verify the sweep</h2>
+    <p class="note">Re-scan the address and prove the consolidation worked: the UTXO count must drop and the balance must equal the pre-sweep total minus the exact fee.</p>
+    <div class="actions">
+      <button id="sw-verify-rescan" class="btn primary" type="button">Re-scan address</button>
+    </div>
+    <p class="status" id="sw-verify-status"></p>
+    <div id="sw-verify-out" hidden>
+      <p id="sw-verdict" class="verdict"></p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Check</th><th>Before</th><th>After</th><th></th></tr></thead>
+          <tbody id="sw-verify-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <h3>Standalone verifier</h3>
+    <p class="note">No sweep in progress? Paste any consolidation txid — the verifier checks every input came from the swept address and every output pays the target, then recomputes the exact fee.</p>
+    <div class="grid">
+      <label class="field">
+        <span>Consolidation txid</span>
+        <input id="sw-sa-txid" type="text" class="mono" autocomplete="off" spellcheck="false" placeholder="64 hex chars">
+      </label>
+      <label class="field">
+        <span>Swept address</span>
+        <input id="sw-sa-swept" type="text" class="mono" autocomplete="off" spellcheck="false">
+      </label>
+      <label class="field">
+        <span>Target address</span>
+        <input id="sw-sa-target" type="text" class="mono" autocomplete="off" spellcheck="false">
+      </label>
+    </div>
+    <div class="actions">
+      <button id="sw-sa-run" class="btn" type="button">Verify txid</button>
+    </div>
+    <p class="status" id="sw-sa-status"></p>
+    <div id="sw-sa-out" class="math mono" hidden></div>
+  </section>
+
+  <section class="panel honesty">
+    <h2>Honest limits</h2>
+    <ul>
+      <li><strong>Your key, your coins.</strong> This page can only spend what the pasted key controls — and it refuses loudly if the key doesn't derive the analyzed address.</li>
+      <li><strong>Consolidation is final.</strong> Once broadcast, the sweep cannot be undone. Check the txid, outputs, and fee on the Sign step before you confirm.</li>
+      <li><strong>Dust is the protocol floor.</strong> Outputs below 546 grains are refused; the breakeven guard refuses any plan whose fee eats the recovered value.</li>
+      <li><strong>Thresholds use your fee rate.</strong> "Uneconomic" is computed against the fee rate you set — raise the rate and more UTXOs count as uneconomic.</li>
+      <li><strong>Blockbook is a third-party read source.</strong> Balances and fee estimates come from the Blockbook you configure; verify anything surprising independently.</li>
+      <li><strong>No funds moved in testing.</strong> The builder never executed a live mainnet consolidation; QA runs against stubbed Blockbook responses.</li>
+    </ul>
+  </section>
+</main>
+
+<footer>
+  <p>Built by the Pearl 24/7 builder · <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a></p>
+  <p class="donate">Donate PRL: <span class="mono" id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</span> <button id="copy-donate" class="btn small" type="button">Copy</button></p>
+  <p class="dim">Community-built, not an official pearl-research-labs property. Keys never leave your browser.</p>
+</footer>
+
+<script src="pearl-sweep.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
