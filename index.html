@@ -39,6 +39,7 @@
         <a href="pages/stream/">Stream</a>
         <a href="pages/raffle/">Raffle</a>
         <a href="pages/swap/">Swap</a>
+        <a href="pages/auction/">Auction</a>
         <a href="pages/pool/">Mining pool</a>
         <a href="pages/wallet/">Wallet</a>
         <a href="pages/mining/">Mining calc</a>
@@ -293,6 +294,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Swap — Trustless PRL ⇄ BTC Atomic Swaps <span class="badge">new</span></h3>
             <p>The collision chamber — coordinate trustless PRL↔BTC atomic swaps over Taproot HTLCs. Alice locks PRL behind a hashlock/timelock script tree, Bob mirrors it with a byte-identical claim leaf on Bitcoin, Bob claims the PRL by revealing the preimage on-chain, and Alice reads it from his claim witness to take the BTC. Five steps: propose → lock → track → claim → refund, with T1&gt;T2 timelock guards, local signing, and per-signature re-verification. Keys never leave the page.</p>
             <div class="card-links"><a href="pages/swap/">Open Pearl Swap →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Auction — Sealed-Bid PRL Auction Hall <span class="badge">new</span></h3>
+            <p>The auction hall — run sealed-bid PRL auctions without smart contracts, on a commit-reveal fairness protocol. List an item in a tamper-evident auction:v1: descriptor with minimum bid and block-height deadlines, take sealed SHA-256 bid commitments before the commit deadline, reveal bids (mismatch = loud refusal), and settle to the highest verified bid with ties broken by earliest reveal. Full derivation table, winner-pays-seller payment plan with pearl: QR, signed result record, and a standalone verifier. The page never moves PRL.</p>
+            <div class="card-links"><a href="pages/auction/">Open Pearl Auction →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Notary — Proof of Existence <span class="badge">new</span></h3>

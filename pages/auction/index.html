@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Auction — Sealed-Bid PRL Auction Hall</title>
+<meta name="description" content="Pearl Auction: sealed-bid PRL auctions with commit-reveal fairness. List an item in a tamper-evident auction:v1: descriptor, take sealed SHA-256 bid commitments before the commit deadline, reveal bids before the reveal deadline, settle to the highest verified bid with a full derivation table, and verify anyone's auction standalone. No PRL ever moves through this page.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<div class="hall-glow" aria-hidden="true"><span class="orb o1"></span><span class="orb o2"></span><span class="orb o3"></span><span class="velvet" aria-hidden="true"></span></div>
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 48 48" aria-hidden="true">
+      <rect x="6" y="34" width="36" height="5" rx="2" fill="currentColor" opacity="0.9"/>
+      <rect x="20" y="26" width="8" height="9" rx="1.5" fill="currentColor" opacity="0.9"/>
+      <rect x="10" y="14" width="22" height="11" rx="4" fill="none" stroke="currentColor" stroke-width="3" transform="rotate(-24 21 19)"/>
+      <rect x="26" y="16" width="14" height="3.6" rx="1.8" fill="currentColor" transform="rotate(-24 33 18)"/>
+      <rect x="4" y="41" width="40" height="2.4" rx="1.2" fill="currentColor" opacity="0.55"/>
+    </svg>
+    <div>
+      <h1>Pearl Auction</h1>
+      <p class="tagline">sealed-bid PRL auctions · the auction hall</p>
+    </div>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-step="list" class="active">1 · List</button>
+    <button data-step="commit">2 · Commit</button>
+    <button data-step="reveal">3 · Reveal</button>
+    <button data-step="settle">4 · Settle</button>
+    <button data-step="verify">5 · Verify</button>
+    <button data-step="track">6 · Track</button>
+  </nav>
+</header>
+
+<main>
+  <!-- STEP 1: LIST -->
+  <section id="step-list" class="panel active">
+    <h2>List the auction</h2>
+    <p class="lede">The auctioneer commits to the <strong>item terms</strong>, the <strong>minimum bid</strong>,
+      the <strong>commit deadline</strong> and the <strong>reveal deadline</strong> (both block heights) in a
+      tamper-evident descriptor. <strong class="moves-real">Publish the descriptor before the commit deadline</strong> —
+      that is what makes the sealed-bid phase provably fair.</p>
+    <div class="form-grid">
+      <label>Network
+        <select id="li-network">
+          <option value="mainnet" selected>Mainnet (prl…)</option>
+          <option value="testnet">Testnet (tprl…)</option>
+        </select>
+      </label>
+      <label class="wide">Item name
+        <input id="li-name" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. Genesis-block framed print, #042">
+      </label>
+      <label class="wide">Description
+        <textarea id="li-desc" rows="3" spellcheck="false" placeholder="What the winner receives, condition, delivery terms…"></textarea>
+      </label>
+      <label class="wide">Image URL (optional)
+        <input id="li-image" type="text" autocomplete="off" spellcheck="false" placeholder="https://…">
+      </label>
+      <label class="wide">Seller address (prl1… — receives the winning bid)
+        <input id="li-seller" type="text" autocomplete="off" spellcheck="false" placeholder="prl1p…">
+      </label>
+      <label>Minimum bid (PRL)
+        <input id="li-minbid" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="e.g. 1.5 (decimals ok)">
+      </label>
+      <label>Commit deadline (block height, future)
+        <input id="li-commith" type="number" min="1" step="1" autocomplete="off" placeholder="e.g. 120100">
+      </label>
+      <label>Reveal deadline (block height, after commit)
+        <input id="li-revealh" type="number" min="1" step="1" autocomplete="off" placeholder="e.g. 120200">
+      </label>
+      <label>Nonce (hex, auto-generated)
+        <input id="li-nonce" type="text" autocomplete="off" spellcheck="false">
+      </label>
+      <label class="wide">Blockbook endpoint (reads the chain tip so the app can prove the commit deadline is in the future)
+        <input id="li-blockbook" type="text" autocomplete="off" spellcheck="false" placeholder="https://blockbook.pearlresearch.ai">
+      </label>
+    </div>
+    <div class="row">
+      <button id="li-new-nonce" class="ghost">New nonce</button>
+      <button id="li-tip" class="ghost">Read current tip from Blockbook</button>
+      <label class="inline">or enter tip manually <input id="li-tip-manual" type="number" min="0" step="1" placeholder="current height"></label>
+    </div>
+    <p class="hint" id="li-tip-out" hidden></p>
+    <div class="rules">
+      <h4>The auction rules (published with the descriptor)</h4>
+      <ul>
+        <li>One bidder, one commitment. A second commitment from the same address is flagged and <strong>both are excluded</strong>.</li>
+        <li>Commitment hashes must be published <strong>before</strong> the commit deadline block — late hashes are refused.</li>
+        <li>Bids are revealed after the commit deadline and <strong>before</strong> the reveal deadline. A reveal whose (bid, salt) does not reproduce the recorded commitment is refused loudly.</li>
+        <li>Revealed bids below the minimum are refused. Highest verified bid wins; <strong>ties are broken by earliest reveal</strong>.</li>
+        <li>The winner pays the seller directly, off-page. This page never moves PRL.</li>
+      </ul>
+    </div>
+    <div class="row">
+      <button id="li-button" class="primary">List the auction</button>
+    </div>
+    <p class="err" id="li-error" hidden></p>
+    <div id="li-out" hidden>
+      <h3>Auction listed</h3>
+      <div class="kv"><span>Descriptor</span></div>
+      <textarea id="li-descriptor" rows="3" readonly spellcheck="false"></textarea>
+      <div class="row">
+        <button class="copy-btn" data-for="li-descriptor">Copy</button>
+        <button id="li-download" class="ghost">Download JSON</button>
+      </div>
+      <h3>Commitment — publish this <em>before</em> the commit deadline</h3>
+      <p class="hint">Post the descriptor (or the commitment below) publicly — X, Discord, the item page —
+        <strong>before block <span id="li-commit-height"></span> is mined</strong>. Every bid commitment is bound
+        to this descriptor's hash, so a commitment that references a descriptor published only after the
+        commit deadline proves nothing.</p>
+      <div class="kv"><span>Descriptor hash (SHA-256)</span><code id="li-dhash"></code></div>
+      <label>Publishable commitment
+        <textarea id="li-publish" rows="4" readonly spellcheck="false"></textarea>
+      </label>
+      <div class="row">
+        <button class="copy-btn" data-for="li-publish">Copy</button>
+      </div>
+      <p class="hint">Listed <span id="li-listed-at"></span> · minimum <strong id="li-minbid-out"></strong> · commit by block <span id="li-commith-out"></span> · reveal by block <span id="li-revealh-out"></span></p>
+      <div class="row">
+        <button id="li-carry" class="ghost">Record commitments →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 2: COMMIT -->
+  <section id="step-commit" class="panel">
+    <h2>Commit a sealed bid</h2>
+    <p class="lede">A bidder computes their commitment <strong>locally</strong> — address + bid + a random 16-byte
+      salt, hashed as <code>SHA-256("pearl-auction-commit:v1:⟨descriptorHash⟩:⟨address⟩:⟨bidGrains⟩:⟨saltHex⟩")</code>.
+      Then they publish <strong>only the hash</strong>. The bid stays secret until the reveal phase.</p>
+
+    <h3>1 · Generate the commitment</h3>
+    <div class="form-grid">
+      <label class="wide">Auction descriptor
+        <textarea id="cm-descriptor" rows="2" spellcheck="false" placeholder="auction:v1:prl:…"></textarea>
+      </label>
+      <label class="wide">Bidder address (prl1…)
+        <input id="cm-address" type="text" autocomplete="off" spellcheck="false" placeholder="prl1p…">
+      </label>
+      <label>Bid (PRL)
+        <input id="cm-bid" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="e.g. 2.25">
+      </label>
+      <label>Salt (16 bytes hex)
+        <input id="cm-salt" type="text" autocomplete="off" spellcheck="false" placeholder="press “New salt”">
+      </label>
+    </div>
+    <div class="row">
+      <button id="cm-new-salt" class="ghost">New salt</button>
+      <button id="cm-button" class="primary">Generate commitment</button>
+    </div>
+    <p class="err" id="cm-error" hidden></p>
+    <div id="cm-out" hidden>
+      <div class="loud">
+        <h4>⛔ PUBLISH ONLY THE HASH — BEFORE THE COMMIT DEADLINE</h4>
+        <p>Post the <strong>commitment hash</strong> anywhere public (X, Discord, the auction page).
+          <strong>NEVER</strong> post the bid amount or the salt — anyone who sees them can read your bid.
+          Save the bid + salt somewhere safe: you need both to reveal.</p>
+      </div>
+      <div class="kv"><span>Commitment hash (publish this)</span><code id="cm-hash" class="mono big"></code></div>
+      <div class="row">
+        <button class="copy-btn" data-for="cm-hash">Copy hash</button>
+      </div>
+      <details>
+        <summary>Your secret material (bid + salt — never publish)</summary>
+        <div class="kv"><span>Bid</span><code id="cm-bid-out"></code></div>
+        <div class="kv"><span>Salt</span><code id="cm-salt-out" class="mono"></code></div>
+        <div class="kv"><span>Preimage</span><code id="cm-preimage" class="mono small"></code></div>
+        <div class="row">
+          <button class="copy-btn" data-for="cm-salt-out">Copy salt</button>
+          <button class="copy-btn" data-for="cm-bid-out">Copy bid</button>
+        </div>
+      </details>
+    </div>
+
+    <h3>2 · Organizer: record published commitments</h3>
+    <p class="hint">Bidders publish their hashes themselves. The organizer records each <em>(address, hash)</em>
+      pair. The page refuses hashes published at or after the commit deadline, duplicate hashes, and a second
+      hash from the same address.</p>
+    <div class="form-grid">
+      <label class="wide">Commitment hash (64 hex)
+        <input id="cm-rec-hash" type="text" autocomplete="off" spellcheck="false" placeholder="64 hex">
+      </label>
+      <label class="wide">Bidder address (prl1…)
+        <input id="cm-rec-address" type="text" autocomplete="off" spellcheck="false" placeholder="prl1p…">
+      </label>
+      <label>Current chain height
+        <input id="cm-rec-tip" type="number" min="0" step="1" autocomplete="off" placeholder="tip at publish time">
+      </label>
+    </div>
+    <div class="row">
+      <button id="cm-rec-fetch-tip" class="ghost">Read tip from Blockbook</button>
+      <button id="cm-record" class="primary">Record commitment</button>
+    </div>
+    <p class="err" id="cm-rec-error" hidden></p>
+    <h4>Commitment ledger (<span id="cm-count">0</span>)</h4>
+    <div id="cm-ledger-wrap" class="table-wrap" hidden>
+      <table class="rtable">
+        <thead><tr><th>#</th><th>Bidder</th><th>Commitment hash</th><th>Recorded tip</th></tr></thead>
+        <tbody id="cm-ledger"></tbody>
+      </table>
+    </div>
+    <div class="row">
+      <button id="cm-clear" class="ghost">Clear ledger</button>
+      <button id="cm-carry" class="ghost">Reveal bids →</button>
+    </div>
+  </section>
+
+  <!-- STEP 3: REVEAL -->
+  <section id="step-reveal" class="panel">
+    <h2>Reveal the bids</h2>
+    <p class="lede">After the commit deadline and <strong>before</strong> the reveal deadline, each bidder reveals
+      their bid + salt. The page re-derives the commitment — a mismatch is <strong>refused loudly</strong> and the
+      bid is rejected. Bids below the minimum are refused. Reveals are processed in order; ties go to the
+      earliest reveal.</p>
+    <div class="form-grid">
+      <label class="wide">Auction descriptor
+        <textarea id="rv-descriptor" rows="2" spellcheck="false" placeholder="auction:v1:prl:…"></textarea>
+      </label>
+      <label class="wide">Bidder address (prl1…)
+        <input id="rv-address" type="text" autocomplete="off" spellcheck="false" placeholder="prl1p…">
+      </label>
+      <label>Bid (PRL — must match the committed bid exactly)
+        <input id="rv-bid" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="e.g. 2.25">
+      </label>
+      <label>Salt (16 bytes hex)
+        <input id="rv-salt" type="text" autocomplete="off" spellcheck="false" placeholder="32 hex">
+      </label>
+      <label>Current chain height
+        <input id="rv-tip" type="number" min="0" step="1" autocomplete="off" placeholder="tip now">
+      </label>
+    </div>
+    <div class="row">
+      <button id="rv-fetch-tip" class="ghost">Read tip from Blockbook</button>
+      <button id="rv-button" class="primary">Reveal bid</button>
+    </div>
+    <p class="err" id="rv-error" hidden></p>
+    <h4>Reveals — in reveal order (<span id="rv-count">0</span>)</h4>
+    <p class="hint" id="rv-empty">No reveals yet. The order below is the reveal order — it breaks bid ties.</p>
+    <div id="rv-table-wrap" class="table-wrap" hidden>
+      <table class="rtable">
+        <thead><tr><th>Order</th><th>Bidder</th><th class="num">Bid</th><th>Commitment check</th></tr></thead>
+        <tbody id="rv-table"></tbody>
+      </table>
+    </div>
+    <div class="row">
+      <button id="rv-carry" class="ghost">Settle →</button>
+    </div>
+  </section>
+
+  <!-- STEP 4: SETTLE -->
+  <section id="step-settle" class="panel">
+    <h2>Settle the auction</h2>
+    <p class="lede">Every commitment is re-checked, every reveal re-verified, cheaters (hash collisions, double
+      reveals) excluded, and the ranking computed: <strong>highest verified bid wins; ties go to the earliest
+      reveal</strong>. The winner pays the seller <strong>directly, off-page</strong> — the plan below gives the
+      exact <code>pearl:</code> payment URI with a QR code. This page never moves PRL.</p>
+    <div class="form-grid">
+      <label class="wide">Auction descriptor
+        <textarea id="st-descriptor" rows="2" spellcheck="false" placeholder="auction:v1:prl:…"></textarea>
+      </label>
+      <label class="wide">Seller address (to build the winner's payment plan; filled from the List step when this session forged it)
+        <input id="st-seller" type="text" autocomplete="off" spellcheck="false" placeholder="prl1p…">
+      </label>
+    </div>
+    <div class="row">
+      <button id="st-button" class="primary">Settle now</button>
+      <button id="st-csv" class="ghost" disabled>Download CSV</button>
+      <button id="st-json" class="ghost" disabled>Download result JSON</button>
+    </div>
+    <p class="err" id="st-error" hidden></p>
+    <div id="st-out" hidden>
+      <div id="st-verdict" class="verdict"></div>
+      <h3>Full derivation</h3>
+      <div id="st-derivation" class="table-wrap">
+        <table class="rtable">
+          <thead><tr><th>Reveal order</th><th>Bidder</th><th class="num">Bid</th><th>Commitment check</th></tr></thead>
+          <tbody id="st-table"></tbody>
+        </table>
+      </div>
+      <h3>Payment plan — winner pays the seller off-page</h3>
+      <div id="st-payment"></div>
+      <h3>Signed result record</h3>
+      <textarea id="st-record" rows="8" readonly spellcheck="false"></textarea>
+      <div class="row">
+        <button class="copy-btn" data-for="st-record">Copy result record</button>
+        <button id="st-carry-verify" class="ghost">Open in Verify →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 5: VERIFY -->
+  <section id="step-verify" class="panel">
+    <h2>Verify an auction</h2>
+    <p class="lede">The standalone verifier. Paste anyone's descriptor, their published commitments, and the
+      reveals (in reveal order) — the app re-derives the auction hash, re-checks every commitment, recomputes
+      the winner. <strong>Tampered input gets a loud ✗ NOT PROVEN refusal.</strong></p>
+    <div class="form-grid">
+      <label class="wide">Auction descriptor
+        <textarea id="vf-descriptor" rows="2" spellcheck="false" placeholder="auction:v1:prl:…"></textarea>
+      </label>
+      <label class="wide">Published commitments — one <code>&lt;address&gt; &lt;64-hex-hash&gt;</code> per line
+        <textarea id="vf-commitments" rows="5" spellcheck="false" placeholder="prl1p… <64 hex>&#10;prl1p… <64 hex>"></textarea>
+      </label>
+      <label class="wide">Reveals — one <code>&lt;address&gt; &lt;bid in PRL or grains&gt; &lt;32-hex-salt&gt;</code> per line, reveal order = line order
+        <textarea id="vf-reveals" rows="5" spellcheck="false" placeholder="prl1p… 1.5 <32 hex>&#10;prl1p… 150000000 <32 hex>"></textarea>
+      </label>
+    </div>
+    <div class="row">
+      <button id="vf-run" class="primary">Verify auction</button>
+    </div>
+    <p class="err" id="vf-error" hidden></p>
+    <div id="vf-out" hidden>
+      <div id="vf-verdict" class="verdict"></div>
+      <h3>Recomputed derivation</h3>
+      <div id="vf-detail" class="table-wrap">
+        <table class="rtable">
+          <thead><tr><th>Reveal order</th><th>Bidder</th><th class="num">Bid</th><th>Commitment check</th></tr></thead>
+          <tbody id="vf-table"></tbody>
+        </table>
+      </div>
+      <h3>Signed result record (recomputed)</h3>
+      <textarea id="vf-record" rows="8" readonly spellcheck="false"></textarea>
+      <div class="row">
+        <button class="copy-btn" data-for="vf-record">Copy result record</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 6: TRACK -->
+  <section id="step-track" class="panel">
+    <h2>Track the auction</h2>
+    <p class="lede">Reload a descriptor to re-derive it, see committed/revealed counts (bids stay hidden until
+      reveal), and count down to the commit and reveal deadlines via Blockbook or a manually entered height.</p>
+    <div class="form-grid">
+      <label class="wide">Auction descriptor
+        <textarea id="tk-descriptor" rows="2" spellcheck="false" placeholder="auction:v1:prl:…"></textarea>
+      </label>
+      <label class="wide">Blockbook endpoint
+        <input id="tk-blockbook" type="text" autocomplete="off" spellcheck="false" placeholder="https://blockbook.pearlresearch.ai">
+      </label>
+    </div>
+    <div class="row">
+      <button id="tk-load" class="primary">Load auction</button>
+      <button id="tk-scan" class="ghost">Scan tip + deadlines</button>
+    </div>
+    <p class="err" id="tk-error" hidden></p>
+    <div id="tk-out" hidden>
+      <dl class="review" id="tk-fields"></dl>
+      <div class="dashboard">
+        <div class="stat"><span class="stat-label">Chain tip</span><span class="stat-value" id="tk-tip">—</span></div>
+        <div class="stat"><span class="stat-label">Phase</span><span class="stat-value" id="tk-phase">—</span></div>
+        <div class="stat"><span class="stat-label">Blocks to commit deadline</span><span class="stat-value" id="tk-commit-left">—</span></div>
+        <div class="stat"><span class="stat-label">Blocks to reveal deadline</span><span class="stat-value" id="tk-reveal-left">—</span></div>
+        <div class="stat"><span class="stat-label">Committed (ledger)</span><span class="stat-value" id="tk-committed">—</span></div>
+        <div class="stat"><span class="stat-label">Revealed</span><span class="stat-value" id="tk-revealed">—</span></div>
+      </div>
+      <p class="hint">Unrevealed bids stay hidden — only counts are shown. Countdowns assume the 194-second target block time; real block times vary.</p>
+    </div>
+  </section>
+
+  <section id="honest-limits" class="panel limits">
+    <h2>Honest limits</h2>
+    <ul>
+      <li><strong>No PRL ever moves through this page.</strong> It lists auctions, generates and checks sealed-bid
+        commitments, settles to a winner, and plans the payment — the winner pays the seller directly from their
+        own wallet, off-page.</li>
+      <li>Fairness is a commitment protocol, not code: Pearl has no smart contracts, so nothing on-chain enforces
+        the auction. The guarantee is that <strong>the descriptor must be published before the commit
+        deadline</strong> — anyone can then re-check every commitment hash and redo every SHA-256 reveal by hand.
+        A descriptor that appears only after the commit deadline proves nothing.</li>
+      <li>Bids are only as sealed as the bidder's discipline. Publishing the bid or the salt before the reveal
+        deadline lets anyone read (or front-run) the bid. Commitments are hiding only while the salt stays secret.</li>
+      <li>The organizer's commitment ledger is manual: bidders publish their hashes publicly (X, Discord, the
+        item page) and the organizer records them. Verify the ledger against those public posts for auctions that
+        decide real money.</li>
+      <li>One bidder, one commitment. A second commitment from the same address flags the bidder and excludes both —
+        but nothing stops one person from bidding under two different addresses. Know your bidders.</li>
+      <li>Blockbook is a third-party read source; for real-money deadlines, confirm heights with your own
+        <code>pearld</code> node — the manual-height paths exist for exactly this. Block countdowns assume the
+        194-second target block time.</li>
+    </ul>
+  </section>
+</main>
+
+<footer>
+  <p>Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> for the Pearl ecosystem · All hashing runs locally in your browser — nothing is sent anywhere except the Blockbook lookups you trigger.</p>
+  <p>Donations: <code id="donate">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code> <button class="copy-btn" data-for="donate">Copy</button></p>
+</footer>
+
+<script src="qrcode.min.js?v=1"></script>
+<script src="pearl-auction.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
