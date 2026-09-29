@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Legacy — Dead-Man's-Switch PRL Inheritance Vault</title>
+<meta name="description" content="Forge a two-leaf Taproot PRL inheritance vault: an owner heartbeat leaf and a timelocked heir claim leaf. The owner can always refresh; the heir can claim only after n blocks of silence.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="top">
+  <div class="seal">✦</div>
+  <h1>Pearl Legacy</h1>
+  <p class="tagline">A dead-man's-switch PRL inheritance vault — your heir inherits on silence, never on trust.</p>
+</header>
+
+<div class="wrap">
+  <nav id="steps" aria-label="Legacy steps">
+    <button data-step="plan" class="active">1 · Plan</button>
+    <button data-step="vault" >2 · Vault</button>
+    <button data-step="watch">3 · Watch</button>
+    <button data-step="claim">4 · Claim &amp; Refresh</button>
+    <button data-step="verify">Verifier</button>
+  </nav>
+
+  <!-- ============ STEP 1: PLAN ============ -->
+  <section class="step active" id="step-plan">
+    <div class="panel">
+      <h2>Plan the vault</h2>
+      <p class="lede">Two leaves under a NUMS internal key (no keypath bypass possible): the <b>heartbeat leaf</b> the owner can always spend, and the <b>heir leaf</b> that unlocks only after <i>n</i> blocks of inactivity.</p>
+
+      <div class="field">
+        <label for="pl-network">Network</label>
+        <select id="pl-network">
+          <option value="mainnet" selected>Pearl mainnet (prl)</option>
+          <option value="testnet">Pearl testnet (tprl)</option>
+        </select>
+      </div>
+
+      <h3>Owner key</h3>
+      <div class="radio-row" id="pl-owner-mode-row">
+        <label><input type="radio" name="pl-owner-mode" value="priv" checked> I have the private key (mnemonic / WIF / hex)</label>
+        <label><input type="radio" name="pl-owner-mode" value="watch"> Watch-only (x-only pubkey)</label>
+      </div>
+      <div class="field" id="pl-owner-priv-box">
+        <label for="pl-owner-input">Owner secret — mnemonic, WIF, or hex private key (auto-detected)</label>
+        <textarea id="pl-owner-input" placeholder="12 or 24 word mnemonic, WIF, or 64-hex private key…" autocomplete="off" spellcheck="false"></textarea>
+        <div class="hint">Stays in this page's memory only. Never sent anywhere. Never written to disk by this page.</div>
+      </div>
+      <div class="field" id="pl-owner-xonly-box" hidden>
+        <label for="pl-owner-xonly">Owner x-only pubkey (64 hex)</label>
+        <input type="text" id="pl-owner-xonly" placeholder="32-byte x-only public key…" autocomplete="off" spellcheck="false">
+      </div>
+
+      <h3>Heir identity</h3>
+      <div class="field">
+        <label for="pl-heir">Heir x-only pubkey (64 hex) or Pearl Taproot address (prl1p…)</label>
+        <input type="text" id="pl-heir" placeholder="heir x-only key or prl1p address…" autocomplete="off" spellcheck="false">
+        <div class="hint">The heir's key, not yours. Owner and heir must differ — that is refused, loudly, if they match.</div>
+      </div>
+
+      <h3>Inactivity threshold</h3>
+      <div class="field">
+        <label for="pl-n">Inactivity blocks n (1 – 65535)</label>
+        <input type="number" id="pl-n" value="44640" min="1" max="65535" step="1">
+        <div class="hint" id="pl-days">≈ 100.1 days at 194 s/block (estimate only — the chain enforces blocks, never time).<br>
+        OP_CHECKSEQUENCEVERIFY is 16-bit: a "one year" setting is impossible and is refused, not silently truncated.</div>
+      </div>
+
+      <button class="btn" id="pl-forge">Forge vault plan</button>
+      <div class="alert error" id="pl-error" hidden></div>
+
+      <div id="pl-out" hidden>
+        <h3>Vault address</h3>
+        <div class="addr-row"><code id="pl-address"></code> <button class="copy-btn" data-for="pl-address">Copy</button></div>
+        <div id="pl-qr"></div>
+        <h3>Descriptor <span class="hint">(share with the heir — recomputable; NOT signed — verify against the published address)</span></h3>
+        <div class="addr-row"><code id="pl-desc"></code> <button class="copy-btn" data-for="pl-desc">Copy</button></div>
+        <h3>Vault spec (JSON — keep this; it re-derives everything)</h3>
+        <textarea id="pl-spec" readonly></textarea>
+        <div>
+          <button class="btn small" id="pl-dl">Download JSON</button>
+          <button class="btn small ghost" id="pl-carry-vault">Open in Vault tab →</button>
+          <button class="btn small ghost" id="pl-carry-watch">Watch this vault →</button>
+        </div>
+        <div class="kv">
+          <dt>Owner heartbeat leaf</dt><dd><code id="pl-leafA"></code></dd>
+          <dt>Heir claim leaf</dt><dd><code id="pl-leafB"></code></dd>
+          <dt>Internal key (NUMS)</dt><dd><code id="pl-internal"></code></dd>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ STEP 2: VAULT ============ -->
+  <section class="step" id="step-vault">
+    <div class="panel">
+      <h2>The vault</h2>
+      <p class="lede">Load a vault spec to see the address, the descriptor, and what each key can do. The spec re-derives everything and refuses tampering loudly.</p>
+      <div class="field">
+        <label for="v-spec">Vault spec (JSON)</label>
+        <textarea id="v-spec" placeholder='Paste the vault spec JSON…'></textarea>
+      </div>
+      <button class="btn" id="v-load">Load spec</button>
+      <button class="btn ghost" id="v-loadsaved">Load saved spec</button>
+      <button class="btn ghost" id="v-clear-saved">Clear saved</button>
+      <div class="alert error" id="v-error" hidden></div>
+      <div class="alert info" id="v-storage-note">This page can keep the <b>spec</b> (never private keys) in this browser's localStorage for convenience. It survives even if localStorage is hostile or disabled — it just won't persist.</div>
+
+      <div id="v-out" hidden>
+        <h3>Vault address</h3>
+        <div class="addr-row"><code id="v-address"></code> <button class="copy-btn" data-for="v-address">Copy</button></div>
+        <div id="v-qr" class="qr-slot"></div>
+        <div class="kv">
+          <dt>Descriptor</dt><dd><code id="v-desc"></code> <button class="copy-btn" data-for="v-desc">Copy</button></dd>
+          <dt>Owner key</dt><dd id="v-owner"></dd>
+          <dt>Heir key</dt><dd id="v-heir"></dd>
+          <dt>Inactivity n</dt><dd id="v-n"></dd>
+          <dt>Owner leaf</dt><dd><code id="v-leafA"></code></dd>
+          <dt>Heir leaf</dt><dd><code id="v-leafB"></code></dd>
+        </div>
+        <div>
+          <button class="btn small" id="v-save">Save spec in this browser</button>
+          <button class="btn small ghost" id="v-carry-watch">Watch this vault →</button>
+          <button class="btn small ghost" id="v-carry-claim">Claim / Refresh →</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ STEP 3: WATCH ============ -->
+  <section class="step" id="step-watch">
+    <div class="panel">
+      <h2>Watch</h2>
+      <p class="lede">Read-only. Blockbook is only ever fetched with GET — never trusted blindly: every returned UTXO's script is checked against the vault contract before it is believed.</p>
+      <div class="field">
+        <label for="w-address">Vault address</label>
+        <input type="text" id="w-address" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="w-blockbook">Blockbook base URL</label>
+        <input type="text" id="w-blockbook" autocomplete="off" spellcheck="false">
+        <div class="hint">Only GET requests are ever made. Default: the network's public endpoint.</div>
+      </div>
+      <div class="field">
+        <label><input type="checkbox" id="w-manual"> Manual chain height (skip Blockbook tip)</label>
+        <input type="number" id="w-height" placeholder="current height…" min="0" style="margin-top:.4rem">
+      </div>
+      <button class="btn" id="w-scan">Scan vault</button>
+      <label style="margin-left:.8rem;font-size:.85rem"><input type="checkbox" id="w-auto"> auto-refresh every <input type="number" id="w-every" value="10" min="1" style="width:4em"> min</label>
+      <div class="alert error" id="w-error" hidden></div>
+
+      <div id="w-out" hidden>
+        <h3>Status</h3>
+        <div id="w-status"></div>
+        <div class="kv">
+          <dt>Chain tip</dt><dd id="w-tip"></dd>
+          <dt>Vault balance</dt><dd id="w-balance"></dd>
+          <dt>Oldest UTXO age</dt><dd id="w-age"></dd>
+          <dt>Countdown</dt><dd id="w-countdown"></dd>
+        </div>
+        <h3>UTXOs</h3>
+        <table class="grid" id="w-utxos"><thead><tr><th>txid:vout</th><th>value</th><th>funded at</th><th>age</th><th>status</th></tr></thead><tbody></tbody></table>
+        <div>
+          <button class="btn small" id="w-carry-claim">Build heir claim →</button>
+          <button class="btn small ghost" id="w-carry-refresh">Build owner refresh →</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ STEP 4: CLAIM & REFRESH ============ -->
+  <section class="step" id="step-claim">
+    <div class="panel">
+      <h2>Claim &amp; refresh</h2>
+      <p class="lede">Both transactions are built and signed <b>locally</b>. Nothing is broadcast until you explicitly confirm — twice.</p>
+      <div class="radio-row">
+        <label><input type="radio" name="c-mode" value="claim" checked> Heir claim (needs maturity)</label>
+        <label><input type="radio" name="c-mode" value="refresh"> Owner refresh / heartbeat</label>
+      </div>
+      <div class="field">
+        <label for="c-spec">Vault spec (JSON)</label>
+        <textarea id="c-spec" placeholder="Paste the vault spec JSON (or carry it from another tab)…"></textarea>
+      </div>
+      <button class="btn small ghost" id="c-load">Load spec</button>
+      <div class="alert error" id="c-error" hidden></div>
+      <div id="c-summary" class="alert info" hidden></div>
+
+      <div id="c-claim-box">
+        <h3>Heir claim</h3>
+        <p class="hint">One claim transaction spends <b>one</b> vault UTXO via the heir leaf (nSequence = n, hard-coded). Repeat per UTXO.</p>
+        <div class="field">
+          <label for="c-heir-input">Heir secret — mnemonic, WIF, or hex private key (auto-detected)</label>
+          <textarea id="c-heir-input" autocomplete="off" spellcheck="false"></textarea>
+        </div>
+        <div class="field">
+          <label for="c-txid">Vault UTXO txid</label>
+          <input type="text" id="c-txid" autocomplete="off" spellcheck="false" placeholder="64-hex txid…">
+        </div>
+        <div class="field">
+          <label for="c-vout">vout</label>
+          <input type="number" id="c-vout" value="0" min="0" step="1">
+        </div>
+        <div class="field">
+          <label for="c-value">value (grains)</label>
+          <input type="number" id="c-value" min="1" step="1">
+        </div>
+        <div class="field">
+          <label for="c-fheight">Funding height (block the UTXO was created)</label>
+          <input type="number" id="c-fheight" min="0" step="1">
+          <div class="hint">The claim input's nSequence is set to <i>n</i> exactly; the UTXO must be at least <i>n</i> blocks old at the current height.</div>
+        </div>
+        <div class="field">
+          <label for="c-dest">Heir destination address (prl1p…)</label>
+          <input type="text" id="c-dest" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="field">
+          <label for="c-cheight">Current chain height</label>
+          <input type="number" id="c-cheight" min="0">
+        </div>
+        <div class="field">
+          <label for="c-fee">Fee rate (grains/vbyte)</label>
+          <input type="number" id="c-fee" value="5" min="1" step="1">
+        </div>
+        <button class="btn" id="c-build">Build heir claim</button>
+      </div>
+
+      <div id="c-refresh-box" hidden>
+        <h3>Owner heartbeat refresh</h3>
+        <p class="hint">Spends <b>every</b> vault UTXO via the heartbeat leaf and forges a single <b>fresh UTXO at the SAME vault address</b>. The new coin's funding height restarts the heir's inactivity clock — identical keys + n always produce the same address, by design.</p>
+        <div class="field">
+          <label for="r-owner-input">Owner secret — mnemonic, WIF, or hex private key (auto-detected)</label>
+          <textarea id="r-owner-input" autocomplete="off" spellcheck="false"></textarea>
+        </div>
+        <div class="field">
+          <label for="r-utxos">Vault UTXOs — one per line: <code>txid:vout:valueGrains</code></label>
+          <textarea id="r-utxos" placeholder="ab12…:0:100000000"></textarea>
+        </div>
+        <div class="field">
+          <label for="r-fee">Fee rate (grains/vbyte)</label>
+          <input type="number" id="r-fee" value="5" min="1" step="1">
+        </div>
+        <button class="btn" id="r-build">Build refresh</button>
+        <div id="r-fresh" hidden>
+          <h3>Heartbeat confirmed</h3>
+          <div class="addr-row"><code id="r-fresh-address"></code> <button class="copy-btn" data-for="r-fresh-address">Copy</button></div>
+          <div id="r-qr" class="qr-slot"></div>
+          <p class="hint" id="r-fresh-note"></p>
+          <button class="btn small ghost" id="r-carry-vault">Back to Vault tab →</button>
+        </div>
+      </div>
+
+      <div id="c-result" hidden>
+        <h3>Signed transaction</h3>
+        <div class="kv">
+          <dt>txid</dt><dd><code id="c-txid-out"></code></dd>
+          <dt>fee</dt><dd id="c-fee-out"></dd>
+          <dt>vsize</dt><dd id="c-vsize-out"></dd>
+        </div>
+        <textarea id="c-hex" readonly></textarea>
+        <div class="confirm-banner" id="c-confirm" hidden>
+          <b>Broadcast confirmation</b> — this moves real PRL.
+          <label><input type="checkbox" id="c-ack1"> I checked the destination address and amount above.</label>
+          <label><input type="checkbox" id="c-ack2"> I understand this broadcast is irreversible.</label>
+          <button class="btn danger" id="c-broadcast-go" disabled>Broadcast now</button>
+        </div>
+        <button class="btn" id="c-broadcast">Review &amp; broadcast…</button>
+        <div class="alert" id="c-broadcast-result" hidden></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ VERIFIER ============ -->
+  <section class="step" id="step-verify">
+    <div class="panel">
+      <h2>Standalone verifier</h2>
+      <p class="lede">Paste a <code>legacy:v1:…</code> descriptor <b>and</b> the address it claims to describe. The page recomputes the contract from the keys + n and refuses loudly on any mismatch — the descriptor itself is not signed, so the claimed address must come from a source you trust. No keys needed — verification is trustless.</p>
+      <div class="field">
+        <label for="vf-descriptor">Descriptor</label>
+        <textarea id="vf-descriptor" placeholder="legacy:v1:prl:…"></textarea>
+      </div>
+      <div class="field">
+        <label for="vf-address">Claimed address</label>
+        <input type="text" id="vf-address" autocomplete="off" spellcheck="false">
+      </div>
+      <button class="btn" id="vf-run">Verify</button>
+      <div class="alert error" id="vf-error" hidden></div>
+      <div id="vf-verdict"></div>
+    </div>
+  </section>
+
+  <div class="honest-limits" id="honest-limits">
+    <h3>Honest limits</h3>
+    <ul>
+      <li>Inactivity is measured in <b>blocks</b>, not days — day figures are estimates at 194 s/block and the chain enforces blocks only.</li>
+      <li><i>n</i> is capped at 65535 blocks (~147 days) by OP_CHECKSEQUENCEVERIFY's 16-bit field. Longer lockups are impossible, not silently shortened.</li>
+      <li>The heir can claim only after <i>n</i> blocks of <b>UTXO age</b> — any owner refresh (heartbeat) restarts the clock. Watch the chain; a stale page lies.</li>
+      <li>Blockbook is read-only and never trusted blindly — every UTXO script is re-checked against the vault contract.</li>
+      <li>The descriptor is <b>not signed</b> — anyone can mint a valid-looking one for a different vault. Verify it against the address it was published with.</li>
+      <li>Heartbeat refreshes pay the <b>same</b> vault address — a different address means different keys or a different <i>n</i>.</li>
+      <li>This page never moves PRL by itself: every broadcast needs your explicit double confirmation.</li>
+      <li>Lose both keys and the funds are unspendable. The heir needs the descriptor <i>and</i> their key.</li>
+    </ul>
+  </div>
+
+  <footer class="site">
+    <p>Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> for the Pearl ecosystem · All hashing runs locally in your browser — nothing is sent anywhere except the Blockbook lookups you trigger.</p>
+    <p>Donations: <code id="donate">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code> <button class="copy-btn" data-for="donate">Copy</button></p>
+  </footer>
+</div>
+
+<script src="qrcode.min.js?v=1"></script>
+<script src="pearl-legacy.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
