@@ -63,6 +63,7 @@
         <a href="pages/rig/">Rig planner</a>
         <a href="pages/vault/">Vault</a>
         <a href="pages/channels/">Channels</a>
+        <a href="pages/lend/">Lend</a>
       </nav>
       <a class="btn btn-small" href="https://github.com/pearl-research-labs/pearl" target="_blank" rel="noopener">GitHub ↗</a>
     </div>
@@ -423,6 +424,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Atomic — Cross-Chain HTLC Desk <span class="badge">new</span></h3>
             <p>Trust-minimized cross-chain swaps on Pearl Taproot — lock PRL behind a hash-time-locked contract (SHA-256 secret preimage + CLTV timeout) with a NUMS internal key, so the counterparty claims with the secret before the timeout or you refund after it. Six-step wizard (Deal → Contract → Fund → Track → Settle → Verify) with tamper-evident descriptors, local Schnorr signing, air-gapped unsigned bundles, and a standalone verifier. Keys never leave the page.</p>
             <div class="card-links"><a href="pages/atomic/">Open Pearl Atomic →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Lend — Collateralized PRL Loans <span class="badge">new</span></h3>
+            <p>The counting-house desk — overcollateralized peer-to-peer PRL loans on pure Taproot script (no smart contracts, no oracles): the borrower locks PRL collateral in a two-leaf vault under a NUMS internal key, repays early through a 2-of-2 repay leaf with lender co-signing and signature re-verification, or the lender sweeps via a CSV-delayed default leaf after term + grace. Six steps (Offer → Lock → Fund → Track → Repay → Close &amp; Verify) with tamper-evident descriptors, grain-exact interest math, mutual-close agreements, double-confirm broadcast, and a standalone PROVEN/NOT PROVEN verifier. Keys never leave the page; honest about the pawn-shop model.</p>
+            <div class="card-links"><a href="pages/lend/">Open Pearl Lend →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Sign — Transaction Forge <span class="badge">new</span></h3>
