@@ -5903,6 +5903,7 @@ zoo`.split("\n");
     const [x, y] = bytesToHex(a) <= bytesToHex(b) ? [a, b] : [b, a];
     return taggedHash2("TapBranch", Uint8Array.from([...x, ...y]));
   }
+  var TE = new TextEncoder();
   function taptree2(network, internalXOnly, releaseScript, refundScript) {
     if (!(internalXOnly instanceof Uint8Array) || internalXOnly.length !== 32) {
       throw new Error("internal key must be 32 bytes");
@@ -5975,8 +5976,8 @@ zoo`.split("\n");
       ...spks,
       ...seqs,
       ...outs,
-      1,
-      // spend_type: script path, no annex
+      2,
+      // spend_type: script path (ext_flag=1), no annex
       ...u32le(inputIdx),
       ...leafHash,
       0,
@@ -6105,7 +6106,7 @@ zoo`.split("\n");
     return { outputs, fee, vBytes: vbytes(outputs.length), change };
   }
   function scriptAsm(script) {
-    const names = { 82: "2", 117: "DROP", 135: "EQUAL", 172: "CHECKSIG", 186: "CHECKSIGADD", 177: "CLTV" };
+    const names = { 82: "2", 117: "DROP", 135: "EQUAL", 136: "EQUALVERIFY", 168: "SHA256", 172: "CHECKSIG", 186: "CHECKSIGADD", 177: "CLTV" };
     const parts = [];
     let i = 0;
     while (i < script.length) {
@@ -6190,8 +6191,8 @@ zoo`.split("\n");
       ...spks,
       ...seqs,
       ...outs,
-      1,
-      // spend_type: script path, no annex
+      2,
+      // spend_type: script path (ext_flag=1), no annex
       ...u32le(inputIdx),
       ...leafHash,
       0,

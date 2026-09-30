@@ -40,6 +40,7 @@
         <a href="pages/vesting/">Vesting</a>
         <a href="pages/rain/">Rain</a>
         <a href="pages/stream/">Stream</a>
+        <a href="pages/bond/">Bond</a>
         <a href="pages/raffle/">Raffle</a>
         <a href="pages/swap/">Swap</a>
         <a href="pages/auction/">Auction</a>
@@ -302,6 +303,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Stream — Continuous PRL Payment Streaming <span class="badge">new</span></h3>
             <p>Payroll-style PRL streaming on Taproot — a funder streams PRL to a beneficiary at a fixed rate, one P2TR address per tick unlocking at start + i × interval. Live accrual dashboard (streamed / claimable / remaining), ONE multi-input batch-claim transaction sweeping all matured ticks, and funder cancel clawing back unmatured ticks in a single tx. NUMS internal key, tamper-evident descriptors, local signing with per-signature re-verification. Keys never leave the page.</p>
             <div class="card-links"><a href="pages/stream/">Open Pearl Stream →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Bond — Fixed-Income Desk <span class="badge">new</span></h3>
+            <p>Issue fully-collateralized fixed-income bonds on Taproot — every coupon and the principal is a pre-funded P2TR tranche output with an absolute OP_CHECKLOCKTIMEVERIFY claim leaf and a holder-reassignable transfer leaf, sealed under a NUMS internal key so there is no keypath backdoor. Forge the term sheet (30/360 coupon schedule, funding plan), redeem tranches with locally-signed + re-verified claims, and sell on the secondary market through atomic 0x83 (SINGLE|ANYONECANPAY) presigned transfers. YTM solver, accrued interest, tamper-evident descriptors. Keys never leave the page.</p>
+            <div class="card-links"><a href="pages/bond/">Open Pearl Bond →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Rain — Batch-Send PRL Airdrops <span class="badge">new</span></h3>

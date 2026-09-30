@@ -258,7 +258,7 @@ export function scriptPathSigDigestEx(network, input, outputs, leafScript, opts 
   const msg = Uint8Array.from([
     0x00, 0x00, ...u32le(network.txVersion), ...u32le(locktime),
     ...prevouts, ...amounts, ...spks, ...seqs, ...outs,
-    0x01, // spend_type: script path, no annex
+    0x02, // spend_type: script path (ext_flag=1), no annex
     ...u32le(inputIdx),
     ...leafHash, 0x00, 0xff, 0xff, 0xff, 0xff, // leaf hash, key version 0, codesep 0xffffffff
   ]);

@@ -5856,6 +5856,7 @@ zoo`.split("\n");
     if (out[out.length - 1] & 128) out.push(0);
     return Uint8Array.from(out);
   }
+  var TE = new TextEncoder();
   function signForXOnly(priv, digest) {
     const p = priv instanceof Uint8Array ? priv : hexToBytes(String(priv));
     const dg = digest instanceof Uint8Array ? digest : hexToBytes(String(digest));
@@ -5879,7 +5880,7 @@ zoo`.split("\n");
     }
   }
   function scriptAsm(script) {
-    const names = { 82: "2", 117: "DROP", 135: "EQUAL", 172: "CHECKSIG", 186: "CHECKSIGADD", 177: "CLTV" };
+    const names = { 82: "2", 117: "DROP", 135: "EQUAL", 136: "EQUALVERIFY", 168: "SHA256", 172: "CHECKSIG", 186: "CHECKSIGADD", 177: "CLTV" };
     const parts = [];
     let i = 0;
     while (i < script.length) {
@@ -6299,8 +6300,8 @@ zoo`.split("\n");
       ...spks,
       ...seqs,
       ...outs,
-      1,
-      // spend_type: script path, no annex
+      2,
+      // spend_type: script path (ext_flag=1), no annex
       ...u32le(inputIdx),
       ...leafHash,
       0,

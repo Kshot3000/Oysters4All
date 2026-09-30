@@ -1,0 +1,160 @@
+/* Pearl Bond — engraved certificate theme: deep ink, oxblood, gold foil. */
+:root {
+  --ink: #17110c;
+  --ink2: #241a12;
+  --paper: #f5edd8;
+  --paper2: #efe3c8;
+  --oxblood: #5c1a1a;
+  --oxblood2: #7a2424;
+  --gold: #c9a227;
+  --gold2: #e6c766;
+  --gold-dim: #8a6f1c;
+  --text: #f0e7cf;
+  --muted: #b8a67e;
+  --line: #3a2c1c;
+  --err: #e0705f;
+  --ok: #8fc98f;
+}
+* { box-sizing: border-box; }
+html { background: var(--ink); }
+body {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  color: var(--text);
+  background:
+    radial-gradient(1200px 500px at 50% -120px, #2b1d12 0%, var(--ink) 60%),
+    var(--ink);
+  min-height: 100vh;
+}
+h1, h2, h3 { font-weight: normal; letter-spacing: 0.02em; }
+h2 {
+  color: var(--gold2);
+  border-bottom: 1px solid var(--gold-dim);
+  padding-bottom: 0.4em;
+  font-variant: small-caps;
+  letter-spacing: 0.08em;
+}
+h3 { color: var(--gold); font-variant: small-caps; letter-spacing: 0.06em; }
+
+/* Top bar */
+.topbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 1rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 3px double var(--gold-dim);
+  background: linear-gradient(180deg, #20140c, #17110c);
+}
+.brand { display: flex; align-items: center; gap: 0.8rem; }
+.seal { width: 44px; height: 44px; color: var(--gold); }
+.brand h1 { margin: 0; font-size: 1.7rem; color: var(--gold2); font-variant: small-caps; letter-spacing: 0.1em; }
+.tagline { margin: 0.1rem 0 0; color: var(--muted); font-style: italic; font-size: 0.9rem; }
+.steps { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-left: auto; }
+.steps button {
+  font-family: inherit; cursor: pointer;
+  background: transparent; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 2px;
+  padding: 0.45rem 0.7rem; font-size: 0.85rem;
+}
+.steps button:hover { border-color: var(--gold-dim); color: var(--gold2); }
+.steps button.active {
+  background: var(--oxblood); color: var(--gold2);
+  border-color: var(--gold-dim);
+}
+
+/* Panels — certificate cards */
+main { max-width: 1080px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+.panel {
+  display: none;
+  background: linear-gradient(180deg, var(--ink2), #1c130c);
+  border: 1px solid var(--gold-dim);
+  outline: 3px double rgba(201, 162, 39, 0.25);
+  outline-offset: 5px;
+  border-radius: 2px;
+  padding: 1.5rem 1.75rem;
+  margin-bottom: 1.5rem;
+}
+.panel.active { display: block; }
+.panel.limits { display: block; border-color: var(--oxblood2); }
+.panel.limits h2 { color: var(--muted); border-color: var(--line); }
+.panel.limits ul { margin: 0.5rem 0; padding-left: 1.2rem; color: var(--muted); }
+.panel.limits li { margin: 0.4rem 0; font-size: 0.92rem; }
+.lede { color: #d9c9a3; line-height: 1.55; }
+.lede.small, .small { font-size: 0.85rem; }
+.hint { color: var(--muted); font-size: 0.8em; font-style: italic; }
+.mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.85rem; }
+.err { color: var(--err); font-size: 0.9rem; }
+.hidden { display: none !important; }
+.empty { color: var(--muted); font-style: italic; padding: 1rem 0; }
+.callout {
+  border-left: 3px solid var(--gold);
+  background: rgba(201, 162, 39, 0.07);
+  padding: 0.7rem 1rem; margin: 0.8rem 0;
+  line-height: 1.6; font-size: 0.93rem;
+}
+
+/* Forms */
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin: 1rem 0; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; }
+.col h3 { margin-top: 0; }
+.field { margin-bottom: 0.9rem; }
+.field label { display: block; margin-bottom: 0.35rem; color: var(--gold); font-size: 0.9rem; font-variant: small-caps; letter-spacing: 0.05em; }
+input[type="text"], input[type="number"], input[type="password"], select, textarea {
+  width: 100%;
+  background: #100c07; color: var(--text);
+  border: 1px solid var(--line); border-radius: 2px;
+  padding: 0.55rem 0.65rem;
+  font-family: inherit; font-size: 0.95rem;
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--gold); }
+textarea { resize: vertical; }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.7rem; margin: 0.9rem 0; }
+
+/* Buttons */
+.btn {
+  font-family: inherit; cursor: pointer;
+  border: 1px solid var(--gold-dim); border-radius: 2px;
+  padding: 0.55rem 1.1rem; font-size: 0.92rem;
+  background: transparent; color: var(--gold2);
+  font-variant: small-caps; letter-spacing: 0.06em;
+}
+.btn:hover { border-color: var(--gold2); }
+.btn.primary {
+  background: linear-gradient(180deg, var(--oxblood2), var(--oxblood));
+  color: var(--gold2); border-color: var(--gold);
+}
+.btn.primary:hover { filter: brightness(1.15); }
+.btn.ghost { color: var(--muted); border-color: var(--line); }
+.btn.ghost:hover { color: var(--gold2); border-color: var(--gold-dim); }
+.copy-btn {
+  font-family: inherit; font-size: 0.8rem; cursor: pointer;
+  background: transparent; color: var(--gold); border: 1px solid var(--line);
+  border-radius: 2px; padding: 0.2rem 0.6rem; margin-left: 0.5rem;
+}
+.copy-btn:hover { border-color: var(--gold); }
+
+/* Tables */
+.tablewrap { overflow-x: auto; margin: 0.8rem 0; }
+table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+th, td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--line); }
+th { color: var(--gold); font-variant: small-caps; letter-spacing: 0.05em; font-weight: normal; }
+td.mono, th.mono { font-size: 0.78rem; }
+tr:hover td { background: rgba(201, 162, 39, 0.04); }
+.status { font-variant: small-caps; letter-spacing: 0.05em; padding: 0.15rem 0.5rem; border-radius: 2px; border: 1px solid var(--line); }
+.status.claimable { color: var(--ok); border-color: var(--ok); }
+.status.locked { color: var(--gold2); border-color: var(--gold-dim); }
+.status.unfunded { color: var(--muted); }
+.status.spent { color: var(--err); border-color: var(--err); }
+.status.funded { color: #9fc3e0; border-color: #4a6a8a; }
+
+/* Footer */
+footer {
+  border-top: 3px double var(--gold-dim);
+  padding: 1.2rem 1.5rem 2rem;
+  color: var(--muted); font-size: 0.88rem; text-align: center;
+}
+footer a { color: var(--gold2); }
+footer code { color: var(--text); font-size: 0.78rem; word-break: break-all; }
+
+@media (max-width: 640px) {
+  .panel { padding: 1rem; }
+  .topbar { padding: 0.8rem; }
+}

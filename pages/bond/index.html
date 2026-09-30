@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Bond — fixed-income desk for PRL</title>
+<meta name="description" content="Pearl Bond: issue fixed-income bonds on Pearl. Pre-funded Taproot tranches — N coupons plus principal at maturity — fully collateralized by construction. Local signing, atomic secondary transfers, YTM solver. All crypto runs locally in your browser.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 32 32" aria-hidden="true">
+      <rect x="4" y="3" width="24" height="26" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+      <path d="M4 9h24M4 23h24" stroke="currentColor" stroke-width="1.4"/>
+      <path d="M10 14.5c2.5-1.6 5-1.6 7.5 0s5 1.6 7.5 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      <circle cx="16" cy="18.6" r="1.6" fill="currentColor"/>
+    </svg>
+    <div>
+      <h1>Pearl Bond</h1>
+      <p class="tagline">the fixed-income desk for PRL</p>
+    </div>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-step="terms" class="active">1 · Terms</button>
+    <button data-step="fund" class="">2 · Schedule &amp; Fund</button>
+    <button data-step="redeem" class="">3 · Redeem</button>
+    <button data-step="transfer" class="">4 · Transfer</button>
+    <button data-step="track" class="">5 · Verify &amp; Track</button>
+  </nav>
+</header>
+
+<main>
+  <!-- STEP 1: TERMS -->
+  <section id="step-terms" class="panel active">
+    <h2>Draft the term sheet</h2>
+    <p class="lede">A bond is a set of <strong>pre-funded Taproot tranches</strong> — one per coupon plus principal at maturity. Each tranche pays its holder at its lock height. Fully collateralized by construction: no issuer credit risk, no smart contracts.</p>
+    <div class="grid2">
+      <div class="field">
+        <label for="t-name">Bond name</label>
+        <input id="t-name" type="text" value="Pearl Bond 001" maxlength="64" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="t-network">Network</label>
+        <select id="t-network">
+          <option value="mainnet" selected>Pearl mainnet</option>
+          <option value="testnet">Pearl testnet</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="t-face">Face value (PRL)</label>
+        <input id="t-face" type="text" inputmode="decimal" value="1000" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="t-rate">Annual coupon rate (%)</label>
+        <input id="t-rate" type="text" inputmode="decimal" value="5" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="t-freq">Coupon frequency</label>
+        <select id="t-freq">
+          <option value="1">Annual</option>
+          <option value="2" selected>Semiannual</option>
+          <option value="4">Quarterly</option>
+          <option value="12">Monthly</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="t-periods">Number of periods</label>
+        <input id="t-periods" type="number" min="1" max="240" value="4" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="t-issue">Issue height <span class="hint">(defaults to chain tip)</span></label>
+        <input id="t-issue" type="text" inputmode="numeric" placeholder="auto" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="t-holder">Holder key <span class="hint">(x-only pubkey hex, or 12/24-word mnemonic to sign later)</span></label>
+        <input id="t-holder" type="text" placeholder="paste x-only pubkey or mnemonic — or generate below" autocomplete="off" spellcheck="false">
+        <div class="row">
+          <button id="t-genkey" class="btn ghost">Generate new key</button>
+        </div>
+      </div>
+    </div>
+    <div class="row">
+      <button id="t-forge" class="btn primary">Forge bond →</button>
+      <span id="t-err" class="err"></span>
+    </div>
+    <div id="t-summary" class="callout hidden"></div>
+  </section>
+
+  <!-- STEP 2: SCHEDULE & FUND -->
+  <section id="step-fund" class="panel">
+    <h2>Coupon schedule &amp; funding plan</h2>
+    <p class="lede">30/360 day-count, block target 194&nbsp;s. Fund each tranche address with exactly its amount — the schedule <em>is</em> the collateral.</p>
+    <div id="f-empty" class="empty">Forge a bond in step 1 first.</div>
+    <div id="f-body" class="hidden">
+      <div class="grid2">
+        <div class="field">
+          <label for="f-feerate">Fee rate (grains/vbyte)</label>
+          <input id="f-feerate" type="text" inputmode="decimal" value="2" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>YTM at price</label>
+          <div class="row">
+            <input id="f-price" type="text" inputmode="decimal" placeholder="price in PRL (default: par)" autocomplete="off">
+            <button id="f-ytm" class="btn ghost">Solve YTM</button>
+            <span id="f-ytm-out" class="mono"></span>
+          </div>
+        </div>
+      </div>
+      <h3>Tranches</h3>
+      <div class="tablewrap"><table id="f-table">
+        <thead><tr><th>#</th><th>Kind</th><th>Amount (PRL)</th><th>Lock height</th><th>Tranche address</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <h3>Funding plan</h3>
+      <div id="f-plan" class="callout"></div>
+      <h3>Bond descriptor</h3>
+      <p class="lede small">Anyone holding this re-derives every tranche address. Share it with the holder, the buyer, or your records.</p>
+      <textarea id="f-desc" class="mono" rows="3" readonly></textarea>
+      <div class="row">
+        <button id="f-copydesc" class="btn ghost">Copy descriptor</button>
+        <button id="f-dl" class="btn ghost">Download term sheet (.json)</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 3: REDEEM -->
+  <section id="step-redeem" class="panel">
+    <h2>Redeem a matured tranche</h2>
+    <p class="lede">Claim leaf: <span class="mono">&lt;lock&gt; CLTV DROP &lt;holder&gt; CHECKSIG</span>. Signed locally; the signature is re-verified before the transaction is built.</p>
+    <div class="grid2">
+      <div class="field">
+        <label for="r-desc">Bond descriptor <span class="hint">(or forge in step 1)</span></label>
+        <input id="r-desc" type="text" placeholder="bond:v1:…" autocomplete="off" spellcheck="false">
+        <div class="row"><button id="r-load" class="btn ghost">Load tranches</button></div>
+      </div>
+      <div class="field">
+        <label for="r-tranche">Tranche</label>
+        <select id="r-tranche"></select>
+      </div>
+      <div class="field">
+        <label for="r-txid">Funding txid</label>
+        <input id="r-txid" type="text" placeholder="64-hex txid of the tranche funding tx" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="r-vout">Funding vout</label>
+        <input id="r-vout" type="text" inputmode="numeric" value="0" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="r-dest">Destination <span class="hint">(PRL address, key path)</span></label>
+        <input id="r-dest" type="text" placeholder="prl1p…" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="r-height">Current chain height</label>
+        <input id="r-height" type="text" inputmode="numeric" placeholder="auto from Blockbook" autocomplete="off">
+        <div class="row"><button id="r-tip" class="btn ghost">Fetch tip</button></div>
+      </div>
+      <div class="field">
+        <label for="r-feerate">Fee rate (grains/vbyte)</label>
+        <input id="r-feerate" type="text" inputmode="decimal" value="2" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="r-key">Holder signing key <span class="hint">(mnemonic or 64-hex privkey — never leaves this page)</span></label>
+        <input id="r-key" type="password" placeholder="needed to sign the claim" autocomplete="off" spellcheck="false">
+      </div>
+    </div>
+    <div class="row">
+      <button id="r-build" class="btn primary">Plan &amp; sign claim</button>
+      <span id="r-err" class="err"></span>
+    </div>
+    <div id="r-out" class="hidden">
+      <h3>Signed claim transaction</h3>
+      <div id="r-meta" class="callout"></div>
+      <label>Raw transaction hex <span class="hint">(broadcast with your node / wallet)</span></label>
+      <textarea id="r-hex" class="mono" rows="5" readonly></textarea>
+      <div class="row">
+        <button id="r-copy" class="btn ghost">Copy raw tx</button>
+        <span class="mono small" id="r-txid-out"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 4: TRANSFER -->
+  <section id="step-transfer" class="panel">
+    <h2>Secondary transfer — atomic, pre-maturity</h2>
+    <p class="lede">Transfer leaf: <span class="mono">&lt;holder&gt; CHECKSIG</span>. The seller presigns each leg with <span class="mono">SIGHASH_SINGLE|ANYONECANPAY (0x83)</span>; the buyer verifies the package and builds one fill transaction. Neither side can steal: the presignature commits only to its own input↔output pair.</p>
+    <div class="cols">
+      <div class="col">
+        <h3>Seller: presign legs</h3>
+        <div class="field"><label for="s-desc">Bond descriptor</label><input id="s-desc" type="text" placeholder="bond:v1:…" autocomplete="off" spellcheck="false"></div>
+        <div class="field"><label for="s-key">Seller signing key <span class="hint">(mnemonic or 64-hex privkey)</span></label><input id="s-key" type="password" autocomplete="off" spellcheck="false"></div>
+        <div class="field"><label for="s-buyer">Buyer tranche key <span class="hint">(x-only pubkey hex or PRL address)</span></label><input id="s-buyer" type="text" autocomplete="off" spellcheck="false"></div>
+        <div class="field"><label for="s-legs">Legs <span class="hint">(tranche indexes, comma-separated; funding txid:vout:value per leg below)</span></label><input id="s-legs" type="text" value="0" autocomplete="off"></div>
+        <div class="field"><label for="s-outpoints">Funding outpoints <span class="hint">(one per leg: txid:vout:valueGrains)</span></label><textarea id="s-outpoints" rows="3" class="mono" placeholder="ab…:0:2500000000"></textarea></div>
+        <div class="field"><label for="s-feerate">Fee rate (grains/vbyte)</label><input id="s-feerate" type="text" inputmode="decimal" value="2" autocomplete="off"></div>
+        <div class="row"><button id="s-presign" class="btn primary">Presign legs</button><span id="s-err" class="err"></span></div>
+      </div>
+      <div class="col">
+        <h3>Buyer: verify &amp; fill</h3>
+        <div class="field"><label for="b-pkg">Transfer package (JSON)</label><textarea id="b-pkg" rows="5" class="mono" placeholder='paste the seller&apos;s package'></textarea></div>
+        <div class="field"><label for="b-price">Agreed price (PRL)</label><input id="b-price" type="text" inputmode="decimal" autocomplete="off"></div>
+        <div class="field"><label for="b-utxo">Buyer payment UTXO <span class="hint">(txid:vout:valueGrains)</span></label><input id="b-utxo" type="text" class="mono" autocomplete="off" spellcheck="false"></div>
+        <div class="field"><label for="b-utxokey">Buyer UTXO signing key <span class="hint">(mnemonic or 64-hex privkey)</span></label><input id="b-utxokey" type="password" autocomplete="off" spellcheck="false"></div>
+        <div class="field"><label for="b-sellerpay">Seller payment address <span class="hint">(PRL address)</span></label><input id="b-sellerpay" type="text" autocomplete="off" spellcheck="false"></div>
+        <div class="field"><label for="b-change">Buyer change address <span class="hint">(PRL address)</span></label><input id="b-change" type="text" autocomplete="off" spellcheck="false"></div>
+        <div class="field"><label for="b-feerate">Fee rate (grains/vbyte)</label><input id="b-feerate" type="text" inputmode="decimal" value="2" autocomplete="off"></div>
+        <div class="row"><button id="b-fill" class="btn primary">Verify &amp; build fill tx</button><span id="b-err" class="err"></span></div>
+      </div>
+    </div>
+    <div id="t-pkg-out" class="hidden">
+      <h3>Transfer package</h3>
+      <p class="lede small">Send this JSON to the buyer. It contains the seller's 0x83 presignatures — safe to transmit.</p>
+      <textarea id="t-pkg" class="mono" rows="6" readonly></textarea>
+      <div class="row"><button id="t-pkgcopy" class="btn ghost">Copy package</button></div>
+    </div>
+    <div id="t-fill-out" class="hidden">
+      <h3>Fill transaction</h3>
+      <div id="t-fill-meta" class="callout"></div>
+      <textarea id="t-fill-hex" class="mono" rows="5" readonly></textarea>
+      <div class="row"><button id="t-fill-copy" class="btn ghost">Copy raw tx</button></div>
+    </div>
+  </section>
+
+  <!-- STEP 5: VERIFY & TRACK -->
+  <section id="step-track" class="panel">
+    <h2>Verify &amp; track</h2>
+    <p class="lede">Re-derive every tranche from the descriptor and check funding + maturity against Blockbook.</p>
+    <div class="field" style="max-width:640px">
+      <label for="k-desc">Bond descriptor</label>
+      <input id="k-desc" type="text" placeholder="bond:v1:…" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="row">
+      <button id="k-check" class="btn primary">Verify &amp; track</button>
+      <span id="k-err" class="err"></span>
+    </div>
+    <div id="k-out" class="hidden">
+      <div id="k-meta" class="callout"></div>
+      <div class="tablewrap"><table id="k-table">
+        <thead><tr><th>#</th><th>Kind</th><th>Address</th><th>Amount</th><th>Lock</th><th>Status</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <section id="honest-limits" class="panel limits">
+    <h2>Honest limits</h2>
+    <ul>
+      <li>Nothing is locked until the issuer actually sends PRL to each tranche address — the term sheet is a plan until funded.</li>
+      <li>Coupon dates are block-height estimates (194&nbsp;s target). Real maturity follows the chain, not the calendar.</li>
+      <li>Secondary transfers need the seller's cooperation to presign; there is no trustless listing or price discovery here.</li>
+      <li>Tracking reads the public Blockbook indexer. Balances shown are on-chain facts, not promises.</li>
+      <li>Test on testnet first. This is a fixed-income toolkit, not legal, tax, or investment advice.</li>
+    </ul>
+  </section>
+</main>
+
+<footer>
+  <p>Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> for the Pearl ecosystem · All cryptography runs locally in your browser — keys never leave this page.</p>
+  <p>Donations: <code id="donate">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code> <button class="copy-btn" data-for="donate">Copy</button></p>
+</footer>
+
+<script src="pearl-bond.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>

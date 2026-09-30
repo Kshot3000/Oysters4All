@@ -237,7 +237,7 @@ test("scriptPathSigDigestMulti matches a hand-rolled BIP-341 message", () => {
     const msg = Uint8Array.from([
       0x00, 0x00, ...u32le(N.txVersion), ...u32le(0),
       ...prevouts, ...amounts, ...spks, ...seqs, ...outs,
-      0x01, ...u32le(idx), ...leafHash, 0x00, 0xff, 0xff, 0xff, 0xff,
+      0x02, ...u32le(idx), ...leafHash, 0x00, 0xff, 0xff, 0xff, 0xff, // 0x02 = script path (ext_flag=1), BIP-341
     ]);
     const expected = taggedHash("TapSighash", msg);
     assert.deepEqual(

@@ -18,7 +18,7 @@ var PearlNotary = (() => {
   };
   var __toCommonJS = (mod2) => __copyProps(__defProp({}, "__esModule", { value: true }), mod2);
 
-  // notary/src/index.js
+  // src/index.js
   var index_exports = {};
   __export(index_exports, {
     CARRIER_VALUE_GRAINS: () => CARRIER_VALUE_GRAINS,
@@ -52,10 +52,10 @@ var PearlNotary = (() => {
     walletFromWIF: () => walletFromWIF
   });
 
-  // sign/lib/noble-hashes/crypto.js
+  // ../sign/lib/noble-hashes/crypto.js
   var crypto = typeof globalThis === "object" && "crypto" in globalThis ? globalThis.crypto : void 0;
 
-  // sign/lib/noble-hashes/utils.js
+  // ../sign/lib/noble-hashes/utils.js
   function isBytes(a) {
     return a instanceof Uint8Array || ArrayBuffer.isView(a) && a.constructor.name === "Uint8Array";
   }
@@ -206,7 +206,7 @@ var PearlNotary = (() => {
     throw new Error("crypto.getRandomValues must be defined");
   }
 
-  // sign/lib/noble-curves/utils.js
+  // ../sign/lib/noble-curves/utils.js
   var _0n = /* @__PURE__ */ BigInt(0);
   var _1n = /* @__PURE__ */ BigInt(1);
   function _abool2(value, title = "") {
@@ -359,7 +359,7 @@ var PearlNotary = (() => {
     };
   }
 
-  // sign/lib/noble-curves/abstract/modular.js
+  // ../sign/lib/noble-curves/abstract/modular.js
   var _0n2 = BigInt(0);
   var _1n2 = BigInt(1);
   var _2n = /* @__PURE__ */ BigInt(2);
@@ -704,7 +704,7 @@ var PearlNotary = (() => {
     return isLE ? numberToBytesLE(reduced, fieldLen) : numberToBytesBE(reduced, fieldLen);
   }
 
-  // sign/lib/noble-hashes/_md.js
+  // ../sign/lib/noble-hashes/_md.js
   function setBigUint64(view, byteOffset, value, isLE) {
     if (typeof view.setBigUint64 === "function")
       return view.setBigUint64(byteOffset, value, isLE);
@@ -842,7 +842,7 @@ var PearlNotary = (() => {
     327033209
   ]);
 
-  // sign/lib/noble-hashes/_u64.js
+  // ../sign/lib/noble-hashes/_u64.js
   var U32_MASK64 = /* @__PURE__ */ BigInt(2 ** 32 - 1);
   var _32n = /* @__PURE__ */ BigInt(32);
   function fromBig(n, le = false) {
@@ -877,7 +877,7 @@ var PearlNotary = (() => {
   var add5L = (Al, Bl, Cl, Dl, El) => (Al >>> 0) + (Bl >>> 0) + (Cl >>> 0) + (Dl >>> 0) + (El >>> 0);
   var add5H = (low, Ah, Bh, Ch, Dh, Eh) => Ah + Bh + Ch + Dh + Eh + (low / 2 ** 32 | 0) | 0;
 
-  // sign/lib/noble-hashes/sha2.js
+  // ../sign/lib/noble-hashes/sha2.js
   var SHA256_K = /* @__PURE__ */ Uint32Array.from([
     1116352408,
     1899447441,
@@ -1215,7 +1215,7 @@ var PearlNotary = (() => {
   var sha256 = /* @__PURE__ */ createHasher(() => new SHA256());
   var sha512 = /* @__PURE__ */ createHasher(() => new SHA512());
 
-  // sign/lib/noble-hashes/hmac.js
+  // ../sign/lib/noble-hashes/hmac.js
   var HMAC = class extends Hash {
     constructor(hash, _key) {
       super();
@@ -1283,7 +1283,7 @@ var PearlNotary = (() => {
   var hmac = (hash, key, message) => new HMAC(hash, key).update(message).digest();
   hmac.create = (hash, key) => new HMAC(hash, key);
 
-  // sign/lib/noble-curves/abstract/curve.js
+  // ../sign/lib/noble-curves/abstract/curve.js
   var _0n3 = BigInt(0);
   var _1n3 = BigInt(1);
   function negateCt(condition, item) {
@@ -1561,7 +1561,7 @@ var PearlNotary = (() => {
     return { CURVE, Fp, Fn };
   }
 
-  // sign/lib/noble-curves/abstract/weierstrass.js
+  // ../sign/lib/noble-curves/abstract/weierstrass.js
   var divNearest = (num2, den) => (num2 + (num2 >= 0 ? den : -den) / _2n2) / den;
   function _splitEndoScalar(k, basis, n) {
     const [[a1, b1], [a2, b2]] = basis;
@@ -2575,16 +2575,16 @@ var PearlNotary = (() => {
     return _ecdsa_new_output_to_legacy(c, signs);
   }
 
-  // sign/lib/noble-curves/_shortw_utils.js
+  // ../sign/lib/noble-curves/_shortw_utils.js
   function createCurve(curveDef, defHash) {
     const create = (hash) => weierstrass({ ...curveDef, hash });
     return { ...create(defHash), create };
   }
 
-  // sign/lib/noble-curves/abstract/hash-to-curve.js
+  // ../sign/lib/noble-curves/abstract/hash-to-curve.js
   var _DST_scalar = utf8ToBytes("HashToScalar-");
 
-  // sign/lib/noble-curves/secp256k1.js
+  // ../sign/lib/noble-curves/secp256k1.js
   var secp256k1_CURVE = {
     p: BigInt("0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"),
     n: BigInt("0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141"),
@@ -2745,7 +2745,7 @@ var PearlNotary = (() => {
     };
   })();
 
-  // sign/lib/noble-hashes/legacy.js
+  // ../sign/lib/noble-hashes/legacy.js
   var Rho160 = /* @__PURE__ */ Uint8Array.from([
     7,
     4,
@@ -2863,7 +2863,7 @@ var PearlNotary = (() => {
   };
   var ripemd160 = /* @__PURE__ */ createHasher(() => new RIPEMD160());
 
-  // sign/lib/scure-base/index.js
+  // ../sign/lib/scure-base/index.js
   function isBytes2(a) {
     return a instanceof Uint8Array || ArrayBuffer.isView(a) && a.constructor.name === "Uint8Array";
   }
@@ -3149,7 +3149,7 @@ var PearlNotary = (() => {
   var base58 = /* @__PURE__ */ genBase58("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz");
   var createBase58check = (sha2563) => /* @__PURE__ */ chain(checksum(4, (data) => sha2563(sha2563(data))), base58);
 
-  // sign/lib/scure-bip32/index.js
+  // ../sign/lib/scure-bip32/index.js
   var Point = secp256k1.ProjectivePoint;
   var base58check = createBase58check(sha256);
   function bytesToNumber(bytes) {
@@ -3394,7 +3394,7 @@ var PearlNotary = (() => {
     }
   };
 
-  // sign/lib/noble-hashes/pbkdf2.js
+  // ../sign/lib/noble-hashes/pbkdf2.js
   function pbkdf2Init(hash, _password, _salt, _opts) {
     ahash(hash);
     const opts = checkOpts({ dkLen: 32, asyncTick: 10 }, _opts);
@@ -3439,7 +3439,7 @@ var PearlNotary = (() => {
     return pbkdf2Output(PRF, PRFSalt, DK, prfW, u);
   }
 
-  // sign/lib/scure-bip39/index.js
+  // ../sign/lib/scure-bip39/index.js
   var isJapanese = (wordlist2) => wordlist2[0] === "\u3042\u3044\u3053\u304F\u3057\u3093";
   function nfkd(str) {
     if (typeof str !== "string")
@@ -3499,7 +3499,7 @@ var PearlNotary = (() => {
     return pbkdf2(sha512, normalize(mnemonic).nfkd, psalt(passphrase), { c: 2048, dkLen: 64 });
   }
 
-  // sign/lib/scure-bip39/wordlists/english.js
+  // ../sign/lib/scure-bip39/wordlists/english.js
   var wordlist = `abandon
 ability
 able
@@ -5549,14 +5549,14 @@ zero
 zone
 zoo`.split("\n");
 
-  // sign/lib/noble-hashes/sha256.js
+  // ../sign/lib/noble-hashes/sha256.js
   var sha2562 = sha256;
 
-  // sign/lib/noble-curves/abstract/utils.js
+  // ../sign/lib/noble-curves/abstract/utils.js
   var bytesToNumberBE2 = bytesToNumberBE;
   var numberToBytesBE2 = numberToBytesBE;
 
-  // sign/src/crypto.js
+  // ../sign/src/crypto.js
   var GRAIN_PER_PRL = 1e8;
   var DUST_GRAIN = 546;
   var NETWORKS = {
@@ -5887,8 +5887,8 @@ zoo`.split("\n");
       ...spks,
       ...seqs,
       ...outs,
-      1,
-      // spend_type: script path, no annex
+      2,
+      // spend_type: script path (ext_flag=1), no annex
       ...u32le(inputIdx),
       ...leafHash,
       0,
@@ -5986,7 +5986,7 @@ zoo`.split("\n");
     return txid.toLowerCase();
   }
 
-  // etch/src/etch-core.js
+  // ../etch/src/etch-core.js
   function addressToProgram(address, network) {
     const d = decodeBech32m(address, network.hrp);
     return d.program;
@@ -6156,7 +6156,7 @@ zoo`.split("\n");
     throw new Error("no inscription envelopes found in reveal witness");
   }
 
-  // notary/src/notary-core.js
+  // src/notary-core.js
   function hashDocument(data) {
     let bytes;
     if (data instanceof Uint8Array) bytes = data;

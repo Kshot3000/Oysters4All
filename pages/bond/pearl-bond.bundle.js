@@ -1,5 +1,5 @@
-/* Pearl Covenant bundle (window.PearlCovenant) — built with esbuild from src/index.js. Do not edit by hand; run `node build.mjs`. */
-var PearlCovenant = (() => {
+/* Pearl Bond bundle (window.PearlBond) — built with esbuild from src/index.js (bond-core.js + sign/escrow/market-lineage helpers). Do not edit by hand; run `node build.mjs`. */
+var PearlBond = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
   var __getOwnPropNames = Object.getOwnPropertyNames;
@@ -21,54 +21,75 @@ var PearlCovenant = (() => {
   // src/index.js
   var index_exports = {};
   __export(index_exports, {
+    BLOCKBOOK_MAINNET: () => BLOCKBOOK_MAINNET,
+    BLOCK_TIME_SEC: () => BLOCK_TIME_SEC,
     DESCRIPTOR_PREFIX: () => DESCRIPTOR_PREFIX,
     DUST_GRAIN: () => DUST_GRAIN,
     GRAIN_PER_PRL: () => GRAIN_PER_PRL,
-    MAX_COSIGNERS: () => MAX_COSIGNERS,
+    MAX_PERIODS: () => MAX_PERIODS,
     NETWORKS: () => NETWORKS,
-    ROUND_KIND: () => ROUND_KIND,
-    ROUND_VERSION: () => ROUND_VERSION,
+    SEQ_FINAL: () => SEQ_FINAL,
+    SEQ_NONFINAL: () => SEQ_NONFINAL,
+    SIGHASH_SINGLE_ANYONECANPAY: () => SIGHASH_SINGLE_ANYONECANPAY2,
+    Sign: () => sign_core_exports,
+    accruedInterest: () => accruedInterest,
     addressToProgram: () => addressToProgram,
     broadcastTx: () => broadcastTx,
-    buildMultisigScript: () => buildMultisigScript,
-    buildSigningRound: () => buildSigningRound,
+    buildClaimScript: () => buildClaimScript,
+    buildFillTx: () => buildFillTx,
+    buildTransferScript: () => buildTransferScript,
     bytesToHex: () => bytesToHex,
-    convertBits: () => convertBits,
-    covenantDescriptor: () => covenantDescriptor,
-    covenantFromDescriptor: () => covenantFromDescriptor,
-    covenantSpendVBytes: () => covenantSpendVBytes,
-    covenantTaptree: () => covenantTaptree,
-    createCovenant: () => createCovenant,
+    classifyTranches: () => classifyTranches,
+    couponGrains: () => couponGrains,
+    couponSchedule: () => couponSchedule,
     dblSha: () => dblSha,
     decodeBech32m: () => decodeBech32m,
-    describeRound: () => describeRound,
+    decodeBondDescriptor: () => decodeBondDescriptor,
     encodeBech32m: () => encodeBech32m,
+    encodeBondDescriptor: () => encodeBondDescriptor,
+    encodeScriptNum: () => encodeScriptNum,
     fetchFeeRateGrainsPerVByte: () => fetchFeeRateGrainsPerVByte,
     fetchTxStatus: () => fetchTxStatus,
     fetchUtxos: () => fetchUtxos,
-    finalizeRound: () => finalizeRound,
+    fmtPRL: () => fmtPRL,
+    forgeBond: () => forgeBond,
+    forgeTranche: () => forgeTranche,
+    fundingPlan: () => fundingPlan,
     hexToBytes: () => hexToBytes,
-    importSig: () => importSig,
+    keypathTxVBytes: () => keypathTxVBytes,
+    lockHeightForPeriod: () => lockHeightForPeriod,
     newMnemonic: () => newMnemonic,
-    numsInternalKey: () => numsInternalKey,
+    numsInternalKeyBond: () => numsInternalKeyBond,
     p2trScriptPubKey: () => p2trScriptPubKey,
-    parseRound: () => parseRound,
+    parseBondTerms: () => parseBondTerms,
+    parsePRL: () => parsePRL,
     parseXOnlyKey: () => parseXOnlyKey,
     partyKeyFromInput: () => partyKeyFromInput,
-    pubkeyFromPriv: () => pubkeyFromPriv,
-    roundStatus: () => roundStatus,
+    planClaim: () => planClaim,
+    planSpend: () => planSpend,
+    presignTransferLeg: () => presignTransferLeg,
     schnorr: () => schnorr,
     scriptAsm: () => scriptAsm,
+    scriptPathSigDigest83: () => scriptPathSigDigest83,
     scriptPathSigDigestEx: () => scriptPathSigDigestEx,
-    serializeRound: () => serializeRound,
     sha256: () => sha2562,
+    signClaim: () => signClaim,
     signForXOnly: () => signForXOnly,
-    signRound: () => signRound,
-    sortKeys: () => sortKeys,
+    spendVBytes: () => spendVBytes,
+    taptreeBond: () => taptreeBond,
+    totalFundingGrains: () => totalFundingGrains,
+    transferLegVBytes: () => transferLegVBytes,
+    tweakKeypath: () => tweakKeypath,
+    tweakPrivKeypath: () => tweakPrivKeypath,
     txidLE: () => txidLE,
-    verifyCovenantControlBlock: () => verifyCovenantControlBlock,
+    verifyDescriptor: () => verifyDescriptor,
     verifySchnorrSig: () => verifySchnorrSig,
-    walletFromMnemonic: () => walletFromMnemonic
+    verifyTransferLeg: () => verifyTransferLeg,
+    walletFromMnemonic: () => walletFromMnemonic,
+    walletFromPriv: () => walletFromPriv,
+    walletFromWIF: () => walletFromWIF,
+    walletToWIF: () => walletToWIF,
+    yieldToMaturity: () => yieldToMaturity
   });
 
   // ../sign/lib/noble-hashes/crypto.js
@@ -5703,6 +5724,22 @@ zoo`.split("\n");
     return walletFromPriv(child.privateKey, network);
   }
   var b58check = createBase58check(sha2562);
+  function walletFromWIF(wif, network) {
+    const raw = b58check.decode(wif.trim());
+    if (raw.length < 33) throw new Error("invalid WIF payload length");
+    if (raw[0] !== network.wifVersion) throw new Error(`wrong WIF network version (expected 0x${network.wifVersion.toString(16)})`);
+    let key = raw.slice(1);
+    if (key.length === 33 && key[32] === 1) key = key.slice(0, 32);
+    if (key.length !== 32) throw new Error("invalid WIF key length");
+    return walletFromPriv(key, network);
+  }
+  function walletToWIF(priv, network) {
+    const payload = new Uint8Array(34);
+    payload[0] = network.wifVersion;
+    payload.set(priv, 1);
+    payload[33] = 1;
+    return b58check.encode(payload);
+  }
   function walletFromPriv(priv, network) {
     const p = priv instanceof Uint8Array ? priv : hexToBytes(priv);
     if (p.length !== 32) throw new Error("private key must be 32 bytes");
@@ -5720,6 +5757,13 @@ zoo`.split("\n");
     const P = schnorr.utils.lift_x(bytesToNumberBE2(internalXOnly));
     const Q = P.add(schnorr.Point.BASE.multiply(bytesToNumberBE2(t)));
     return { tweakedX: schnorr.utils.pointToBytes(Q), t };
+  }
+  function tweakPrivKeypath(priv, internalXOnly) {
+    let d = bytesToNumberBE2(priv);
+    const P = secp256k1.ProjectivePoint.fromPrivateKey(numberToBytesBE2(d, 32));
+    if (P.toRawBytes(true)[0] === 3) d = secp256k1.CURVE.n - d;
+    const { t } = tweakKeypath(internalXOnly);
+    return numberToBytesBE2((d + bytesToNumberBE2(t)) % secp256k1.CURVE.n, 32);
   }
   function varint(n) {
     if (n < 253) return [n];
@@ -5742,6 +5786,60 @@ zoo`.split("\n");
     if (!/^[0-9a-f]{64}$/i.test(txidHex)) throw new Error("bad txid");
     return hexToBytes(txidHex).reverse();
   };
+  function keypathTxVBytes(nIn, nOut) {
+    if (!Number.isInteger(nIn) || nIn < 1) throw new Error("nIn must be a positive integer");
+    if (!Number.isInteger(nOut) || nOut < 1) throw new Error("nOut must be a positive integer");
+    const baseBytes = 4 + 1 + 41 * nIn + 1 + 43 * nOut + 4;
+    const weight = 4 * baseBytes + 2 + 66 * nIn;
+    return Math.ceil(weight / 4);
+  }
+  function keypathSigDigestEx(network, inputs, outputs, sequence, idx, hashType = 0) {
+    const sha = (b) => sha2562(b);
+    if (!Number.isInteger(idx) || idx < 0 || idx >= inputs.length) throw new Error("bad input index");
+    if (hashType !== 0 && hashType !== 131) throw new Error("unsupported hash_type (only 0x00 and 0x83)");
+    const acp = (hashType & 128) !== 0;
+    const base = hashType & 3;
+    for (const i of inputs) {
+      if (!/^[0-9a-f]{64}$/i.test(i.txid || "")) throw new Error("bad input txid");
+      if (!Number.isInteger(i.vout) || i.vout < 0) throw new Error("bad input vout");
+      if (!Number.isSafeInteger(i.value) || i.value <= 0) throw new Error("bad input value");
+      if (!(i.spk instanceof Uint8Array) || i.spk.length === 0) throw new Error("bad input spk");
+    }
+    const msg = [0, hashType, ...u32le(network.txVersion), ...u32le(0)];
+    if (!acp) {
+      msg.push(...sha(Uint8Array.from(inputs.flatMap((i) => [...txidLE(i.txid), ...u32le(i.vout)]))));
+      msg.push(...sha(Uint8Array.from(inputs.flatMap((i) => u64le(i.value)))));
+      msg.push(...sha(Uint8Array.from(inputs.flatMap((i) => [...varint(i.spk.length), ...i.spk]))));
+      msg.push(...sha(Uint8Array.from(inputs.flatMap(() => u32le(sequence)))));
+    }
+    if (base !== 3 && base !== 2) {
+      msg.push(...sha(Uint8Array.from(outputs.flatMap((o) => {
+        const s = p2trScriptPubKey(o.program);
+        return [...u64le(o.value), ...varint(s.length), ...s];
+      }))));
+    }
+    msg.push(0);
+    const inp = inputs[idx];
+    if (acp) {
+      msg.push(
+        ...txidLE(inp.txid),
+        ...u32le(inp.vout),
+        ...u64le(inp.value),
+        ...varint(inp.spk.length),
+        ...inp.spk,
+        ...u32le(sequence)
+      );
+    } else {
+      msg.push(...u32le(idx));
+    }
+    if (base === 3) {
+      if (idx >= outputs.length) throw new Error("SIGHASH_SINGLE: no output at input index");
+      const o = outputs[idx];
+      const s = p2trScriptPubKey(o.program);
+      msg.push(...sha(Uint8Array.from([...u64le(o.value), ...varint(s.length), ...s])));
+    }
+    return taggedHash2("TapSighash", Uint8Array.from(msg));
+  }
   var TAPLEAF_VERSION = 192;
   function tapLeafHash(script) {
     const pre = Uint8Array.from([TAPLEAF_VERSION, ...varint(script.length), ...script]);
@@ -5798,10 +5896,362 @@ zoo`.split("\n");
     return bbFetch(blockbookBase, `/api/v2/tx/${txid}`);
   }
 
+  // ../sign/src/sign-core.js
+  var sign_core_exports = {};
+  __export(sign_core_exports, {
+    SIGHASH_DEFAULT: () => SIGHASH_DEFAULT,
+    SIGHASH_SINGLE_ANYONECANPAY: () => SIGHASH_SINGLE_ANYONECANPAY,
+    broadcastViaBlockbook: () => broadcastViaBlockbook,
+    buildKeypathTxEx: () => buildKeypathTxEx,
+    decodeRawTx: () => decodeRawTx,
+    describeSpk: () => describeSpk,
+    fetchFeeRate: () => fetchFeeRate,
+    fetchUtxos: () => fetchUtxos2,
+    fmtPRL: () => fmtPRL,
+    parsePRL: () => parsePRL,
+    parseUtxoList: () => parseUtxoList,
+    pearldRpc: () => pearldRpc,
+    selectCoins: () => selectCoins,
+    verifySignedTx: () => verifySignedTx
+  });
+  var SIGHASH_DEFAULT = 0;
+  var SIGHASH_SINGLE_ANYONECANPAY = 131;
+  function fmtPRL(grains) {
+    const g = BigInt(grains);
+    const neg = g < 0n;
+    const a = neg ? -g : g;
+    const whole = a / BigInt(GRAIN_PER_PRL);
+    const frac = (a % BigInt(GRAIN_PER_PRL)).toString().padStart(8, "0").replace(/0+$/, "");
+    return (neg ? "-" : "") + whole.toString() + (frac ? "." + frac : "");
+  }
+  function parsePRL(s) {
+    if (typeof s !== "string") throw new Error("amount must be a string");
+    const m = s.trim().match(/^(\d+)(?:\.(\d{1,8}))?$/);
+    if (!m) throw new Error(`invalid PRL amount: ${s}`);
+    const whole = BigInt(m[1]) * BigInt(GRAIN_PER_PRL);
+    const frac = m[2] ? BigInt(m[2].padEnd(8, "0")) : 0n;
+    return whole + frac;
+  }
+  var Reader = class {
+    constructor(bytes) {
+      this.b = bytes;
+      this.i = 0;
+    }
+    get left() {
+      return this.b.length - this.i;
+    }
+    bytes(n) {
+      if (this.left < n) throw new Error(`truncated tx (need ${n} bytes, have ${this.left})`);
+      return this.b.slice(this.i, this.i += n);
+    }
+    u32() {
+      if (this.left < 4) throw new Error(`truncated tx (need 4 bytes, have ${this.left})`);
+      const v = new DataView(this.b.buffer, this.b.byteOffset + this.i, 4).getUint32(0, true);
+      this.i += 4;
+      return v;
+    }
+    u64() {
+      const lo = this.u32(), hi = this.u32();
+      return BigInt(hi) * 0x100000000n + BigInt(lo);
+    }
+    varint() {
+      const b0 = this.bytes(1)[0];
+      if (b0 < 253) return b0;
+      if (b0 === 253) {
+        const v2 = this.u32() & 65535;
+        return v2;
+      }
+      if (b0 === 254) return this.u32();
+      const v = this.u64();
+      if (v > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("varint too large");
+      return Number(v);
+    }
+    varbytes() {
+      return this.bytes(this.varint());
+    }
+  };
+  function decodeRawTx(hex) {
+    if (!/^[0-9a-fA-F]*$/.test(hex) || hex.length % 2 !== 0) throw new Error("not hex");
+    const b = hexToBytes(hex.toLowerCase());
+    const r = new Reader(b);
+    const version = r.u32();
+    let witness = null;
+    if (r.left >= 2 && r.b[r.i] === 0 && r.b[r.i + 1] === 1) {
+      r.i += 2;
+      witness = [];
+    }
+    const nIn = r.varint();
+    if (nIn === 0 || nIn > 1e5) throw new Error("bad input count");
+    const inputs = [];
+    for (let k = 0; k < nIn; k++) {
+      const txid2 = bytesToHex(r.bytes(32).slice().reverse());
+      const vout = r.u32();
+      const scriptSig = r.varbytes();
+      const sequence = r.u32();
+      inputs.push({ txid: txid2, vout, scriptSig, sequence });
+    }
+    const nOut = r.varint();
+    if (nOut === 0 || nOut > 1e5) throw new Error("bad output count");
+    const outputs = [];
+    for (let k = 0; k < nOut; k++) {
+      const value = r.u64();
+      const spk = r.varbytes();
+      outputs.push({ value, spk });
+    }
+    if (witness) {
+      for (let k = 0; k < nIn; k++) {
+        const nItems = r.varint();
+        if (nItems > 100) throw new Error("witness stack too large");
+        const stack = [];
+        for (let j = 0; j < nItems; j++) stack.push(r.varbytes());
+        witness.push(stack);
+      }
+    }
+    const locktime = r.u32();
+    if (r.left !== 0) throw new Error(`${r.left} trailing bytes`);
+    const core = [...u32le(version), ...varint(nIn)];
+    for (const inp of inputs) {
+      core.push(...hexToBytes(inp.txid).reverse(), ...u32le(inp.vout), ...varint(inp.scriptSig.length), ...inp.scriptSig, ...u32le(inp.sequence));
+    }
+    core.push(...varint(nOut));
+    for (const out of outputs) {
+      const lo = Number(out.value & 0xffffffffn), hi = Number(out.value >> 32n);
+      core.push(...u32le(lo), ...u32le(hi), ...varint(out.spk.length), ...out.spk);
+    }
+    core.push(...u32le(locktime));
+    const txid = bytesToHex(sha2562(sha2562(Uint8Array.from(core))).reverse());
+    return { version, inputs, outputs, witness, locktime, txid };
+  }
+  function describeSpk(spk, network) {
+    if (spk.length === 34 && spk[0] === 81 && spk[1] === 32) {
+      const program = spk.slice(2);
+      return { type: "P2TR", address: encodeBech32m(network.hrp, 1, program), program };
+    }
+    if (spk.length === 22 && spk[0] === 0 && spk[1] === 20) return { type: "P2WPKH(v0, non-Pearl)", address: null };
+    if (spk.length === 25 && spk[0] === 118) return { type: "P2PKH (non-Pearl)", address: null };
+    return { type: "unknown", address: null };
+  }
+  function buildKeypathTxEx(network, inputs, outputs, hashType = SIGHASH_DEFAULT, sequence = 4294967295) {
+    if (!inputs.length || !outputs.length) throw new Error("need inputs and outputs");
+    if (hashType !== SIGHASH_DEFAULT && hashType !== SIGHASH_SINGLE_ANYONECANPAY) throw new Error("unsupported hash_type");
+    for (const o of outputs) {
+      if (!(o.program instanceof Uint8Array) || o.program.length !== 32) throw new Error("bad output program");
+      if (!Number.isSafeInteger(o.value) || o.value <= 0) throw new Error("bad output value");
+    }
+    const inDigest = inputs.map((i) => {
+      if (!(i.spk instanceof Uint8Array) || i.spk.length === 0) throw new Error("input needs spk");
+      if (!Number.isSafeInteger(i.value) || i.value <= 0) throw new Error("bad input value");
+      return { txid: i.txid, vout: i.vout, value: i.value, spk: i.spk };
+    });
+    const core = [...u32le(network.txVersion), ...varint(inputs.length)];
+    for (const inp of inputs) core.push(...txidLE(inp.txid), ...u32le(inp.vout), ...varint(0), ...u32le(sequence));
+    core.push(...varint(outputs.length));
+    for (const out of outputs) {
+      const s = p2trScriptPubKey(out.program);
+      core.push(...u64le(out.value), ...varint(s.length), ...s);
+    }
+    core.push(...u32le(0));
+    const txid = bytesToHex(sha2562(sha2562(Uint8Array.from(core))).reverse());
+    const sigs = inputs.map((inp, i) => {
+      const digest = keypathSigDigestEx(network, inDigest, outputs, sequence, i, hashType);
+      const tweaked = tweakPrivKeypath(inp.priv, inp.internalXOnly);
+      return schnorr.sign(digest, tweaked, new Uint8Array(32));
+    });
+    const full = [...u32le(network.txVersion), 0, 1, ...varint(inputs.length)];
+    for (const inp of inputs) full.push(...txidLE(inp.txid), ...u32le(inp.vout), ...varint(0), ...u32le(sequence));
+    full.push(...varint(outputs.length));
+    for (const out of outputs) {
+      const s = p2trScriptPubKey(out.program);
+      full.push(...u64le(out.value), ...varint(s.length), ...s);
+    }
+    for (const sig of sigs) {
+      const withType = hashType === SIGHASH_DEFAULT ? sig : Uint8Array.from([...sig, hashType]);
+      full.push(...varint(1), ...varint(withType.length), ...withType);
+    }
+    full.push(...u32le(0));
+    return { txid, hex: bytesToHex(Uint8Array.from(full)) };
+  }
+  function verifySignedTx(network, signedHex, prevouts) {
+    const dec = decodeRawTx(signedHex);
+    if (!dec.witness) throw new Error("no witness data \u2014 nothing to verify");
+    if (prevouts.length !== dec.inputs.length) throw new Error("prevout count mismatch");
+    const results = [];
+    for (let i = 0; i < dec.inputs.length; i++) {
+      const stack = dec.witness[i];
+      if (stack.length !== 1) {
+        results.push({ index: i, ok: false, reason: `expected 1 witness item (keypath), got ${stack.length}` });
+        continue;
+      }
+      const wit = stack[0];
+      let sig, hashType;
+      if (wit.length === 64) {
+        sig = wit;
+        hashType = SIGHASH_DEFAULT;
+      } else if (wit.length === 65) {
+        sig = wit.slice(0, 64);
+        hashType = wit[64];
+      } else {
+        results.push({ index: i, ok: false, reason: `bad witness length ${wit.length}` });
+        continue;
+      }
+      try {
+        const po = prevouts[i];
+        const d = describeSpk(po.spk, network);
+        if (d.type !== "P2TR") {
+          results.push({ index: i, ok: false, reason: `prevout is ${d.type}, keypath verify needs P2TR` });
+          continue;
+        }
+        const digest = keypathSigDigestEx(
+          network,
+          prevouts.map((p, k) => ({ txid: dec.inputs[k].txid, vout: dec.inputs[k].vout, value: p.value, spk: p.spk })),
+          dec.outputs.map((o) => ({ program: describeSpk(o.spk, network).program ?? new Uint8Array(32), value: Number(o.value) })),
+          dec.inputs[i].sequence,
+          i,
+          hashType
+        );
+        const ok = schnorr.verify(sig, digest, d.program);
+        results.push({ index: i, ok, reason: ok ? "BIP-341 keypath signature valid" : "signature does NOT verify" });
+      } catch (e) {
+        results.push({ index: i, ok: false, reason: String(e.message || e) });
+      }
+    }
+    return results;
+  }
+  function selectCoins(utxos, targetGrains, feeRateGrainsPerVByte, nOut) {
+    const target = BigInt(targetGrains);
+    const sorted = [...utxos].sort((a, b) => Number(BigInt(b.value) - BigInt(a.value)));
+    const selected = [];
+    let total = 0n;
+    for (const u of sorted) {
+      selected.push(u);
+      total += BigInt(u.value);
+      const withChange = keypathTxVBytes(selected.length, nOut + 1);
+      const feeWithChange = BigInt(Math.ceil(withChange * feeRateGrainsPerVByte));
+      const change = total - target - feeWithChange;
+      if (change >= BigInt(DUST_GRAIN)) {
+        return { selected, fee: feeWithChange, change };
+      }
+      const noChange = keypathTxVBytes(selected.length, nOut);
+      const feeNoChange = BigInt(Math.ceil(noChange * feeRateGrainsPerVByte));
+      if (total >= target + feeNoChange) {
+        return { selected, fee: total - target, change: 0n };
+      }
+    }
+    throw new Error(`insufficient funds: have ${fmtPRL(total)} PRL, need ${fmtPRL(target)} PRL + fee`);
+  }
+  async function pearldRpc(endpoint, user, pass, method, params = []) {
+    let res;
+    try {
+      res = await fetch(endpoint.replace(/\/$/, ""), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Basic " + btoa(`${user}:${pass}`)
+        },
+        body: JSON.stringify({ jsonrpc: "1.0", id: "pearl-sign", method, params })
+      });
+    } catch (e) {
+      throw new Error(`pearld unreachable at ${endpoint} \u2014 is the node running with RPC enabled? (${e.message})`);
+    }
+    const j = await res.json().catch(() => ({}));
+    if (j.error) throw new Error(`pearld ${method} rejected: ${j.error.message || JSON.stringify(j.error)}`);
+    return j.result;
+  }
+  async function broadcastViaBlockbook(blockbookBase, hex) {
+    const base = blockbookBase.replace(/\/$/, "");
+    let res, text;
+    try {
+      res = await fetch(base + "/api/sendtx/", {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: hex
+      });
+      text = await res.text();
+    } catch (e) {
+      throw new Error(`blockbook unreachable at ${base} \u2014 check the URL and your network connection (${e.message})`);
+    }
+    let j = {};
+    try {
+      j = JSON.parse(text);
+    } catch {
+    }
+    if (!res.ok || j.error) throw new Error("node rejected the transaction: " + (j.error || `HTTP ${res.status}: ${text.slice(0, 160)}`));
+    const txid = j.result ?? j.txid;
+    if (!/^[0-9a-f]{64}$/i.test(txid || "")) throw new Error("unexpected broadcast response: " + text.slice(0, 160));
+    return txid.toLowerCase();
+  }
+  async function fetchUtxos2(blockbookBase, address) {
+    const base = blockbookBase.replace(/\/$/, "");
+    let res;
+    try {
+      res = await fetch(base + `/api/v2/utxo/${address}`);
+    } catch (e) {
+      throw new Error(`blockbook unreachable at ${base} \u2014 check the URL and your network connection (${e.message})`);
+    }
+    if (!res.ok) throw new Error(`blockbook ${res.status} on /api/v2/utxo`);
+    const list = await res.json();
+    if (!Array.isArray(list)) throw new Error("unexpected utxo response");
+    return list.map((u) => ({ txid: u.txid, vout: u.vout, value: Number(u.value), confirmations: u.confirmations ?? 0 })).filter((u) => u.value > 0 && /^[0-9a-f]{64}$/i.test(u.txid || ""));
+  }
+  async function fetchFeeRate(blockbookBase, blocks = 2) {
+    const base = blockbookBase.replace(/\/$/, "");
+    let res;
+    try {
+      res = await fetch(base + `/api/v2/estimatefee/${blocks}`);
+    } catch (e) {
+      throw new Error(`blockbook unreachable at ${base} \u2014 check the URL and your network connection (${e.message})`);
+    }
+    const r = await res.json().catch(() => ({}));
+    const perKb = Number(r.result ?? r);
+    if (!Number.isFinite(perKb) || perKb <= 0) throw new Error("fee estimate unavailable");
+    return perKb * GRAIN_PER_PRL / 1e3;
+  }
+  function parseUtxoList(text, network = null) {
+    const out = [];
+    const lines = text.split(/\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith("#"));
+    for (const line of lines) {
+      const m = line.match(/^([0-9a-fA-F]{64}):(\d+)\s+(\S+)(?:\s+(prl|grains?))?(?:\s+([a-z0-9]+))?$/i);
+      if (!m) throw new Error(`bad UTXO line: ${line}`);
+      const grains = (m[4] || "grains").toLowerCase().startsWith("prl") ? parsePRL(m[3]) : BigInt(m[3]);
+      let spk = null;
+      if (m[5]) {
+        if (!network) throw new Error(`network needed to decode the address on line: ${line}`);
+        spk = p2trScriptPubKey(decodeBech32m(m[5], network.hrp).program);
+      }
+      const value = Number(grains);
+      if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`bad UTXO value: ${line}`);
+      out.push({ txid: m[1].toLowerCase(), vout: Number(m[2]), value, confirmations: 0, spk });
+    }
+    return out;
+  }
+
   // ../escrow/src/escrow-core.js
+  var OP = {
+    FALSE: 0,
+    TWO: 82,
+    DROP: 117,
+    EQUAL: 135,
+    CHECKSIG: 172,
+    CHECKSIGADD: 186,
+    CLTV: 177
+  };
   var TAPLEAF_VERSION2 = 192;
   var EMPTY = new Uint8Array(0);
   var MAX_SEQ = 4294967295;
+  function pushData(data) {
+    const b = data instanceof Uint8Array ? data : Uint8Array.from(data);
+    if (b.length === 0) return [OP.FALSE];
+    if (b.length <= 75) return [b.length, ...b];
+    if (b.length <= 255) return [76, b.length, ...b];
+    if (b.length <= 520) return [77, b.length & 255, b.length >> 8 & 255, ...b];
+    throw new Error("push exceeds 520 bytes");
+  }
+  function constEq(a, b) {
+    if (!(a instanceof Uint8Array) || !(b instanceof Uint8Array) || a.length !== b.length) return false;
+    let d = 0;
+    for (let i = 0; i < a.length; i++) d |= a[i] ^ b[i];
+    return d === 0;
+  }
   function parseXOnlyKey(hex) {
     if (typeof hex !== "string" || !/^[0-9a-fA-F]{64}$/.test(hex.trim())) {
       throw new Error("x-only pubkey must be 64 hex characters");
@@ -5820,7 +6270,41 @@ zoo`.split("\n");
     }
     throw new Error("party key must be a 64-hex x-only pubkey or a 12/24-word mnemonic");
   }
+  function encodeScriptNum(n) {
+    if (!Number.isSafeInteger(n) || n < 0) throw new Error("script number must be a non-negative safe integer");
+    if (n === 0) return new Uint8Array([OP.FALSE]);
+    const out = [];
+    let v = n;
+    while (v > 0) {
+      out.push(v & 255);
+      v = Math.floor(v / 256);
+    }
+    if (out[out.length - 1] & 128) out.push(0);
+    return Uint8Array.from(out);
+  }
+  function tapBranch(a, b) {
+    const [x, y] = bytesToHex(a) <= bytesToHex(b) ? [a, b] : [b, a];
+    return taggedHash2("TapBranch", Uint8Array.from([...x, ...y]));
+  }
   var TE = new TextEncoder();
+  function verifyControlBlock(internalXOnly, leafScript, controlBlock, tweakedX) {
+    try {
+      if (!(controlBlock instanceof Uint8Array) || controlBlock.length !== 65) return false;
+      if ((controlBlock[0] & 254) !== TAPLEAF_VERSION2) return false;
+      if (!constEq(controlBlock.slice(1, 33), internalXOnly)) return false;
+      const leafHash = tapLeafHash(leafScript);
+      const sibling = controlBlock.slice(33, 65);
+      const root = tapBranch(leafHash, sibling);
+      const t = taggedHash2("TapTweak", Uint8Array.from([...internalXOnly, ...root]));
+      const P = schnorr.utils.lift_x(bytesToNumberBE2(internalXOnly));
+      const Q = P.add(schnorr.Point.BASE.multiply(bytesToNumberBE2(t)));
+      const x = schnorr.utils.pointToBytes(Q);
+      const parity = Q.toAffine().y & 1n ? 1 : 0;
+      return constEq(x, tweakedX) && (controlBlock[0] & 1) === parity;
+    } catch {
+      return false;
+    }
+  }
   function scriptPathSigDigestEx(network, input, outputs, leafScript, opts = {}) {
     const { sequence = MAX_SEQ, locktime = 0, inputIdx = 0 } = opts;
     if (!/^[0-9a-f]{64}$/i.test(input.txid || "")) throw new Error("bad input txid");
@@ -6025,377 +6509,606 @@ zoo`.split("\n");
     return program;
   }
 
-  // src/covenant-core.js
-  var OP = {
-    FALSE: 0,
-    EQUAL: 135,
-    CHECKSIGADD: 186
-  };
+  // src/bond-core.js
+  var BLOCKBOOK_MAINNET = "https://blockbook.pearlresearch.ai";
+  var BLOCK_TIME_SEC = 194;
+  var MAX_PERIODS = 240;
+  var SIGHASH_SINGLE_ANYONECANPAY2 = 131;
+  var SEQ_NONFINAL = 4294967294;
+  var SEQ_FINAL = 4294967295;
+  var DESCRIPTOR_PREFIX = "bond:v1";
+  var OP2 = { DROP: 117, CHECKSIG: 172, CLTV: 177 };
   var TAPLEAF_VERSION3 = 192;
-  var EMPTY2 = new Uint8Array(0);
-  var MAX_COSIGNERS = 16;
-  var ROUND_KIND = "pearl-covenant-signing-round";
-  var ROUND_VERSION = 1;
-  var DESCRIPTOR_PREFIX = "covenant:v1";
-  function constEq(a, b) {
-    if (!(a instanceof Uint8Array) || !(b instanceof Uint8Array) || a.length !== b.length) return false;
-    let d = 0;
-    for (let i = 0; i < a.length; i++) d |= a[i] ^ b[i];
-    return d === 0;
+  var LOCKTIME_THRESHOLD = 5e8;
+  function parseBondTerms(t) {
+    if (!t || typeof t !== "object") throw new Error("terms required");
+    const name = String(t.name ?? "").trim().slice(0, 48) || "Unnamed series";
+    const faceGrains = toGrains(t.facePRL, "face value");
+    if (faceGrains < DUST_GRAIN) throw new Error(`face value below dust (${DUST_GRAIN} grains)`);
+    const annualBps = toInt(t.annualBps, "annual coupon (bps)", 0, 1e5);
+    const freq = toInt(t.frequency, "coupon frequency", 1, 12);
+    if (![1, 2, 4, 12].includes(freq)) throw new Error("frequency must be 1, 2, 4 or 12 coupons per year");
+    const periods = toInt(t.periods, "number of periods", 1, MAX_PERIODS);
+    const issueHeight = toInt(t.issueHeight, "issue height", 0, 1e7);
+    return { name, faceGrains, annualBps, frequency: freq, periods, issueHeight };
   }
-  function pushData(data) {
-    const b = data instanceof Uint8Array ? data : Uint8Array.from(data);
-    if (b.length === 0) return [OP.FALSE];
-    if (b.length <= 75) return [b.length, ...b];
-    throw new Error("push exceeds 75 bytes");
+  function toInt(v, label, min, max) {
+    const n = Number(v);
+    if (!Number.isInteger(n) || n < min || n > max) throw new Error(`${label} must be an integer in ${min}..${max}`);
+    return n;
   }
-  function opN(n) {
-    if (!Number.isInteger(n) || n < 1 || n > 16) throw new Error("OP_N out of range 1..16");
-    return 80 + n;
+  function toGrains(prl, label) {
+    const g = BigInt(parsePRL(String(prl)));
+    if (g > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error(`${label} too large`);
+    const n = Number(g);
+    if (!Number.isSafeInteger(n) || n <= 0) throw new Error(`${label} must be a positive PRL amount`);
+    return n;
   }
-  function sortKeys(keys) {
-    const ks = keys.map((k) => k instanceof Uint8Array ? k : parseXOnlyKey(k));
-    const seen = /* @__PURE__ */ new Set();
-    for (const k of ks) {
-      if (k.length !== 32) throw new Error("cosigner key must be 32 bytes");
-      schnorr.utils.lift_x(bytesToNumberBE2(k));
-      const h = bytesToHex(k);
-      if (seen.has(h)) throw new Error("duplicate cosigner key");
-      seen.add(h);
+  function couponGrains(terms) {
+    const c = Math.round(terms.faceGrains * terms.annualBps / 1e4 / terms.frequency);
+    if (c < DUST_GRAIN && terms.annualBps > 0) {
+      throw new Error(`coupon would be ${c} grains \u2014 below dust; raise face, rate, or lower frequency`);
     }
-    return ks.map(bytesToHex).sort().map(hexToBytes);
+    return c;
   }
-  function buildMultisigScript(sortedKeys, m) {
-    const n = sortedKeys.length;
-    if (!Number.isInteger(m) || m < 1 || m > n) throw new Error(`m must be 1..n (got m=${m}, n=${n})`);
-    if (n < 1 || n > MAX_COSIGNERS) throw new Error(`n must be 1..${MAX_COSIGNERS}`);
-    const s = [OP.FALSE];
-    for (const k of sortedKeys) s.push(...pushData(k), OP.CHECKSIGADD);
-    s.push(opN(m), OP.EQUAL);
-    return Uint8Array.from(s);
+  function lockHeightForPeriod(terms, i) {
+    const months = i * 12 / terms.frequency;
+    const blocks = Math.round(months * 30 * 86400 / BLOCK_TIME_SEC);
+    const h = terms.issueHeight + blocks;
+    if (h >= LOCKTIME_THRESHOLD) throw new Error("lock height exceeds locktime height range");
+    return h;
   }
-  function numsInternalKey(leafScript) {
-    if (!(leafScript instanceof Uint8Array) || leafScript.length === 0) throw new Error("bad leaf script");
-    for (let c = 0; c < 256; c++) {
-      const preimage = c === 0 ? leafScript : Uint8Array.from([...leafScript, c]);
-      const h = taggedHash2("PearlCovenantNUMS/v1", preimage);
+  function couponSchedule(terms) {
+    const c = couponGrains(terms);
+    const out = [];
+    for (let i = 1; i <= terms.periods; i++) {
+      const last = i === terms.periods;
+      const amount = last ? c + terms.faceGrains : c;
+      if (amount < DUST_GRAIN) throw new Error(`tranche ${i} below dust`);
+      out.push({
+        index: i,
+        kind: last ? "coupon+principal" : "coupon",
+        amountGrains: amount,
+        couponGrains: c,
+        principalGrains: last ? terms.faceGrains : 0,
+        lockHeight: lockHeightForPeriod(terms, i),
+        approxMonths: i * 12 / terms.frequency
+      });
+    }
+    for (let i = 1; i < out.length; i++) {
+      if (out[i].lockHeight <= out[i - 1].lockHeight) {
+        throw new Error(`periods ${i} and ${i + 1} map to the same lock height \u2014 lengthen the term`);
+      }
+    }
+    return out;
+  }
+  function totalFundingGrains(schedule) {
+    return schedule.reduce((a, t) => a + t.amountGrains, 0);
+  }
+  function accruedInterest(terms, settleTimeMs, issueTimeMs) {
+    const c = couponGrains(terms);
+    if (c === 0) return 0;
+    const periodDays = 360 / terms.frequency;
+    const elapsedDays = Math.max(0, (settleTimeMs - issueTimeMs) / 864e5);
+    const inPeriod = elapsedDays % periodDays;
+    return Math.round(c * inPeriod / periodDays);
+  }
+  function yieldToMaturity(terms, cleanPriceGrains) {
+    const c = couponGrains(terms);
+    const price = Number(cleanPriceGrains);
+    if (!(price > 0)) throw new Error("price must be positive");
+    const pv = (y) => {
+      let s = 0;
+      for (let i = 1; i <= terms.periods; i++) {
+        const cf = i === terms.periods ? c + terms.faceGrains : c;
+        s += cf / Math.pow(1 + y / terms.frequency, i);
+      }
+      return s;
+    };
+    let lo = -0.999, hi = 10;
+    if (pv(lo) < price) throw new Error("price above any finite yield \u2014 check inputs");
+    for (let k = 0; k < 200; k++) {
+      const mid = (lo + hi) / 2;
+      if (pv(mid) > price) lo = mid;
+      else hi = mid;
+    }
+    return (lo + hi) / 2;
+  }
+  function buildClaimScript(holderXOnly, lock) {
+    const k = holderXOnly instanceof Uint8Array ? holderXOnly : parseXOnlyKey(holderXOnly);
+    if (k.length !== 32) throw new Error("holder key must be 32 bytes");
+    if (!Number.isInteger(lock) || lock < 1 || lock >= LOCKTIME_THRESHOLD) {
+      throw new Error("lock must be a block height in 1..499999999");
+    }
+    return Uint8Array.from([...pushData(encodeScriptNum(lock)), OP2.CLTV, OP2.DROP, ...pushData(k), OP2.CHECKSIG]);
+  }
+  function buildTransferScript(holderXOnly) {
+    const k = holderXOnly instanceof Uint8Array ? holderXOnly : parseXOnlyKey(holderXOnly);
+    if (k.length !== 32) throw new Error("holder key must be 32 bytes");
+    return Uint8Array.from([...pushData(k), OP2.CHECKSIG]);
+  }
+  function numsInternalKeyBond(scripts) {
+    if (!Array.isArray(scripts) || scripts.length !== 2) throw new Error("need exactly 2 leaf scripts");
+    const preimage = Uint8Array.from(scripts.flatMap((s) => [...s]));
+    for (let ctr = 0; ; ctr++) {
+      const h = taggedHash2("PearlBondNUMS/v1", Uint8Array.from([...preimage, ctr]));
       try {
-        schnorr.utils.lift_x(bytesToNumberBE2(h));
-        return h;
+        return schnorr.utils.pointToBytes(schnorr.utils.lift_x(bytesToNumberBE2(h)));
       } catch {
       }
     }
-    throw new Error("NUMS lift failed (unreachable in practice)");
   }
-  function covenantTaptree(network, leafScript) {
-    const internalXOnly = numsInternalKey(leafScript);
-    const leafHash = tapLeafHash(leafScript);
-    const t = taggedHash2("TapTweak", Uint8Array.from([...internalXOnly, ...leafHash]));
+  function tapBranch2(a, b) {
+    const [x, y] = bytesToHex(a) <= bytesToHex(b) ? [a, b] : [b, a];
+    return taggedHash2("TapBranch", Uint8Array.from([...x, ...y]));
+  }
+  function taptreeBond(network, internalXOnly, claimScript, transferScript) {
+    if (!(internalXOnly instanceof Uint8Array) || internalXOnly.length !== 32) {
+      throw new Error("internal key must be 32 bytes");
+    }
+    const lhClaim = tapLeafHash(claimScript);
+    const lhTransfer = tapLeafHash(transferScript);
+    const root = tapBranch2(lhClaim, lhTransfer);
+    const t = taggedHash2("TapTweak", Uint8Array.from([...internalXOnly, ...root]));
     const P = schnorr.utils.lift_x(bytesToNumberBE2(internalXOnly));
     const Q = P.add(schnorr.Point.BASE.multiply(bytesToNumberBE2(t)));
     const tweakedX = schnorr.utils.pointToBytes(Q);
     const parity = Q.toAffine().y & 1n ? 1 : 0;
-    const controlBlock = Uint8Array.from([TAPLEAF_VERSION3 | parity, ...internalXOnly]);
+    const mkCb = (sib) => Uint8Array.from([TAPLEAF_VERSION3 | parity, ...internalXOnly, ...sib]);
     return {
-      internalXOnly,
-      leafHash,
+      leafHashes: { claim: lhClaim, transfer: lhTransfer },
+      root,
       tweak: t,
       tweakedX,
       parity,
-      controlBlock,
+      internalXOnly,
       address: encodeBech32m(network.hrp, 1, tweakedX),
-      spk: p2trScriptPubKey(tweakedX)
+      spk: p2trScriptPubKey(tweakedX),
+      claimControlBlock: mkCb(lhTransfer),
+      transferControlBlock: mkCb(lhClaim)
     };
   }
-  function verifyCovenantControlBlock(internalXOnly, leafScript, controlBlock, tweakedX) {
-    try {
-      if (!(controlBlock instanceof Uint8Array) || controlBlock.length !== 33) return false;
-      if ((controlBlock[0] & 254) !== TAPLEAF_VERSION3) return false;
-      if (!constEq(controlBlock.slice(1, 33), internalXOnly)) return false;
-      const leafHash = tapLeafHash(leafScript);
-      const t = taggedHash2("TapTweak", Uint8Array.from([...internalXOnly, ...leafHash]));
-      const P = schnorr.utils.lift_x(bytesToNumberBE2(internalXOnly));
-      const Q = P.add(schnorr.Point.BASE.multiply(bytesToNumberBE2(t)));
-      const x = schnorr.utils.pointToBytes(Q);
-      const parity = Q.toAffine().y & 1n ? 1 : 0;
-      return constEq(x, tweakedX) && (controlBlock[0] & 1) === parity;
-    } catch {
-      return false;
-    }
-  }
-  function createCovenant({ m, keyInputs, network }) {
-    if (!Array.isArray(keyInputs) || keyInputs.length === 0) throw new Error("need at least one cosigner key");
-    if (keyInputs.length > MAX_COSIGNERS) throw new Error(`at most ${MAX_COSIGNERS} cosigners`);
-    const parsed = keyInputs.map((inp) => partyKeyFromInput(inp, network));
-    const sorted = sortKeys(parsed.map((p) => p.xonly));
-    const sortedHex = sorted.map(bytesToHex);
-    const byKey = new Map(parsed.map((p) => [bytesToHex(p.xonly), p]));
-    const keys = sortedHex.map((h) => {
-      const p = byKey.get(h);
-      return { xonly: h, source: p.source, hasPriv: !!p.priv };
-    });
-    const secrets = parsed.filter((p) => p.priv).map((p) => ({ xonly: bytesToHex(p.xonly), priv: bytesToHex(p.priv) }));
-    const script = buildMultisigScript(sorted, m);
-    const tree = covenantTaptree(network, script);
-    if (!verifyCovenantControlBlock(tree.internalXOnly, script, tree.controlBlock, tree.tweakedX)) {
-      throw new Error("internal control-block self-check failed");
-    }
-    const covenant = {
-      kind: "pearl-covenant",
-      version: 1,
-      network: network.id,
-      hrp: network.hrp,
-      m,
-      n: sorted.length,
-      keys,
-      scriptHex: bytesToHex(script),
-      scriptAsm: scriptAsm(script),
-      internalKeyHex: bytesToHex(tree.internalXOnly),
-      tweakedHex: bytesToHex(tree.tweakedX),
-      controlBlockHex: bytesToHex(tree.controlBlock),
+  function forgeTranche(network, holderXOnly, lock) {
+    const claimScript = buildClaimScript(holderXOnly, lock);
+    const transferScript = buildTransferScript(holderXOnly);
+    const internalXOnly = numsInternalKeyBond([claimScript, transferScript]);
+    const tree = taptreeBond(network, internalXOnly, claimScript, transferScript);
+    return {
+      lock,
+      holder: bytesToHex(holderXOnly instanceof Uint8Array ? holderXOnly : parseXOnlyKey(holderXOnly)),
+      claimScript,
+      transferScript,
+      internalXOnly,
+      tweakedX: tree.tweakedX,
+      parity: tree.parity,
       address: tree.address,
-      spkHex: bytesToHex(tree.spk)
+      spk: tree.spk,
+      claimControlBlock: tree.claimControlBlock,
+      transferControlBlock: tree.transferControlBlock,
+      claimAsm: scriptAsm(claimScript),
+      transferAsm: scriptAsm(transferScript)
     };
-    return { covenant, secrets };
   }
-  function covenantDescriptor(covenant) {
-    const ks = covenant.keys.map((k) => k.xonly).join(":");
-    return `${DESCRIPTOR_PREFIX}:${covenant.hrp}:${covenant.m}-of-${covenant.n}:${ks}`;
+  function forgeBond(network, terms, holder) {
+    if (!network || !network.hrp) throw new Error("network required");
+    const hk = holder && typeof holder === "object" && holder.key ? holder : partyKeyFromInput(holder, network);
+    const hx = hk.key instanceof Uint8Array ? hk.key : parseXOnlyKey(hk.key);
+    const schedule = couponSchedule(terms);
+    const tranches = schedule.map((s) => ({ ...s, ...forgeTranche(network, hx, s.lockHeight) }));
+    return {
+      terms,
+      holderMode: hk.mode || "raw",
+      holderKey: bytesToHex(hx),
+      descriptor: encodeBondDescriptor(network, terms, hk),
+      tranches,
+      totalGrains: totalFundingGrains(schedule)
+    };
   }
-  function covenantFromDescriptor(descriptor, network) {
-    const t = String(descriptor || "").trim();
-    const parts = t.split(":");
-    if (parts.length < 5 || parts[0] !== "covenant" || parts[1] !== "v1") {
-      throw new Error("bad covenant descriptor (expected covenant:v1:<hrp>:<m>-of-<n>:<keys...>)");
+  var NET_LETTER = { mainnet: "m", testnet: "t", regtest: "r" };
+  var LETTER_NET = { m: "mainnet", t: "testnet", r: "regtest" };
+  function encodeBondDescriptor(network, terms, holder) {
+    const hk = holder && typeof holder === "object" && holder.key ? holder : partyKeyFromInput(holder, network);
+    const letter = NET_LETTER[network.id] || "m";
+    const mode = hk.mode === "address" ? "addr" : "raw";
+    const keyHex = hk.key instanceof Uint8Array ? bytesToHex(hk.key) : String(hk.key);
+    return [
+      DESCRIPTOR_PREFIX,
+      letter,
+      terms.faceGrains,
+      terms.annualBps,
+      terms.frequency,
+      terms.periods,
+      terms.issueHeight,
+      mode,
+      keyHex
+    ].join("/");
+  }
+  function decodeBondDescriptor(desc) {
+    if (typeof desc !== "string") throw new Error("descriptor must be a string");
+    const p = desc.trim().split("/");
+    if (p.length !== 9 || p[0] !== DESCRIPTOR_PREFIX) throw new Error("bad bond descriptor");
+    const netName = LETTER_NET[p[1]];
+    if (!netName || !NETWORKS[netName]) throw new Error("bad network in descriptor");
+    const terms = parseBondTerms({
+      facePRL: (Number(p[2]) / GRAIN_PER_PRL).toFixed(8),
+      annualBps: Number(p[3]),
+      frequency: Number(p[4]),
+      periods: Number(p[5]),
+      issueHeight: Number(p[6])
+    });
+    if (!/^[0-9a-fA-F]{64}$/.test(p[8])) throw new Error("bad holder key in descriptor");
+    if (p[7] !== "raw" && p[7] !== "addr") throw new Error("bad holder mode in descriptor");
+    return { network: NETWORKS[netName], terms, holder: { key: hexToBytes(p[8].toLowerCase()), mode: p[7] === "addr" ? "address" : "raw" } };
+  }
+  function verifyDescriptor(desc) {
+    const { network, terms, holder } = decodeBondDescriptor(desc);
+    const bond = forgeBond(network, terms, holder);
+    return {
+      network: network.id,
+      terms,
+      holderMode: bond.holderMode,
+      descriptor: bond.descriptor,
+      tranches: bond.tranches.map((t) => ({
+        index: t.index,
+        kind: t.kind,
+        amountGrains: t.amountGrains,
+        lockHeight: t.lockHeight,
+        address: t.address,
+        spkHex: bytesToHex(t.spk)
+      }))
+    };
+  }
+  function fundingPlan(bond, feeRateGrainsPerVByte, nFundingInputs = 1) {
+    if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) {
+      throw new Error("fee rate must be positive");
     }
-    const hrp = parts[2];
-    if (hrp !== network.hrp) throw new Error(`descriptor is for ${hrp}, not ${network.hrp}`);
-    const mm = parts[3].match(/^(\d+)-of-(\d+)$/);
-    if (!mm) throw new Error("bad m-of-n in descriptor");
-    const m = parseInt(mm[1], 10);
-    const keyHexes = parts.slice(4);
-    if (keyHexes.length !== parseInt(mm[2], 10)) throw new Error("descriptor key count != n");
-    const { covenant } = createCovenant({ m, keyInputs: keyHexes, network });
-    if (covenantDescriptor(covenant) !== t) throw new Error("descriptor failed round-trip check");
-    return covenant;
+    const nOut = bond.tranches.length;
+    const vBytes = Math.ceil(10.5 + 57.25 * nFundingInputs + 43 * nOut);
+    const fee = Math.ceil(vBytes * feeRateGrainsPerVByte);
+    return {
+      tranches: bond.tranches.map((t) => ({
+        index: t.index,
+        kind: t.kind,
+        address: t.address,
+        amountGrains: t.amountGrains,
+        lockHeight: t.lockHeight
+      })),
+      totalGrains: bond.totalGrains,
+      estFeeGrains: fee,
+      estVBytes: vBytes,
+      grandTotalGrains: bond.totalGrains + fee,
+      feeRateGrainsPerVByte
+    };
   }
-  function pubkeyFromPriv(priv) {
-    const p = priv instanceof Uint8Array ? priv : hexToBytes(String(priv).trim());
-    if (p.length !== 32) throw new Error("private key must be 32 bytes");
-    const P = secp256k1.ProjectivePoint.fromPrivateKey(p);
-    const raw = P.toRawBytes(true);
-    return bytesToHex(raw.slice(1));
+  function validOutpoint(txid, vout) {
+    const t = String(txid || "").trim().toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(t)) throw new Error("funding txid must be 64 hex characters");
+    if (!Number.isInteger(vout) || vout < 0) throw new Error("vout must be a non-negative integer");
+    return t;
   }
-  function covenantSpendVBytes(covenant, nOut) {
-    const stackLens = [
-      ...Array(covenant.m).fill(64),
-      ...Array(covenant.n - covenant.m).fill(0)
-    ];
-    return spendVBytes({
-      nOut,
-      scriptLen: covenant.scriptHex.length / 2,
-      controlLen: 33,
-      stackLens
+  function planClaim(network, tranche, outpoint, destProgram, feeRateGrainsPerVByte, currentHeight) {
+    if (!(destProgram instanceof Uint8Array) || destProgram.length !== 32) {
+      throw new Error("destination program must be 32 bytes");
+    }
+    if (!Number.isInteger(currentHeight) || currentHeight < 0) throw new Error("current height required");
+    if (currentHeight < tranche.lockHeight) {
+      throw new Error(`tranche locked until height ${tranche.lockHeight} (chain at ${currentHeight})`);
+    }
+    const txid = validOutpoint(outpoint.txid, outpoint.vout);
+    const input = {
+      txid,
+      vout: outpoint.vout,
+      value: outpoint.value,
+      spk: tranche.spk
+    };
+    if (!Number.isSafeInteger(input.value) || input.value <= 0) throw new Error("bad tranche value");
+    if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) {
+      throw new Error("fee rate must be positive");
+    }
+    const scriptLen = tranche.claimScript.length;
+    const controlLen = tranche.claimControlBlock.length;
+    const vBytes = spendVBytes({ nOut: 1, scriptLen, controlLen, stackLens: [64] });
+    const fee = Math.ceil(vBytes * feeRateGrainsPerVByte);
+    const payValue = input.value - fee;
+    if (payValue < DUST_GRAIN) throw new Error(`tranche value ${input.value} cannot cover fee ${fee}`);
+    const outputs = [{ program: destProgram, value: payValue }];
+    return { input, outputs, fee, vBytes, lockHeight: tranche.lockHeight };
+  }
+  function signClaim(network, tranche, planned, holderPriv) {
+    const digest = scriptPathSigDigestEx(network, planned.input, planned.outputs, tranche.claimScript, {
+      sequence: SEQ_NONFINAL,
+      locktime: tranche.lockHeight
     });
-  }
-  function buildSigningRound(covenant, network, { utxo, payments, feeRateGrainsPerVByte, memo }) {
-    if (!/^[0-9a-f]{64}$/i.test(utxo?.txid || "")) throw new Error("bad utxo txid");
-    if (!Number.isInteger(utxo?.vout) || utxo.vout < 0) throw new Error("bad utxo vout");
-    if (!Number.isSafeInteger(utxo?.value) || utxo.value <= 0) throw new Error("bad utxo value");
-    const outs = (payments || []).map((p) => ({
-      program: addressToProgram(p.address, network),
-      value: p.valueGrains,
-      address: String(p.address).trim()
-    }));
-    if (outs.length === 0) throw new Error("need at least one payment");
-    const scriptLen = covenant.scriptHex.length / 2;
-    const stackLens = [...Array(covenant.m).fill(64), ...Array(covenant.n - covenant.m).fill(0)];
-    const plan = planSpend({
-      inputValue: utxo.value,
-      payments: outs.map((o) => ({ program: o.program, value: o.value })),
-      feeRateGrainsPerVByte,
-      scriptLen,
-      controlLen: 33,
-      stackLens
-    });
-    const vaultProgram = hexToBytes(covenant.tweakedHex);
-    const finalOutputs = plan.outputs.map((o) => ({
-      program: o.program || vaultProgram,
-      value: o.value,
-      address: o.program ? outs.find((x) => constEq(x.program, o.program))?.address : covenant.address,
-      change: !!o.change
-    }));
-    if (finalOutputs.some((o) => !o.address)) throw new Error("internal: change address resolution failed");
-    const input = { txid: utxo.txid.toLowerCase(), vout: utxo.vout, value: utxo.value, spk: hexToBytes(covenant.spkHex) };
-    const leafScript = hexToBytes(covenant.scriptHex);
-    const digest = scriptPathSigDigestEx(
+    const sig = signForXOnly(holderPriv, digest);
+    if (!verifySchnorrSig(sig, digest, tranche.holder)) {
+      throw new Error("claim signature failed local re-verification \u2014 refusing to build");
+    }
+    const built = buildScriptPathSpend(
       network,
-      input,
-      finalOutputs.map((o) => ({ program: o.program, value: o.value })),
-      leafScript,
-      {}
+      planned.input,
+      planned.outputs,
+      tranche.claimScript,
+      tranche.claimControlBlock,
+      [sig],
+      { sequence: SEQ_NONFINAL, locktime: tranche.lockHeight }
     );
+    return { ...built, sig: bytesToHex(sig), digest: bytesToHex(digest) };
+  }
+  function scriptPathSigDigest83(network, input, output, leafScript, sequence = SEQ_FINAL) {
+    const sha = (b) => sha2562(b);
+    if (!/^[0-9a-f]{64}$/i.test(input.txid || "")) throw new Error("bad input txid");
+    if (!Number.isInteger(input.vout) || input.vout < 0) throw new Error("bad input vout");
+    if (!Number.isSafeInteger(input.value) || input.value <= 0) throw new Error("bad input value");
+    if (!(input.spk instanceof Uint8Array) || input.spk.length === 0) throw new Error("bad input spk");
+    if (!(output.program instanceof Uint8Array) || output.program.length !== 32) {
+      throw new Error("output program must be 32 bytes");
+    }
+    if (!Number.isSafeInteger(output.value) || output.value < DUST_GRAIN) {
+      throw new Error(`output below dust (${DUST_GRAIN} grains)`);
+    }
+    if (!(leafScript instanceof Uint8Array) || leafScript.length === 0) throw new Error("bad leaf script");
+    const msg = [0, SIGHASH_SINGLE_ANYONECANPAY2, ...u32le(network.txVersion), ...u32le(0)];
+    msg.push(2);
+    msg.push(
+      ...txidLE(input.txid),
+      ...u32le(input.vout),
+      ...u64le(input.value),
+      ...varint(input.spk.length),
+      ...input.spk,
+      ...u32le(sequence)
+    );
+    const s = p2trScriptPubKey(output.program);
+    msg.push(...sha(Uint8Array.from([...u64le(output.value), ...varint(s.length), ...s])));
+    msg.push(...tapLeafHash(leafScript), 0, 255, 255, 255, 255);
+    return taggedHash2("TapSighash", Uint8Array.from(msg));
+  }
+  function transferLegVBytes(transferScriptLen, controlLen = 65) {
+    const wit = 1 + (1 + 65) + (1 + transferScriptLen) + (1 + controlLen);
+    return 84 + wit / 4;
+  }
+  function presignTransferLeg(network, tranche, outpoint, sellerPriv, buyerProgram, feeRateGrainsPerVByte) {
+    if (!(buyerProgram instanceof Uint8Array) || buyerProgram.length !== 32) {
+      throw new Error("buyer tranche program must be 32 bytes");
+    }
+    if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) {
+      throw new Error("fee rate must be positive");
+    }
+    const txid = validOutpoint(outpoint.txid, outpoint.vout);
+    if (!Number.isSafeInteger(outpoint.value) || outpoint.value <= 0) throw new Error("bad tranche value");
+    const legVBytes = transferLegVBytes(tranche.transferScript.length, tranche.transferControlBlock.length);
+    const feeLeg = Math.ceil(legVBytes * feeRateGrainsPerVByte);
+    const outValue = outpoint.value - feeLeg;
+    if (outValue < DUST_GRAIN) {
+      throw new Error(`tranche value cannot cover the transfer leg fee (${feeLeg} grains)`);
+    }
+    const input = { txid, vout: outpoint.vout, value: outpoint.value, spk: tranche.spk };
+    const output = { program: buyerProgram, value: outValue };
+    const digest = scriptPathSigDigest83(network, input, output, tranche.transferScript, SEQ_FINAL);
+    const sig = signForXOnly(sellerPriv, digest);
+    if (!verifySchnorrSig(sig, digest, tranche.holder)) {
+      throw new Error("transfer presignature failed local re-verification \u2014 refusing to export");
+    }
+    const sig65 = Uint8Array.from([...sig, SIGHASH_SINGLE_ANYONECANPAY2]);
     return {
-      kind: ROUND_KIND,
-      version: ROUND_VERSION,
-      covenant: covenantDescriptor(covenant),
-      input: { txid: input.txid, vout: input.vout, value: input.value },
-      outputs: finalOutputs.map((o) => ({ address: o.address, value: o.value, change: !!o.change })),
-      feeGrains: plan.fee,
-      vBytes: plan.vBytes,
+      version: 1,
+      trancheIndex: tranche.index,
+      kind: tranche.kind,
+      lockHeight: tranche.lockHeight,
+      trancheValue: outpoint.value,
+      input: { txid, vout: outpoint.vout, value: outpoint.value, spkHex: bytesToHex(tranche.spk) },
+      sellerXOnly: tranche.holder,
+      internalXOnlyHex: bytesToHex(tranche.internalXOnly),
+      tweakedXHex: bytesToHex(tranche.tweakedX),
+      transferScriptHex: bytesToHex(tranche.transferScript),
+      transferControlBlockHex: bytesToHex(tranche.transferControlBlock),
+      output: { programHex: bytesToHex(buyerProgram), value: outValue },
       feeRateGrainsPerVByte,
-      digest: bytesToHex(digest),
-      memo: memo ? String(memo).slice(0, 200) : "",
-      partialSigs: []
-      // [{ key, sig }]
+      feeLegGrains: feeLeg,
+      sequence: SEQ_FINAL,
+      digestHex: bytesToHex(digest),
+      sig65Hex: bytesToHex(sig65)
     };
   }
-  function serializeRound(round) {
-    return JSON.stringify(round);
-  }
-  function parseRound(json, network) {
-    let r;
-    try {
-      r = typeof json === "string" ? JSON.parse(json) : json;
-    } catch {
-      throw new Error("round is not valid JSON");
+  function verifyTransferLeg(network, pkg) {
+    if (!pkg || pkg.version !== 1) throw new Error("bad transfer package version");
+    const transferScript = hexToBytes(pkg.transferScriptHex);
+    const controlBlock = hexToBytes(pkg.transferControlBlockHex);
+    const internalXOnly = hexToBytes(pkg.internalXOnlyHex);
+    const tweakedX = hexToBytes(pkg.tweakedXHex);
+    const input = {
+      txid: pkg.input.txid,
+      vout: pkg.input.vout,
+      value: pkg.input.value,
+      spk: hexToBytes(pkg.input.spkHex)
+    };
+    const output = { program: hexToBytes(pkg.output.programHex), value: pkg.output.value };
+    if (!verifyControlBlock(internalXOnly, transferScript, controlBlock, tweakedX)) {
+      throw new Error("control block does not bind the transfer leaf \u2014 package forged or corrupted");
     }
-    if (!r || r.kind !== ROUND_KIND || r.version !== ROUND_VERSION) throw new Error("not a Pearl Covenant signing round");
-    const covenant = covenantFromDescriptor(r.covenant, network);
-    if (!/^[0-9a-f]{64}$/.test(r.input?.txid || "")) throw new Error("round: bad input txid");
-    if (!Number.isInteger(r.input?.vout) || r.input.vout < 0) throw new Error("round: bad input vout");
-    if (!Number.isSafeInteger(r.input?.value) || r.input.value <= 0) throw new Error("round: bad input value");
-    if (!Array.isArray(r.outputs) || r.outputs.length === 0) throw new Error("round: no outputs");
-    const outputs = r.outputs.map((o) => {
-      if (!Number.isSafeInteger(o?.value) || o.value < DUST_GRAIN) throw new Error("round: bad output value");
-      return { program: addressToProgram(o.address, network), value: o.value };
+    if (bytesToHex(p2trScriptPubKey(tweakedX)) !== bytesToHex(input.spk)) {
+      throw new Error("input spk does not match the package taptree");
+    }
+    const expectFee = Math.ceil(transferLegVBytes(transferScript.length, controlBlock.length) * pkg.feeRateGrainsPerVByte);
+    if (expectFee !== pkg.feeLegGrains) throw new Error("leg fee mismatch");
+    if (pkg.output.value !== pkg.input.value - pkg.feeLegGrains) throw new Error("output value mismatch");
+    const digest = scriptPathSigDigest83(network, input, output, transferScript, pkg.sequence);
+    if (bytesToHex(digest) !== pkg.digestHex.toLowerCase()) throw new Error("digest mismatch \u2014 package tampered");
+    const sig65 = hexToBytes(pkg.sig65Hex);
+    if (sig65.length !== 65 || sig65[64] !== SIGHASH_SINGLE_ANYONECANPAY2) {
+      throw new Error("presignature must be 65 bytes ending in 0x83");
+    }
+    if (!verifySchnorrSig(sig65.slice(0, 64), digest, hexToBytes(pkg.sellerXOnly))) {
+      throw new Error("seller presignature INVALID for this leg \u2014 do not pay");
+    }
+    return {
+      ok: true,
+      trancheIndex: pkg.trancheIndex,
+      kind: pkg.kind,
+      inputValue: pkg.input.value,
+      buyerReceives: pkg.output.value,
+      sellerXOnly: pkg.sellerXOnly
+    };
+  }
+  function buildFillTx(network, legs, priceGrains, buyerUtxo, sellerPayProgram, buyerChangeProgram, feeRateGrainsPerVByte) {
+    if (!Array.isArray(legs) || legs.length === 0 || legs.length > MAX_PERIODS) {
+      throw new Error("need 1..N verified legs");
+    }
+    if (!Number.isSafeInteger(priceGrains) || priceGrains < 0) throw new Error("bad price");
+    for (const p of [sellerPayProgram, buyerChangeProgram]) {
+      if (!(p instanceof Uint8Array) || p.length !== 32) throw new Error("payment programs must be 32 bytes");
+    }
+    if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) throw new Error("bad fee rate");
+    const bu = buyerUtxo;
+    if (!/^[0-9a-f]{64}$/i.test(bu.txid || "") || !Number.isInteger(bu.vout) || bu.vout < 0) {
+      throw new Error("bad buyer utxo outpoint");
+    }
+    if (!Number.isSafeInteger(bu.value) || bu.value <= 0) throw new Error("bad buyer utxo value");
+    if (!(bu.spk instanceof Uint8Array) || bu.spk.length !== 34) throw new Error("buyer utxo spk must be a P2TR spk");
+    if (!(bu.priv instanceof Uint8Array) || bu.priv.length !== 32) throw new Error("buyer privkey must be 32 bytes");
+    const totalTrancheIn = legs.reduce((a, l) => a + l.input.value, 0);
+    const outputs = [];
+    let priceLeft = priceGrains;
+    legs.forEach((leg, i) => {
+      const last = i === legs.length - 1;
+      const share = last ? priceLeft : Math.floor(priceGrains * leg.input.value / totalTrancheIn);
+      priceLeft -= share;
+      leg._sellerShare = share;
+      outputs.push({ program: hexToBytes(leg.output.programHex), value: leg.output.value });
     });
-    const input = { txid: r.input.txid, vout: r.input.vout, value: r.input.value, spk: hexToBytes(covenant.spkHex) };
-    const expected = bytesToHex(scriptPathSigDigestEx(
-      network,
-      input,
-      outputs,
-      hexToBytes(covenant.scriptHex),
-      {}
-    ));
-    if (expected !== String(r.digest).toLowerCase()) throw new Error("round: digest mismatch \u2014 the spend was tampered with");
-    if (!Array.isArray(r.partialSigs)) throw new Error("round: bad partialSigs");
-    const seen = /* @__PURE__ */ new Set();
-    for (const ps of r.partialSigs) {
-      const key = String(ps?.key || "").toLowerCase();
-      const sig = String(ps?.sig || "").toLowerCase();
-      if (!covenant.keys.some((k) => k.xonly === key)) throw new Error("round: signature from non-cosigner key");
-      if (seen.has(key)) throw new Error("round: duplicate signer");
-      seen.add(key);
-      if (!/^[0-9a-f]{128}$/.test(sig)) throw new Error("round: bad signature encoding");
-      if (!verifySchnorrSig(sig, r.digest, key)) throw new Error(`round: signature from ${key.slice(0, 12)}\u2026 does not verify`);
-    }
-    return {
-      kind: ROUND_KIND,
-      version: ROUND_VERSION,
-      covenant: covenantDescriptor(covenant),
-      input: { txid: r.input.txid.toLowerCase(), vout: r.input.vout, value: r.input.value },
-      outputs: r.outputs.map((o) => ({ address: String(o.address), value: o.value, change: !!o.change })),
-      feeGrains: r.feeGrains,
-      vBytes: r.vBytes,
-      feeRateGrainsPerVByte: r.feeRateGrainsPerVByte,
-      digest: String(r.digest).toLowerCase(),
-      memo: String(r.memo || ""),
-      partialSigs: r.partialSigs.map((ps) => ({ key: String(ps.key).toLowerCase(), sig: String(ps.sig).toLowerCase() }))
+    if (priceGrains >= DUST_GRAIN) outputs.push({ program: sellerPayProgram, value: priceGrains });
+    const nIn = legs.length + 1;
+    const witLeg = (leg) => {
+      const script = hexToBytes(leg.transferScriptHex);
+      const cb = hexToBytes(leg.transferControlBlockHex);
+      return 1 + 66 + (1 + script.length) + (1 + cb.length);
     };
-  }
-  function signRound(round, covenant, privHex) {
-    const priv = hexToBytes(String(privHex).trim());
-    if (priv.length !== 32) throw new Error("private key must be 32 bytes");
-    const key = pubkeyFromPriv(priv);
-    if (!covenant.keys.some((k) => k.xonly === key)) {
-      throw new Error("this key is not a cosigner of the covenant");
-    }
-    return importSig(round, covenant, key, bytesToHex(signForXOnly(priv, round.digest)));
-  }
-  function importSig(round, covenant, keyHex, sigHex) {
-    const key = String(keyHex).trim().toLowerCase();
-    const sig = String(sigHex).trim().toLowerCase();
-    if (!covenant.keys.some((k) => k.xonly === key)) throw new Error("key is not a cosigner of the covenant");
-    if (round.partialSigs.some((ps) => ps.key === key)) throw new Error("this cosigner already signed");
-    if (!/^[0-9a-f]{128}$/.test(sig)) throw new Error("signature must be 128 hex characters");
-    if (!verifySchnorrSig(sig, round.digest, key)) {
-      throw new Error("signature does not verify against the round digest");
-    }
-    round.partialSigs.push({ key, sig });
-    return round;
-  }
-  function roundStatus(round, covenant) {
-    const signers = round.partialSigs.map((ps) => ps.key);
-    return {
-      have: signers.length,
-      need: covenant.m,
-      signers,
-      ready: signers.length >= covenant.m
+    const vBytesFor = (nOut) => {
+      const base2 = 4 + 1 + nIn * 41 + 1 + nOut * 43 + 4;
+      let wit = 0;
+      for (const leg of legs) wit += witLeg(leg);
+      wit += 1 + 65;
+      const total = base2 + 2 + wit;
+      return Math.ceil((base2 * 3 + total) / 4);
     };
-  }
-  function finalizeRound(round, covenant, network) {
-    const st = roundStatus(round, covenant);
-    if (!st.ready) throw new Error(`quorum not reached: ${st.have} of ${st.need} signatures`);
-    const sigByKey = new Map(round.partialSigs.map((ps) => [ps.key, hexToBytes(ps.sig)]));
-    const sortedHex = covenant.keys.map((k) => k.xonly);
-    const check = [...sortedHex].sort();
-    if (check.some((k, i) => k !== sortedHex[i])) throw new Error("covenant keys not in sorted order");
-    const stackItems = [];
-    for (let i = sortedHex.length - 1; i >= 0; i--) {
-      stackItems.push(sigByKey.get(sortedHex[i]) || EMPTY2);
-    }
-    let drops = st.have - covenant.m;
-    if (drops > 0) {
-      for (let i = 0; i < stackItems.length && drops > 0; i++) {
-        if (stackItems[i].length === 64) {
-          stackItems[i] = EMPTY2;
-          drops--;
-        }
+    const totalIn = totalTrancheIn + bu.value;
+    const trancheOut = outputs.reduce((a, o) => a + o.value, 0);
+    let fee = Math.ceil(vBytesFor(outputs.length + 1) * feeRateGrainsPerVByte);
+    let change = totalIn - trancheOut - fee;
+    let withChange = true;
+    if (change < DUST_GRAIN) {
+      fee = Math.ceil(vBytesFor(outputs.length) * feeRateGrainsPerVByte);
+      change = totalIn - trancheOut - fee;
+      withChange = false;
+      if (change > 0) {
+        fee += change;
+        change = 0;
       }
     }
-    const outputs = round.outputs.map((o) => ({
-      program: addressToProgram(o.address, network),
-      value: o.value
+    if (change < 0) throw new Error(`buyer funds short: need ${trancheOut + fee} grains, have ${totalIn}`);
+    if (withChange) outputs.push({ program: buyerChangeProgram, value: change });
+    const vBytes = vBytesFor(outputs.length);
+    const inParts = [];
+    const witnesses = [];
+    legs.forEach((leg) => {
+      inParts.push(...txidLE(leg.input.txid), ...u32le(leg.input.vout), ...varint(0), ...u32le(leg.sequence));
+      const sig65 = hexToBytes(leg.sig65Hex);
+      const script = hexToBytes(leg.transferScriptHex);
+      const cb = hexToBytes(leg.transferControlBlockHex);
+      const w = [3, ...varint(65), ...sig65, ...varint(script.length), ...script, ...varint(cb.length), ...cb];
+      witnesses.push(w);
+    });
+    const buyerSeq = SEQ_NONFINAL;
+    inParts.push(...txidLE(bu.txid.toLowerCase()), ...u32le(bu.vout), ...varint(0), ...u32le(buyerSeq));
+    const buyerWitIdx = witnesses.length;
+    witnesses.push(null);
+    const outParts = [];
+    for (const o of outputs) {
+      const s = p2trScriptPubKey(o.program);
+      outParts.push(...u64le(o.value), ...varint(s.length), ...s);
+    }
+    const base = [
+      ...u32le(network.txVersion),
+      ...varint(nIn),
+      ...inParts,
+      ...varint(outputs.length),
+      ...outParts,
+      ...u32le(0)
+    ];
+    const txid = bytesToHex(dblSha(Uint8Array.from(base)).reverse());
+    const allInputs = legs.map((leg) => ({
+      txid: leg.input.txid,
+      vout: leg.input.vout,
+      value: leg.input.value,
+      spk: hexToBytes(leg.input.spkHex)
     }));
-    const input = {
-      txid: round.input.txid,
-      vout: round.input.vout,
-      value: round.input.value,
-      spk: hexToBytes(covenant.spkHex)
-    };
-    const spend = buildScriptPathSpend(
-      network,
-      input,
-      outputs,
-      hexToBytes(covenant.scriptHex),
-      hexToBytes(covenant.controlBlockHex),
-      stackItems,
-      {}
-    );
-    if (spend.digest !== round.digest) throw new Error("internal: digest mismatch at finalize");
-    return spend;
-  }
-  function describeRound(round, covenant) {
-    const st = roundStatus(round, covenant);
-    const totalOut = round.outputs.reduce((a, o) => a + o.value, 0);
+    allInputs.push({ txid: bu.txid.toLowerCase(), vout: bu.vout, value: bu.value, spk: bu.spk });
+    const seqs = [...legs.map((l) => l.sequence), buyerSeq];
+    const digest = keypathSigDigestExMulti(network, allInputs, outputs, seqs, legs.length, SIGHASH_DEFAULT);
+    const sig = signForXOnly(bu.priv, digest);
+    witnesses[buyerWitIdx] = [1, ...varint(64), ...sig];
+    const witFlat = witnesses.flatMap((w) => w);
+    const full = [
+      ...u32le(network.txVersion),
+      0,
+      1,
+      ...varint(nIn),
+      ...inParts,
+      ...varint(outputs.length),
+      ...outParts,
+      ...witFlat,
+      ...u32le(0)
+    ];
     return {
-      covenant: `${covenant.m}-of-${covenant.n}`,
-      address: covenant.address,
-      input: `${round.input.txid.slice(0, 12)}\u2026:${round.input.vout} (${(round.input.value / GRAIN_PER_PRL).toFixed(8)} PRL)`,
-      outputs: round.outputs.map((o) => ({
-        address: o.address.length > 24 ? o.address.slice(0, 12) + "\u2026" + o.address.slice(-8) : o.address,
-        value: (o.value / GRAIN_PER_PRL).toFixed(8),
-        change: o.change
-      })),
-      totalOut: (totalOut / GRAIN_PER_PRL).toFixed(8),
-      fee: (round.feeGrains / GRAIN_PER_PRL).toFixed(8),
-      feeRate: round.feeRateGrainsPerVByte,
-      quorum: `${st.have}/${st.need}`,
-      ready: st.ready,
-      signers: st.signers.map((s) => s.slice(0, 12) + "\u2026"),
-      memo: round.memo
+      hex: bytesToHex(Uint8Array.from(full)),
+      txid,
+      feeGrains: fee,
+      vBytes,
+      nLegs: legs.length,
+      buyerPaid: priceGrains,
+      buyerChange: withChange ? change : 0,
+      buyerDigestHex: bytesToHex(digest),
+      buyerSigHex: bytesToHex(sig)
     };
+  }
+  function keypathSigDigestExMulti(network, inputs, outputs, sequences, idx, hashType) {
+    const sha = (b) => sha2562(b);
+    const msg = [0, hashType, ...u32le(network.txVersion), ...u32le(0)];
+    msg.push(...sha(Uint8Array.from(inputs.flatMap((i) => [...txidLE(i.txid), ...u32le(i.vout)]))));
+    msg.push(...sha(Uint8Array.from(inputs.flatMap((i) => u64le(i.value)))));
+    msg.push(...sha(Uint8Array.from(inputs.flatMap((i) => [...varint(i.spk.length), ...i.spk]))));
+    msg.push(...sha(Uint8Array.from(sequences.flatMap((s) => u32le(s)))));
+    msg.push(...sha(Uint8Array.from(outputs.flatMap((o) => {
+      const s = p2trScriptPubKey(o.program);
+      return [...u64le(o.value), ...varint(s.length), ...s];
+    }))));
+    msg.push(0, ...u32le(idx));
+    return taggedHash2("TapSighash", Uint8Array.from(msg));
+  }
+  function classifyTranches(bond, chainState) {
+    const height = chainState && Number.isInteger(chainState.height) ? chainState.height : null;
+    const info = chainState && chainState.info || {};
+    return bond.tranches.map((t) => {
+      const st = info[t.address] || { balance: 0, txs: 0 };
+      const funded = st.balance >= t.amountGrains;
+      const matured = height === null ? null : height >= t.lockHeight;
+      let status = "unfunded";
+      if (funded && matured === true) status = "claimable";
+      else if (funded && matured === false) status = "locked";
+      else if (funded) status = "funded";
+      else if (st.txs > 0 && st.balance === 0) status = "spent";
+      return {
+        index: t.index,
+        kind: t.kind,
+        address: t.address,
+        amountGrains: t.amountGrains,
+        lockHeight: t.lockHeight,
+        balance: st.balance,
+        txs: st.txs,
+        matured,
+        funded,
+        status
+      };
+    });
   }
   return __toCommonJS(index_exports);
 })();

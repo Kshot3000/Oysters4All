@@ -5859,6 +5859,7 @@ zoo`.split("\n");
     if (out[out.length - 1] & 128) out.push(0);
     return Uint8Array.from(out);
   }
+  var TE = new TextEncoder();
   function scriptPathSigDigestEx(network, input, outputs, leafScript, opts = {}) {
     const { sequence = MAX_SEQ, locktime = 0, inputIdx = 0 } = opts;
     if (!/^[0-9a-f]{64}$/i.test(input.txid || "")) throw new Error("bad input txid");
@@ -5889,8 +5890,8 @@ zoo`.split("\n");
       ...spks,
       ...seqs,
       ...outs,
-      1,
-      // spend_type: script path, no annex
+      2,
+      // spend_type: script path (ext_flag=1), no annex
       ...u32le(inputIdx),
       ...leafHash,
       0,
@@ -6019,7 +6020,7 @@ zoo`.split("\n");
     return { outputs, fee, vBytes: vbytes(outputs.length), change };
   }
   function scriptAsm(script) {
-    const names = { 82: "2", 117: "DROP", 135: "EQUAL", 172: "CHECKSIG", 186: "CHECKSIGADD", 177: "CLTV" };
+    const names = { 82: "2", 117: "DROP", 135: "EQUAL", 136: "EQUALVERIFY", 168: "SHA256", 172: "CHECKSIG", 186: "CHECKSIGADD", 177: "CLTV" };
     const parts = [];
     let i = 0;
     while (i < script.length) {

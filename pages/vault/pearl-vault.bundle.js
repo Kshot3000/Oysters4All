@@ -6170,8 +6170,8 @@ zoo`.split("\n");
       ...spks,
       ...seqs,
       ...outs,
-      1,
-      // spend_type: script path, no annex
+      2,
+      // spend_type: script path (ext_flag=1), no annex
       ...u32le(inputIdx),
       ...leafHash,
       0,

@@ -247,7 +247,7 @@ test("independent sighash cross-check: node:crypto sha256 recomputation", () => 
     const msg = Buffer.concat([
       Buffer.from([0x00, 0x00]), u32le(net.txVersion), u32le(ticks[1].lock),
       prevouts, amounts, spks, seqs, outs,
-      Buffer.from([0x01]), u32le(i), leafHash, Buffer.from([0x00, 0xff, 0xff, 0xff, 0xff]),
+      Buffer.from([0x02]), u32le(i), leafHash, Buffer.from([0x00, 0xff, 0xff, 0xff, 0xff]), // 0x02 = script path (ext_flag=1), BIP-341
     ]);
     const independent = tagged("TapSighash", msg);
     assert.equal(independent.toString("hex"), built.digestsHex[i], "input " + i + " digest byte-equality");

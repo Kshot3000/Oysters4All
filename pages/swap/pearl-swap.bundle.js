@@ -5966,6 +5966,7 @@ zoo`.split("\n");
     }
     throw new Error("party key must be a 64-hex x-only pubkey or a 12/24-word mnemonic");
   }
+  var TE = new TextEncoder();
   function scriptPathSigDigestEx(network, input, outputs, leafScript, opts = {}) {
     const { sequence = MAX_SEQ, locktime = 0, inputIdx = 0 } = opts;
     if (!/^[0-9a-f]{64}$/i.test(input.txid || "")) throw new Error("bad input txid");
@@ -5996,8 +5997,8 @@ zoo`.split("\n");
       ...spks,
       ...seqs,
       ...outs,
-      1,
-      // spend_type: script path, no annex
+      2,
+      // spend_type: script path (ext_flag=1), no annex
       ...u32le(inputIdx),
       ...leafHash,
       0,
