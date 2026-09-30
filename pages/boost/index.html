@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Boost — Stuck-Transaction Accelerator Desk for PRL</title>
+<meta name="description" content="Pearl Boost: diagnose a stuck PRL transaction, then accelerate it with CPFP (child-pays-for-parent) or BIP-125 RBF replacement — pure Taproot, local Schnorr signing, honest limits.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 48 48" aria-hidden="true">
+      <path d="M24 3 L30 20 L24 17 L18 20 Z" fill="currentColor"/>
+      <path d="M24 17 C24 17 14 28 14 36 C14 41 18 44 24 44 C30 44 34 41 34 36 C34 28 24 17 24 17 Z" fill="none" stroke="currentColor" stroke-width="2.4"/>
+      <circle cx="24" cy="32" r="3.4" fill="currentColor"/>
+      <path d="M14 24 L8 28 M34 24 L40 28 M18 30 L12 36 M30 30 L36 36" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+    </svg>
+    <div>
+      <h1>Pearl Boost</h1>
+      <p class="tagline">the launchpad — stuck-transaction accelerator for PRL · light the fuse, don't relight the rocket</p>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs">
+    <button data-tab="diagnose" class="active">1 · Diagnose</button>
+    <button data-tab="cpfp">2 · CPFP</button>
+    <button data-tab="rbf">3 · RBF</button>
+    <button data-tab="track">4 · Track</button>
+    <button data-tab="verify">5 · Verify</button>
+  </nav>
+</header>
+
+<div class="settingsbar">
+  <label>Blockbook backend <span class="hint">GET-only reads.</span>
+    <input id="cfg-backend" size="42" spellcheck="false" value="https://blockbook.pearlresearch.ai"></label>
+  <label>Network
+    <select id="cfg-network"><option value="mainnet" selected>Mainnet (prl1…)</option><option value="testnet">Testnet (tprl1…)</option></select></label>
+  <span class="hint">Keys are in-memory only and wiped after use. This page never stores them.</span>
+</div>
+
+<main>
+  <!-- 1 · DIAGNOSE -->
+  <section id="tab-diagnose" class="panel active">
+    <h2>Diagnose the stuck transaction</h2>
+    <p class="lede">Paste a <strong>txid</strong>. The desk reads it with GET-only Blockbook calls and
+    reports confirmations, fee paid, computed vBytes, effective feerate, and whether any input
+    signals BIP-125 replaceability (any <code>nSequence ≤ 0xfffffffd</code> — the rule straight out of
+    pearld's <code>node/mempool/mempool.go</code>, <code>MaxRBFSequence</code>). Nothing here moves coins.</p>
+    <div class="form-grid">
+      <label class="wide">Transaction id <input id="dg-txid" spellcheck="false" autocomplete="off" placeholder="64-hex txid" maxlength="64"></label>
+    </div>
+    <div class="btnrow">
+      <button id="dg-go" class="primary">Diagnose</button>
+    </div>
+    <details class="offline">
+      <summary>Offline: paste a Blockbook <code>/api/v2/tx</code> JSON instead (air-gapped path)</summary>
+      <textarea id="dg-json" rows="4" spellcheck="false" placeholder='{"txid":"…","confirmations":0,"fees":"1000",…}'></textarea>
+      <div class="btnrow"><button id="dg-go-offline">Diagnose pasted JSON</button></div>
+    </details>
+    <div id="dg-result" class="result" aria-live="polite"></div>
+  </section>
+
+  <!-- 2 · CPFP -->
+  <section id="tab-cpfp" class="panel">
+    <h2>Child-pays-for-parent</h2>
+    <p class="lede">You received a low-fee payment and control one of its outputs. Spend that output in a
+    <strong>child</strong> transaction paying a fat fee: miners are incentivized to confirm parent + child
+    as a package. You pick the output, enter its key, set the target <strong>package</strong> feerate —
+    the desk does the exact math, signs locally, re-verifies every signature, and asks twice before
+    broadcasting.</p>
+    <div id="cp-need-diag" class="warnbox">Diagnose a transaction first (tab 1) — the CPFP planner needs its fee and size.</div>
+    <div class="form-grid">
+      <label class="wide">Spend this output (must be yours, unspent)
+        <select id="cp-output"></select></label>
+      <label class="wide">WIF of the output's key <span class="hint">in-memory only · wiped after use</span>
+        <input id="cp-wif" type="password" spellcheck="false" autocomplete="off" placeholder="WIF (5… / c… / 9… / K… / L…)"></label>
+      <label>Target package feerate <span class="hint">grains/vB.</span>
+        <input id="cp-target" inputmode="decimal" value="10"></label>
+      <label class="wide">Child pays to <span class="hint">defaults to the same address.</span>
+        <input id="cp-dest" spellcheck="false" autocomplete="off" placeholder="prl1… (leave blank = same address)"></label>
+    </div>
+    <div class="btnrow">
+      <button id="cp-plan" class="primary">Plan child</button>
+      <button id="cp-sign">Sign locally</button>
+      <button id="cp-wipe" class="ghost">Wipe key</button>
+    </div>
+    <div id="cp-planout" class="result" aria-live="polite"></div>
+    <div id="cp-signout" class="result" aria-live="polite"></div>
+    <div class="btnrow">
+      <button id="cp-bcast" class="danger" disabled>Broadcast child tx</button>
+    </div>
+    <div id="cp-bcastout" class="result" aria-live="polite"></div>
+  </section>
+
+  <!-- 3 · RBF -->
+  <section id="tab-rbf" class="panel">
+    <h2>Replace-by-fee</h2>
+    <p class="lede">The stuck transaction <strong>signaled BIP-125</strong> (diagnosis says so) and you hold the
+    keys to its inputs. Build a replacement spending the <strong>same inputs</strong>, keeping the same
+    outputs, with the fee bumped by trimming one output you choose. pearld enforces three rules and the
+    desk checks all three before signing: the new feerate must <strong>strictly beat</strong> the old one,
+    the absolute fee must exceed old fee + min-relay fee, and no output may drop below dust.</p>
+    <div id="rbf-need-diag" class="warnbox">Diagnose a transaction first (tab 1) — and it must signal RBF, or this tab refuses.</div>
+    <div id="rbf-wifs" class="wiflist"></div>
+    <div class="form-grid">
+      <label class="wide">Trim the bump from this output <span class="hint">fee-source; must stay ≥ 546 grains.</span>
+        <select id="rbf-feesrc"></select></label>
+      <label>Target feerate <span class="hint">grains/vB — must beat the current rate.</span>
+        <input id="rbf-target" inputmode="decimal" value=""></label>
+    </div>
+    <div class="btnrow">
+      <button id="rbf-plan" class="primary">Plan replacement</button>
+      <button id="rbf-sign">Sign locally</button>
+      <button id="rbf-wipe" class="ghost">Wipe keys</button>
+    </div>
+    <div id="rbf-planout" class="result" aria-live="polite"></div>
+    <div id="rbf-signout" class="result" aria-live="polite"></div>
+    <div class="btnrow">
+      <button id="rbf-bcast" class="danger" disabled>Broadcast replacement</button>
+    </div>
+    <div id="rbf-bcastout" class="result" aria-live="polite"></div>
+  </section>
+
+  <!-- 4 · TRACK -->
+  <section id="tab-track" class="panel">
+    <h2>Track confirmation</h2>
+    <p class="lede">Poll Blockbook for a txid's confirmation count. Loud when the backend is unreachable;
+    stops itself at 1+ confirmations.</p>
+    <div class="form-grid">
+      <label class="wide">Transaction id <input id="tr-txid" spellcheck="false" autocomplete="off" placeholder="64-hex txid" maxlength="64"></label>
+    </div>
+    <div class="btnrow">
+      <button id="tr-go" class="primary">Start tracking</button>
+      <button id="tr-stop" class="ghost">Stop</button>
+    </div>
+    <div id="tr-result" class="result" aria-live="polite"></div>
+  </section>
+
+  <!-- 5 · VERIFY -->
+  <section id="tab-verify" class="panel">
+    <h2>Package-feerate verifier</h2>
+    <p class="lede">Standalone check: paste a parent txid (and optional child txid), state a claimed package
+    feerate, and the desk recomputes <code>(parentFee + childFee) / (parentVSize + childVSize)</code> from
+    Blockbook and rules <strong>PROVEN</strong> or <strong>NOT PROVEN</strong> — with the full derivation
+    on screen so anyone can hand-check it.</p>
+    <div class="form-grid">
+      <label class="wide">Parent txid <input id="vf-parent" spellcheck="false" autocomplete="off" placeholder="64-hex txid" maxlength="64"></label>
+      <label class="wide">Child txid <span class="hint">optional.</span>
+        <input id="vf-child" spellcheck="false" autocomplete="off" placeholder="64-hex txid (leave blank for parent alone)" maxlength="64"></label>
+      <label>Claimed package feerate <span class="hint">grains/vB.</span>
+        <input id="vf-claimed" inputmode="decimal" placeholder="e.g. 10"></label>
+    </div>
+    <div class="btnrow">
+      <button id="vf-go" class="primary">Verify claim</button>
+    </div>
+    <div id="vf-result" class="result" aria-live="polite"></div>
+  </section>
+
+  <!-- HONEST LIMITS -->
+  <aside class="limits">
+    <h2>Honest limits</h2>
+    <ul>
+      <li><strong>No confirmation is guaranteed.</strong> Boosting only makes a transaction more attractive to miners; it cannot force inclusion.</li>
+      <li><strong>RBF acceptance is node policy, not consensus.</strong> pearld implements BIP-125 (verified in <code>node/mempool/mempool.go</code>), but a node operator may set <code>rejectreplacement</code>, and the Blockbook relay you broadcast through may refuse replacements. A rejected broadcast is not a bug in your math.</li>
+      <li><strong>CPFP needs package-aware miners.</strong> The child is worthless until the parent confirms; if a miner takes the child alone it can't — but most miners score by ancestor package. If the parent is double-spent, your child dies with it.</li>
+      <li><strong>This page never sees the mempool directly</strong> — it sees Blockbook's view of it. Fees shown are what Blockbook reports.</li>
+      <li><strong>Dust floor: 546 grains</strong> per P2TR output (upstream <code>txrules</code>). The desk refuses to create dust.</li>
+      <li><strong>Keys:</strong> WIFs live in page memory only, are wiped by the Wipe button and automatically after broadcast. Never paste a key you can't afford to lose into any website — ideally use a dedicated boosting key.</li>
+      <li><strong>Already confirmed?</strong> Both accelerator paths refuse loudly — a confirmed transaction cannot be boosted, only spent onward.</li>
+    </ul>
+  </aside>
+</main>
+
+<footer>
+  <p>Built for the Pearl blockchain (PRL) · <a href="https://x.com/kshot9000">@kshot9000</a></p>
+  <p>Support the build: <code id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code></p>
+  <p class="fine">Pearl Boost · launchpad ignition desk · pure Taproot, no smart contracts · all signing local, keys wiped.</p>
+</footer>
+
+<script src="pearl-boost.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
