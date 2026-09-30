@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Circle — Rotating Savings Club Desk for PRL</title>
+<meta name="description" content="Run a trust-minimized rotating savings club (ROSCA) on Pearl: commit-reveal payout lottery, per-round Taproot pot escrows, winner claims and m-of-n timeout refunds. Keys never leave the page.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="hero">
+  <div class="ring" aria-hidden="true"></div>
+  <div class="hero-inner">
+    <p class="kicker">Pearl · Rotating Savings Club</p>
+    <h1>Pearl Circle</h1>
+    <p class="sub">N members put in C PRL a round, for N rounds. Each round one member
+      takes the whole pot — the payout order is drawn by a commit-reveal lottery
+      nobody can game, and every pot sits in a Taproot escrow with a winner-claim
+      leaf and an m-of-n timeout-refund leaf. Pure Taproot, no smart contracts,
+      keys never leave this page.</p>
+    <nav id="steps" class="steps" aria-label="Workflow steps">
+      <button data-step="found" class="active">1 · Found</button>
+      <button data-step="lottery">2 · Lottery</button>
+      <button data-step="fund">3 · Fund</button>
+      <button data-step="claim">4 · Claim &amp; Refund</button>
+      <button data-step="track">5 · Track</button>
+    </nav>
+  </div>
+</header>
+
+<aside class="limits" aria-label="Honest limits">
+  <strong>Honest limits — always true:</strong>
+  <ul>
+    <li>Contributions are <em>voluntary</em>: this page cannot force any member to fund a round.</li>
+    <li>The order lottery needs <em>all</em> reveals. If a member withholds theirs, the order cannot be computed — the abort path is to refund any funded rounds through the timeout leaf once its lock height passes.</li>
+    <li>Round and lock "times" are <em>block-height estimates</em> (≈194&nbsp;s per block); the chain decides, not the clock.</li>
+    <li>Funding and status checks read <em>Blockbook, a third-party indexer</em> — it can lag or be wrong. The page cannot tell you <em>who</em> funded a round, only that an address holds funds.</li>
+    <li>Refunds need <em>m of n</em> member signatures on one template. With m&nbsp;&lt;&nbsp;n a coalition can refund early; with m&nbsp;=&nbsp;n one uncooperative member blocks refunds. Choose m with eyes open.</li>
+  </ul>
+</aside>
+
+<main>
+  <!-- ============ 1 · FOUND ============ -->
+  <section id="step-found" class="panel active">
+    <h2>Found the circle</h2>
+    <p class="hint">Define the members and the money. Each member is a bech32m
+      <code>prl1…</code>/<code>tprl1…</code> address, a 64-hex x-only key, or a BIP-39
+      mnemonic (converted locally to its key). One line per member:
+      <code>Name | address-or-key-or-mnemonic</code></p>
+    <div class="grid">
+      <label>Circle name<input id="f-name" maxlength="48" value="Harbor Savings Circle"></label>
+      <label>Network
+        <select id="f-network">
+          <option value="mainnet" selected>mainnet (prl1…)</option>
+          <option value="testnet">testnet (tprl1…)</option>
+          <option value="regtest">regtest</option>
+        </select>
+      </label>
+      <label>Contribution per round (PRL)<input id="f-contrib" inputmode="decimal" value="10"></label>
+      <label>Round length (blocks)<input id="f-roundblocks" inputmode="numeric" value="2160"></label>
+      <label>Start height<input id="f-startheight" inputmode="numeric" value="0"></label>
+      <label>Refund grace (blocks after next round opens)<input id="f-grace" inputmode="numeric" value="144"></label>
+      <label>Refund threshold m (of n)<input id="f-m" inputmode="numeric" placeholder="default n−1"></label>
+    </div>
+    <label>Members (2–16, one per line)<textarea id="f-members" rows="5" spellcheck="false"></textarea></label>
+    <div class="row">
+      <button id="f-forge" class="primary">Forge circle</button>
+      <span id="f-err" class="err" role="alert"></span>
+    </div>
+    <div id="f-out" class="hidden">
+      <h3>Setup descriptor</h3>
+      <p class="hint">Share this with every member <em>before</em> the lottery. It pins the
+        members, the money, and the rules — anyone can re-derive it and check the fingerprint.</p>
+      <textarea id="f-desc" rows="3" readonly spellcheck="false"></textarea>
+      <p class="mono">fingerprint <code id="f-fp"></code> · setup hash <code id="f-setuphash"></code></p>
+      <div class="row">
+        <button id="f-copydesc">Copy descriptor</button>
+        <button id="f-golottery">Continue to lottery →</button>
+      </div>
+      <p id="f-summary" class="summary"></p>
+    </div>
+  </section>
+
+  <!-- ============ 2 · LOTTERY ============ -->
+  <section id="step-lottery" class="panel">
+    <h2>Commit-reveal lottery</h2>
+    <p class="hint">Each member generates a random 32-byte secret and publishes
+      <code>sha256(secret)</code>. Once every commitment is public, secrets are revealed
+      and the payout order is computed deterministically — late reveals cannot change
+      anyone else's odds because every commitment was already locked in.</p>
+    <label>Circle descriptor<textarea id="l-desc" rows="3" spellcheck="false" placeholder="Paste the setup descriptor from step 1"></textarea></label>
+    <div class="row">
+      <button id="l-gensecrets" class="primary">Generate secrets for all members</button>
+      <button id="l-togglesecrets">Show secrets</button>
+      <span id="l-err" class="err" role="alert"></span>
+    </div>
+    <table id="l-table" class="hidden">
+      <thead><tr><th>#</th><th>Member</th><th>Secret (keep private until reveal)</th><th>Commitment (publish this)</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <h3>Publish commitments</h3>
+    <p class="hint">Send every member's commitment to the group <em>before</em> anyone reveals.
+      Paste the published set here to lock the draw:</p>
+    <textarea id="l-commitments" rows="4" spellcheck="false" placeholder='[{"memberIndex":0,"commitment":"…"}, …]'></textarea>
+    <h3>Reveal</h3>
+    <p class="hint">After all commitments are public, each member reveals their secret.
+      Paste the reveals here:</p>
+    <textarea id="l-reveals" rows="4" spellcheck="false" placeholder='[{"memberIndex":0,"secretHex":"…"}, …]'></textarea>
+    <div class="row">
+      <button id="l-draw" class="primary">Verify reveals &amp; draw the order</button>
+    </div>
+    <div id="l-out" class="hidden">
+      <h3>Payout order</h3>
+      <ol id="l-order"></ol>
+      <p class="mono">order <code id="l-orderjson"></code></p>
+      <div class="row">
+        <button id="l-gofund">Continue to funding →</button>
+      </div>
+      <p class="warn">If a member never reveals, the draw cannot run — do not fund.
+        Funded rounds can be recovered through the timeout refund leaf after its lock height.</p>
+    </div>
+  </section>
+
+  <!-- ============ 3 · FUND ============ -->
+  <section id="step-fund" class="panel">
+    <h2>Fund the rounds</h2>
+    <p class="hint">Each round's pot address is a Taproot escrow: the winner's claim leaf
+      plus an m-of-n timeout refund leaf under a NUMS internal key (no keypath backdoor).
+      Every member sends exactly the contribution to each round address.</p>
+    <label>Circle descriptor<textarea id="u-desc" rows="3" spellcheck="false"></textarea></label>
+    <label>Payout order (from the lottery)<input id="u-order" spellcheck="false" placeholder="e.g. 2,0,1"></label>
+    <div class="row">
+      <label class="inline">Fee rate (grains/vB)<input id="u-feerate" inputmode="decimal" value="2"></label>
+      <button id="u-load" class="primary">Derive rounds &amp; funding plan</button>
+      <span id="u-err" class="err" role="alert"></span>
+    </div>
+    <table id="u-table" class="hidden">
+      <thead><tr><th>Round</th><th>Pot address</th><th>Each pays</th><th>Winner</th><th>Opens @</th><th>Refund @</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div id="u-plan" class="hidden"></div>
+    <h3>Verify funding on-chain</h3>
+    <p class="hint">Reads each round address from Blockbook (third-party — can lag).
+      A full pot means the round is claimable by its winner.</p>
+    <div class="row">
+      <button id="u-check">Check funding</button>
+      <span id="u-checkerr" class="err" role="alert"></span>
+    </div>
+    <table id="u-checktable" class="hidden">
+      <thead><tr><th>Round</th><th>Balance</th><th>Pot</th><th>Status</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <!-- ============ 4 · CLAIM & REFUND ============ -->
+  <section id="step-claim" class="panel">
+    <h2>Claim &amp; refund</h2>
+    <p class="hint">The round winner claims the whole pot through the claim leaf.
+      If a round stalls, any m members sign one refund template through the timeout leaf.</p>
+    <label>Circle descriptor<textarea id="c-desc" rows="3" spellcheck="false"></textarea></label>
+    <label>Payout order<input id="c-order" spellcheck="false" placeholder="e.g. 2,0,1"></label>
+    <div class="row">
+      <button id="c-load" class="primary">Load circle</button>
+      <span id="c-err" class="err" role="alert"></span>
+    </div>
+
+    <div class="cols">
+      <div class="col">
+        <h3>Winner claim</h3>
+        <label>Round<select id="c-round"></select></label>
+        <label>Funding txid<input id="c-txid" spellcheck="false" placeholder="64 hex chars"></label>
+        <div class="grid2">
+          <label>vout<input id="c-vout" inputmode="numeric" value="0"></label>
+          <label>Round value (grains)<input id="c-value" inputmode="numeric"></label>
+        </div>
+        <label>Pay to (defaults to winner's address)<input id="c-dest" spellcheck="false"></label>
+        <div class="grid2">
+          <label>Fee rate (grains/vB)<input id="c-feerate" inputmode="decimal" value="2"></label>
+          <label>Winner key (mnemonic / WIF / hex)<input id="c-key" type="password" autocomplete="off" spellcheck="false"></label>
+        </div>
+        <div class="row">
+          <button id="c-build" class="primary">Review &amp; sign claim</button>
+          <button id="c-wipekey" class="ghost">Wipe key</button>
+        </div>
+        <div id="c-confirm" class="hidden confirm">
+          <p id="c-confirmtext"></p>
+          <div class="row">
+            <button id="c-confirmyes" class="primary">Yes — sign it</button>
+            <button id="c-confirmno" class="ghost">Cancel</button>
+          </div>
+        </div>
+        <div id="c-out" class="hidden">
+          <p id="c-meta" class="mono"></p>
+          <textarea id="c-hex" rows="4" readonly spellcheck="false"></textarea>
+          <div class="row">
+            <button id="c-copy">Copy hex</button>
+            <button id="c-broadcast">Broadcast via Blockbook</button>
+          </div>
+          <p id="c-bout" class="mono"></p>
+        </div>
+      </div>
+      <div class="col">
+        <h3>Timeout refund (m-of-n)</h3>
+        <label>Round<select id="d-round"></select></label>
+        <label>Funding txid<input id="d-txid" spellcheck="false" placeholder="64 hex chars"></label>
+        <div class="grid2">
+          <label>vout<input id="d-vout" inputmode="numeric" value="0"></label>
+          <label>Round value (grains)<input id="d-value" inputmode="numeric"></label>
+        </div>
+        <div class="grid2">
+          <label>Current chain height<input id="d-height" inputmode="numeric"></label>
+          <label>Fee rate (grains/vB)<input id="d-feerate" inputmode="decimal" value="2"></label>
+        </div>
+        <div class="row">
+          <button id="d-template" class="primary">Build refund template</button>
+          <span id="d-err" class="err" role="alert"></span>
+        </div>
+        <div id="d-tplout" class="hidden">
+          <p id="d-meta" class="mono"></p>
+          <div class="grid2">
+            <label>Signer<select id="d-member"></select></label>
+            <label>Signer key<input id="d-key" type="password" autocomplete="off" spellcheck="false"></label>
+          </div>
+          <div class="row">
+            <button id="d-sign">Sign template</button>
+            <button id="d-wipekey" class="ghost">Wipe key</button>
+          </div>
+          <ul id="d-sigs" class="siglist"></ul>
+          <div class="row">
+            <button id="d-finalize" class="primary">Finalize refund tx</button>
+          </div>
+          <div id="d-out" class="hidden">
+            <p id="d-fmeta" class="mono"></p>
+            <textarea id="d-hex" rows="4" readonly spellcheck="false"></textarea>
+            <div class="row">
+              <button id="d-copy">Copy hex</button>
+              <button id="d-broadcast">Broadcast via Blockbook</button>
+            </div>
+            <p id="d-bout" class="mono"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 5 · TRACK ============ -->
+  <section id="step-track" class="panel">
+    <h2>Track the circle</h2>
+    <p class="hint">Paste a descriptor (and the payout order, if drawn) to re-derive every
+      round address and classify it against Blockbook.</p>
+    <label>Circle descriptor<textarea id="k-desc" rows="3" spellcheck="false"></textarea></label>
+    <label>Payout order (optional)<input id="k-order" spellcheck="false" placeholder="e.g. 2,0,1"></label>
+    <div class="row">
+      <button id="k-check" class="primary">Classify rounds</button>
+      <span id="k-err" class="err" role="alert"></span>
+    </div>
+    <table id="k-table" class="hidden">
+      <thead><tr><th>Round</th><th>Address</th><th>Winner</th><th>Balance / pot</th><th>Status</th><th>Refund unlocks</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p id="k-meta" class="mono"></p>
+  </section>
+</main>
+
+<footer>
+  <p>Built by <a href="https://x.com/kshot9000">@kshot9000</a> for the Pearl ecosystem ·
+    Donations: <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code></p>
+  <p class="fine">Pearl Circle runs a rotating savings club on Pearl Taproot — commit-reveal
+    payout lottery, per-round 2-leaf escrows (winner claim + m-of-n timeout refund) under a
+    NUMS internal key. No smart contracts, no custodians, no new cryptography: the audited
+    Sign / Escrow / Games / Bond / Covenant lineage. Contributions are voluntary; the page
+    cannot move anyone's coins but the keys you enter.</p>
+</footer>
+
+<script src="pearl-circle.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
