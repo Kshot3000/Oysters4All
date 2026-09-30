@@ -1,0 +1,279 @@
+/* Pearl Treasury — deep emerald + gold "vault ledger" theme.
+ * Pearl family feel (dark, luminous) with Treasury's own personality:
+ * ledger greens, vault gold, engraved borders. */
+
+:root {
+  --bg: #04120d;
+  --bg2: #062015;
+  --panel: #0a2b1c;
+  --panel2: #0d3623;
+  --line: #1d5c3d;
+  --gold: #d4af37;
+  --gold-soft: #f0d97a;
+  --gold-dim: #8a7426;
+  --ink: #eaf7ef;
+  --ink-dim: #9fc3ab;
+  --emerald: #2ecc71;
+  --emerald-deep: #0e7c44;
+  --danger: #ff6b6b;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(1200px 500px at 50% -120px, rgba(46, 204, 113, 0.10), transparent 70%),
+    linear-gradient(180deg, var(--bg), #020a07 70%);
+  color: var(--ink);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+}
+
+.hero {
+  border-bottom: 1px solid var(--line);
+  background:
+    radial-gradient(600px 200px at 20% 0, rgba(212, 175, 55, 0.08), transparent 70%),
+    linear-gradient(180deg, #07231a, transparent);
+  padding: 2.2rem 1.5rem 1.4rem;
+  position: relative;
+}
+.hero .seal {
+  position: absolute;
+  top: 1.2rem; right: 2rem;
+  font-size: 3rem;
+  color: var(--gold);
+  opacity: 0.55;
+  text-shadow: 0 0 24px rgba(212, 175, 55, 0.6);
+}
+.kicker {
+  color: var(--gold-soft);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  margin: 0 0 0.4rem;
+}
+.hero h1 {
+  margin: 0 0 0.6rem;
+  font-size: 2.4rem;
+  font-weight: 700;
+  background: linear-gradient(120deg, var(--gold-soft), var(--gold) 60%, #fff3c4);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.hero .sub { max-width: 62rem; color: var(--ink-dim); line-height: 1.55; margin: 0 0 1.2rem; }
+.hero .sub em { color: var(--gold-soft); font-style: normal; }
+
+.steps { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.steps button {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--ink-dim);
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.92rem;
+}
+.steps button:hover { border-color: var(--gold-dim); color: var(--ink); }
+.steps button.active {
+  background: linear-gradient(180deg, var(--panel2), var(--panel));
+  border-color: var(--gold);
+  color: var(--gold-soft);
+  box-shadow: 0 0 12px rgba(212, 175, 55, 0.25), inset 0 1px 0 rgba(240, 217, 122, 0.15);
+}
+
+.limits {
+  margin: 1.2rem auto 0;
+  max-width: 72rem;
+  padding: 0.9rem 1.2rem;
+  border: 1px solid var(--gold-dim);
+  border-left: 4px solid var(--gold);
+  border-radius: 10px;
+  background: rgba(212, 175, 55, 0.05);
+  font-size: 0.88rem;
+  color: var(--ink-dim);
+  width: calc(100% - 3rem);
+}
+.limits strong { color: var(--gold-soft); }
+.limits ul { margin: 0.4rem 0 0; padding-left: 1.2rem; }
+.limits li { margin: 0.25rem 0; line-height: 1.5; }
+.limits em { color: var(--ink); font-style: normal; font-weight: 600; }
+
+main { max-width: 72rem; margin: 0 auto; padding: 1.2rem 1.5rem 3rem; width: calc(100% - 3rem); }
+
+.panel {
+  display: none;
+  background: linear-gradient(180deg, rgba(13, 54, 35, 0.55), rgba(6, 32, 21, 0.55));
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1.6rem;
+  margin-top: 1.2rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(212, 175, 55, 0.08);
+}
+.panel.active { display: block; }
+.panel h2 {
+  margin: 0 0 0.4rem;
+  color: var(--gold-soft);
+  font-size: 1.45rem;
+  letter-spacing: 0.02em;
+}
+.panel h3 {
+  margin: 1.6rem 0 0.6rem;
+  color: var(--gold);
+  font-size: 1.05rem;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 0.35rem;
+}
+.hint { color: var(--ink-dim); font-size: 0.92rem; line-height: 1.55; }
+.hint code, .mono code { font-family: var(--mono); color: var(--gold-soft); }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.9rem;
+  margin: 1rem 0;
+}
+.grid .span2 { grid-column: span 2; }
+.grid .span3 { grid-column: span 3; }
+label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.86rem; color: var(--ink-dim); }
+.dim { color: var(--ink-dim); opacity: 0.75; font-weight: normal; }
+
+input, select, textarea {
+  background: #03170f;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+  font-size: 0.95rem;
+  font-family: inherit;
+  width: 100%;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.25);
+}
+input[readonly], textarea[readonly] { font-family: var(--mono); font-size: 0.82rem; }
+textarea { resize: vertical; }
+
+.row { display: flex; align-items: center; flex-wrap: wrap; gap: 0.7rem; margin: 0.9rem 0; }
+
+button {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  padding: 0.6rem 1.1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.93rem;
+}
+button:hover { border-color: var(--gold-dim); }
+button.primary {
+  background: linear-gradient(180deg, #b8912a, var(--gold-dim));
+  border-color: var(--gold);
+  color: #0a1f14;
+  font-weight: 700;
+}
+button.primary:hover { filter: brightness(1.1); }
+button.danger {
+  background: rgba(255, 107, 107, 0.08);
+  border-color: #7a3a3a;
+  color: var(--danger);
+}
+button.danger:hover { border-color: var(--danger); }
+
+.err { color: var(--danger); font-size: 0.9rem; }
+.ok { color: var(--emerald); font-size: 0.9rem; }
+
+.hidden { display: none !important; }
+
+.callout {
+  border: 1px solid var(--gold-dim);
+  border-radius: 10px;
+  padding: 1rem 1.2rem;
+  margin: 1rem 0;
+  background: rgba(212, 175, 55, 0.05);
+}
+.callout h3 { border: none; margin-top: 0; }
+.callout.demo { border-color: var(--danger); background: rgba(255, 107, 107, 0.05); }
+.warn { color: #ffd9a0; }
+
+.ledger { width: 100%; border-collapse: collapse; margin: 0.6rem 0; font-size: 0.88rem; }
+.ledger th {
+  text-align: left;
+  color: var(--gold-soft);
+  font-weight: 600;
+  padding: 0.55rem 0.6rem;
+  border-bottom: 1px solid var(--gold-dim);
+  white-space: nowrap;
+}
+.ledger td {
+  padding: 0.55rem 0.6rem;
+  border-bottom: 1px solid rgba(29, 92, 61, 0.5);
+  vertical-align: top;
+  word-break: break-all;
+}
+.ledger tbody tr:hover { background: rgba(46, 204, 113, 0.05); }
+.ledger .mono { font-family: var(--mono); font-size: 0.8rem; }
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  border: 1px solid var(--line);
+  color: var(--ink-dim);
+}
+.badge.open { border-color: var(--gold-dim); color: var(--gold-soft); }
+.badge.quorum { border-color: var(--emerald-deep); color: var(--emerald); }
+.badge.disbursed { background: rgba(46, 204, 113, 0.15); border-color: var(--emerald); color: var(--emerald); }
+.badge.cancelled { color: var(--danger); border-color: #7a3a3a; }
+.badge.demo { border-color: #7a3a3a; color: #ffb3b3; }
+
+.summary { color: var(--gold-soft); font-size: 1rem; }
+
+.mono-block {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  background: #03170f;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.9rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 22rem;
+  overflow-y: auto;
+}
+.mono { font-family: var(--mono); }
+
+.siglist .sig {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 0.4rem 0;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  background: rgba(46, 204, 113, 0.04);
+}
+
+footer {
+  border-top: 1px solid var(--line);
+  padding: 1.4rem 1.5rem 2.5rem;
+  text-align: center;
+  color: var(--ink-dim);
+  font-size: 0.88rem;
+}
+footer a { color: var(--gold-soft); }
+footer code { font-family: var(--mono); color: var(--gold-soft); font-size: 0.8rem; word-break: break-all; }
+
+@media (max-width: 760px) {
+  .grid { grid-template-columns: 1fr; }
+  .grid .span2, .grid .span3 { grid-column: span 1; }
+  .hero h1 { font-size: 1.8rem; }
+}

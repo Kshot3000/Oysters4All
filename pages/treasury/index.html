@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Treasury — DAO / Team Treasury Command Center for PRL</title>
+<meta name="description" content="Treasury console for teams and DAOs holding PRL in m-of-n Taproot vaults: register vaults, propose spends, collect cosigner signatures to quorum, build and broadcast real Taproot disbursements, and keep a hash-chained audit log. Keys never leave this page.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="hero">
+  <div class="seal" aria-hidden="true">◈</div>
+  <div class="hero-inner">
+    <p class="kicker">Pearl · Treasury Desk</p>
+    <h1>Pearl Treasury</h1>
+    <p class="sub">The vault ledger for teams and DAOs holding PRL. Register m-of-n
+      Taproot vaults, draft spend proposals with tamper-evident ids, collect cosigner
+      signatures to quorum, and disburse real Taproot transactions — with an
+      append-only, hash-chained audit trail for every move. No smart contracts on
+      Pearl; pure Taproot script, keys never leave this page.</p>
+    <nav id="steps" class="steps" aria-label="Workflow steps">
+      <button data-step="vaults" class="active">1 · Vaults</button>
+      <button data-step="proposals">2 · Proposals</button>
+      <button data-step="sign">3 · Sign</button>
+      <button data-step="disburse">4 · Disburse</button>
+      <button data-step="audit">5 · Audit</button>
+    </nav>
+  </div>
+</header>
+
+<aside class="limits" aria-label="Honest limits">
+  <strong>Honest limits — always true:</strong>
+  <ul>
+    <li>Pearl has <em>no smart contracts</em>: this desk coordinates <em>off-chain</em>.
+      Proposals and signatures are local records until a quorum-signed transaction is
+      broadcast — the chain only ever sees the final Taproot spend.</li>
+    <li>Balances and fee estimates read <em>Blockbook, a third-party indexer</em> — it can
+      lag or be wrong. The UTXO you paste for a disbursement is <em>your</em> responsibility
+      to confirm.</li>
+    <li>Private keys live <em>in memory only</em>, never in localStorage. Vault descriptors,
+      proposals, and the audit log are public metadata and do persist locally.</li>
+    <li>Recurring schedules are a <em>calendar table in this browser</em> — nothing
+      on-chain enforces timing; each payout is a manual quorum spend when due.</li>
+    <li>No real funds moved in testing — disbursement hex is real transaction
+      construction; verify it before you broadcast.</li>
+  </ul>
+</aside>
+
+<main>
+  <!-- ============ 1 · VAULTS ============ -->
+  <section id="step-vaults" class="panel active">
+    <h2>Vaults</h2>
+    <p class="hint">Register m-of-n Taproot vaults with a
+      <code>covenant:v1:&lt;hrp&gt;:&lt;m&gt;-of-&lt;n&gt;:&lt;keys…&gt;</code> descriptor.
+      The address is fully determined by the cosigner set — no keypath bypass exists
+      (NUMS internal key). Registering is watch-only: no keys required.</p>
+    <div class="grid">
+      <label>Network
+        <select id="v-network">
+          <option value="mainnet" selected>mainnet (prl1…)</option>
+          <option value="testnet">testnet (tprl1…)</option>
+        </select>
+      </label>
+      <label class="span2">Vault label<input id="v-label" maxlength="64" placeholder="Ops vault"></label>
+      <label class="span3">Descriptor<textarea id="v-desc" rows="2" spellcheck="false" placeholder="covenant:v1:prl:2-of-3:&lt;key1&gt;:&lt;key2&gt;:&lt;key3&gt;"></textarea></label>
+      <label>Blockbook URL <span class="dim">(optional override)</span>
+        <input id="v-bburl" spellcheck="false" placeholder="defaults per network"></label>
+    </div>
+    <div class="row">
+      <button id="v-register" class="primary">Register vault</button>
+      <button id="v-gen">Generate demo 2-of-3 vault</button>
+      <button id="v-refresh-all">Refresh all balances</button>
+      <span id="v-err" class="err" role="alert"></span>
+    </div>
+    <div id="v-genout" class="hidden callout demo">
+      <h3>Demo vault — testing only</h3>
+      <p class="warn">These mnemonics are shown <strong>once</strong>. They control a
+        <strong>demo</strong> vault — fund it only with amounts you can lose. Copy them
+        to the cosigners' password managers, then dismiss this panel.</p>
+      <label>Descriptor<textarea id="v-gen-desc" rows="2" readonly spellcheck="false"></textarea></label>
+      <label>Address<input id="v-gen-address" readonly spellcheck="false"></label>
+      <label>Cosigner mnemonics (in order)<textarea id="v-gen-keys" rows="6" readonly spellcheck="false"></textarea></label>
+      <div class="row">
+        <button id="v-gen-copy">Copy descriptor</button>
+        <button id="v-gen-hide">Dismiss (mnemonics hidden forever)</button>
+      </div>
+    </div>
+    <h3>Registered vaults</h3>
+    <table class="ledger">
+      <thead><tr><th>Vault</th><th>Address</th><th>Quorum</th><th>Confirmed</th><th>Unconfirmed</th><th>UTXOs</th><th>Refreshed</th><th></th></tr></thead>
+      <tbody id="v-rows"></tbody>
+    </table>
+    <p id="v-totals" class="summary"></p>
+  </section>
+
+  <!-- ============ 2 · PROPOSALS ============ -->
+  <section id="step-proposals" class="panel">
+    <h2>Spend proposals</h2>
+    <p class="hint">Draft a spend intent. The proposal id is the SHA-256 of its canonical
+      JSON — tamper with any field and the id stops matching. Amounts use integer grain
+      math only; the payee must be a valid Taproot address on the vault's network.</p>
+    <div class="grid">
+      <label>Vault<select id="p-vault"></select></label>
+      <label>Payee address <span class="dim">(prl1… / tprl1…)</span>
+        <input id="p-payee" spellcheck="false" placeholder="prl1p…"></label>
+      <label>Amount (PRL)<input id="p-amount" inputmode="decimal" placeholder="1.25"></label>
+      <label>Proposed by<input id="p-creator" maxlength="64" placeholder="alice"></label>
+      <label>Due date <span class="dim">(optional)</span><input id="p-due" type="date"></label>
+      <label>Recurrence
+        <select id="p-recur-unit">
+          <option value="">one-off</option>
+          <option value="days">every N days</option>
+          <option value="weeks">every N weeks</option>
+          <option value="months">every N months</option>
+        </select></label>
+      <label>Every N<input id="p-recur-every" inputmode="numeric" value="1"></label>
+      <label class="span3">Memo <span class="dim">(280 chars, public)</span>
+        <input id="p-memo" maxlength="280" placeholder="server invoice Q3"></label>
+    </div>
+    <div class="row">
+      <button id="p-create" class="primary">Create proposal</button>
+      <span id="p-err" class="err" role="alert"></span>
+    </div>
+    <h3>Proposals</h3>
+    <table class="ledger">
+      <thead><tr><th>Fingerprint</th><th>Vault</th><th>Payee</th><th>Amount</th><th>Status</th><th>Due</th><th></th></tr></thead>
+      <tbody id="p-rows"></tbody>
+    </table>
+    <div id="p-detail-wrap" class="hidden">
+      <h3>Proposal detail</h3>
+      <pre id="p-detail" class="mono-block"></pre>
+      <div class="row">
+        <button id="p-verify">Tamper-check</button>
+        <button id="p-copy">Copy proposal JSON</button>
+        <button id="p-goto-sign">Continue to signing →</button>
+        <button id="p-cancel">Cancel proposal</button>
+        <span id="p-verify-out" class="ok"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 3 · SIGN ============ -->
+  <section id="step-sign" class="panel">
+    <h2>Cosigner signing</h2>
+    <p class="hint">Turn a proposal into a real Taproot signing round, sign it locally with
+      a cosigner key, and pass the round JSON to the other cosigners. Every signature is
+      Schnorr-verified against the round digest <em>before</em> it is stored; a key that is
+      not a cosigner is loudly refused.</p>
+    <div class="grid">
+      <label>Proposal<select id="s-proposal"></select></label>
+      <label class="span2">…or paste a proposal JSON<textarea id="s-import" rows="2" spellcheck="false" placeholder="paste a proposal from a cosigner"></textarea></label>
+    </div>
+    <div class="row">
+      <button id="s-import-btn">Import proposal</button>
+      <span id="s-err" class="err" role="alert"></span>
+    </div>
+    <h3>Funding outpoint</h3>
+    <div class="grid">
+      <label class="span2">Vault UTXO <span class="dim">(txid:vout)</span>
+        <input id="s-utxo" spellcheck="false" placeholder="ab12…:0"></label>
+      <label>UTXO value (grains)<input id="s-utxo-value" inputmode="numeric" placeholder="250000000"></label>
+      <label>Fee rate (grains/vB)<input id="s-feerate" inputmode="decimal" value="5"></label>
+    </div>
+    <div class="row">
+      <button id="s-estfee">Estimate fee rate (Blockbook)</button>
+      <button id="s-buildround" class="primary">Build signing round</button>
+    </div>
+    <pre id="s-round-out" class="mono-block hidden"></pre>
+    <div class="row">
+      <button id="s-export">Copy round JSON</button>
+    </div>
+    <h3>Cosigner key <span class="dim">(in memory only — never stored)</span></h3>
+    <div class="grid">
+      <label>Key label<input id="s-keylabel" maxlength="32" placeholder="bob"></label>
+      <label>Format
+        <select id="s-keymode">
+          <option value="priv">64-hex private key</option>
+          <option value="wif">WIF</option>
+          <option value="mnemonic">12/24-word mnemonic</option>
+        </select></label>
+      <label class="span2">Key material<input id="s-key" type="password" autocomplete="off" spellcheck="false" placeholder="paste the cosigner key"></label>
+    </div>
+    <div class="row">
+      <button id="s-review" class="primary">Review what I sign</button>
+      <button id="s-wipe" class="danger">Wipe keys from memory</button>
+      <span id="s-keystatus" class="dim"></span>
+    </div>
+    <div id="s-review-wrap" class="hidden callout">
+      <h3>Confirm the spend</h3>
+      <pre id="s-review-out" class="mono-block"></pre>
+      <div class="row">
+        <button id="s-confirm" class="primary">Confirm &amp; sign</button>
+        <button id="s-cancel-review">Back</button>
+      </div>
+    </div>
+    <h3>Collected signatures <span id="s-quorum" class="dim"></span></h3>
+    <div id="s-sigs" class="siglist"></div>
+    <h3>Import a cosigner's signature</h3>
+    <div class="grid">
+      <label>Cosigner x-only key<input id="s-importkey" spellcheck="false" placeholder="64-hex x-only pubkey"></label>
+      <label class="span2">Signature<input id="s-importsig" spellcheck="false" placeholder="128-hex Schnorr signature"></label>
+    </div>
+    <div class="row">
+      <button id="s-importsig-btn">Verify &amp; import signature</button>
+    </div>
+    <h3>Load a cosigner's round</h3>
+    <div class="grid">
+      <label class="span3">Round JSON<textarea id="s-round-json" rows="3" spellcheck="false" placeholder="paste the round JSON"></textarea></label>
+    </div>
+    <div class="row">
+      <button id="s-load-round">Verify &amp; load round</button>
+    </div>
+  </section>
+
+  <!-- ============ 4 · DISBURSE ============ -->
+  <section id="step-disburse" class="panel">
+    <h2>Disburse</h2>
+    <p class="hint">When a proposal's round reaches quorum, finalize the real Taproot spend,
+      inspect the raw hex, and broadcast it through Blockbook. The round is checked
+      against the proposal intent first — a round that drifts from the approved payee or
+      amount is refused.</p>
+    <div class="grid">
+      <label>Proposal<select id="d-proposal"></select></label>
+      <label class="span2">Round JSON <span class="dim">(paste the quorum-reached round)</span>
+        <textarea id="d-round" rows="3" spellcheck="false"></textarea></label>
+    </div>
+    <div class="row">
+      <button id="d-verify-match" class="primary">Check intent match</button>
+      <span id="d-match-out" class="ok"></span>
+      <span id="d-err" class="err" role="alert"></span>
+    </div>
+    <div class="row">
+      <button id="d-finalize" class="primary">Finalize transaction</button>
+    </div>
+    <div id="d-txout" class="hidden">
+      <h3>Signed transaction</h3>
+      <p class="mono">txid <code id="d-txid"></code></p>
+      <p class="mono">vBytes <code id="d-vbytes"></code> · fee <code id="d-fee"></code></p>
+      <label>Raw hex<textarea id="d-hex" rows="5" readonly spellcheck="false"></textarea></label>
+      <div class="row">
+        <button id="d-copy-hex">Copy hex</button>
+        <button id="d-broadcast" class="danger">Broadcast via Blockbook</button>
+      </div>
+      <div id="d-broadcast-wrap" class="hidden callout">
+        <p class="warn">Broadcasting spends <strong>real PRL</strong>. The hex above is
+          final — confirm the payee and amount one last time.</p>
+        <div class="row">
+          <button id="d-broadcast-confirm" class="danger">Yes — broadcast now</button>
+          <button id="d-broadcast-cancel">Back</button>
+        </div>
+      </div>
+      <p id="d-broadcast-out" class="mono"></p>
+    </div>
+    <h3>Scheduled payouts</h3>
+    <p class="hint">Recurring proposals land here as a calendar table. Nothing on-chain
+      enforces the timing — when a payout is due, build its spend above and mark it paid.</p>
+    <div class="grid">
+      <label>Proposal<select id="d-sched-proposal"></select></label>
+      <label>Starts<input id="d-sched-start" type="date"></label>
+      <label>Recurrence
+        <select id="d-sched-unit">
+          <option value="days">every N days</option>
+          <option value="weeks">every N weeks</option>
+          <option value="months">every N months</option>
+        </select></label>
+      <label>Every N<input id="d-sched-every" inputmode="numeric" value="4"></label>
+    </div>
+    <div class="row">
+      <button id="d-sched-add">Add schedule</button>
+    </div>
+    <table class="ledger">
+      <thead><tr><th>Proposal</th><th>Every</th><th>Next due</th><th>Last paid</th><th>Status</th><th></th></tr></thead>
+      <tbody id="d-sched-rows"></tbody>
+    </table>
+  </section>
+
+  <!-- ============ 5 · AUDIT ============ -->
+  <section id="step-audit" class="panel">
+    <h2>Audit log</h2>
+    <p class="hint">Every vault registration, proposal, signature, disbursement, and
+      schedule event is appended to a hash-chained log. Each entry commits to the
+      previous entry's hash — edit any line and the chain check fails.</p>
+    <div class="row">
+      <button id="a-verify" class="primary">Verify chain</button>
+      <button id="a-export-json">Export JSON</button>
+      <button id="a-export-csv">Export CSV</button>
+      <button id="a-clear" class="danger">Clear log</button>
+      <span id="a-verdict" class="ok" role="status"></span>
+    </div>
+    <table class="ledger">
+      <thead><tr><th>#</th><th>Time</th><th>Event</th><th>Actor</th><th>Detail</th><th>Hash</th></tr></thead>
+      <tbody id="a-rows"></tbody>
+    </table>
+    <textarea id="a-export" rows="6" class="hidden mono-block" readonly spellcheck="false"></textarea>
+  </section>
+</main>
+
+<footer>
+  <p>Built by <a href="https://x.com/kshot9000">@kshot9000</a> for the Pearl blockchain ·
+    tips: <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code></p>
+  <p class="dim">Pearl Treasury v1 — keys in memory only · no smart contracts on Pearl ·
+    verify every hex before you broadcast.</p>
+</footer>
+
+<script src="pearl-treasury.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>

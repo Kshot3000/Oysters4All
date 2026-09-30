@@ -46,6 +46,7 @@
         <a href="pages/charity/">Charity</a>
         <a href="pages/node/">Node</a>
         <a href="pages/oracle/">Oracle</a>
+        <a href="pages/treasury/">Treasury</a>
         <a href="pages/id/">ID</a>
         <a href="pages/raffle/">Raffle</a>
         <a href="pages/swap/">Swap</a>
@@ -334,6 +335,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Node — pearld Operator Console <span class="badge">new</span></h3>
             <p>Mission control for your own pearld node — chain status, sortable peer table, mempool depth, and mining telemetry over JSON-RPC. Strictly read-only: it only ever calls the six read-only RPC methods (getinfo, getmininginfo, getmempoolinfo, getpeerinfo, getnettotals, getchaintips), never sends state-changing calls, and never touches wallets. Ships with a zero-dependency relay.mjs (browsers can't call pearld directly — no CORS, self-signed TLS), health heuristics with honest warn/error lamps, and a loud network-mismatch guard. Overview → Peers → Mempool → Mining → Settings.</p>
             <div class="card-links"><a href="pages/node/">Open Pearl Node →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Treasury — DAO / Team Treasury Command Center <span class="badge">new</span></h3>
+            <p>Command center for a team or DAO holding PRL in m-of-n Taproot vaults (emerald + gold vault-ledger theme): Vaults → Proposals → Sign → Disburse → Audit. Register covenant-style `covenant:v1:` vault descriptors and track confirmed balances with GET-only Blockbook reads, draft spend proposals (SHA-256 ids, 64-bit fingerprints, grain-exact integer amounts, P2TR payee validation), collect local BIP-340 cosigner signatures to quorum with per-signature re-verification and loud wrong-key refusal, then finalize real script-path Taproot spends with exact vBytes fee planning, intent-match checks, and dust refusal — plus a hash-chained audit log with one-click tamper check and CSV/JSON export. No new cryptography — audited Sign, Covenant, and Escrow cores throughout; keys in memory only with byte-zeroing wipe. Honest limits up front: no smart contracts on Pearl, so coordination is off-chain until broadcast; schedules are a calendar table; the page moves real PRL only when you broadcast the hex yourself.</p>
+            <div class="card-links"><a href="pages/treasury/">Open Pearl Treasury →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl ID — Sign-in with Pearl <span class="badge">new</span></h3>
