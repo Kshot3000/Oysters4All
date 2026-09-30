@@ -47,6 +47,7 @@
         <a href="pages/node/">Node</a>
         <a href="pages/oracle/">Oracle</a>
         <a href="pages/treasury/">Treasury</a>
+        <a href="pages/names/">Names</a>
         <a href="pages/id/">ID</a>
         <a href="pages/raffle/">Raffle</a>
         <a href="pages/swap/">Swap</a>
@@ -340,6 +341,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Treasury — DAO / Team Treasury Command Center <span class="badge">new</span></h3>
             <p>Command center for a team or DAO holding PRL in m-of-n Taproot vaults (emerald + gold vault-ledger theme): Vaults → Proposals → Sign → Disburse → Audit. Register covenant-style `covenant:v1:` vault descriptors and track confirmed balances with GET-only Blockbook reads, draft spend proposals (SHA-256 ids, 64-bit fingerprints, grain-exact integer amounts, P2TR payee validation), collect local BIP-340 cosigner signatures to quorum with per-signature re-verification and loud wrong-key refusal, then finalize real script-path Taproot spends with exact vBytes fee planning, intent-match checks, and dust refusal — plus a hash-chained audit log with one-click tamper check and CSV/JSON export. No new cryptography — audited Sign, Covenant, and Escrow cores throughout; keys in memory only with byte-zeroing wipe. Honest limits up front: no smart contracts on Pearl, so coordination is off-chain until broadcast; schedules are a calendar table; the page moves real PRL only when you broadcast the hex yourself.</p>
             <div class="card-links"><a href="pages/treasury/">Open Pearl Treasury →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Names — Human-readable names for Pearl addresses <span class="badge">new</span></h3>
+            <p>Give your Taproot address a name — bind a memorable <code>name.prl</code> to your prl1… address by signing a canonical registration record with the BIP-86 key that controls it, then seal it on-chain in a <code>prl-name</code> Taproot inscription envelope: Register → Directory → Verify → Export. Name rules (3–63 chars, reserved list), wrong-key refusal on signing, standalone VALID/INVALID verifier that re-derives the address from the key and re-checks the BIP-340 signature, first-seen conflict resolution in the local directory, full commit→reveal planning with grain-exact fees, and witness self-verification before broadcast. No new cryptography — audited Sign/Etch cores throughout; keys in memory only.</p>
+            <div class="card-links"><a href="pages/names/">Open Pearl Names →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl ID — Sign-in with Pearl <span class="badge">new</span></h3>

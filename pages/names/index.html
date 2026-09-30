@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Names — Human-readable names for Pearl addresses</title>
+<meta name="description" content="Give your Pearl Taproot address a name. Sign a canonical registration record with your BIP-86 key, inscribe it with a prl-name Taproot envelope, and let anyone verify the binding.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="top">
+  <div class="stars" aria-hidden="true"></div>
+  <div class="constellation" aria-hidden="true">✦ ─── ✧ ─── ✦</div>
+  <h1>Pearl Names</h1>
+  <p class="tagline">The Pearl address book — bind a memorable <code>name.prl</code> to your prl1… Taproot address. Sign it with your own key, seal it on-chain, let anyone verify it.</p>
+</header>
+
+<div class="wrap">
+  <aside class="limits" aria-label="Honest limits">
+    <h2>Honest limits</h2>
+    <ul>
+      <li>A name proves <b>control of a key</b> — not a real-world identity, not trustworthiness, not humanity.</li>
+      <li>The Directory below is a <b>local registry</b> (this browser). Global first-seen needs a public prl-name indexer, which doesn't exist yet — until then, resolve conflicts on-chain yourself.</li>
+      <li>Names <b>do not replace addresses</b>. A wrong name still resolves to the recorded address; always confirm the prl1… string before sending funds.</li>
+      <li>Inscribing costs real PRL (commit + reveal fees) and <b>cannot be undone</b>. The wizard shows exact hex before anything is built.</li>
+    </ul>
+  </aside>
+
+  <nav id="tabs" aria-label="Pearl Names sections">
+    <button data-tab="register" class="active">1 · Register</button>
+    <button data-tab="directory">2 · Directory</button>
+    <button data-tab="verify">3 · Verify</button>
+    <button data-tab="export">4 · Export</button>
+  </nav>
+
+  <section class="tab active" id="tab-register">
+    <h2>Register a name</h2>
+    <p class="lede">Four steps: pick a name, prove you hold the address's key, plan the on-chain inscription, broadcast.</p>
+
+    <div class="steps">
+      <div class="step" id="w1">
+        <h3>Step 1 · Choose a name</h3>
+        <p class="hint">3–63 chars, a–z 0–9 and single hyphens, not all digits, not reserved. Shown with the <code>.prl</code> suffix.</p>
+        <label>Desired name <input id="r-name" type="text" placeholder="kshot" autocomplete="off" spellcheck="false"></label>
+        <label>Network
+          <select id="r-network">
+            <option value="mainnet" selected>Mainnet (prl1…)</option>
+            <option value="testnet">Testnet (tprl1…)</option>
+          </select>
+        </label>
+        <label>Expiry (optional) <input id="r-expiry" type="number" min="0" placeholder="unix timestamp, blank = permanent"></label>
+        <div class="row">
+          <button id="r-check" class="btn">Check name</button>
+        </div>
+        <p class="err" id="r-name-err" hidden></p>
+        <p class="ok" id="r-name-ok" hidden></p>
+      </div>
+
+      <div class="step" id="w2">
+        <h3>Step 2 · Prove ownership</h3>
+        <p class="hint">Load the BIP-86 key for the address you're naming (mnemonic, WIF, or raw hex). Keys live in this page's memory only — they are never sent anywhere. Signing builds a BIP-340 proof that the claimed address's key signed this exact record.</p>
+        <div class="row">
+          <button id="r-gen" class="btn ghost">Generate demo key</button>
+        </div>
+        <label>Mnemonic, WIF, or 64-hex private key
+          <textarea id="r-key" rows="2" placeholder="paste key material here" autocomplete="off" spellcheck="false"></textarea>
+        </label>
+        <div class="row">
+          <button id="r-prove" class="btn">Sign registration</button>
+          <button id="r-wipe" class="btn ghost">Wipe key</button>
+        </div>
+        <p class="err" id="r-prove-err" hidden></p>
+        <div id="r-proof" hidden>
+          <p class="ok">✓ Signature valid — this key controls the claimed address.</p>
+          <dl class="kv">
+            <div><dt>Registration id</dt><dd id="r-proof-id" class="mono"></dd></div>
+            <div><dt>Fingerprint</dt><dd id="r-proof-fp" class="mono"></dd></div>
+            <div><dt>Signature (BIP-340)</dt><dd id="r-proof-sig" class="mono"></dd></div>
+          </dl>
+          <label>Canonical record (signed exactly as shown)
+            <textarea id="r-proof-json" rows="8" readonly class="mono"></textarea>
+          </label>
+          <div class="row"><button class="btn ghost copy-btn" data-for="r-proof-json">Copy record</button></div>
+        </div>
+      </div>
+
+      <div class="step" id="w3">
+        <h3>Step 3 · Plan the inscription</h3>
+        <p class="hint">The signed record is sealed into a <code>prl-name</code> Taproot envelope (commit → reveal). Fee math is grain-exact; nothing is broadcast yet.</p>
+        <label>Funding UTXO — txid:vout:value(grains) of an address you control
+          <input id="r-utxo" type="text" placeholder="abc123…:0:2500000" autocomplete="off" spellcheck="false">
+        </label>
+        <label>Fee rate (grains/vB) <input id="r-feerate" type="number" min="1" value="2"></label>
+        <label>Blockbook endpoint (for lookup/broadcast)
+          <input id="r-blockbook" type="text" value="https://blockbook.pearlresearch.ai" autocomplete="off" spellcheck="false">
+        </label>
+        <div class="row"><button id="r-plan" class="btn">Build plan</button></div>
+        <p class="err" id="r-plan-err" hidden></p>
+        <div id="r-plan-out" hidden>
+          <dl class="kv">
+            <div><dt>Commit address</dt><dd id="r-plan-commitaddr" class="mono"></dd></div>
+            <div><dt>Reveal fee</dt><dd id="r-plan-fee" class="mono"></dd></div>
+            <div><dt>Commit value</dt><dd id="r-plan-commitval" class="mono"></dd></div>
+            <div><dt>Leaf hash</dt><dd id="r-plan-leaf" class="mono"></dd></div>
+          </dl>
+        </div>
+      </div>
+
+      <div class="step" id="w4">
+        <h3>Step 4 · Broadcast</h3>
+        <p class="hint">Commit first, wait for it to confirm, then reveal. The page shows the raw hex for each; broadcast is a double-confirmed Blockbook POST.</p>
+        <div class="row">
+          <button id="r-commit" class="btn">Build + sign commit</button>
+          <button id="r-reveal" class="btn">Build + sign reveal</button>
+        </div>
+        <p class="err" id="r-bc-err" hidden></p>
+        <div id="r-txs" hidden>
+          <label>Commit tx <textarea id="r-commit-hex" rows="3" readonly class="mono"></textarea></label>
+          <label>Reveal tx <textarea id="r-reveal-hex" rows="3" readonly class="mono"></textarea></label>
+          <div class="row">
+            <button id="r-bc-commit" class="btn warn">Broadcast commit</button>
+            <button id="r-bc-reveal" class="btn warn">Broadcast reveal</button>
+          </div>
+          <p class="hint">Broadcast needs a real Blockbook and real funds. Testnet first, always.</p>
+        </div>
+        <div id="r-cert" hidden>
+          <h3>Name certificate</h3>
+          <pre id="r-cert-json" class="mono cert"></pre>
+          <div class="row"><button class="btn ghost copy-btn" data-for="r-cert-json">Copy certificate</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="tab" id="tab-directory">
+    <h2>Directory</h2>
+    <p class="lede">Local registry of signed bindings. First-seen (earliest <code>registered_at</code>) wins each name; later claims are flagged contested.</p>
+    <div class="row">
+      <input id="d-search" type="text" placeholder="search name or address…" autocomplete="off" spellcheck="false">
+      <button id="d-add" class="btn">Add signed binding</button>
+      <button id="d-clear" class="btn ghost">Clear local registry</button>
+    </div>
+    <p class="err" id="d-err" hidden></p>
+    <div id="d-addbox" hidden>
+      <label>Paste signed binding JSON <textarea id="d-json" rows="4" class="mono" placeholder='{"json":"…","sig":"…"}'></textarea></label>
+      <div class="row"><button id="d-import" class="btn">Import</button></div>
+    </div>
+    <table class="dir" id="d-table">
+      <thead><tr><th>Name</th><th>Address</th><th>Fingerprint</th><th>Registered</th><th>Status</th></tr></thead>
+      <tbody id="d-rows"><tr><td colspan="5" class="dim">No names yet — register one or import a signed binding.</td></tr></tbody>
+    </table>
+    <div id="d-contested" hidden>
+      <h3>Contested claims</h3>
+      <ul id="d-contested-list"></ul>
+    </div>
+  </section>
+
+  <section class="tab" id="tab-verify">
+    <h2>Verify a binding</h2>
+    <p class="lede">Standalone verifier: paste a signed binding and get a check-by-check ruling. No keys needed, nothing is sent anywhere.</p>
+    <label>Signed binding <textarea id="v-input" rows="6" class="mono" placeholder='{"json":"…","sig":"…"}' autocomplete="off" spellcheck="false"></textarea></label>
+    <div class="row">
+      <button id="v-run" class="btn">Verify</button>
+      <button id="v-witness" class="btn ghost">Verify from reveal hex</button>
+    </div>
+    <div id="v-witnessbox" hidden>
+      <label>Reveal transaction hex <textarea id="v-revealhex" rows="4" class="mono" autocomplete="off" spellcheck="false"></textarea></label>
+      <div class="row"><button id="v-run-witness" class="btn">Verify reveal</button></div>
+    </div>
+    <p class="err" id="v-err" hidden></p>
+    <div id="v-out" hidden>
+      <h3 id="v-verdict"></h3>
+      <ul id="v-checks" class="checks"></ul>
+      <dl class="kv">
+        <div><dt>Registration id</dt><dd id="v-id" class="mono"></dd></div>
+        <div><dt>Fingerprint</dt><dd id="v-fp" class="mono"></dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="tab" id="tab-export">
+    <h2>Export</h2>
+    <p class="lede">Portable records. The registry, certificates, and inscription envelopes download as plain JSON.</p>
+    <div class="row">
+      <button id="x-registry" class="btn">Download registry JSON</button>
+      <button id="x-envelope" class="btn">Download inscription envelope</button>
+    </div>
+    <p class="hint" id="x-hint">The envelope download needs a signed registration from Step 2 first.</p>
+    <p class="err" id="x-err" hidden></p>
+  </section>
+</div>
+
+<footer>
+  <p>Built by <a href="https://x.com/kshot9000">@kshot9000</a> for the Pearl blockchain · <span class="mono">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</span></p>
+  <p class="dim">No new cryptography — audited Pearl Sign / Pearl Etch cores throughout. <a href="README.md">Protocol notes</a></p>
+</footer>
+
+<script src="pearl-names.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
