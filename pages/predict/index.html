@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Predict — prediction markets on Pearl Taproot</title>
+<meta name="description" content="Run prediction markets on Pearl (PRL) with no smart contracts: tamper-evident market descriptors, one Taproot funding address per outcome, arbiter-signed proportional payouts, CLTV void refunds, and a standalone bundle verifier.">
+<link rel="stylesheet" href="styles.css?v=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230c0a07'/%3E%3Cpath d='M6 20 L13 20 L16 12 L19 22 L22 20 L26 20' stroke='%23ffb000' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+</head>
+<body>
+<div class="ticker" aria-hidden="true"><div class="ticker-inner" id="ticker-tape"></div></div>
+
+<header class="hero">
+  <div class="hero-inner">
+    <p class="kicker">Pearl · Prediction Desk</p>
+    <h1>Pearl Predict</h1>
+    <p class="sub">Prediction markets on Pearl Taproot — <em>no smart contracts</em>.
+      Define a market, get one Taproot funding address per outcome, let traders fund
+      their side, and the arbiter settles with a single proportional-payout transaction.
+      Every market carries a tamper-evident descriptor; every payout carries
+      re-verifiable Schnorr signatures. Five steps:
+      <strong>Create → Fund → Resolve → Track → Verify</strong>.</p>
+    <nav id="steps" class="steps" aria-label="Workflow steps">
+      <button data-tab="create" class="active">1 · Create</button>
+      <button data-tab="fund">2 · Fund</button>
+      <button data-tab="resolve">3 · Resolve</button>
+      <button data-tab="track">4 · Track</button>
+      <button data-tab="verify">5 · Verify</button>
+    </nav>
+  </div>
+</header>
+
+<aside class="limits" aria-label="Honest limits">
+  <div>
+    <strong>Honest limits — always true:</strong>
+    <ul>
+      <li>The <em>arbiter is trusted</em> to sign honest payouts. The scripts prove the
+        arbiter <em>authorized</em> a payout — they cannot prove the payout was correct.
+        Choose an arbiter everyone accepts, or don't play.</li>
+      <li>Positions are <em>manually tracked</em>: the desk records the txids you paste or
+        import. It cannot see funding transactions you never tell it about.</li>
+      <li>No live market is running here — there is no order book, no odds feed, no
+        automatic settlement. Funding, signing, and broadcasting are deliberate,
+        human-confirmed actions.</li>
+      <li>Blockbook is a third-party read source. The page never moves real PRL without
+        your keys and an explicit confirmation click.</li>
+    </ul>
+  </div>
+</aside>
+
+<main>
+  <!-- ============ CREATE ============ -->
+  <section id="tab-create" class="tab" aria-label="Create market">
+    <div class="grid2">
+      <div class="card">
+        <h2>Market definition</h2>
+        <label>Network
+          <select id="c-hrp">
+            <option value="prl">prl — Pearl mainnet</option>
+            <option value="tprl">tprl — Pearl testnet</option>
+          </select>
+        </label>
+        <label>Event question
+          <input id="c-question" type="text" maxlength="200" placeholder="e.g. Will Pearl mainnet pass block 900,000 before 2027?">
+        </label>
+        <fieldset class="outcomes"><legend>Outcomes (2–4, unique names)</legend>
+          <input id="c-o0" type="text" maxlength="40" placeholder="Outcome 1 — e.g. Yes">
+          <input id="c-o1" type="text" maxlength="40" placeholder="Outcome 2 — e.g. No">
+          <input id="c-o2" type="text" maxlength="40" placeholder="Outcome 3 (optional)">
+          <input id="c-o3" type="text" maxlength="40" placeholder="Outcome 4 (optional)">
+        </fieldset>
+        <label>Resolution source — how the arbiter decides, in plain words
+          <textarea id="c-source" rows="2" maxlength="300" placeholder="e.g. Blockbook tip height at blockbook.pearlresearch.ai read after the resolution deadline."></textarea>
+        </label>
+        <div class="row2">
+          <label>Trading deadline (block height)
+            <input id="c-tradeh" type="number" min="1" placeholder="e.g. 901000">
+          </label>
+          <label>Resolution deadline (block height)
+            <input id="c-resolveh" type="number" min="1" placeholder="e.g. 902000">
+          </label>
+        </div>
+        <label>Arbiter key — 64-hex x-only pubkey, or a 12/24-word BIP-86 mnemonic for local signing
+          <input id="c-arbiter" type="text" autocomplete="off" spellcheck="false" placeholder="x-only pubkey hex… or mnemonic (never leaves this page)">
+        </label>
+        <label>Refund sweep key (optional — defaults to the arbiter key)
+          <input id="c-refund" type="text" autocomplete="off" spellcheck="false" placeholder="x-only pubkey hex or mnemonic">
+        </label>
+        <div class="row2">
+          <label>Chain tip (air-gapped manual entry)
+            <input id="c-tip" type="number" min="1" placeholder="current block height">
+          </label>
+          <label>Blockbook endpoint
+            <input id="c-blockbook" type="text" value="https://blockbook.pearlresearch.ai" spellcheck="false">
+          </label>
+        </div>
+        <div class="btnrow">
+          <button id="c-fetch-tip" class="ghost">Fetch live tip</button>
+          <button id="c-build" class="primary">Seal market →</button>
+        </div>
+        <p id="c-tip-status" class="muted small"></p>
+        <p id="c-err" class="err" role="alert"></p>
+      </div>
+
+      <div class="card" id="c-commit-card" hidden>
+        <h2>Market commitment</h2>
+        <p class="muted small">Share this descriptor <em>before</em> anyone funds. It commits to the
+          question, outcomes, arbiter, refund key, network, and both deadlines.</p>
+        <label>Descriptor <span class="mono" id="c-descriptor" style="word-break:break-all"></span></label>
+        <div class="btnrow">
+          <button id="c-copy-desc" class="ghost">Copy descriptor</button>
+          <button id="c-dl-market" class="ghost">Download market JSON</button>
+          <button id="c-copy-addrs" class="ghost">Copy funding addresses</button>
+        </div>
+        <h3>Funding addresses — one per outcome</h3>
+        <div id="c-addresses"></div>
+        <h3>Publish checklist</h3>
+        <ol class="checklist small">
+          <li>Post the <strong>descriptor</strong> where traders can see it (forum, chat, Nostr).</li>
+          <li>Post the <strong>canonical market JSON</strong> (download above) — anyone can recompute the descriptor from it.</li>
+          <li>Traders verify: same descriptor from the JSON, addresses re-derive (Verify tab).</li>
+          <li>Funding is only valid <strong>before the trading deadline</strong> — late funds are at the trader's own risk.</li>
+        </ol>
+        <p class="muted small">Descriptor <span class="mono">pearl-predict:v1:&lt;hrp&gt;:&lt;marketHash&gt;:&lt;nOutcomes&gt;:&lt;tradeH&gt;:&lt;resolveH&gt;</span>,
+          marketHash = SHA-256 over the canonical market JSON. Taproot addresses use a NUMS
+          internal key (<span class="mono">H("PearlPredictNUMS/v1"‖marketHash‖outcomeIndex)</span>) —
+          nobody knows the private key, so coins move only through the two script leaves.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FUND ============ -->
+  <section id="tab-fund" class="tab" aria-label="Fund positions" hidden>
+    <div class="card">
+      <h2>Track positions</h2>
+      <p class="muted small">Traders fund their chosen outcome's address. Record each funding here —
+        paste a funding txid and let the desk read it off Blockbook (GET-only), or enter a
+        position by hand. Payout addresses are recorded per position; the chain cannot tell
+        us where a trader wants to be paid, so confirm them with the trader.</p>
+      <div class="btnrow">
+        <button id="f-load-created" class="ghost">Load the market I just created</button>
+        <button id="f-load-desc" class="ghost">Load from descriptor…</button>
+        <button id="f-refresh" class="ghost">Refresh pots from Blockbook</button>
+      </div>
+      <p id="f-market-line" class="mono small"></p>
+      <p id="f-err" class="err" role="alert"></p>
+    </div>
+    <div id="f-outcomes"></div>
+    <div class="grid2">
+      <div class="card">
+        <h3>Add position by hand</h3>
+        <label>Outcome
+          <select id="f-outcome"></select>
+        </label>
+        <label>Funding txid (64 hex)
+          <input id="f-txid" type="text" spellcheck="false" placeholder="…">
+        </label>
+        <div class="row2">
+          <label>vout <input id="f-vout" type="number" min="0" value="0"></label>
+          <label>Value (PRL) <input id="f-value" type="text" placeholder="e.g. 1.5"></label>
+        </div>
+        <label>Trader payout address (P2TR, same network)
+          <input id="f-addr" type="text" spellcheck="false" placeholder="prl1…">
+        </label>
+        <label>Label (optional) <input id="f-label" type="text" maxlength="60"></label>
+        <div class="btnrow"><button id="f-add" class="primary">Record position</button></div>
+      </div>
+      <div class="card">
+        <h3>Import funding txid from Blockbook</h3>
+        <p class="muted small">Reads the transaction GET-only and matches its outputs against the
+          outcome addresses. The payout address is <em>not</em> on-chain — enter it per position after import.</p>
+        <label>Funding txid <input id="f-imp-txid" type="text" spellcheck="false"></label>
+        <div class="btnrow"><button id="f-import" class="primary">Import</button></div>
+        <div id="f-import-out"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Positions <span id="f-count" class="mono"></span></h3>
+      <div class="tablewrap"><table id="f-table">
+        <thead><tr><th>Outcome</th><th>txid:vout</th><th>Value</th><th>Payout address</th><th>Label</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <p class="muted small">Pot totals and implied probabilities update as positions are recorded.
+        Pot = Σ positions on that outcome. Implied P = pot ÷ total pot.</p>
+    </div>
+  </section>
+
+  <!-- ============ RESOLVE ============ -->
+  <section id="tab-resolve" class="tab" aria-label="Resolve market" hidden>
+    <div class="grid2">
+      <div class="card">
+        <h2>Award payout</h2>
+        <p class="muted small">The arbiter picks the winning outcome. The desk builds one transaction
+          spending <em>every</em> tracked funding UTXO (winners' and losers' pots alike) and paying
+          each winning-outcome funder <span class="mono">stake × totalPot ÷ winningPot</span>,
+          minus the fee, grain-exact. The arbiter signs each input locally; every signature is
+          re-verified before it enters the bundle.</p>
+        <label>Winning outcome <select id="r-win"></select></label>
+        <div class="row2">
+          <label>Fee rate (grains/vB) <input id="r-feerate" type="number" min="0.1" step="0.1" value="5"></label>
+          <label>Arbiter signing key — hex privkey, WIF, or BIP-86 mnemonic
+            <input id="r-key" type="password" autocomplete="off" spellcheck="false" placeholder="in-memory only">
+          </label>
+        </div>
+        <div class="btnrow">
+          <button id="r-wipe" class="ghost">Wipe key</button>
+          <button id="r-preview" class="ghost">Preview payout plan</button>
+          <button id="r-sign" class="primary">Sign payout bundle</button>
+        </div>
+        <p id="r-err" class="err" role="alert"></p>
+        <div id="r-preview-out"></div>
+      </div>
+      <div class="card">
+        <h2>Void path</h2>
+        <p class="muted small">If the market cannot resolve (ambiguous event, bad source), the refund
+          leaf sweeps every pot back to its recorded funder after the resolution deadline:
+          <span class="mono">nLockTime = resolveH</span>, stake minus a pro-rata fee share.
+          Signed by the refund sweep key.</p>
+        <label>Refund sweep signing key <input id="r-void-key" type="password" autocomplete="off" spellcheck="false" placeholder="in-memory only"></label>
+        <div class="btnrow">
+          <button id="r-void-preview" class="ghost">Preview void plan</button>
+          <button id="r-void-sign" class="primary">Sign void bundle</button>
+        </div>
+        <p id="r-void-err" class="err" role="alert"></p>
+        <div id="r-void-out"></div>
+      </div>
+    </div>
+    <div class="card" id="r-bundle-card" hidden>
+      <h2>Signed bundle</h2>
+      <div id="r-bundle-out"></div>
+      <div class="btnrow">
+        <button id="r-dl" class="ghost">Download bundle JSON</button>
+        <button id="r-broadcast" class="danger">Broadcast via Blockbook…</button>
+      </div>
+      <p class="muted small">Broadcasting is a separate, deliberate step — the bundle above moves
+        real PRL the moment it confirms. Verify the bundle on the Verify tab first.</p>
+    </div>
+  </section>
+
+  <!-- ============ TRACK ============ -->
+  <section id="tab-track" class="tab" aria-label="Track market" hidden>
+    <div class="card">
+      <h2>Lifecycle</h2>
+      <div class="btnrow">
+        <button id="t-load-created" class="ghost">Load the market I just created</button>
+        <button id="t-refresh" class="primary">Refresh from Blockbook</button>
+      </div>
+      <p id="t-status" class="muted small">Load a market, then refresh.</p>
+      <p id="t-err" class="err" role="alert"></p>
+    </div>
+    <div id="t-outcomes"></div>
+    <div class="card">
+      <h3>Deadlines</h3>
+      <div id="t-deadlines" class="deadlines"></div>
+      <p class="muted small">Countdowns assume the ~194&nbsp;s Pearl block target and the last known tip.</p>
+    </div>
+  </section>
+
+  <!-- ============ VERIFY ============ -->
+  <section id="tab-verify" class="tab" aria-label="Verify bundle" hidden>
+    <div class="card">
+      <h2>Standalone verifier</h2>
+      <p class="muted small">Paste a descriptor, its canonical market JSON, and a payout bundle.
+        The verifier recomputes everything — descriptor hash, outcome addresses, payout
+        proportionality, and every Schnorr signature — and answers
+        <strong>PROVEN</strong> or a loud <strong>NOT PROVEN</strong>.</p>
+      <label>Descriptor <input id="v-desc" type="text" spellcheck="false" placeholder="pearl-predict:v1:…"></label>
+      <label>Canonical market JSON <textarea id="v-market" rows="4" spellcheck="false"></textarea></label>
+      <label>Payout bundle JSON <textarea id="v-bundle" rows="6" spellcheck="false"></textarea></label>
+      <div class="btnrow"><button id="v-run" class="primary">Verify</button></div>
+      <p id="v-err" class="err" role="alert"></p>
+      <div id="v-out"></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>Built for the Pearl blockchain (PRL) ·
+    <a href="https://x.com/kshot9000">@kshot9000</a> ·
+    <a href="https://github.com/Kshot3000/Pearl-Muse-24-7-Ai-builder">Pearl-Muse-24-7-Ai-builder</a></p>
+  <p class="donate">Support the build:
+    <code class="mono" id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+    <button id="copy-donate" class="ghost small">copy</button></p>
+  <p class="muted small">Prediction markets on Pearl Taproot. No smart contracts — 2-leaf taptrees
+    (arbiter award leaf + CLTV refund leaf) under NUMS internal keys. The arbiter is trusted;
+    the math is verifiable.</p>
+</footer>
+
+<script src="pearl-predict.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
