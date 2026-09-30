@@ -65,6 +65,7 @@
         <a href="pages/channels/">Channels</a>
         <a href="pages/lend/">Lend</a>
         <a href="pages/dividend/">Dividend</a>
+        <a href="pages/split/">Split</a>
       </nav>
       <a class="btn btn-small" href="https://github.com/pearl-research-labs/pearl" target="_blank" rel="noopener">GitHub ↗</a>
     </div>
@@ -435,6 +436,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Dividend — PRL-20 Holder Distribution Desk <span class="badge">new</span></h3>
             <p>The luminous transfer-agent / mint-hall desk — pay PRL-20 holders from a CSV snapshot: seal the holder set with a tamper-evident fingerprint, compute grain-exact shares (proportional, equal, or fixed per holder) with explicit dust and remainder accounting, fund each payout chunk, sign locally with BIP-340 Schnorr (air-gapped unsigned bundles, keys wiped after signing), and broadcast with double-confirm — plus a standalone PROVEN / NOT PROVEN verifier that recomputes every share and audits every payout transaction. Honest about indexer limits: the indexer supplies token metadata only, the holder set is yours.</p>
             <div class="card-links"><a href="pages/dividend/">Open Pearl Dividend →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Split — Group Expense Settlement Desk <span class="badge">new</span></h3>
+            <p>The dark tavern-ledger desk — split group expenses in PRL with grain-exact shares (equal, weighted shares, or percentages with deterministic remainder distribution), compute the minimal who-pays-whom transfer set, and have each debtor sign their own payment locally with BIP-340 Schnorr (air-gapped unsigned bundles, keys wiped after signing, double-confirm broadcast) — plus a local ledger book of settled tabs with CSV export. Loud dust refusal; honest about what the desk can and cannot know.</p>
+            <div class="card-links"><a href="pages/split/">Open Pearl Split →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Sign — Transaction Forge <span class="badge">new</span></h3>
