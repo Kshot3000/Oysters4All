@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Solvency — Proof-of-Reserves Desk for PRL</title>
+<meta name="description" content="Pearl Solvency: custodians prove on-chain PRL reserves against declared liabilities. BIP-340 challenge signatures, Blockbook UTXO summation, tamper-evident proof bundles. All crypto runs locally in your browser.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M16 6v20M9 11l7-5 7 5M9 21l7 5 7-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>
+    <div>
+      <h1>Pearl Solvency</h1>
+      <p class="tagline">Proof-of-reserves desk for PRL — the audit room</p>
+    </div>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-step="custodian" class="active">1 · Custodian</button>
+    <button data-step="addresses">2 · Addresses</button>
+    <button data-step="prove">3 · Prove</button>
+    <button data-step="bundle">4 · Bundle</button>
+    <button data-step="verify">5 · Verify</button>
+  </nav>
+</header>
+
+<main>
+  <!-- STEP 1: CUSTODIAN -->
+  <section id="step-custodian" class="panel active">
+    <h2>The custodian</h2>
+    <p class="lede">A proof of reserves is a <strong>signed statement</strong>: <em>we control these addresses,
+    and here is what we owe.</em> Anyone can verify the signatures and re-add the on-chain balances.
+    No account, no server — the statement is a tamper-evident bundle you can publish anywhere.</p>
+
+    <div class="form-grid">
+      <label>Network
+        <select id="network">
+          <option value="mainnet" selected>Mainnet (prl…)</option>
+          <option value="testnet">Testnet (tprl…)</option>
+        </select>
+      </label>
+      <label class="wide">Blockbook API <span class="hint-inline">(GET-only reads; the page never broadcasts)</span>
+        <input id="blockbook" type="url" spellcheck="false">
+      </label>
+      <label class="wide">Custodian name <span class="hint-inline">(appears in every signed challenge)</span>
+        <input id="custodian" spellcheck="false" placeholder="e.g. North Harbor Exchange" maxlength="80">
+      </label>
+      <label>Challenge date
+        <input id="chall-date" type="date">
+      </label>
+      <label>Challenge nonce <span class="hint-inline">(uniqueness per statement)</span>
+        <span class="nonce-row"><input id="chall-nonce" spellcheck="false" placeholder="random hex">
+        <button id="nonce-gen" class="btn ghost" type="button">Generate</button></span>
+      </label>
+      <label class="wide">Declared liabilities (PRL) <span class="hint-inline">(what the custodian owes customers — self-declared)</span>
+        <input id="liabilities" inputmode="decimal" spellcheck="false" placeholder="e.g. 1250000.5">
+      </label>
+    </div>
+    <div id="custodian-err" class="err" hidden></div>
+    <div class="row"><button id="custodian-next" class="btn primary">Continue to addresses →</button></div>
+
+    <aside class="limits">
+      <h3>Honest limits — read before you trust any proof</h3>
+      <ul>
+        <li><strong>Assets, not liabilities.</strong> This desk proves the custodian controls on-chain PRL. The liabilities figure is <em>self-declared</em> — understating it makes any custodian look solvent.</li>
+        <li><strong>A snapshot, not an audit.</strong> Balances move. A proof is only true for the moment it was verified — check the challenge date.</li>
+        <li><strong>Borrowed funds pass.</strong> Nothing here stops a custodian from borrowing PRL, proving reserves, and returning it.</li>
+        <li><strong>Keypath P2TR only.</strong> Each address must be the BIP-86 keypath address of the entered key — script-path or multisig addresses cannot be proven this way.</li>
+      </ul>
+    </aside>
+  </section>
+
+  <!-- STEP 2: ADDRESSES -->
+  <section id="step-addresses" class="panel">
+    <h2>The addresses</h2>
+    <p class="lede">Paste every <code>prl1p…</code> address the custodian claims to control — one per line
+    (up to 250). Each must be a v1 Taproot address on the selected network. Duplicates are merged silently;
+    anything else is rejected loudly.</p>
+    <label class="wide">Reserve addresses
+      <textarea id="addr-list" rows="8" spellcheck="false" placeholder="prl1p…&#10;prl1p…"></textarea>
+    </label>
+    <div class="row">
+      <button id="addr-validate" class="btn primary">Validate addresses</button>
+      <span id="addr-count" class="hint"></span>
+    </div>
+    <div id="addr-err" class="err" hidden></div>
+    <ul id="addr-results" class="addr-results"></ul>
+    <div class="row"><button id="addr-next" class="btn primary" disabled>Continue to proof →</button></div>
+  </section>
+
+  <!-- STEP 3: PROVE -->
+  <section id="step-prove" class="panel">
+    <h2>The proof</h2>
+    <p class="lede">For each address, enter the private key that controls it — <strong>WIF, 64-hex, or a
+    12/24-word mnemonic</strong> (BIP-86 account 0). The page derives the keypath address and
+    <strong>refuses any key that does not reproduce the listed address exactly</strong>, then signs the
+    canonical challenge with the tweaked key. Keys are wiped from memory the moment signing finishes.</p>
+    <div id="prove-list" class="prove-list"></div>
+    <div id="prove-err" class="err" hidden></div>
+    <div class="row">
+      <button id="prove-sign-all" class="btn primary">Sign all challenges</button>
+      <span id="prove-count" class="hint"></span>
+    </div>
+
+    <h3>Air-gap <span class="hint-inline">(sign on a cold device)</span></h3>
+    <p class="hint">Export the unsigned challenge bundle, sign each challenge offline (this same page works
+    offline once loaded), then import the signatures below.</p>
+    <div class="row">
+      <button id="unsigned-export" class="btn ghost">Export unsigned bundle</button>
+      <button id="unsigned-copy" class="btn ghost">Copy</button>
+    </div>
+    <textarea id="unsigned-text" rows="4" readonly spellcheck="false" placeholder="export first"></textarea>
+    <label class="wide">Import signed challenges <span class="hint-inline">JSON: {"signatures":[{"address":"…","sig":"…"}]}</span>
+      <textarea id="signed-import" rows="4" spellcheck="false" placeholder='paste {"signatures":[…]}'></textarea>
+    </label>
+    <div class="row"><button id="signed-import-btn" class="btn ghost">Import &amp; verify signatures</button></div>
+    <div id="signed-import-out" class="ok" hidden></div>
+    <div class="row"><button id="prove-next" class="btn primary" disabled>Continue to bundle →</button></div>
+  </section>
+
+  <!-- STEP 4: BUNDLE -->
+  <section id="step-bundle" class="panel">
+    <h2>The statement</h2>
+    <p class="lede">The tamper-evident proof bundle. The 64-bit fingerprint commits to the custodian name,
+    liabilities, date, nonce, and every signature — <strong>editing any field breaks the fingerprint</strong>.
+    Publish this JSON anywhere: a website, a tweet, an IPFS pin.</p>
+    <dl class="kv">
+      <div><dt>Bundle fingerprint</dt><dd><code id="bundle-fp"></code> <button id="bundle-fp-copy" class="btn ghost">Copy</button></dd></div>
+      <div><dt>Signed addresses</dt><dd id="bundle-naddr"></dd></div>
+      <div><dt>Declared liabilities</dt><dd id="bundle-liab"></dd></div>
+    </dl>
+    <div class="row">
+      <button id="bundle-copy" class="btn ghost">Copy bundle JSON</button>
+      <button id="bundle-download" class="btn ghost">Download .json</button>
+    </div>
+    <textarea id="bundle-text" rows="12" readonly spellcheck="false"></textarea>
+    <div class="row"><button id="bundle-next" class="btn primary">Continue to verify →</button></div>
+  </section>
+
+  <!-- STEP 5: VERIFY -->
+  <section id="step-verify" class="panel">
+    <h2>The verdict</h2>
+    <p class="lede">Paste any <code>pearl-solvency:v1</code> bundle — yours or someone else's. The page
+    re-validates the fingerprint, checks <strong>every</strong> challenge signature, then reads each address's
+    confirmed UTXOs from Blockbook (GET-only), byte-comparing every funding output script against the address.
+    Foreign-script UTXOs are excluded, never trusted.</p>
+    <label class="wide">Proof bundle
+      <textarea id="verify-input" rows="8" spellcheck="false" placeholder='paste a pearl-solvency:v1 bundle'></textarea>
+    </label>
+    <div class="row">
+      <button id="verify-run" class="btn primary">Verify proof of reserves</button>
+      <button id="verify-load-mine" class="btn ghost">Load my bundle</button>
+    </div>
+    <div id="verify-err" class="err" hidden></div>
+    <div id="verdict" class="verdict" hidden></div>
+    <div id="verify-detail" hidden>
+      <h3>Per-address reserves</h3>
+      <table class="reserves"><thead><tr><th>Address</th><th>Confirmed</th><th>Unconfirmed</th><th>Scripts checked</th></tr></thead>
+      <tbody id="reserves-body"></tbody></table>
+      <div id="foreign-warn" class="warn" hidden></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>Pearl Solvency · proof-of-reserves desk for the Pearl blockchain ·
+  <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a></p>
+  <p class="donate">Support the build — <code id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+  <button class="btn ghost copy-btn" data-for="donate-addr">Copy</button></p>
+  <p class="hint">Experimental software. A proof of reserves proves assets, not liabilities — liabilities are self-declared. Verify the challenge date before trusting any statement.</p>
+</footer>
+
+<script src="pearl-solvency.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>

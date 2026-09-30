@@ -32,6 +32,7 @@
         <a href="pages/etch/">Etch</a>
         <a href="pages/escrow/">Escrow</a>
         <a href="pages/atomic/">Atomic</a>
+        <a href="pages/solvency/">Solvency</a>
         <a href="pages/notary/">Notary</a>
         <a href="pages/gift/">Gift</a>
         <a href="pages/covenant/">Covenant</a>
@@ -400,6 +401,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Escrow — Bonded 2-of-3 Escrow <span class="badge">new</span></h3>
             <p>Trust-minimized escrow on Taproot — buyer, seller and arbiter lock funds behind a 2-of-3 tapscript with native OP_CHECKSIGADD, while the buyer keeps a timelocked CLTV refund path. Build the contract, fund it, collect two signatures locally with per-key verification, and broadcast — keys never leave the page.</p>
             <div class="card-links"><a href="pages/escrow/">Open Pearl Escrow →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Solvency — Proof-of-Reserves Desk <span class="badge">new</span></h3>
+            <p>The audit room — custodians prove on-chain PRL reserves against declared liabilities. Sign a canonical challenge per address with BIP-340 Schnorr (address-match guarded, keys wiped after signing), publish a tamper-evident bundle with a 64-bit fingerprint, and let anyone re-verify: every signature re-checked, every funding script byte-compared, grains summed exactly. Five steps: Custodian → Addresses → Prove → Bundle → Verify. Honest scope: proves assets, never liabilities.</p>
+            <div class="card-links"><a href="pages/solvency/">Open Pearl Solvency →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Atomic — Cross-Chain HTLC Desk <span class="badge">new</span></h3>
