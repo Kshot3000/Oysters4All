@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Oracle — Signed Price-Feed Ticker Desk</title>
+<meta name="description" content="Mint an oracle key, publish BIP-340-signed price attestations in a local hash chain, and verify anyone's feed — authorship is proven, truth is self-reported.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="top">
+  <div class="seal">◉</div>
+  <h1>Pearl Oracle</h1>
+  <p class="tagline">A signed price-feed ticker desk — every tick is authored by a key, and the key proves authorship, never truth.</p>
+</header>
+
+<div class="wrap">
+  <nav id="tabs" aria-label="Oracle steps">
+    <button data-tab="identity" class="active">1 · Identity</button>
+    <button data-tab="publish">2 · Publish</button>
+    <button data-tab="feed">3 · Feed</button>
+    <button data-tab="verify">Verify</button>
+  </nav>
+
+  <div class="layout">
+    <main class="maincol">
+      <!-- ============ TAB 1: IDENTITY ============ -->
+      <section class="tab active" id="tab-identity">
+        <div class="panel">
+          <h2>Oracle identity</h2>
+          <p class="lede">Your oracle <em>is</em> a BIP-86 key. Its identity is the <b>tweaked keypath x-only pubkey</b> — the same key that controls its PRL address. Anyone can mint one; that is the honest point of the system.</p>
+
+          <div class="btnrow">
+            <button class="btn" id="or-gen12">Generate new oracle key (12 words)</button>
+          </div>
+          <div class="field">
+            <label for="or-import-input">…or import an existing secret — 12/24-word mnemonic, WIF, or hex private key (auto-detected)</label>
+            <textarea id="or-import-input" placeholder="12 or 24 word mnemonic, WIF, or 64-hex private key…" autocomplete="off" spellcheck="false"></textarea>
+            <div class="hint">Stays in this page's memory only. Never sent anywhere. Never written to disk by this page. Publishing signs locally.</div>
+          </div>
+          <div class="btnrow">
+            <button class="btn" id="or-import">Load oracle key</button>
+            <button class="btn danger" id="or-wipe" hidden>Wipe keys from memory</button>
+          </div>
+          <div class="alert error" id="or-identity-err" hidden></div>
+
+          <div id="or-key-out" hidden>
+            <h3>Oracle identity</h3>
+            <div class="kv">
+              <dt>Key source</dt><dd id="or-key-source"></dd>
+              <dt>Oracle x-only pubkey <span class="hint">(tweaked keypath — the signing identity)</span></dt>
+              <dd><div class="addr-row"><code id="or-xonly"></code> <button class="copy-btn" data-for="or-xonly">Copy</button></div></dd>
+              <dt>PRL address <span class="hint">(same key controls this address)</span></dt>
+              <dd><div class="addr-row"><code id="or-address"></code> <button class="copy-btn" data-for="or-address">Copy</button></div></dd>
+              <dt>Network</dt><dd id="or-network"></dd>
+            </div>
+            <p class="hint">Share the x-only pubkey so consumers can verify your feed. Never share the secret.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ TAB 2: PUBLISH ============ -->
+      <section class="tab" id="tab-publish">
+        <div class="panel">
+          <h2>Publish an attestation</h2>
+          <p class="lede">Compose a price tick. The price is an <b>integer in minor units</b> with a decimals field — floats never touch the wire. The attestation is hash-chained to your previous one and signed with your oracle key.</p>
+
+          <div class="grid2">
+            <div class="field">
+              <label for="or-asset">Asset pair</label>
+              <select id="or-asset">
+                <option value="PRL/USD" selected>PRL/USD</option>
+                <option value="PRL/BTC">PRL/BTC</option>
+                <option value="PRL/ETH">PRL/ETH</option>
+                <option value="__custom">Custom…</option>
+              </select>
+            </div>
+            <div class="field" id="or-asset-custom-box" hidden>
+              <label for="or-asset-custom">Custom asset label</label>
+              <input type="text" id="or-asset-custom" placeholder="e.g. PRL/USDT-perp" autocomplete="off" spellcheck="false">
+            </div>
+          </div>
+
+          <div class="grid2">
+            <div class="field">
+              <label for="or-price">Price — integer minor units (no decimals, no floats)</label>
+              <input type="text" id="or-price" inputmode="numeric" placeholder="41250" autocomplete="off" spellcheck="false">
+              <div class="hint" id="or-price-preview">reads as —</div>
+            </div>
+            <div class="field">
+              <label for="or-decimals">Decimals</label>
+              <input type="text" id="or-decimals" inputmode="numeric" value="2" autocomplete="off" spellcheck="false">
+              <div class="hint">“41250” + “2” = $412.50</div>
+            </div>
+          </div>
+
+          <div class="grid2">
+            <div class="field">
+              <label for="or-ts">Unix timestamp</label>
+              <input type="text" id="or-ts" inputmode="numeric" autocomplete="off" spellcheck="false">
+              <div class="hint">Defaults to now. Asserted by you, not proven — &gt;±24h off now draws a loud warning on verification.</div>
+            </div>
+            <div class="field">
+              <label for="or-seq">Sequence (strictly increasing)</label>
+              <input type="text" id="or-seq" inputmode="numeric" autocomplete="off" spellcheck="false">
+              <div class="hint">Defaults to your last local seq + 1. Replay is stopped only inside a chain a consumer trusts.</div>
+            </div>
+          </div>
+
+          <div class="grid2">
+            <div class="field">
+              <label for="or-nonce">Nonce (16 CSPRNG bytes, hex)</label>
+              <div class="addr-row"><input type="text" id="or-nonce" readonly autocomplete="off" spellcheck="false"> <button class="btn small" id="or-nonce-gen">New</button></div>
+            </div>
+            <div class="field">
+              <label for="or-prev">Prev (SHA-256 of previous canonical bytes)</label>
+              <input type="text" id="or-prev" readonly autocomplete="off" spellcheck="false">
+              <div class="hint">Genesis = 64 zeros. Auto-filled from your local chain.</div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="or-source">Source — where did this price come from? (required, honest self-report)</label>
+            <input type="text" id="or-source" placeholder="e.g. CoinGecko spot, 14:02 UTC" maxlength="200" autocomplete="off" spellcheck="false">
+            <div class="hint">Free text, max 200 chars. The signature proves <i>you</i> wrote it, not that it is true.</div>
+          </div>
+
+          <h3>Canonical preview</h3>
+          <textarea id="or-canonical" readonly spellcheck="false"></textarea>
+          <div class="kv"><dt>Attestation id</dt><dd><code id="or-attid">—</code></dd></div>
+          <div class="btnrow">
+            <button class="btn" id="or-publish">Sign &amp; publish to local feed</button>
+          </div>
+          <div class="alert error" id="or-pub-err" hidden></div>
+
+          <div id="or-pub-out" hidden>
+            <h3>Signed attestation <span class="badge-ok">SIGNED</span></h3>
+            <textarea id="or-signed-json" readonly spellcheck="false"></textarea>
+            <div class="btnrow">
+              <button class="btn small" id="or-copy-signed">Copy JSON</button>
+              <button class="btn small ghost" id="or-dl-signed">Download JSON</button>
+              <button class="btn small ghost" id="or-goto-feed">Open in Feed →</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ TAB 3: FEED ============ -->
+      <section class="tab" id="tab-feed">
+        <div class="panel">
+          <h2>Local feed</h2>
+          <p class="lede">Your published attestations, hash-chained in this browser. Import someone else's feed (paste or file) to audit their oracle instead.</p>
+
+          <div class="btnrow">
+            <button class="btn" id="or-chain-check">Run whole-chain tamper check</button>
+            <span id="or-chain-summary" class="chain-summary"></span>
+          </div>
+          <div class="alert error" id="or-feed-err" hidden></div>
+          <div class="alert ok" id="or-feed-ok" hidden></div>
+
+          <div class="tablewrap">
+            <table class="feedtable">
+              <thead><tr><th>seq</th><th>asset</th><th>price</th><th>ts (UTC)</th><th>id</th><th>source</th><th>status</th><th></th></tr></thead>
+              <tbody id="or-feed-body"></tbody>
+            </table>
+            <p class="hint" id="or-feed-empty">No attestations yet — publish your first tick in the Publish tab.</p>
+          </div>
+
+          <h3>Price chart</h3>
+          <div class="field inline-row">
+            <label for="or-chart-asset">Asset</label>
+            <select id="or-chart-asset"></select>
+          </div>
+          <canvas id="or-chart" width="640" height="240"></canvas>
+          <p class="hint" id="or-chart-note">Select an asset with at least one tick. Display conversion only — the wire format keeps integer minor units.</p>
+
+          <h3>Import a feed</h3>
+          <div class="field">
+            <label for="or-feed-import">Paste a feed (JSON array, or a single signed attestation)</label>
+            <textarea id="or-feed-import" placeholder='[{"p":"prl-oracle",…}]' spellcheck="false"></textarea>
+          </div>
+          <div class="btnrow">
+            <button class="btn" id="or-feed-import-btn">Import &amp; verify</button>
+            <label class="btn ghost filebtn">Import from file<input type="file" id="or-feed-import-file" accept="application/json,.json" hidden></label>
+            <button class="btn ghost" id="or-feed-restore">Restore my local feed</button>
+          </div>
+
+          <h3>Export</h3>
+          <div class="btnrow">
+            <button class="btn small" id="or-export-json">Download JSON</button>
+            <button class="btn small" id="or-export-csv">Download CSV</button>
+            <button class="btn small ghost" id="or-copy-feed">Copy JSON</button>
+            <button class="btn small danger" id="or-clear-feed">Delete all rows</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ TAB 4: VERIFY ============ -->
+      <section class="tab" id="tab-verify">
+        <div class="panel">
+          <h2>Standalone verifier</h2>
+          <p class="lede">Paste any signed attestation — yours, or anyone's. Every check runs from the pasted bytes alone: no key needed, no network, no trust.</p>
+          <div class="field">
+            <label for="or-verify-input">Signed attestation JSON</label>
+            <textarea id="or-verify-input" placeholder='{"p":"prl-oracle","v":1,…,"pub":"…","sig":"…"}' spellcheck="false"></textarea>
+          </div>
+          <div class="btnrow">
+            <button class="btn" id="or-verify-btn">Verify attestation</button>
+          </div>
+          <div id="or-verify-result" hidden>
+            <h3>Verdict <span id="or-verdict" class="verdict"></span></h3>
+            <div class="kv"><dt>Attestation id</dt><dd><code id="or-verify-id">—</code></dd></div>
+            <div id="or-verify-checks" class="checks"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <aside class="honest" aria-label="Honest limits">
+      <h2>Honest limits</h2>
+      <ul>
+        <li>A signature proves <b>authorship</b>, not truth — prices are self-reported by whoever holds the key.</li>
+        <li><b>Anyone can mint an oracle key.</b> A pretty pubkey is not a credential.</li>
+        <li>This feed is <b>local-only</b>: no listing relay, no shared network, nothing is broadcast.</li>
+        <li>Replay is stopped only inside a chain a <b>consumer chooses to trust</b> (seq + prev links).</li>
+        <li>Timestamps are <b>asserted, not proven</b> — ±24h sanity is a warning, not a proof.</li>
+        <li>This page <b>never moves PRL</b> and never broadcasts anything.</li>
+      </ul>
+    </aside>
+  </div>
+</div>
+
+<footer class="foot">
+  <p>Pearl Oracle · signed price-feed ticker desk · built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a></p>
+  <p class="donate">PRL tips: <code id="foot-prl">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code> <button class="copy-btn" data-for="foot-prl">Copy</button></p>
+</footer>
+
+<script src="pearl-oracle.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>

@@ -45,6 +45,7 @@
         <a href="pages/bounty/">Bounty</a>
         <a href="pages/charity/">Charity</a>
         <a href="pages/node/">Node</a>
+        <a href="pages/oracle/">Oracle</a>
         <a href="pages/raffle/">Raffle</a>
         <a href="pages/swap/">Swap</a>
         <a href="pages/auction/">Auction</a>
@@ -332,6 +333,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Node — pearld Operator Console <span class="badge">new</span></h3>
             <p>Mission control for your own pearld node — chain status, sortable peer table, mempool depth, and mining telemetry over JSON-RPC. Strictly read-only: it only ever calls the six read-only RPC methods (getinfo, getmininginfo, getmempoolinfo, getpeerinfo, getnettotals, getchaintips), never sends state-changing calls, and never touches wallets. Ships with a zero-dependency relay.mjs (browsers can't call pearld directly — no CORS, self-signed TLS), health heuristics with honest warn/error lamps, and a loud network-mismatch guard. Overview → Peers → Mempool → Mining → Settings.</p>
             <div class="card-links"><a href="pages/node/">Open Pearl Node →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Oracle — Signed Price-Feed Ticker Desk <span class="badge">new</span></h3>
+            <p>The signal beacon — mint a BIP-86 oracle key and publish BIP-340-signed price attestations (integer minor units + decimals, never floats) in a local hash chain: Identity → Publish → Feed → Verify. Each tick's id is SHA-256 of its canonical bytes, signed with the tweaked keypath key that also controls the oracle's prl1… address; the feed carries per-row VALID badges, a per-asset price chart, CSV/JSON export, a whole-chain tamper check, and a standalone verifier that rules VALID / INVALID with per-check rows. No new cryptography — the audited Sign core throughout. Honest limits up front: a signature proves authorship, not truth; the feed is local-only; the page never moves PRL.</p>
+            <div class="card-links"><a href="pages/oracle/">Open Pearl Oracle →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Rain — Batch-Send PRL Airdrops <span class="badge">new</span></h3>
