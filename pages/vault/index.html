@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Vault — m-of-n Taproot Multisig Safe</title>
+<meta name="description" content="Pearl Vault: forge an m-of-n Taproot multisig safe on Pearl (PRL) under a NUMS internal key — no keypath backdoor. Coordinate unsigned signing bundles and partial Schnorr signatures, verify every signature locally, and broadcast via Blockbook.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 44'%3E%3Ccircle cx='22' cy='22' r='19' fill='none' stroke='%23d4a24e' stroke-width='3'/%3E%3Ccircle cx='22' cy='22' r='11' fill='none' stroke='%23d4a24e' stroke-width='2'/%3E%3Ccircle cx='22' cy='22' r='3.5' fill='%2334d399'/%3E%3Cpath d='M22 3v8M22 33v8M3 22h8M33 22h8' stroke='%23d4a24e' stroke-width='2.5'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<div class="vaultbg" aria-hidden="true"><i class="rings"></i><i class="dust"></i></div>
+
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 44 44" aria-hidden="true">
+      <circle cx="22" cy="22" r="19" fill="none" stroke="#d4a24e" stroke-width="3"/>
+      <circle cx="22" cy="22" r="11" fill="none" stroke="#d4a24e" stroke-width="2"/>
+      <circle cx="22" cy="22" r="3.5" fill="#34d399"/>
+      <path d="M22 3v8M22 33v8M3 22h8M33 22h8" stroke="#d4a24e" stroke-width="2.5"/>
+    </svg>
+    <div>
+      <h1>Pearl Vault</h1>
+      <p class="tagline">the strongroom — m-of-n Taproot multisig for PRL · no keypath backdoor</p>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs" aria-label="Vault sections">
+    <button data-tab="forge" id="tb-forge" class="active" type="button">1 · Forge</button>
+    <button data-tab="fund" id="tb-fund" type="button">2 · Fund</button>
+    <button data-tab="plan" id="tb-plan" type="button">3 · Plan</button>
+    <button data-tab="sign" id="tb-sign" type="button">4 · Sign</button>
+    <button data-tab="track" id="tb-track" type="button">5 · Track</button>
+    <button data-tab="verify" id="tb-verify" type="button">Verify</button>
+  </nav>
+</header>
+
+<main id="main">
+  <div class="err" id="err" role="alert" hidden></div>
+
+  <!-- 1 · FORGE -->
+  <section class="panel" id="panel-forge" aria-label="Forge a vault">
+    <h2>Forge the vault</h2>
+    <p class="lede">Pick a quorum, enter the cosigners' keys, and the page derives the vault's
+      Taproot address — a single <code>CHECKSIGADD</code> script leaf under a NUMS internal key.
+      Nobody knows the internal key's discrete log, so coins can <em>only</em> move through the
+      multisig leaf. There is no keypath backdoor.</p>
+    <div class="grid2">
+      <div class="card">
+        <h3>Quorum</h3>
+        <label>Network
+          <select id="f-network">
+            <option value="mainnet" selected>Mainnet (prl1…)</option>
+            <option value="testnet">Testnet (tprl1…)</option>
+          </select>
+        </label>
+        <div class="row">
+          <label>Approvals needed (m)
+            <select id="f-m"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option></select>
+          </label>
+          <label>Cosigners (n)
+            <select id="f-n"><option>2</option><option selected>3</option><option>4</option><option>5</option></select>
+          </label>
+        </div>
+        <p class="hint">To forge you only need the cosigners' <strong>public</strong> x-only keys.
+          Mnemonics / WIFs are accepted for convenience only if you hold the key — they never leave this page.</p>
+      </div>
+      <div class="card">
+        <h3>Cosigner keys</h3>
+        <div id="f-keys"></div>
+        <p class="hint">Each row: 64-hex x-only pubkey · 64-hex private key (local) · WIF · 12/24-word mnemonic. Bare 64-hex is treated as a <strong>public key</strong>; tick “this is my private key” to sign with it later.</p>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="f-forge" type="button" class="btn-brass">Forge vault →</button>
+      <button id="f-clear" type="button" class="btn-ghost">Clear</button>
+    </div>
+    <div id="f-result" hidden>
+      <div class="card vaultcard">
+        <h3>Vault descriptor</h3>
+        <div class="addrrow"><code id="f-address" class="addr"></code>
+          <button id="f-copy-addr" type="button" class="btn-small">Copy</button></div>
+        <div class="qrwrap" id="f-qr"></div>
+        <dl class="kv">
+          <div><dt>Descriptor</dt><dd><code id="f-descriptor" class="wrap"></code>
+            <button id="f-copy-desc" type="button" class="btn-small">Copy</button></dd></div>
+          <div><dt>SHA-256</dt><dd><code id="f-hash" class="wrap"></code></dd></div>
+          <div><dt>Quorum</dt><dd id="f-quorum"></dd></div>
+          <div><dt>Internal key</dt><dd><code id="f-internal" class="wrap"></code></dd></div>
+        </dl>
+        <div class="actions">
+          <button id="f-download" type="button" class="btn-ghost">Download descriptor JSON</button>
+          <button id="f-use" type="button" class="btn-brass">Load into Fund / Plan →</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 · FUND -->
+  <section class="panel" id="panel-fund" aria-label="Fund the vault" hidden>
+    <h2>Fund the vault</h2>
+    <p class="lede">The deposit address. Coins are safe the moment they confirm — spending needs the quorum, not you.</p>
+    <div id="fund-empty" class="card"><p>No vault loaded. Forge one in step 1, or paste a descriptor below.</p>
+      <div class="actions"><button id="fund-goto-forge" type="button" class="btn-ghost">Go to Forge</button></div>
+    </div>
+    <div id="fund-body" hidden>
+      <div class="grid2">
+        <div class="card">
+          <h3>Deposit</h3>
+          <div class="addrrow"><code id="fund-address" class="addr"></code>
+            <button id="fund-copy" type="button" class="btn-small">Copy</button></div>
+          <div class="qrwrap" id="fund-qr"></div>
+          <p class="hint" id="fund-quorum"></p>
+        </div>
+        <div class="card">
+          <h3>On-chain state <span class="net" id="fund-net"></span></h3>
+          <label class="blockbook">Blockbook URL
+            <input id="fund-bb" type="url" placeholder="https://blockbook.pearlresearch.ai">
+          </label>
+          <dl class="kv">
+            <div><dt>Balance</dt><dd id="fund-balance">—</dd></div>
+            <div><dt>Total received</dt><dd id="fund-received">—</dd></div>
+            <div><dt>Transactions</dt><dd id="fund-txs">—</dd></div>
+          </dl>
+          <div class="actions">
+            <button id="fund-refresh" type="button" class="btn-brass">Refresh</button>
+            <button id="fund-load-plan" type="button" class="btn-ghost">Use in Plan →</button>
+          </div>
+          <h4>UTXOs</h4>
+          <div id="fund-utxos" class="utxolist"><p class="hint">Refresh to list spendable coins.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 · PLAN -->
+  <section class="panel" id="panel-plan" aria-label="Plan a spend" hidden>
+    <h2>Plan a spend</h2>
+    <p class="lede">Choose coins, recipients and a fee rate. The page builds an <strong>unsigned bundle</strong> —
+      every cosigner re-derives the fee, the vBytes and every per-input digest from it before signing anything.</p>
+    <div id="plan-empty" class="card"><p>No vault loaded. Forge one in step 1 or load it in step 2 first.</p></div>
+    <div id="plan-body" hidden>
+      <div class="grid2">
+        <div class="card">
+          <h3>Coins <span class="net" id="plan-net"></span></h3>
+          <div class="actions"><button id="plan-fetch" type="button" class="btn-ghost">Fetch UTXOs</button>
+            <button id="plan-all" type="button" class="btn-small">Select all</button>
+            <button id="plan-none" type="button" class="btn-small">Select none</button></div>
+          <div id="plan-utxos" class="utxolist"></div>
+        </div>
+        <div class="card">
+          <h3>Recipients</h3>
+          <div id="plan-recips"></div>
+          <div class="actions"><button id="plan-add-recip" type="button" class="btn-small">+ Recipient</button></div>
+          <div class="grid2">
+            <label>Fee rate (grains/vB)<input id="plan-feerate" type="number" min="1" step="1" value="10"></label>
+            <div class="actions"><button id="plan-estimate" type="button" class="btn-small">Estimate from Blockbook</button></div>
+          </div>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="plan-build" type="button" class="btn-brass">Build unsigned bundle →</button>
+      </div>
+      <div id="plan-result" class="card" hidden>
+        <h3>Unsigned bundle</h3>
+        <dl class="kv">
+          <div><dt>Inputs</dt><dd id="plan-in-n"></dd></div>
+          <div><dt>Outputs</dt><dd id="plan-out-n"></dd></div>
+          <div><dt>Size</dt><dd id="plan-vbytes"></dd></div>
+          <div><dt>Fee</dt><dd id="plan-fee"></dd></div>
+          <div><dt>Change</dt><dd id="plan-change"></dd></div>
+          <div><dt>Fingerprint</dt><dd><code id="plan-fp" class="wrap"></code></dd></div>
+        </dl>
+        <label>Bundle JSON
+          <textarea id="plan-bundle" rows="8" readonly></textarea>
+        </label>
+        <div class="actions">
+          <button id="plan-copy" type="button" class="btn-small">Copy bundle</button>
+          <button id="plan-download" type="button" class="btn-small">Download</button>
+          <button id="plan-to-sign" type="button" class="btn-brass">Continue to Sign →</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 · SIGN -->
+  <section class="panel" id="panel-sign" aria-label="Sign and finalize" hidden>
+    <h2>Sign &amp; finalize</h2>
+    <p class="lede">Two roles, one page. <strong>Cosigners</strong> import the bundle, check the plan, and export a
+      partial signature with their key. The <strong>coordinator</strong> collects partials — every signature is
+      re-verified against the claimed key and the exact input digest — and finalizes once the quorum is met.</p>
+    <div class="grid2">
+      <div class="card">
+        <h3>Cosigner — sign the bundle</h3>
+        <label>Unsigned bundle JSON
+          <textarea id="s-bundle" rows="6" placeholder='Paste the pearl-vault-unsigned:v1 bundle…'></textarea>
+        </label>
+        <div class="actions"><button id="s-import" type="button" class="btn-ghost">Import &amp; check bundle</button></div>
+        <div id="s-check" class="check" hidden></div>
+        <div id="s-signbox" hidden>
+          <label>My cosigner index
+            <select id="s-keyindex"></select>
+          </label>
+          <label>My signing key (private — stays on this page)
+            <input id="s-key" type="password" autocomplete="off" placeholder="64-hex priv · WIF · mnemonic">
+          </label>
+          <p class="hint">The key must belong to cosigner <em>i</em> in the descriptor — a mismatch is refused loudly.</p>
+          <div class="actions">
+            <button id="s-sign" type="button" class="btn-brass">Sign &amp; export partial</button>
+            <button id="s-wipe" type="button" class="btn-ghost">Wipe key</button>
+          </div>
+          <label>Partial signature JSON
+            <textarea id="s-partial" rows="6" readonly></textarea>
+          </label>
+          <div class="actions"><button id="s-copy-partial" type="button" class="btn-small">Copy partial</button></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Coordinator — collect &amp; finalize</h3>
+        <div id="c-nobundle" class="hint">Import the same bundle on the left first.</div>
+        <div id="c-box" hidden>
+          <label>Partial signatures (one per cosigner)
+            <textarea id="c-partials" rows="6" placeholder='Paste pearl-vault-partialsig:v1 JSON, one or more…'></textarea>
+          </label>
+          <div class="actions"><button id="c-add" type="button" class="btn-small">+ Add partial</button></div>
+          <div id="c-list" class="check"></div>
+          <div class="actions"><button id="c-finalize" type="button" class="btn-brass">Verify &amp; finalize spend</button></div>
+          <div id="c-result" hidden>
+            <dl class="kv">
+              <div><dt>txid</dt><dd><code id="c-txid" class="wrap"></code>
+                <button id="c-copy-txid" type="button" class="btn-small">Copy</button></dd></div>
+              <div><dt>Fee</dt><dd id="c-fee"></dd></div>
+            </dl>
+            <label>Signed transaction (hex)
+              <textarea id="c-hex" rows="6" readonly></textarea>
+            </label>
+            <div class="actions">
+              <button id="c-broadcast" type="button" class="btn-brass">Broadcast via Blockbook</button>
+              <button id="c-copy-hex" type="button" class="btn-small">Copy hex</button>
+            </div>
+            <p class="hint">Or broadcast with your own node:
+              <code>pearld sendrawtransaction &lt;hex&gt;</code></p>
+            <div id="c-bcast" class="check" hidden></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 · TRACK -->
+  <section class="panel" id="panel-track" aria-label="Track a spend" hidden>
+    <h2>Track a spend</h2>
+    <p class="lede">Follow any vault transaction's confirmations with GET-only Blockbook reads.</p>
+    <div class="card">
+      <div class="row">
+        <label class="grow">Transaction ID
+          <input id="t-txid" type="text" placeholder="64 hex characters" spellcheck="false">
+        </label>
+        <label>Blockbook URL
+          <input id="t-bb" type="url" placeholder="https://blockbook.pearlresearch.ai">
+        </label>
+      </div>
+      <div class="actions">
+        <button id="t-check" type="button" class="btn-brass">Check confirmations</button>
+        <button id="t-auto" type="button" class="btn-ghost">Auto-refresh 30s</button>
+      </div>
+      <div id="t-result" class="check" hidden></div>
+    </div>
+  </section>
+
+  <!-- VERIFY -->
+  <section class="panel" id="panel-verify" aria-label="Verify a descriptor" hidden>
+    <h2>Verify a descriptor</h2>
+    <p class="lede">Anyone can re-derive the vault address from the descriptor's canonical JSON.
+      Before you fund a vault someone else forged, verify it here — tampering rules <strong>NOT PROVEN</strong>.</p>
+    <div class="card">
+      <label>Descriptor JSON
+        <textarea id="v-json" rows="8" placeholder='Paste the pearl vault descriptor JSON…'></textarea>
+      </label>
+      <div class="actions"><button id="v-run" type="button" class="btn-brass">Verify descriptor</button></div>
+      <div id="v-result" class="check" hidden></div>
+    </div>
+  </section>
+
+  <!-- HONEST LIMITS -->
+  <section class="panel limits" aria-label="Honest limits">
+    <h2>Honest limits</h2>
+    <ul>
+      <li>The NUMS internal key has no known private key — spending is possible <em>only</em> through the
+        multisig script leaf. There is no keypath escape hatch, by design.</li>
+      <li>The quorum is enforced by the Bitcoin-script CHECKSIGADD leaf on Pearl's Taproot — it is a chain
+        rule, not an app convention.</li>
+      <li>Partial signatures are verified against the claimed cosigner key and the exact per-input BIP-341
+        digest before acceptance. A bad signature never reaches the chain.</li>
+      <li>Fees are computed from the exact script-path witness weight. Change below 546 grains is added to
+        the fee and disclosed — never stranded.</li>
+      <li>Keys you enter stay in this page's memory; use the wipe button when done. The page never uploads keys anywhere.</li>
+      <li>Blockbook reads are third-party data; an unreachable Blockbook means no balances, no broadcast — the page says so loudly instead of guessing.</li>
+    </ul>
+  </section>
+</main>
+
+<footer class="foot">
+  <p>Pearl Vault · forged by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a></p>
+  <p class="donate">Vault tips: <code id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+    <button id="donate-copy" type="button" class="btn-small">Copy</button></p>
+  <p class="hint"><a href="../">← all Pearl apps</a></p>
+</footer>
+
+<script src="qrcode.min.js?v=1"></script>
+<script src="pearl-vault.bundle.js?v=2"></script>
+<script src="app.js?v=2"></script>
+</body>
+</html>

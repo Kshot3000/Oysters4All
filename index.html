@@ -56,6 +56,7 @@
         <a href="pages/wallet/">Wallet</a>
         <a href="pages/mining/">Mining calc</a>
         <a href="pages/rig/">Rig planner</a>
+        <a href="pages/vault/">Vault</a>
       </nav>
       <a class="btn btn-small" href="https://github.com/pearl-research-labs/pearl" target="_blank" rel="noopener">GitHub ↗</a>
     </div>
@@ -336,6 +337,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Sweep — UTXO Consolidation Optimizer <span class="badge">new</span></h3>
             <p>The tidal refinery — analyze a Pearl Taproot address's UTXO health (dust / uneconomic / healthy, value-distribution histogram, consolidation-savings estimate), plan a consolidation with grain-exact fee math and a breakeven guard that loudly refuses value-destroying sweeps, sign locally with per-signature Schnorr re-verification, track the consolidation txid, and prove the sweep with a post-consolidation re-scan. Keys never leave the page.</p>
             <div class="card-links"><a href="pages/sweep/">Open Pearl Sweep →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Vault — m-of-n Taproot Multisig Safe <span class="badge">new</span></h3>
+            <p>The strongroom — forge a 1-of-1 to 5-of-5 Taproot multisig vault on a single CHECKSIGADD script leaf under a NUMS internal key (no keypath backdoor, ever), fund it over GET-only Blockbook reads, plan spends with exact script-path fee math, coordinate unsigned bundles and partial Schnorr signatures across cosigners with verify-on-add and per-signature re-verification, broadcast with two explicit clicks, and prove any descriptor with the standalone verifier. Keys never leave the page; a bad signature never reaches the chain.</p>
+            <div class="card-links"><a href="pages/vault/">Open Pearl Vault →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Fund — Refundable Crowdfunding <span class="badge">new</span></h3>
