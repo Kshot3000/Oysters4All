@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Games — Provably-Fair Commit-Reveal Games on Pearl</title>
+<meta name="description" content="Pearl Games: provably-fair coin flip and dice on Pearl Taproot. The dealer commits sha256(secret) before you bet, funds lock in 2-of-2 escrow, the loser co-signs the winner's payout. All crypto runs locally in your browser.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<div class="felt" aria-hidden="true"><i class="f1"></i><i class="f2"></i><i class="f3"></i></div>
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 32 32" aria-hidden="true">
+      <circle cx="16" cy="16" r="13" fill="none" stroke="#e8c55a" stroke-width="1.8"/>
+      <circle cx="16" cy="16" r="9.5" fill="none" stroke="#e8c55a" stroke-width="0.9" opacity=".55"/>
+      <circle cx="16" cy="16" r="2.2" fill="#e8c55a"/>
+      <path d="M16 4.5 L16 9 M16 23 L16 27.5 M4.5 16 L9 16 M23 16 L27.5 16" stroke="#e8c55a" stroke-width="1.2" stroke-linecap="round"/>
+    </svg>
+    <div>
+      <h1>Pearl Games</h1>
+      <p class="tagline">provably-fair commit-reveal games · Taproot, no smart contracts</p>
+    </div>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-step="setup">1 · Setup</button>
+    <button data-step="commit">2 · Commit</button>
+    <button data-step="fund">3 · Fund</button>
+    <button data-step="reveal">4 · Reveal</button>
+    <button data-step="settle">5 · Settle</button>
+    <button data-step="refund">Refund</button>
+    <button data-step="verify">Verify</button>
+    <button data-step="solo" class="active">Solo practice</button>
+  </nav>
+</header>
+
+<main>
+  <section class="limits" id="limits">
+    <h2>Honest limits — read before any real PRL moves</h2>
+    <ul>
+      <li><strong>Two-player mode needs a live counterparty running this protocol.</strong> This page coordinates through shareable bundles, but it cannot force anyone to reveal a secret or co-sign a settle. A sore loser can stall until the timeout — then each side refunds its own deposit.</li>
+      <li><strong>"Provably fair" means the outcome is fixed before you bet and verifiable after</strong> — the dealer's sha256(secret) commitment binds the result before funding. It does not mean the dealer can't get lucky.</li>
+      <li><strong>Timeout is an absolute block height.</strong> After it passes, each depositor can unilaterally refund their own deposit — nobody can touch the other's coins. Until then, nobody can refund.</li>
+      <li><strong>Solo practice is a protocol demo.</strong> No PRL moves, no funding, no broadcast — it shows the commit → reveal → verify flow against a local dealer.</li>
+      <li>Timeouts are capped at 52,560 blocks (~4 months at ~194s/block). The page shows a wall-clock estimate; the chain decides.</li>
+    </ul>
+  </section>
+
+  <div class="rolebar">
+    <span class="role-label">I am the…</span>
+    <div class="role-switch" id="role-switch">
+      <button data-role="dealer">Dealer</button>
+      <button data-role="player">Player</button>
+      <button data-role="solo" class="active">Solo practice</button>
+    </div>
+    <span class="role-hint" id="role-hint"></span>
+  </div>
+
+  <!-- STEP 1: SETUP -->
+  <section class="panel" id="panel-setup">
+    <h2>1 · Setup — agree the game</h2>
+    <p class="lede">Pick a game, set the stakes and the timeout, enter both parties' keys. The page derives the tamper-evident game descriptor and both escrow addresses.</p>
+    <div class="grid2">
+      <div class="card">
+        <h3>Game</h3>
+        <label>Game
+          <select id="in-game">
+            <option value="flip">Coin Flip — even money</option>
+            <option value="dice-hilo">Dice Hi/Lo — even money</option>
+            <option value="dice-exact">Dice Exact — 5:1</option>
+          </select>
+        </label>
+        <label>Your bet
+          <select id="in-bet"></select>
+        </label>
+        <p class="hint" id="game-desc"></p>
+        <label>Player's base stake (PRL)
+          <input id="in-stake" type="text" inputmode="decimal" placeholder="e.g. 1.5" value="1">
+        </label>
+        <label>Timeout (block height)
+          <input id="in-timeout" type="text" inputmode="numeric" placeholder="e.g. 51200">
+        </label>
+        <p class="hint">Must be a future height, 144–52,560 blocks out. <span id="timeout-est"></span></p>
+        <div class="stakes" id="stakes-preview"></div>
+      </div>
+      <div class="card">
+        <h3>Parties</h3>
+        <label>Network
+          <select id="in-net">
+            <option value="mainnet">Mainnet (prl1…)</option>
+            <option value="testnet">Testnet (tprl1…)</option>
+          </select>
+        </label>
+        <label>Dealer key <span class="tag">x-only hex · mnemonic · WIF</span>
+          <input id="in-dealer" type="password" autocomplete="off" placeholder="dealer's key (or x-only pubkey if that's not you)">
+        </label>
+        <label>Player key <span class="tag">x-only hex · mnemonic · WIF</span>
+          <input id="in-player" type="password" autocomplete="off" placeholder="player's key (or x-only pubkey if that's not you)">
+        </label>
+        <p class="hint">Enter the <em>private</em> key only for your own role. Your counterparty's side takes an x-only pubkey — enough to derive the escrow, never enough to spend.</p>
+        <label>Blockbook URL
+          <input id="in-blockbook" type="text" placeholder="https://blockbook.pearlresearch.ai">
+        </label>
+        <label>Fee rate (grains/vB)
+          <input id="in-feerate" type="text" inputmode="decimal" value="10">
+        </label>
+        <div class="row">
+          <button class="btn primary" id="btn-create">Create game</button>
+          <button class="btn ghost" id="btn-wipe">Wipe keys</button>
+        </div>
+      </div>
+    </div>
+    <div class="card" id="game-summary" hidden>
+      <h3>Game descriptor <span class="fp" id="game-fp"></span></h3>
+      <code class="desc" id="game-desc-out"></code>
+      <div class="row">
+        <button class="btn ghost copy-btn" data-copy="game-desc-out">Copy descriptor</button>
+        <button class="btn ghost" id="btn-share-setup">Copy share bundle</button>
+      </div>
+      <div class="escrows" id="escrow-cards"></div>
+    </div>
+  </section>
+
+  <!-- STEP 2: COMMIT -->
+  <section class="panel" id="panel-commit" hidden>
+    <h2>2 · Commit — the dealer locks the outcome</h2>
+    <p class="lede">The dealer generates a secret and publishes <code>sha256(secret)</code>. The player must see this commitment <strong>before</strong> funding — the page enforces that order.</p>
+    <div class="grid2">
+      <div class="card">
+        <h3>Dealer: publish commitment</h3>
+        <div class="row">
+          <button class="btn primary" id="btn-newsecret">Generate secret + commitment</button>
+        </div>
+        <label>Secret (keep private until reveal)
+          <input id="out-secret" type="password" readonly placeholder="—">
+        </label>
+        <label>Commitment — share this
+          <input id="out-commitment" type="text" readonly placeholder="—">
+        </label>
+        <div class="row">
+          <button class="btn ghost copy-btn" data-copy="out-commitment">Copy commitment</button>
+          <button class="btn ghost" id="btn-wipe-secret">Wipe secret</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Player: record the commitment</h3>
+        <label>Paste the dealer's commitment
+          <input id="in-commitment" type="text" placeholder="64-hex sha256">
+        </label>
+        <div class="row">
+          <button class="btn primary" id="btn-lock-commitment">Lock commitment</button>
+        </div>
+        <p class="hint" id="commit-status">No commitment locked yet — the Fund step stays closed until one is.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 3: FUND -->
+  <section class="panel" id="panel-fund" hidden>
+    <h2>3 · Fund — each side stakes its own escrow</h2>
+    <p class="lede">Each party funds <strong>their own</strong> escrow address with <strong>exactly</strong> their stake. The two addresses share the 2-of-2 settle leaf, but each binds its depositor — a deposit can only ever refund to its depositor or settle 2-of-2.</p>
+    <div class="grid2" id="fund-cards"></div>
+    <div class="card">
+      <h3>Track funding</h3>
+      <div class="row">
+        <button class="btn primary" id="btn-scan-funding">Scan Blockbook for funding</button>
+      </div>
+      <div id="funding-status"></div>
+    </div>
+  </section>
+
+  <!-- STEP 4: REVEAL -->
+  <section class="panel" id="panel-reveal" hidden>
+    <h2>4 · Reveal — the dealer opens the secret</h2>
+    <p class="lede">The dealer reveals the secret. The page checks it against the locked commitment, derives the outcome deterministically, and scores the winner. Anyone can re-verify this independently.</p>
+    <div class="grid2">
+      <div class="card">
+        <h3>Dealer: reveal</h3>
+        <label>Secret
+          <input id="in-reveal-secret" type="password" placeholder="the 64-hex secret from step 2">
+        </label>
+        <div class="row">
+          <button class="btn primary" id="btn-reveal">Reveal + score</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Result</h3>
+        <div id="reveal-out" class="reveal-out"><p class="hint">No reveal yet.</p></div>
+        <div class="row">
+          <button class="btn ghost" id="btn-copy-reveal" hidden>Copy reveal bundle</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 5: SETTLE -->
+  <section class="panel" id="panel-settle" hidden>
+    <h2>5 · Settle — the loser co-signs the winner's payout</h2>
+    <p class="lede">The winner builds an unsigned settle bundle (both deposits in, winner paid out, exact fee). The loser imports it, re-verifies the outcome and the math independently, signs, and the winner finalizes + broadcasts after a double confirmation.</p>
+    <div class="grid2">
+      <div class="card">
+        <h3>Winner: build unsigned bundle</h3>
+        <label>Winner payout address <span class="tag">prl1… / tprl1…</span>
+          <input id="in-winner-addr" type="text" placeholder="where the pot goes">
+        </label>
+        <div class="row">
+          <button class="btn primary" id="btn-build-settle">Build settle bundle</button>
+        </div>
+        <label>Unsigned bundle
+          <textarea id="out-settle" rows="6" readonly placeholder="—"></textarea>
+        </label>
+        <div class="row">
+          <button class="btn ghost copy-btn" data-copy="out-settle">Copy bundle</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Loser: import, verify, sign</h3>
+        <label>Paste settle bundle
+          <textarea id="in-settle" rows="6" placeholder='{"kind":"pearl-games-settle-bundle",…}'></textarea>
+        </label>
+        <div class="row">
+          <button class="btn primary" id="btn-import-settle">Import + verify</button>
+        </div>
+        <div id="settle-verify-out"></div>
+        <label>Your signing key <span class="tag">mnemonic · WIF</span>
+          <input id="in-settle-key" type="password" autocomplete="off" placeholder="loser's private key">
+        </label>
+        <div class="row">
+          <button class="btn primary" id="btn-sign-settle">Sign settle</button>
+          <button class="btn ghost" id="btn-wipe-settle-key">Wipe</button>
+        </div>
+        <label>Signed bundle (hand back to the winner)
+          <textarea id="out-signed-settle" rows="6" readonly placeholder="—"></textarea>
+        </label>
+        <div class="row">
+          <button class="btn ghost copy-btn" data-copy="out-signed-settle">Copy</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Winner: finalize + broadcast</h3>
+      <label>Paste the fully-signed bundle
+        <textarea id="in-final-settle" rows="4" placeholder="bundle with both signatures"></textarea>
+      </label>
+      <div class="row">
+        <button class="btn primary" id="btn-finalize-settle">Finalize (build tx)</button>
+      </div>
+      <div id="settle-final-out"></div>
+      <div class="row">
+        <button class="btn danger" id="btn-broadcast-settle" hidden>Broadcast settle</button>
+      </div>
+      <p class="hint">Broadcast needs two confirmations here. The tx is not sent until you confirm twice.</p>
+    </div>
+  </section>
+
+  <!-- REFUND -->
+  <section class="panel" id="panel-refund" hidden>
+    <h2>Refund — unilateral, after the timeout only</h2>
+    <p class="lede">Once the chain passes the timeout height, each depositor can take back their own deposit alone — no counterparty needed. Before the timeout, the page refuses loudly.</p>
+    <div class="grid2">
+      <div class="card">
+        <h3>Build refund</h3>
+        <label>I am refunding as
+          <select id="in-refund-role">
+            <option value="dealer">Dealer</option>
+            <option value="player">Player</option>
+          </select>
+        </label>
+        <label>Funding txid
+          <input id="in-refund-txid" type="text" placeholder="64-hex txid of your deposit">
+        </label>
+        <label>Funding vout
+          <input id="in-refund-vout" type="text" inputmode="numeric" value="0">
+        </label>
+        <label>Your payout address
+          <input id="in-refund-addr" type="text" placeholder="your prl1… address">
+        </label>
+        <label>Your signing key <span class="tag">mnemonic · WIF</span>
+          <input id="in-refund-key" type="password" autocomplete="off">
+        </label>
+        <div class="row">
+          <button class="btn primary" id="btn-build-refund">Build + sign refund</button>
+          <button class="btn ghost" id="btn-wipe-refund-key">Wipe</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Refund transaction</h3>
+        <div id="refund-out"><p class="hint">No refund built yet.</p></div>
+        <div class="row">
+          <button class="btn danger" id="btn-broadcast-refund" hidden>Broadcast refund</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- VERIFY -->
+  <section class="panel" id="panel-verify" hidden>
+    <h2>Verify — standalone transcript check</h2>
+    <p class="lede">Paste a game descriptor, the dealer's commitment and the revealed secret. The page answers <strong>PROVEN</strong> or <strong>NOT PROVEN</strong> — no keys needed, nothing leaves your browser.</p>
+    <div class="card">
+      <label>Game descriptor
+        <input id="in-v-desc" type="text" placeholder="pearlgames:v1:…">
+      </label>
+      <label>Commitment
+        <input id="in-v-commit" type="text" placeholder="64-hex">
+      </label>
+      <label>Revealed secret
+        <input id="in-v-secret" type="text" placeholder="64-hex">
+      </label>
+      <div class="row">
+        <button class="btn primary" id="btn-verify">Verify transcript</button>
+      </div>
+      <div id="verify-out"></div>
+    </div>
+  </section>
+
+  <!-- SOLO PRACTICE -->
+  <section class="panel" id="panel-solo">
+    <h2>Solo practice — the protocol against a local dealer</h2>
+    <p class="lede">No PRL moves here. The page plays dealer: it commits <code>sha256(secret)</code> before you see it, then reveals after your bet. Every round is independently verifiable below.</p>
+    <div class="grid2">
+      <div class="card">
+        <h3>Play a round</h3>
+        <label>Game
+          <select id="in-solo-game">
+            <option value="flip">Coin Flip</option>
+            <option value="dice-hilo">Dice Hi/Lo</option>
+            <option value="dice-exact">Dice Exact</option>
+          </select>
+        </label>
+        <label>Your bet
+          <select id="in-solo-bet"></select>
+        </label>
+        <div class="row">
+          <button class="btn primary" id="btn-solo-play">Commit → bet → reveal</button>
+        </div>
+        <div id="solo-out"></div>
+      </div>
+      <div class="card">
+        <h3>Round history</h3>
+        <div id="solo-history"><p class="hint">No rounds yet.</p></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> for the Pearl blockchain · commit-reveal, Taproot escrow, verified locally</p>
+  <p class="donate">Support the build — <code id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+  <button class="btn ghost copy-btn" data-copy="donate-addr">Copy</button></p>
+  <p class="foot-note"><a href="../">← all Pearl apps</a></p>
+</footer>
+
+<script src="pearl-games.bundle.js?v=1"></script>
+<script src="qrcode.min.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>

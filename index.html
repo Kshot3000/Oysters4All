@@ -51,6 +51,7 @@
         <a href="pages/invoice/">Invoice</a>
         <a href="pages/tax/">Tax</a>
         <a href="pages/batch/">Batch</a>
+        <a href="pages/games/">Games</a>
         <a href="pages/watch/">Watch</a>
         <a href="pages/pool/">Mining pool</a>
         <a href="pages/wallet/">Wallet</a>
@@ -377,6 +378,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Batch — PRL Batch Payments Studio <span class="badge">new</span></h3>
             <p>The freight terminal — dispatch one Pearl transaction to up to 250 recipients: a 5-step wizard (Recipients → Fund → Review → Sign → Broadcast) with bech32m-validated manifests, dust refusal, duplicate merging (or loud refusal), GET-only Blockbook UTXO reads plus an air-gapped paste path, grain-exact fee/change math via the audited keypathTxVBytes sizer, unsigned JSON bundles with 64-bit fingerprints for cold signing, address-match key guard, per-input Schnorr re-verification, double-confirm broadcast, and a standalone txid verifier. No new cryptography — audited Sign core throughout.</p>
             <div class="card-links"><a href="pages/batch/">Open Pearl Batch →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Games — Provably-Fair Taproot Games <span class="badge">new</span></h3>
+            <p>The midnight casino — commit-reveal coin flip and dice games on pure Pearl Taproot, no smart contracts. Dealer commits to sha256(secret) before the round ID is drawn, both sides fund their own Taproot escrow (shared 2-of-2 settle leaf + per-depositor CLTV refund leaf), the winner and loser co-sign the pot to the winner, and anyone can re-derive the outcome from the public transcript. Solo practice mode included. Keys never leave the page.</p>
+            <div class="card-links"><a href="pages/games/">Open Pearl Games →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Notary — Proof of Existence <span class="badge">new</span></h3>
