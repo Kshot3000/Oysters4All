@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Bounty — Bug-Bounty &amp; Task-Bounty Desk for PRL</title>
+<meta name="description" content="Post PRL bounties on pure Taproot script: poster-funded bounty outputs with an award leaf and a post-deadline CLTV reclaim leaf. Commit-reveal hunter submissions, local signing, keys never leave the page.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="hero">
+  <div class="seal" aria-hidden="true">✦</div>
+  <div class="hero-inner">
+    <p class="kicker">Pearl · Bounty Hall</p>
+    <h1>Pearl Bounty</h1>
+    <p class="sub">Post a PRL bounty for a bug, a task, a feature. The reward sits in a
+      Taproot output only <em>your</em> signature can move — award it to the winning
+      hunter, or reclaim it yourself after the deadline. Hunters commit to solutions
+      with SHA-256 so nobody can steal a reveal. Pure Taproot, no smart contracts,
+      keys never leave this page.</p>
+    <nav id="steps" class="steps" aria-label="Workflow steps">
+      <button data-step="post" class="active">1 · Post</button>
+      <button data-step="fund">2 · Fund</button>
+      <button data-step="hunt">3 · Hunt</button>
+      <button data-step="award">4 · Award</button>
+      <button data-step="reclaim">5 · Reclaim</button>
+      <button data-step="verify">6 · Verify</button>
+    </nav>
+  </div>
+</header>
+
+<aside class="limits" aria-label="Honest limits">
+  <strong>Honest limits — always true:</strong>
+  <ul>
+    <li>A bounty is <em>poster-trusted</em>: script cannot judge solution quality — the poster's signature is the award decision. The trustless direction is the <em>reclaim</em>: hunters never risk funds, only the poster funds the output.</li>
+    <li>Submissions live <em>in this browser only</em> (localStorage). There is no listing relay — publish the bounty descriptor wherever hunters gather.</li>
+    <li>The deadline is an <em>absolute block height</em>. Day-estimates use ≈194&nbsp;s per block; the chain decides, not the clock.</li>
+    <li>Funding and status checks read <em>Blockbook, a third-party indexer</em> — it can lag or be wrong.</li>
+    <li>No real bounty was funded in testing (that needs the poster's funds and a live chain). Everything here is real cryptography and real transaction construction — verify the hex before you broadcast.</li>
+  </ul>
+</aside>
+
+<main>
+  <!-- ============ 1 · POST ============ -->
+  <section id="step-post" class="panel active">
+    <h2>Post the bounty</h2>
+    <p class="hint">Forge the bounty contract. The poster key signs awards and reclaims —
+      paste it to sign in this browser, or stay <em>watch-only</em> and sign elsewhere.</p>
+    <div class="grid">
+      <label class="span2">Title<input id="p-title" maxlength="120" value="Fix the reorg race in block relay"></label>
+      <label>Network
+        <select id="p-network">
+          <option value="mainnet" selected>mainnet (prl1…)</option>
+          <option value="testnet">testnet (tprl1…)</option>
+        </select>
+      </label>
+      <label>Reward (PRL)<input id="p-reward" inputmode="decimal" value="25"></label>
+      <label>Reclaim deadline (block height)<input id="p-deadline" inputmode="numeric" value="900000"></label>
+      <label>Poster key mode
+        <select id="p-mode">
+          <option value="priv" selected>I hold the key — sign here</option>
+          <option value="watch">Watch-only (x-only pubkey)</option>
+        </select>
+      </label>
+      <label class="span2">Poster key <span class="dim">(hex priv · WIF · 12/24-word mnemonic · or 64-hex x-only in watch-only mode)</span>
+        <input id="p-key" type="password" autocomplete="off" spellcheck="false" placeholder="paste the poster key"></label>
+      <label>Public contact (optional)<input id="p-contact" maxlength="200" placeholder="@handle or email"></label>
+      <label class="span2">Terms (optional, public)<textarea id="p-terms" rows="3" maxlength="2000" spellcheck="false" placeholder="What counts as a winning solution? Payable on merged PR, …"></textarea></label>
+    </div>
+    <div class="row">
+      <button id="p-forge" class="primary">Forge bounty</button>
+      <span id="p-err" class="err" role="alert"></span>
+    </div>
+    <div id="p-out" class="hidden">
+      <h3>Bounty contract</h3>
+      <p class="hint">The address is deterministic: same poster key + deadline always
+        forges the same contract. Share the descriptor with hunters; fund the address with any PRL wallet.</p>
+      <label>Bounty address<input id="p-address" readonly spellcheck="false"></label>
+      <label>Descriptor<textarea id="p-desc" rows="2" readonly spellcheck="false"></textarea></label>
+      <p class="mono">fingerprint <code id="p-fp"></code></p>
+      <label>Bounty spec (JSON — carries the contract, paste into any step)<textarea id="p-spec" rows="6" readonly spellcheck="false"></textarea></label>
+      <div class="row">
+        <button id="p-copyaddr">Copy address</button>
+        <button id="p-copydesc">Copy descriptor</button>
+        <button id="p-copyspec">Copy spec</button>
+        <button id="p-gofund">Continue to funding →</button>
+      </div>
+      <h3>Contract leaves</h3>
+      <p class="mono">award&nbsp;&nbsp;: <code id="p-awardasm"></code></p>
+      <p class="mono">reclaim: <code id="p-reclaimasm"></code></p>
+      <p id="p-summary" class="summary"></p>
+    </div>
+  </section>
+
+  <!-- ============ 2 · FUND ============ -->
+  <section id="step-fund" class="panel">
+    <h2>Fund &amp; watch</h2>
+    <p class="hint">Fund the bounty address with any PRL wallet, then watch for the
+      funding here (GET-only Blockbook reads — the page never asks for keys on this step).</p>
+    <label>Bounty spec (JSON)<textarea id="u-spec" rows="4" spellcheck="false" placeholder="Paste the bounty spec from step 1"></textarea></label>
+    <div class="row">
+      <button id="u-load" class="primary">Load bounty</button>
+      <span id="u-err" class="err" role="alert"></span>
+    </div>
+    <div id="u-out" class="hidden">
+      <label>Fund this address<input id="u-address" readonly spellcheck="false"></label>
+      <div class="row">
+        <button id="u-check">Check funding (Blockbook)</button>
+        <button id="u-gohunt">Continue to hunting →</button>
+      </div>
+      <table id="u-table" class="hidden">
+        <thead><tr><th>txid</th><th>vout</th><th>value (PRL)</th><th>confs</th><th>contract ✓</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <p id="u-meta" class="summary"></p>
+    </div>
+  </section>
+
+  <!-- ============ 3 · HUNT ============ -->
+  <section id="step-hunt" class="panel">
+    <h2>Hunt — commit &amp; reveal</h2>
+    <p class="hint">Hunters: commit to your solution <em>before</em> revealing it.
+      The commitment binds your handle, the bounty descriptor, the solution, and a
+      random salt — a copycat can't replay your reveal under their own name. Keep the
+      solution + salt secret until you reveal to the poster out-of-band.</p>
+    <label>Bounty spec (JSON)<textarea id="h-spec" rows="3" spellcheck="false" placeholder="Paste the bounty spec"></textarea></label>
+    <div class="row">
+      <button id="h-load" class="primary">Load bounty</button>
+      <span id="h-err" class="err" role="alert"></span>
+    </div>
+    <div id="h-out" class="hidden">
+      <h3>Make a commitment</h3>
+      <div class="grid">
+        <label>Handle<input id="h-handle" maxlength="64" placeholder="hunter-7"></label>
+        <label>Salt (hex)<input id="h-salt" spellcheck="false" placeholder="generate one →"></label>
+      </div>
+      <label>Solution (kept secret until reveal)<textarea id="h-solution" rows="4" spellcheck="false" placeholder="Describe the fix, attach the patch, …"></textarea></label>
+      <div class="row">
+        <button id="h-gensalt">Generate salt</button>
+        <button id="h-commit" class="primary">Commit</button>
+      </div>
+      <label>Your commitment (publish this)<input id="h-commitment" readonly spellcheck="false"></label>
+      <h3>Submission board <span class="dim">(this browser only)</span></h3>
+      <div class="row">
+        <button id="h-record">Record my commitment on the board</button>
+        <button id="h-clearboard">Clear board</button>
+      </div>
+      <table id="h-table">
+        <thead><tr><th>handle</th><th>commitment</th><th>revealed</th><th>recorded</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <h3>Verify a reveal</h3>
+      <p class="hint">Poster: when a hunter reveals their solution + salt, check it against their published commitment.</p>
+      <div class="grid">
+        <label>Handle<input id="h-rhandle" maxlength="64"></label>
+        <label>Commitment<input id="h-rcommitment" spellcheck="false"></label>
+      </div>
+      <label>Revealed solution<textarea id="h-rsolution" rows="3" spellcheck="false"></textarea></label>
+      <label>Revealed salt<input id="h-rsalt" spellcheck="false"></label>
+      <div class="row">
+        <button id="h-verifyreveal" class="primary">Verify reveal</button>
+      </div>
+      <p id="h-revealout" class="summary"></p>
+    </div>
+  </section>
+
+  <!-- ============ 4 · AWARD ============ -->
+  <section id="step-award" class="panel">
+    <h2>Award the hunter</h2>
+    <p class="hint">The poster's signature is the award decision. Spend one bounty UTXO:
+      pay the winner (full pot or a partial award — the remainder returns to your change address).
+      The signature is re-verified before the hex is shown.</p>
+    <label>Bounty spec (JSON)<textarea id="a-spec" rows="3" spellcheck="false" placeholder="Paste the bounty spec"></textarea></label>
+    <div class="grid">
+      <label>Bounty UTXO (txid:vout)<input id="a-utxo" spellcheck="false" placeholder="ab…ef:0"></label>
+      <label>UTXO value (PRL)<input id="a-value" inputmode="decimal"></label>
+      <label class="span2">Winner address (prl1…)<input id="a-winner" spellcheck="false"></label>
+      <label>Award amount (PRL)<input id="a-amount" inputmode="decimal"></label>
+      <label class="span2">Change address (poster — receives the remainder)<input id="a-change" spellcheck="false"></label>
+      <label>Fee rate (grains/vB)<input id="a-feerate" inputmode="decimal" value="2"></label>
+      <label>Poster key<input id="a-key" type="password" autocomplete="off" spellcheck="false" placeholder="paste the poster key"></label>
+    </div>
+    <div class="row">
+      <button id="a-plan" class="primary">Plan award</button>
+      <span id="a-err" class="err" role="alert"></span>
+    </div>
+    <div id="a-planout" class="hidden">
+      <p id="a-planmeta" class="summary"></p>
+      <div class="row">
+        <button id="a-build" class="primary">Sign award</button>
+      </div>
+    </div>
+    <div id="a-confirm" class="hidden">
+      <p class="warn" id="a-confirmtext"></p>
+      <div class="row">
+        <button id="a-confirmyes" class="danger">Yes — sign &amp; show the hex</button>
+        <button id="a-confirmno">Cancel</button>
+      </div>
+    </div>
+    <div id="a-out" class="hidden">
+      <p id="a-meta" class="summary"></p>
+      <label>Signed award tx (hex)<textarea id="a-hex" rows="6" readonly spellcheck="false"></textarea></label>
+      <div class="row">
+        <button id="a-copyhex">Copy hex</button>
+        <button id="a-broadcast">Broadcast via Blockbook</button>
+        <button id="a-wipe" class="danger">Wipe key</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 5 · RECLAIM ============ -->
+  <section id="step-reclaim" class="panel">
+    <h2>Reclaim after the deadline</h2>
+    <p class="hint">Past the deadline height, the poster can unilaterally reclaim the pot
+      through the CLTV leaf (nLockTime = deadline). Refused loudly before the deadline —
+      a premature reclaim is invalid on-chain.</p>
+    <label>Bounty spec (JSON)<textarea id="r-spec" rows="3" spellcheck="false" placeholder="Paste the bounty spec"></textarea></label>
+    <div class="grid">
+      <label>Bounty UTXO (txid:vout)<input id="r-utxo" spellcheck="false" placeholder="ab…ef:0"></label>
+      <label>UTXO value (PRL)<input id="r-value" inputmode="decimal"></label>
+      <label class="span2">Destination address (poster)<input id="r-dest" spellcheck="false"></label>
+      <label>Fee rate (grains/vB)<input id="r-feerate" inputmode="decimal" value="2"></label>
+      <label>Chain tip height<input id="r-height" inputmode="numeric" placeholder="fetch →"></label>
+      <label>Poster key<input id="r-key" type="password" autocomplete="off" spellcheck="false" placeholder="paste the poster key"></label>
+    </div>
+    <div class="row">
+      <button id="r-fetchheight">Fetch tip height</button>
+      <button id="r-plan" class="primary">Plan reclaim</button>
+      <span id="r-err" class="err" role="alert"></span>
+    </div>
+    <div id="r-planout" class="hidden">
+      <p id="r-planmeta" class="summary"></p>
+      <div class="row">
+        <button id="r-build" class="primary">Sign reclaim</button>
+      </div>
+    </div>
+    <div id="r-confirm" class="hidden">
+      <p class="warn" id="r-confirmtext"></p>
+      <div class="row">
+        <button id="r-confirmyes" class="danger">Yes — sign &amp; show the hex</button>
+        <button id="r-confirmno">Cancel</button>
+      </div>
+    </div>
+    <div id="r-out" class="hidden">
+      <p id="r-meta" class="summary"></p>
+      <label>Signed reclaim tx (hex)<textarea id="r-hex" rows="6" readonly spellcheck="false"></textarea></label>
+      <div class="row">
+        <button id="r-copyhex">Copy hex</button>
+        <button id="r-broadcast">Broadcast via Blockbook</button>
+        <button id="r-wipe" class="danger">Wipe key</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 6 · VERIFY ============ -->
+  <section id="step-verify" class="panel">
+    <h2>Verify</h2>
+    <p class="hint">Two standalone verifiers. They recompute everything from the
+      descriptor/spec and refuse loudly on any mismatch — never trust, always re-derive.</p>
+    <h3>Descriptor check</h3>
+    <div class="grid">
+      <label class="span2">Descriptor<textarea id="v-descriptor" rows="2" spellcheck="false" placeholder="bounty:v1:…"></textarea></label>
+      <label>Network
+        <select id="v-network">
+          <option value="mainnet" selected>mainnet (prl1…)</option>
+          <option value="testnet">testnet (tprl1…)</option>
+        </select>
+      </label>
+      <label>Claimed bounty address<input id="v-address" spellcheck="false" placeholder="prl1p… (must match the descriptor)"></label>
+    </div>
+    <div class="row">
+      <button id="v-verifydesc" class="primary">Verify descriptor</button>
+      <span id="v-erra" class="err" role="alert"></span>
+    </div>
+    <p id="v-descout" class="summary"></p>
+    <h3>Transaction check</h3>
+    <p class="hint">Paste a bounty spec and a transaction hex — the verifier confirms a
+      bounty input spends through the award or reclaim leaf with the right control block
+      (and, for reclaims, nLockTime = deadline).</p>
+    <label>Bounty spec (JSON)<textarea id="v-spec" rows="3" spellcheck="false"></textarea></label>
+    <label>Transaction hex<textarea id="v-txhex" rows="5" spellcheck="false"></textarea></label>
+    <div class="row">
+      <button id="v-verifytx" class="primary">Verify transaction</button>
+      <span id="v-errb" class="err" role="alert"></span>
+    </div>
+    <p id="v-txout" class="summary"></p>
+  </section>
+</main>
+
+<footer>
+  <p>Built by <a href="https://x.com/kshot9000">@kshot9000</a> · tips:
+    <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code></p>
+  <p class="dim">Pearl Bounty — pure Taproot script, no smart contracts. Verify every hex before you broadcast.</p>
+</footer>
+
+<script src="pearl-bounty.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>

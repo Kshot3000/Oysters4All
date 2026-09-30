@@ -42,6 +42,7 @@
         <a href="pages/stream/">Stream</a>
         <a href="pages/bond/">Bond</a>
         <a href="pages/circle/">Circle</a>
+        <a href="pages/bounty/">Bounty</a>
         <a href="pages/raffle/">Raffle</a>
         <a href="pages/swap/">Swap</a>
         <a href="pages/auction/">Auction</a>
@@ -314,6 +315,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Circle — Rotating Savings Club (ROSCA) Desk <span class="badge">new</span></h3>
             <p>N members contribute C PRL per round for N rounds — each round exactly one member takes the whole pot, and the payout order is drawn by a commit-reveal lottery nobody can rig. Every round's pot sits in a 2-leaf Taproot escrow (winner-claim leaf + m-of-n CLTV timeout-refund leaf) under a NUMS internal key. Found → Lottery → Fund → Claim &amp; Refund → Track, with tamper-evident descriptors, per-round Blockbook lifecycle classification, local Schnorr signing with per-signature re-verification, double-confirm, and key wipe. Keys never leave the page.</p>
             <div class="card-links"><a href="pages/circle/">Open Pearl Circle →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Bounty — Bug-Bounty / Task-Bounty Desk <span class="badge">new</span></h3>
+            <p>Post bounties, hunt them, get paid on Taproot — no middleman. A bounty is a 2-leaf Taproot contract under a NUMS internal key: the poster's signature on the award leaf <em>is</em> the award decision, and a CLTV reclaim leaf (byte-identical to the audited escrow refund script) sweeps funds back after the deadline. Post → Fund → Hunt → Award → Reclaim → Verify, with commit-reveal hunter submissions, tamper-evident descriptors, local Schnorr signing with per-signature re-verification, double-confirm, and key wipe. Keys never leave the page.</p>
+            <div class="card-links"><a href="pages/bounty/">Open Pearl Bounty →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Rain — Batch-Send PRL Airdrops <span class="badge">new</span></h3>
