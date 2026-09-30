@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Dividend — PRL-20 Holder Dividends, Struck in the Browser</title>
+<meta name="description" content="Pearl Dividend: pay PRL dividends to PRL-20 token holders. Seal a holder snapshot, derive grain-exact shares (proportional / equal / fixed), fund chunked payouts, sign locally with per-input Schnorr re-verification, and let anyone verify. Keys never leave your browser.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="16" cy="16" r="9.5" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="2 2"/><text x="16" y="20.5" text-anchor="middle" font-size="9" font-weight="bold" fill="currentColor" font-family="Georgia,serif">P</text></svg>
+    <div>
+      <h1>Pearl Dividend</h1>
+      <p class="tagline">PRL-20 holder dividends — the mint-hall desk</p>
+    </div>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-step="token" class="active">1 · Token</button>
+    <button data-step="snapshot" disabled>2 · Snapshot</button>
+    <button data-step="plan" disabled>3 · Plan</button>
+    <button data-step="fund" disabled>4 · Fund</button>
+    <button data-step="sign" disabled>5 · Sign</button>
+    <button data-step="broadcast" disabled>6 · Broadcast</button>
+    <button data-step="verify">7 · Verify</button>
+  </nav>
+</header>
+
+<main>
+  <!-- STEP 1: TOKEN -->
+  <section id="step-token" class="panel active">
+    <h2>Choose the token</h2>
+    <p class="lede">A dividend starts with the token whose holders you want to pay. This desk reads token
+    metadata from a <strong>Pearlscriptions indexer you choose</strong> (GET-only — it never writes anything),
+    or from <strong>metadata you type by hand</strong> when no indexer is reachable. Either way, the holder list
+    itself always comes from <em>your</em> snapshot in step 2 — the indexer is never trusted for who gets paid.</p>
+    <div class="form-grid">
+      <label>Network
+        <select id="tok-network"><option value="mainnet" selected>Mainnet (prl1…)</option><option value="testnet">Testnet (tprl1…)</option></select></label>
+      <label>Indexer base URL <span class="hint">e.g. https://indexer.example — GET-only reads.</span>
+        <input id="tok-indexer" autocomplete="off" spellcheck="false" placeholder="https://…"></label>
+      <label>Token ticker <span class="hint">PRL-20 ticker, e.g. pearl.</span>
+        <input id="tok-tick" autocomplete="off" spellcheck="false" placeholder="ticker"></label>
+      <label class="check"><input type="checkbox" id="tok-manual"> Type metadata by hand <span class="hint">no indexer — you vouch for the numbers.</span></label>
+      <label>Decimals (manual) <input id="tok-decimals" type="number" min="0" max="18" value="8" disabled></label>
+      <label>Max supply, token units (manual, optional) <input id="tok-maxsupply" autocomplete="off" spellcheck="false" placeholder="e.g. 21000000" disabled></label>
+    </div>
+    <div class="row">
+      <button id="tok-fetch" class="primary">Read token metadata</button>
+    </div>
+    <div id="tok-error" class="error" hidden></div>
+    <div id="tok-result" hidden>
+      <h3>Token card</h3>
+      <dl class="kv">
+        <div><dt>Ticker</dt><dd><code id="tok-r-tick"></code></dd></div>
+        <div><dt>Max supply</dt><dd id="tok-r-max"></dd></div>
+        <div><dt>Minted</dt><dd id="tok-r-minted"></dd></div>
+        <div><dt>Holders (indexer count)</dt><dd id="tok-r-holders"></dd></div>
+        <div><dt>Decimals</dt><dd id="tok-r-dec"></dd></div>
+        <div><dt>Indexer height</dt><dd id="tok-r-height"></dd></div>
+        <div><dt>Metadata source</dt><dd id="tok-r-src"></dd></div>
+      </dl>
+      <p class="note">The holder <em>count</em> above is the indexer's claim — your snapshot in step 2 is the
+      list that actually gets paid, and the desk re-checks this count for drift before you broadcast.</p>
+    </div>
+  </section>
+
+  <!-- STEP 2: SNAPSHOT -->
+  <section id="step-snapshot" class="panel">
+    <h2>Seal the holder snapshot</h2>
+    <p class="lede">Paste your holder list as CSV — <code>address,balance</code> per line, balances in token units.
+    Export it from an indexer you run, or assemble it by hand. Every address is validated in-browser
+    (bech32m <code>prl1…</code>/<code>tprl1…</code>), duplicates are merged or refused — your call — and the
+    canonical list is sealed under a tamper-evident <code>pearl-div-snapshot:v1</code> descriptor with a
+    64-bit fingerprint. <strong>The fingerprint binds the holder list only</strong>, so anyone can re-seal the
+    same CSV later and reproduce it exactly.</p>
+    <div class="form-grid">
+      <label class="wide">Holder CSV <span class="hint"><code>address,balance</code> per line. Blank lines and # comments ignored.</span>
+        <textarea id="snap-csv" rows="8" spellcheck="false" placeholder="prl1p…,100.5&#10;prl1p…,200"></textarea></label>
+    </div>
+    <div class="row">
+      <button id="snap-parse" class="primary">Validate &amp; seal snapshot</button>
+      <button id="snap-sample" class="ghost">Load labeled sample</button>
+    </div>
+    <div id="snap-error" class="error" hidden></div>
+    <div id="snap-dups" hidden>
+      <h3>Duplicate addresses</h3>
+      <p class="note">The same address appears more than once. Merge (balances summed) or refuse (snapshot rejected).</p>
+      <ul id="snap-dups-list" class="mono-list"></ul>
+      <div class="row">
+        <button id="snap-merge" class="primary">Merge duplicates</button>
+        <button id="snap-refuse" class="ghost">Refuse snapshot</button>
+      </div>
+    </div>
+    <div id="snap-result" hidden>
+      <h3>Snapshot sealed</h3>
+      <dl class="kv">
+        <div><dt>Holders</dt><dd id="snap-r-count"></dd></div>
+        <div><dt>Total token units</dt><dd id="snap-r-total"></dd></div>
+        <div><dt>Supply check</dt><dd id="snap-r-supply"></dd></div>
+        <div><dt>Fingerprint</dt><dd><code id="snap-r-fp"></code></dd></div>
+      </dl>
+      <div class="row">
+        <button id="snap-download" class="ghost">Download snapshot JSON</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 3: PLAN -->
+  <section id="step-plan" class="panel">
+    <h2>Strike the dividend plan</h2>
+    <p class="lede">Set the pool and the distribution rule. Every share is <strong>grain-exact integer math</strong>:
+    proportional shares are floored, so the leftover — every single grain — is accounted as the
+    <strong>remainder</strong> and returns to you (or to a treasury address) in the last transaction.
+    Shares below the dust floor are <strong>dropped loudly</strong>, never silently. Recipients are chunked into
+    transactions of at most 250 outputs.</p>
+    <div class="form-grid">
+      <label>Dividend pool (PRL) <input id="plan-pool" type="number" min="0" step="any" value="1"></label>
+      <label>Distribution rule
+        <select id="plan-rule">
+          <option value="proportional" selected>Proportional — by token balance</option>
+          <option value="equal">Equal — same payout per holder</option>
+          <option value="fixed">Fixed — set PRL per holder</option>
+        </select></label>
+      <label>Fixed per holder (PRL) <span class="hint">fixed rule only.</span>
+        <input id="plan-fixed" type="number" min="0" step="any" value="0.1" disabled></label>
+      <label>Dust floor (PRL) <span class="hint">shares below this are dropped. Default 0.00000546.</span>
+        <input id="plan-dust" type="number" min="0" step="any" value="0.00000546"></label>
+      <label>Fee rate (grains/vB) <span class="hint">estimate — exact at signing.</span>
+        <input id="plan-feerate" type="number" min="1" step="any" value="2"></label>
+      <label>Max outputs per tx <span class="hint">1–250.</span>
+        <input id="plan-maxtx" type="number" min="1" max="250" value="250"></label>
+      <label>Funder address <span class="hint">prl1… paying the pool — remainder returns here.</span>
+        <input id="plan-funder" autocomplete="off" spellcheck="false" placeholder="prl1…"></label>
+      <label>Treasury address (optional) <span class="hint">remainder goes here as an explicit output instead.</span>
+        <input id="plan-treasury" autocomplete="off" spellcheck="false" placeholder="prl1…"></label>
+      <label>Minimum balance, token units (optional) <input id="plan-minbal" autocomplete="off" spellcheck="false" placeholder="0"></label>
+      <label class="wide">Exclusions (optional) <span class="hint">one address per line — e.g. the deploy vault.</span>
+        <textarea id="plan-exclusions" rows="2" spellcheck="false" placeholder="prl1…"></textarea></label>
+      <label class="wide">Memo <span class="hint">optional, stored in the descriptor (max 280 chars).</span>
+        <input id="plan-note" autocomplete="off" spellcheck="false" placeholder="e.g. Q3 2026 holder dividend"></label>
+    </div>
+    <div class="row">
+      <button id="plan-build" class="primary">Compute shares &amp; seal plan</button>
+    </div>
+    <div id="plan-error" class="error" hidden></div>
+    <div id="plan-result" hidden>
+      <h3>Dividend plan</h3>
+      <dl class="kv">
+        <div><dt>Eligible / paid</dt><dd id="plan-r-counts"></dd></div>
+        <div><dt>Total to holders</dt><dd id="plan-r-total"></dd></div>
+        <div><dt>Remainder</dt><dd id="plan-r-remainder"></dd></div>
+        <div><dt>Dust-dropped</dt><dd id="plan-r-dust"></dd></div>
+        <div><dt>Transactions</dt><dd id="plan-r-chunks"></dd></div>
+        <div><dt>Est. fees</dt><dd id="plan-r-fees"></dd></div>
+        <div><dt>Plan fingerprint</dt><dd><code id="plan-r-fp"></code></dd></div>
+      </dl>
+      <h4>Share table</h4>
+      <div class="table-wrap"><table id="plan-table">
+        <thead><tr><th>#</th><th>Address</th><th>Token balance</th><th>Share (PRL)</th><th>Tx</th></tr></thead>
+        <tbody id="plan-table-body"></tbody>
+      </table></div>
+      <div class="row">
+        <button id="plan-download" class="ghost">Download plan JSON</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 4: FUND -->
+  <section id="step-fund" class="panel">
+    <h2>Fund the payout</h2>
+    <p class="lede">Point the desk at the funder's UTXOs — read live from Blockbook (GET-only) or paste them
+    air-gapped. Coins are assigned per transaction, largest-first, covering that transaction's payouts plus its
+    fee. The desk refuses loudly if any transaction is short.</p>
+    <div class="form-grid">
+      <label>Blockbook base URL <span class="hint">GET-only reads.</span>
+        <input id="fund-blockbook" autocomplete="off" spellcheck="false" placeholder="https://…"></label>
+      <label class="wide">…or paste UTXOs (JSON) <span class="hint">[{"txid":"…","vout":0,"value":grains}]</span>
+        <textarea id="fund-paste" rows="4" spellcheck="false" placeholder='[{"txid":"…","vout":0,"value":100000000}]'></textarea></label>
+    </div>
+    <div class="row">
+      <button id="fund-fetch" class="primary">Fetch UTXOs</button>
+      <button id="fund-apply" class="ghost">Use pasted UTXOs</button>
+    </div>
+    <div id="fund-error" class="error" hidden></div>
+    <div id="fund-result" hidden>
+      <h3>Funding plan</h3>
+      <div id="fund-chunks"></div>
+    </div>
+  </section>
+
+  <!-- STEP 5: SIGN -->
+  <section id="step-sign" class="panel">
+    <h2>Sign each payout</h2>
+    <p class="lede">Every payout transaction is signed <strong>locally</strong> — the funder's key never leaves this
+    page, is wiped after signing, and must control the funder address (the desk refuses otherwise). Each
+    transaction's signatures are <strong>re-verified locally</strong> before the hex is shown. For air-gapped
+    signing, export the unsigned bundle, sign it on the offline machine, and import it back.</p>
+    <div class="form-grid">
+      <label>Transaction <select id="sign-chunk"></select></label>
+    </div>
+    <div class="row">
+      <button id="sign-export" class="ghost">Export unsigned bundle</button>
+    </div>
+    <div class="form-grid">
+      <label class="wide">Unsigned bundle (import) <span class="hint">paste a bundle exported above or from the offline machine.</span>
+        <textarea id="sign-bundle" rows="4" spellcheck="false" placeholder='{"bundle":"pearl-div-unsigned:v1:",…}'></textarea></label>
+      <label class="wide">Funder secret <span class="hint">mnemonic, WIF, 64-hex priv, or xprv — memory only, wiped after.</span>
+        <input id="sign-key" type="password" autocomplete="off" spellcheck="false" placeholder="paste secret to sign"></label>
+    </div>
+    <div class="row">
+      <button id="sign-import" class="ghost">Verify &amp; load bundle</button>
+      <button id="sign-sign" class="primary">Sign transaction</button>
+      <button id="sign-wipe" class="ghost">Wipe key</button>
+    </div>
+    <div id="sign-error" class="error" hidden></div>
+    <div id="sign-result" hidden>
+      <h3>Signed</h3>
+      <dl class="kv">
+        <div><dt>Txid</dt><dd><code id="sign-r-txid" class="addr"></code></dd></div>
+        <div><dt>Fee</dt><dd id="sign-r-fee"></dd></div>
+        <div><dt>Signatures re-verified</dt><dd id="sign-r-sigs"></dd></div>
+      </dl>
+      <label>Signed hex <textarea id="sign-r-hex" rows="4" readonly spellcheck="false"></textarea></label>
+    </div>
+  </section>
+
+  <!-- STEP 6: BROADCAST -->
+  <section id="step-broadcast" class="panel">
+    <h2>Broadcast</h2>
+    <p class="lede">Broadcast each signed payout transaction. Every broadcast is behind a <strong>double-confirm
+    gate</strong> — arm, then confirm. Track confirmations per transaction below.</p>
+    <div class="form-grid">
+      <label>Blockbook base URL <span class="hint">for broadcast + tracking.</span>
+        <input id="bcast-blockbook" autocomplete="off" spellcheck="false" placeholder="https://…"></label>
+    </div>
+    <div id="bcast-list"></div>
+    <div id="bcast-error" class="error" hidden></div>
+  </section>
+
+  <!-- STEP 7: VERIFY -->
+  <section id="step-verify" class="panel">
+    <h2>Verify — no trust required</h2>
+    <p class="lede">Anyone can audit a dividend with three artifacts: the <strong>holder CSV</strong>, the
+    <strong>dividend plan JSON</strong>, and the <strong>payout transactions</strong> (fetched live from
+    Blockbook or pasted). The verifier re-seals the snapshot, recomputes every share from the plan's rule,
+    and checks each payout transaction output-by-output. Verdict: <strong>PROVEN</strong> or
+    <strong>NOT PROVEN</strong> — tampering is refused loudly, never averaged away.</p>
+    <div class="form-grid">
+      <label class="wide">Holder CSV <textarea id="ver-csv" rows="6" spellcheck="false" placeholder="address,balance&#10;…"></textarea></label>
+      <label class="wide">Dividend plan JSON <span class="hint">{"descriptor":{…},"fingerprint":"…","funderAddress":"prl1…"} — include the funder address for the on-chain leg.</span>
+        <textarea id="ver-bundle" rows="6" spellcheck="false" placeholder='{"descriptor":{"kind":"pearl-div:v1",…}}'></textarea></label>
+      <label>Blockbook base URL (optional) <span class="hint">fetch payout txs by txid; or paste tx JSON below.</span>
+        <input id="ver-blockbook" autocomplete="off" spellcheck="false" placeholder="https://…"></label>
+      <label class="wide">Payouts <span class="hint">one per line: <code>chunkIndex,txid</code> — e.g. <code>0,abc123…</code>. To paste raw tx JSON instead, use the Blockbook fetch or the tx-JSON box.</span>
+        <textarea id="ver-txids" rows="3" spellcheck="false" placeholder="0,txid…"></textarea></label>
+      <label class="wide">…or paste Blockbook tx JSON array <span class="hint">[{txid, vin, vout, confirmations}] matching the lines above.</span>
+        <textarea id="ver-txjson" rows="4" spellcheck="false" placeholder='[{"txid":"…","vin":[…],"vout":[…]}]'></textarea></label>
+    </div>
+    <div class="row"><button id="ver-run" class="primary">Verify dividend</button></div>
+    <div id="ver-error" class="error" hidden></div>
+    <div id="ver-verdict" class="verdict" hidden></div>
+    <div id="ver-details" class="checks" hidden></div>
+  </section>
+
+  <!-- HONEST LIMITS -->
+  <section class="panel limits">
+    <h2>Honest limits</h2>
+    <ul>
+      <li><strong>The holder list is yours, not the chain's.</strong> Pearl has no smart contracts and the PRL-20
+      ledger lives in the Pearlscriptions indexer — this desk pays whoever is in <em>your</em> CSV. A dividend is
+      only as fair as the snapshot you seal; the verifier lets anyone re-check your work, but it cannot conjure
+      a trustless holder set.</li>
+      <li><strong>Indexer metadata is a convenience, not consensus.</strong> Ticker, supply, and holder counts are
+      read GET-only from an indexer you choose. If it lies, your snapshot is still exactly what you pasted —
+      garbage in, audited garbage out.</li>
+      <li><strong>Snapshots go stale.</strong> Tokens move between your snapshot and broadcast. The desk pins the
+      indexer height at seal time and warns on drift, but it cannot freeze the ledger.</li>
+      <li><strong>Dust is real.</strong> Shares below the dust floor cannot exist on-chain; they are dropped and
+      disclosed. Tiny pools over many holders mostly evaporate into the remainder — the plan shows you before
+      you spend a grain on fees.</li>
+      <li><strong>Keys.</strong> Pasted secrets live in memory only and are wiped after signing. Prefer the
+      air-gapped bundle flow for mainnet money.</li>
+    </ul>
+  </section>
+</main>
+
+<footer>
+  <p>Built for the Pearl blockchain (PRL) · <a href="https://x.com/kshot9000">@kshot9000</a></p>
+  <p>Support the build: <code id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code></p>
+  <p class="fine">Pearl has no smart contracts — every dividend here is plain Taproot keypath spends, planned grain-exact and verified output-by-output in your browser.</p>
+</footer>
+
+<script src="pearl-dividend.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>

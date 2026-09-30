@@ -64,6 +64,7 @@
         <a href="pages/vault/">Vault</a>
         <a href="pages/channels/">Channels</a>
         <a href="pages/lend/">Lend</a>
+        <a href="pages/dividend/">Dividend</a>
       </nav>
       <a class="btn btn-small" href="https://github.com/pearl-research-labs/pearl" target="_blank" rel="noopener">GitHub ↗</a>
     </div>
@@ -429,6 +430,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Lend — Collateralized PRL Loans <span class="badge">new</span></h3>
             <p>The counting-house desk — overcollateralized peer-to-peer PRL loans on pure Taproot script (no smart contracts, no oracles): the borrower locks PRL collateral in a two-leaf vault under a NUMS internal key, repays early through a 2-of-2 repay leaf with lender co-signing and signature re-verification, or the lender sweeps via a CSV-delayed default leaf after term + grace. Six steps (Offer → Lock → Fund → Track → Repay → Close &amp; Verify) with tamper-evident descriptors, grain-exact interest math, mutual-close agreements, double-confirm broadcast, and a standalone PROVEN/NOT PROVEN verifier. Keys never leave the page; honest about the pawn-shop model.</p>
             <div class="card-links"><a href="pages/lend/">Open Pearl Lend →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Dividend — PRL-20 Holder Distribution Desk <span class="badge">new</span></h3>
+            <p>The luminous transfer-agent / mint-hall desk — pay PRL-20 holders from a CSV snapshot: seal the holder set with a tamper-evident fingerprint, compute grain-exact shares (proportional, equal, or fixed per holder) with explicit dust and remainder accounting, fund each payout chunk, sign locally with BIP-340 Schnorr (air-gapped unsigned bundles, keys wiped after signing), and broadcast with double-confirm — plus a standalone PROVEN / NOT PROVEN verifier that recomputes every share and audits every payout transaction. Honest about indexer limits: the indexer supplies token metadata only, the holder set is yours.</p>
+            <div class="card-links"><a href="pages/dividend/">Open Pearl Dividend →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Sign — Transaction Forge <span class="badge">new</span></h3>
