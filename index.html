@@ -49,6 +49,7 @@
         <a href="pages/treasury/">Treasury</a>
         <a href="pages/names/">Names</a>
         <a href="pages/fees/">Fees</a>
+        <a href="pages/commons/">Commons</a>
         <a href="pages/id/">ID</a>
         <a href="pages/raffle/">Raffle</a>
         <a href="pages/swap/">Swap</a>
@@ -347,6 +348,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Names — Human-readable names for Pearl addresses <span class="badge">new</span></h3>
             <p>Give your Taproot address a name — bind a memorable <code>name.prl</code> to your prl1… address by signing a canonical registration record with the BIP-86 key that controls it, then seal it on-chain in a <code>prl-name</code> Taproot inscription envelope: Register → Directory → Verify → Export. Name rules (3–63 chars, reserved list), wrong-key refusal on signing, standalone VALID/INVALID verifier that re-derives the address from the key and re-checks the BIP-340 signature, first-seen conflict resolution in the local directory, full commit→reveal planning with grain-exact fees, and witness self-verification before broadcast. No new cryptography — audited Sign/Etch cores throughout; keys in memory only.</p>
             <div class="card-links"><a href="pages/names/">Open Pearl Names →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Commons — quadratic funding rounds for PRL <span class="badge">new</span></h3>
+            <p>Fund the commons the fair way. Open a round with a fixed PRL matching pool and a contribution window, register projects with chain-validated Taproot addresses, log contributions (or paste a txid and let the desk read the payment off Blockbook, GET-only), and the desk computes each project's quadratic match — (Σ√c<sub>i</sub>)² − Σc<sub>i</sub>, aggregated per donor, capital-constrained to the pool with the scale factor shown honestly: Rounds → Projects → Contribute → Results → Audit → Settings. Finalizing a round seals the results hash in a tamper-evident log; JSON/CSV export for everything. No escrow, no keys, no smart contracts — the pool is a pledged figure and payout stays manual; donor labels are self-declared, so results are best-effort, not sybil-proof. No new cryptography — the audited Sign core only.</p>
+            <div class="card-links"><a href="pages/commons/">Open Pearl Commons →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Fees — the fee-rate desk for PRL <span class="badge">new</span></h3>

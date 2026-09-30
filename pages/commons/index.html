@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Commons — quadratic funding rounds for PRL</title>
+<meta name="description" content="Run quadratic funding rounds on Pearl (PRL): register projects, log contributions, and compute open, auditable QF matching with the capital constraint applied. Read-only ledger — keys never touch this page.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="hero">
+  <div class="seal" aria-hidden="true">❖</div>
+  <div class="hero-inner">
+    <p class="kicker">Pearl · Commons Desk</p>
+    <h1>Pearl Commons</h1>
+    <p class="sub">The quadratic funding desk for the Pearl ecosystem. Open a round with a fixed
+      PRL matching pool, register projects, log contributions, and the desk computes each
+      project's match — <em>(Σ√c<sub>i</sub>)² − Σc<sub>i</sub></em>, capital-constrained to the pool,
+      sealed in a hash-chained audit log. Keys never touch this page: settlement stays
+      manual, on-chain, in your hands.</p>
+    <nav id="steps" class="steps" aria-label="Workflow steps">
+      <button data-tab="rounds" class="active">1 · Rounds</button>
+      <button data-tab="projects">2 · Projects</button>
+      <button data-tab="contribute">3 · Contribute</button>
+      <button data-tab="results">4 · Results</button>
+      <button data-tab="audit">5 · Audit</button>
+      <button data-tab="settings">6 · Settings</button>
+    </nav>
+  </div>
+</header>
+
+<aside class="limits" aria-label="Honest limits">
+  <div>
+    <strong>Honest limits — always true:</strong>
+    <ul>
+      <li>The matching pool is a <em>pledged number you enter</em>; the desk does not escrow it
+        and cannot move it. Paying out matches is a manual on-chain transfer by the round operator.</li>
+      <li>Donor labels are self-declared. Repeat donations from one label to one project are
+        aggregated before the square-root step — but the desk cannot prove two labels are two
+        humans. Treat results as <em>best-effort</em>, not sybil-proof.</li>
+      <li>Contributions are logged from what you type or paste; the optional Blockbook txid
+        check reads the chain GET-only and never signs anything.</li>
+      <li>All data lives in this browser's localStorage. Export the round JSON before wiping.</li>
+    </ul>
+  </div>
+</aside>
+
+<main>
+  <section id="tab-rounds" class="tab" aria-label="Rounds"></section>
+  <section id="tab-projects" class="tab" aria-label="Projects" hidden></section>
+  <section id="tab-contribute" class="tab" aria-label="Contribute" hidden></section>
+  <section id="tab-results" class="tab" aria-label="Results" hidden></section>
+  <section id="tab-audit" class="tab" aria-label="Audit" hidden></section>
+  <section id="tab-settings" class="tab" aria-label="Settings" hidden></section>
+</main>
+
+<footer>
+  <p>Built for the Pearl blockchain (PRL) ·
+    <a href="https://x.com/kshot9000">@kshot9000</a> ·
+    <a href="https://github.com/Kshot3000/Pearl-Muse-24-7-Ai-builder">Pearl-Muse-24-7-Ai-builder</a></p>
+  <p class="donate">Support the commons:
+    <code class="mono" id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+    <button id="copy-donate" class="ghost small">copy</button></p>
+  <p class="muted small">Quadratic funding: Buterin–Hitzig–Weyl liberal radicalism with a capital constraint.
+    Matching computed in floating point, floored to whole grains; floor dust stays in the pool and is reported.</p>
+</footer>
+
+<script src="pearl-commons.bundle.js?v=1"></script>
+<script>
+document.getElementById("copy-donate").addEventListener("click", function () {
+  var t = document.getElementById("donate-addr").textContent;
+  if (navigator.clipboard) navigator.clipboard.writeText(t).then(function () {
+    document.getElementById("copy-donate").textContent = "copied ✓";
+  });
+});
+</script>
+</body>
+</html>
