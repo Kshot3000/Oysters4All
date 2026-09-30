@@ -43,6 +43,7 @@
         <a href="pages/bond/">Bond</a>
         <a href="pages/circle/">Circle</a>
         <a href="pages/bounty/">Bounty</a>
+        <a href="pages/charity/">Charity</a>
         <a href="pages/raffle/">Raffle</a>
         <a href="pages/swap/">Swap</a>
         <a href="pages/auction/">Auction</a>
@@ -320,6 +321,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Bounty — Bug-Bounty / Task-Bounty Desk <span class="badge">new</span></h3>
             <p>Post bounties, hunt them, get paid on Taproot — no middleman. A bounty is a 2-leaf Taproot contract under a NUMS internal key: the poster's signature on the award leaf <em>is</em> the award decision, and a CLTV reclaim leaf (byte-identical to the audited escrow refund script) sweeps funds back after the deadline. Post → Fund → Hunt → Award → Reclaim → Verify, with commit-reveal hunter submissions, tamper-evident descriptors, local Schnorr signing with per-signature re-verification, double-confirm, and key wipe. Keys never leave the page.</p>
             <div class="card-links"><a href="pages/bounty/">Open Pearl Bounty →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Charity — Transparent Donation Desk <span class="badge">new</span></h3>
+            <p>Run transparent donation campaigns on Pearl — donations go straight to the charity's own Taproot address; this page never holds, moves, or broadcasts funds. Forge a campaign (tamper-evident descriptor with 64-bit fingerprint, optional organizer signature with key wipe), track funding against the goal with live Blockbook stats and lifecycle classification, issue hash-bound donation receipts with CSV/JSON export, and independently verify any descriptor or receipt cross-checked against the chain. Launch → Fund → Receipts → Track → Verify. Keys never leave the page.</p>
+            <div class="card-links"><a href="pages/charity/">Open Pearl Charity →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Rain — Batch-Send PRL Airdrops <span class="badge">new</span></h3>

@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Charity — Transparent PRL Donation Desk</title>
+<meta name="description" content="Launch tamper-evident PRL donation campaigns. Funds go straight to the charity's own Taproot address — the page never holds or moves funds. Donor receipts, goal tracking, standalone verification.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="hero">
+  <div class="lantern" aria-hidden="true">🕯</div>
+  <div class="hero-inner">
+    <p class="kicker">Pearl · Charity Desk</p>
+    <h1>Pearl Charity</h1>
+    <p class="sub">Launch a transparent PRL donation campaign. Donations go
+      <em>straight to the charity's own address</em> — this page never holds, moves,
+      or broadcasts funds. Every campaign carries a tamper-evident descriptor and a
+      64-bit fingerprint; every donor receipt is hash-bound and printable. Verify
+      everything standalone.</p>
+    <nav id="steps" class="steps" aria-label="Workflow steps">
+      <button data-step="launch" class="active">1 · Launch</button>
+      <button data-step="fund" >2 · Fund</button>
+      <button data-step="receipts">3 · Receipts</button>
+      <button data-step="track">4 · Track</button>
+      <button data-step="verify">5 · Verify</button>
+    </nav>
+  </div>
+</header>
+
+<aside class="limits" aria-label="Honest limits">
+  <strong>Honest limits — always true:</strong>
+  <ul>
+    <li>This page <em>never holds or moves funds</em>. Donations travel from the donor's own wallet to the charity's address. There is no escrow, no vault, no smart contract.</li>
+    <li>A campaign is <em>organizer-trusted</em>: the descriptor proves the campaign text was not altered, but trust in the recipient address is social — verify the organizer independently before donating.</li>
+    <li>Receipt donor names are <em>self-declared</em> — a receipt proves a transaction happened, not who sent it.</li>
+    <li>Deadlines are <em>absolute block heights</em> (exact). Day-estimates use ≈194&nbsp;s per block and are labeled approximate — the chain decides, not the clock.</li>
+    <li>Funding checks read <em>Blockbook, a third-party indexer</em> — it can lag or be wrong. Receipts stay valid offline; only their <em>live cross-check</em> needs Blockbook.</li>
+    <li>The page never broadcasts. No real donation was made in testing.</li>
+  </ul>
+</aside>
+
+<main>
+  <!-- ============ 1 · LAUNCH ============ -->
+  <section id="step-launch" class="panel active">
+    <h2>Launch a campaign</h2>
+    <p class="hint">Forge a tamper-evident campaign. The recipient address is validated
+      in-browser and committed into the descriptor hash — anyone who alters it later
+      fails verification loudly. Optionally sign the campaign with an organizer key
+      (held in memory only, wiped right after forging).</p>
+    <div class="grid">
+      <label class="span2">Organizer name<input id="l-org" maxlength="120" value="Pearl Lantern Society"></label>
+      <label>Network
+        <select id="l-network">
+          <option value="mainnet" selected>mainnet (prl1…)</option>
+          <option value="testnet">testnet (tprl1…)</option>
+        </select>
+      </label>
+      <label>Goal (PRL)<input id="l-goal" inputmode="decimal" value="100"></label>
+      <label class="span2">Charity recipient address <span class="dim">(bech32m prl1…/tprl1… — funds go straight here)</span>
+        <input id="l-recipient" spellcheck="false" placeholder="prl1p…"></label>
+      <label>Deadline (block height, optional)<input id="l-deadline" inputmode="numeric" placeholder="leave empty for none"></label>
+      <label>Chain tip <span class="dim">(to sanity-check the deadline)</span>
+        <span class="inline-row"><button id="l-gettip">Fetch tip</button><span id="l-tipinfo" class="dim"></span></span></label>
+      <label class="span2">Description (public, hash-committed)<textarea id="l-desc" rows="3" maxlength="2000" spellcheck="false" placeholder="What is the campaign for? Where do funds go?"></textarea></label>
+      <label>Public contact (optional)<input id="l-contact" maxlength="200" placeholder="@handle or email"></label>
+      <label>Organizer authorship
+        <select id="l-mode">
+          <option value="nosign" selected>Unsigned (no key needed)</option>
+          <option value="sign">Sign with an organizer key (wiped after)</option>
+        </select>
+      </label>
+      <label id="l-keywrap" class="span2 hidden">Organizer key <span class="dim">(hex priv · WIF · 12/24-word mnemonic — in-memory only)</span>
+        <input id="l-key" type="password" autocomplete="off" spellcheck="false" placeholder="paste the organizer key"></label>
+    </div>
+    <div class="row">
+      <button id="l-forge" class="primary">Forge campaign</button>
+      <span id="l-err" class="err" role="alert"></span>
+    </div>
+    <div id="l-out" class="hidden">
+      <h3>Campaign launched</h3>
+      <p class="hint">The donation address is the charity's own address — share it with
+        donors. Publish the descriptor + spec wherever donors gather.</p>
+      <label>Donation address<input id="l-address" readonly spellcheck="false"></label>
+      <label>Descriptor<textarea id="l-descriptor" rows="2" readonly spellcheck="false"></textarea></label>
+      <p class="mono">fingerprint <code id="l-fp"></code></p>
+      <p id="l-authnote" class="summary"></p>
+      <label>Campaign spec (JSON — carries the campaign, paste into any step)<textarea id="l-spec" rows="6" readonly spellcheck="false"></textarea></label>
+      <div class="row">
+        <button id="l-copyaddr">Copy address</button>
+        <button id="l-copydesc">Copy descriptor</button>
+        <button id="l-copyspec">Copy spec</button>
+        <button id="l-gofund">Continue to funding →</button>
+      </div>
+      <h3>Publish checklist</h3>
+      <ul id="l-checklist" class="checklist"></ul>
+      <p id="l-summary" class="summary"></p>
+    </div>
+  </section>
+
+  <!-- ============ 2 · FUND ============ -->
+  <section id="step-fund" class="panel">
+    <h2>Fund &amp; watch</h2>
+    <p class="hint">Donors send PRL to the campaign address with <em>their own wallets</em> —
+      this page only watches (GET-only Blockbook reads). Fully offline? Expand the
+      air-gapped path below and paste donation records manually.</p>
+    <label>Campaign spec (JSON)<textarea id="f-spec" rows="4" spellcheck="false" placeholder="Paste the campaign spec from step 1"></textarea></label>
+    <label>Blockbook base (override)<input id="f-bburl" spellcheck="false" placeholder="leave empty for the network default"></label>
+    <div class="row">
+      <button id="f-load" class="primary">Load campaign</button>
+      <span id="f-err" class="err" role="alert"></span>
+    </div>
+    <div id="f-out" class="hidden">
+      <label>Donate to this address<input id="f-address" readonly spellcheck="false"></label>
+      <div class="row">
+        <button id="f-check">Check donations (Blockbook)</button>
+        <button id="f-goreceipts">Continue to receipts →</button>
+      </div>
+      <table id="f-table" class="hidden">
+        <thead><tr><th>txid</th><th>amount (PRL)</th><th>height</th><th>confs</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <p id="f-meta" class="summary"></p>
+      <details id="f-air">
+        <summary>Air-gapped path — paste donation records (offline)</summary>
+        <p class="hint">No network access? Paste a JSON list of donation records and the
+          page computes the campaign stats locally. Each record: <code>{"txid":"…","valueGrains":123,"blockHeight":900100}</code>.
+          These are <em>manual claims</em> — they are not verified against the chain.</p>
+        <label>Donation records (JSON array)<textarea id="f-airtx" rows="4" spellcheck="false" placeholder='[{"txid":"ab…","valueGrains":100000000,"blockHeight":900100}]'></textarea></label>
+        <div class="row">
+          <button id="f-airload">Load offline records</button>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <!-- ============ 3 · RECEIPTS ============ -->
+  <section id="step-receipts" class="panel">
+    <h2>Donor receipts</h2>
+    <p class="hint">Issue hash-bound donor receipts. The donor handle is self-declared
+      (pseudonyms welcome); the txid and amount should match a real donation to the
+      campaign address. Receipts live in <em>this browser only</em> (localStorage) —
+      export them to keep them.</p>
+    <label>Campaign spec (JSON)<textarea id="r-spec" rows="3" spellcheck="false" placeholder="Paste the campaign spec"></textarea></label>
+    <div class="row">
+      <button id="r-load" class="primary">Load campaign</button>
+      <span id="r-err" class="err" role="alert"></span>
+    </div>
+    <div id="r-out" class="hidden">
+      <h3>Issue a receipt</h3>
+      <div class="grid">
+        <label>Donor handle <span class="dim">(optional — blank = anonymous)</span><input id="r-donor" maxlength="64" placeholder="lantern-fan"></label>
+        <label>Donation txid<input id="r-txid" spellcheck="false" placeholder="64 hex chars"></label>
+        <label>Amount (PRL)<input id="r-amount" inputmode="decimal"></label>
+        <label>Block height <span class="dim">(optional)</span><input id="r-height" inputmode="numeric"></label>
+      </div>
+      <div class="row">
+        <button id="r-add" class="primary">Issue receipt</button>
+      </div>
+      <h3>Receipt ledger <span class="dim">(this browser only)</span></h3>
+      <div class="row">
+        <button id="r-exportcsv">Export CSV</button>
+        <button id="r-exportjson">Export JSON</button>
+        <button id="r-print">Print receipts</button>
+        <button id="r-clear" class="danger">Clear ledger</button>
+      </div>
+      <table id="r-table">
+        <thead><tr><th>donor</th><th>amount (PRL)</th><th>txid</th><th>hash ✓</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <p id="r-total" class="summary"></p>
+    </div>
+    <div id="r-printarea" class="printonly"></div>
+  </section>
+
+  <!-- ============ 4 · TRACK ============ -->
+  <section id="step-track" class="panel">
+    <h2>Track the goal</h2>
+    <p class="hint">Goal progress from GET-only Blockbook reads plus your local receipt
+      ledger. Everything shown here is a read of public chain data — the page never
+      moves funds.</p>
+    <label>Campaign spec (JSON)<textarea id="t-spec" rows="3" spellcheck="false" placeholder="Paste the campaign spec"></textarea></label>
+    <label>Blockbook base (override)<input id="t-bburl" spellcheck="false" placeholder="leave empty for the network default"></label>
+    <div class="row">
+      <button id="t-load" class="primary">Load campaign</button>
+      <button id="t-refresh">Refresh (Blockbook)</button>
+      <span id="t-err" class="err" role="alert"></span>
+    </div>
+    <div id="t-out" class="hidden">
+      <div class="meter"><div id="t-bar" class="meter-fill"></div></div>
+      <p id="t-pct" class="summary"></p>
+      <div class="grid">
+        <p class="stat">Raised<br><b id="t-raised">—</b></p>
+        <p class="stat">Goal<br><b id="t-goal">—</b></p>
+        <p class="stat">Donors (ledger)<br><b id="t-donors">—</b></p>
+        <p class="stat">Deadline<br><b id="t-deadline">—</b></p>
+      </div>
+      <table id="t-table">
+        <thead><tr><th>txid</th><th>amount (PRL)</th><th>height</th><th>confs</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <p id="t-meta" class="summary"></p>
+    </div>
+  </section>
+
+  <!-- ============ 5 · VERIFY ============ -->
+  <section id="step-verify" class="panel">
+    <h2>Verify</h2>
+    <p class="hint">Two standalone verifiers. They recompute everything from the
+      descriptor/spec and refuse loudly on any mismatch — never trust, always re-derive.</p>
+    <h3>Campaign check</h3>
+    <p class="hint">Paste a campaign descriptor and its spec. The verifier recomputes
+      the hash, fingerprint, and recipient address — and refuses if the claimed
+      address does not match. If the campaign was signed, the organizer's Schnorr
+      signature is checked too.</p>
+    <div class="grid">
+      <label class="span2">Descriptor<textarea id="v-descriptor" rows="2" spellcheck="false" placeholder="pearl-charity:v1:…"></textarea></label>
+      <label class="span2">Campaign spec (JSON)<textarea id="v-spec" rows="3" spellcheck="false"></textarea></label>
+      <label>Network
+        <select id="v-network">
+          <option value="mainnet" selected>mainnet (prl1…)</option>
+          <option value="testnet">testnet (tprl1…)</option>
+        </select>
+      </label>
+      <label>Claimed donation address<input id="v-address" spellcheck="false" placeholder="prl1p… (must match the descriptor)"></label>
+    </div>
+    <div class="row">
+      <button id="v-verifydesc" class="primary">Verify campaign</button>
+      <span id="v-erra" class="err" role="alert"></span>
+    </div>
+    <p id="v-descout" class="summary"></p>
+    <h3>Receipt check</h3>
+    <p class="hint">Paste a receipt JSON. The verifier recomputes its hash — then,
+      optionally, cross-checks the donation against Blockbook (tx exists, pays the
+      campaign address the recorded amount, ≥ 1 confirmation).</p>
+    <label>Receipt (JSON)<textarea id="v-receipt" rows="4" spellcheck="false" placeholder='{"kind":"pearl-charity-receipt",…}'></textarea></label>
+    <label>Blockbook base (override)<input id="v-bburl" spellcheck="false" placeholder="leave empty for the network default"></label>
+    <div class="row">
+      <button id="v-verifyreceipt" class="primary">Check receipt hash</button>
+      <button id="v-crosscheck">Live cross-check (Blockbook)</button>
+      <span id="v-errb" class="err" role="alert"></span>
+    </div>
+    <p id="v-receiptout" class="summary"></p>
+  </section>
+</main>
+
+<footer>
+  <p>Built by <a href="https://x.com/kshot9000">@kshot9000</a> · tips:
+    <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code></p>
+  <p class="dim">Pearl Charity — the page never holds or moves funds. Verify every address before you donate.</p>
+</footer>
+
+<script src="pearl-charity.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
