@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Subscribe — Standing Orders for PRL</title>
+<meta name="description" content="Pearl Subscribe: recurring PRL payments as pre-signed nLockTime Taproot transactions. Subscriber funds one tx with a per-period output; each period's payment is signed locally with a consensus-enforced locktime; cancel any not-yet-due period by double-spending it. Keys never leave your browser.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M16 8v8l6 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M16 2.5v3M16 26.5v3M2.5 16h3M26.5 16h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    <div>
+      <h1>Pearl Subscribe</h1>
+      <p class="tagline">Standing orders for PRL — the chronometer desk</p>
+    </div>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-step="service" class="active">1 · Service</button>
+    <button data-step="terms">2 · Terms</button>
+    <button data-step="fund">3 · Fund</button>
+    <button data-step="presign">4 · Pre-sign</button>
+    <button data-step="track">5 · Track</button>
+    <button data-step="cancel">6 · Cancel</button>
+    <button data-step="verify">7 · Verify</button>
+  </nav>
+</header>
+
+<main>
+  <!-- STEP 1: SERVICE -->
+  <section id="step-service" class="panel active">
+    <h2>The service</h2>
+    <p class="lede">Set up a recurring PRL payment — a salary, a retainer, a subscription. Pearl has no smart
+    contracts, so this desk builds a <strong>consent structure</strong>: you fund one transaction with one
+    output per period, then <strong>pre-sign each period's payment</strong> with a block-height locktime the
+    network enforces. The merchant broadcasts each payment when it matures. You can cancel any not-yet-due
+    period by spending its funding output back to yourself — the pre-signed payment can then never confirm.</p>
+
+    <div class="form-grid">
+      <label>Network
+        <select id="network">
+          <option value="mainnet" selected>Mainnet (prl…)</option>
+          <option value="testnet">Testnet (tprl…)</option>
+        </select>
+      </label>
+      <label class="wide">Blockbook API <span class="hint-inline">(GET-only reads + broadcast; paste your own node-backed endpoint)</span>
+        <input id="blockbook" type="url" spellcheck="false" placeholder="https://blockbook.pearlresearch.ai">
+      </label>
+      <label class="wide">Merchant address <span class="hint-inline">(who gets paid — a prl1p… Taproot address)</span>
+        <input id="sub-merchant" spellcheck="false" placeholder="prl1p…">
+      </label>
+      <label class="wide">Your address (anchor) <span class="hint-inline">(your prl1p… address — receives change and cancellations; keys stay with you)</span>
+        <input id="sub-anchor" spellcheck="false" placeholder="prl1p…">
+      </label>
+      <label>Amount per period (PRL)
+        <input id="sub-amount" inputmode="decimal" spellcheck="false" placeholder="e.g. 25">
+      </label>
+      <label>Fee rate (grains/vB)
+        <input id="sub-feerate" inputmode="numeric" spellcheck="false" placeholder="e.g. 5" value="5">
+      </label>
+      <label>Period length
+        <select id="sub-period">
+          <option value="3118" selected>Weekly (≈ 7 days)</option>
+          <option value="6236">Every 2 weeks (≈ 14 days)</option>
+          <option value="13361">Monthly (≈ 30 days)</option>
+          <option value="custom">Custom blocks…</option>
+        </select>
+      </label>
+      <label id="sub-period-custom-wrap" hidden>Custom period (blocks, ≥ 144)
+        <input id="sub-period-custom" inputmode="numeric" spellcheck="false" placeholder="e.g. 445">
+      </label>
+      <label>Number of periods <span class="hint-inline">(1–60)</span>
+        <input id="sub-periods" inputmode="numeric" spellcheck="false" placeholder="e.g. 12" value="12">
+      </label>
+      <label>First payment height
+        <span class="nonce-row"><input id="sub-start" inputmode="numeric" spellcheck="false" placeholder="e.g. 512340">
+        <button id="sub-start-tip" class="btn ghost" type="button">tip + 144</button></span>
+      </label>
+    </div>
+    <div id="service-err" class="err" hidden></div>
+    <div class="row"><button id="service-next" class="btn primary">Review the terms →</button></div>
+
+    <aside class="limits">
+      <h3>Honest limits — read before you fund anything</h3>
+      <ul>
+        <li><strong>Consent, not enforcement.</strong> Pre-signed transactions are your standing permission — the chain cannot force the merchant to broadcast, nor force you to keep funding.</li>
+        <li><strong>The merchant holds the payments.</strong> You hand them signed transactions; they broadcast each one after its locktime. If they lose them, nothing is paid (your funds stay reclaimable).</li>
+        <li><strong>Cancel = double-spend.</strong> Cancelling a period spends its funding output back to you. If the merchant's payment confirms first, that period is paid — there is a race, and the desk shows it honestly.</li>
+        <li><strong>Locktimes are block heights.</strong> Period lengths are approximate (Pearl targets 194 s/block); the network enforces heights, not dates.</li>
+        <li><strong>Test on testnet first.</strong> Keys are wiped after signing and never stored, but verify the whole flow with tPRL before real money.</li>
+      </ul>
+    </aside>
+  </section>
+
+  <!-- STEP 2: TERMS -->
+  <section id="step-terms" class="panel">
+    <h2>The terms</h2>
+    <p class="lede">The tamper-evident subscription descriptor. The 64-bit fingerprint commits to merchant,
+    anchor, amount, period, count, start height, and fee rate — <strong>editing any field breaks the
+    fingerprint</strong>. Both parties keep a copy; the verifier re-checks everything.</p>
+    <dl class="kv">
+      <div><dt>Descriptor fingerprint</dt><dd><code id="terms-fp"></code> <button id="terms-fp-copy" class="btn ghost">Copy</button></dd></div>
+      <div><dt>Merchant total</dt><dd id="terms-merchant-total"></dd></div>
+      <div><dt>Funding total (incl. fee reserves)</dt><dd id="terms-funding-total"></dd></div>
+      <div><dt>Schedule</dt><dd id="terms-schedule-note"></dd></div>
+    </dl>
+    <table class="reserves"><thead><tr><th>Period</th><th>Locktime (height)</th><th>≈ date</th><th>Merchant gets</th></tr></thead>
+    <tbody id="terms-body"></tbody></table>
+    <div class="row">
+      <button id="terms-copy" class="btn ghost">Copy descriptor JSON</button>
+      <button id="terms-download" class="btn ghost">Download .json</button>
+    </div>
+    <textarea id="terms-desc" rows="10" readonly spellcheck="false"></textarea>
+    <div class="row">
+      <button id="terms-back" class="btn ghost">← Back</button>
+      <button id="terms-next" class="btn primary">Continue to funding →</button>
+    </div>
+  </section>
+
+  <!-- STEP 3: FUND -->
+  <section id="step-fund" class="panel">
+    <h2>The funding</h2>
+    <p class="lede">One transaction with <strong>one output per period</strong>, each worth amount + fee reserve,
+    all to your anchor address. Build it from your UTXOs (Blockbook scan or paste), sign it locally with your
+    key — the page <strong>refuses any key that does not control the anchor address</strong> — then broadcast.
+    The key is wiped the moment signing finishes.</p>
+    <h3>Funding plan</h3>
+    <dl class="kv">
+      <div><dt>Outputs</dt><dd id="fund-nout"></dd></div>
+      <div><dt>Per output</dt><dd id="fund-perout"></dd></div>
+      <div><dt>Total to fund</dt><dd id="fund-total"></dd></div>
+    </dl>
+    <table class="reserves"><thead><tr><th>vout</th><th>Address</th><th>Value</th><th>Unlocks period</th></tr></thead>
+    <tbody id="fund-body"></tbody></table>
+    <h3>Your coins</h3>
+    <div class="row">
+      <button id="fund-scan" class="btn ghost">Scan anchor via Blockbook</button>
+      <span class="hint">or paste UTXOs (<code>txid:vout:value-grains</code> per line)</span>
+    </div>
+    <textarea id="fund-utxos" rows="5" spellcheck="false" placeholder="aabb…:0:150000000"></textarea>
+    <label class="wide">Your key <span class="hint-inline">(mnemonic, WIF, or 64-hex — wiped after signing)</span>
+      <input id="fund-key" type="password" autocomplete="off" spellcheck="false">
+    </label>
+    <div id="fund-err" class="err" hidden></div>
+    <div class="row">
+      <button id="fund-build" class="btn primary">Build &amp; sign funding tx</button>
+      <button id="fund-broadcast" class="btn ghost" disabled>Broadcast via Blockbook</button>
+    </div>
+    <div id="fund-out" hidden>
+      <dl class="kv"><div><dt>Funding txid</dt><dd><code id="fund-txid"></code></dd></div></dl>
+      <textarea id="fund-hex" rows="4" readonly spellcheck="false"></textarea>
+    </div>
+    <div class="row">
+      <button id="fund-back" class="btn ghost">← Back</button>
+      <button id="fund-next" class="btn primary">Continue to pre-sign →</button>
+    </div>
+  </section>
+
+  <!-- STEP 4: PRE-SIGN -->
+  <section id="step-presign" class="panel">
+    <h2>The pre-signed payments</h2>
+    <p class="lede">One payment per period, each spending its funding output: merchant gets the exact amount,
+    dust-free change returns to your anchor, <code>nLockTime</code> is the period's height and
+    <code>sequence = 0xfffffffe</code> so the network enforces it. Every signature is re-verified against its
+    own BIP-341 digest before the hex is shown. Hand the signed bundle to the merchant — that is the standing order.</p>
+    <label class="wide">Funding txid
+      <input id="ps-funding-txid" spellcheck="false" placeholder="64-hex funding txid">
+    </label>
+    <div class="row"><button id="ps-plans" class="btn ghost">Show payment plans</button></div>
+    <table class="reserves"><thead><tr><th>Period</th><th>Locktime</th><th>Payment txid (precomputed)</th><th>Fee</th></tr></thead>
+    <tbody id="ps-body"></tbody></table>
+    <label class="wide">Your key <span class="hint-inline">(must control the anchor — wiped after signing)</span>
+      <input id="ps-key" type="password" autocomplete="off" spellcheck="false">
+    </label>
+    <div id="ps-err" class="err" hidden></div>
+    <div class="row"><button id="ps-sign" class="btn primary">Sign all payments</button></div>
+    <div id="ps-out" hidden>
+      <h3>Signed bundle — send this to the merchant</h3>
+      <div class="row">
+        <button id="ps-copy" class="btn ghost">Copy bundle JSON</button>
+        <button id="ps-download" class="btn ghost">Download .json</button>
+      </div>
+      <textarea id="ps-bundle" rows="10" readonly spellcheck="false"></textarea>
+    </div>
+    <div class="row">
+      <button id="ps-back" class="btn ghost">← Back</button>
+      <button id="ps-next" class="btn primary">Continue to tracking →</button>
+    </div>
+  </section>
+
+  <!-- STEP 5: TRACK -->
+  <section id="step-track" class="panel">
+    <h2>The ledger</h2>
+    <p class="lede">Watch every period: <strong>upcoming</strong>, <strong>due</strong> (locktime passed —
+    the merchant may broadcast), <strong>paid</strong> (spent by the exact pre-signed payment),
+    <strong>cancelled</strong> (spent by anything else). Reads Blockbook GET-only; paste values manually if the
+    endpoint is unreachable.</p>
+    <label class="wide">Descriptor <span class="hint-inline">(paste the pearl-sub:v1 JSON)</span>
+      <textarea id="tr-desc" rows="4" spellcheck="false" placeholder='paste descriptor JSON — or "Load my terms"'></textarea>
+    </label>
+    <label class="wide">Funding txid
+      <input id="tr-funding-txid" spellcheck="false" placeholder="64-hex">
+    </label>
+    <div class="row">
+      <button id="tr-run" class="btn primary">Refresh ledger</button>
+      <button id="tr-load-mine" class="btn ghost">Load my terms</button>
+      <span id="tr-tip" class="hint"></span>
+    </div>
+    <div id="tr-err" class="err" hidden></div>
+    <table class="reserves"><thead><tr><th>Period</th><th>Locktime</th><th>≈ date</th><th>Status</th><th>Detail</th></tr></thead>
+    <tbody id="tr-body"></tbody></table>
+  </section>
+
+  <!-- STEP 6: CANCEL -->
+  <section id="step-cancel" class="panel">
+    <h2>The escape hatch</h2>
+    <p class="lede">Reclaim any period whose funding output is still unspent: spend it back to your anchor in a
+    transaction with <strong>no locktime</strong>. Once that confirms, the pre-signed payment for that period
+    can never confirm (its input is gone). <strong>The race is real</strong> — if the merchant already
+    broadcast the payment and it confirms first, the period is paid. Check the ledger first.</p>
+    <div class="form-grid">
+      <label>Funding txid
+        <input id="cx-funding-txid" spellcheck="false" placeholder="64-hex">
+      </label>
+      <label>Period to cancel
+        <select id="cx-period"></select>
+      </label>
+      <label class="wide">Your key <span class="hint-inline">(must control the anchor — wiped after signing)</span>
+        <input id="cx-key" type="password" autocomplete="off" spellcheck="false">
+      </label>
+    </div>
+    <div id="cx-err" class="err" hidden></div>
+    <div class="row">
+      <button id="cx-build" class="btn primary">Build &amp; sign cancel tx</button>
+      <button id="cx-broadcast" class="btn ghost" disabled>Broadcast via Blockbook</button>
+    </div>
+    <div id="cx-out" hidden>
+      <dl class="kv">
+        <div><dt>Cancel txid</dt><dd><code id="cx-txid"></code></dd></div>
+        <div><dt>Reclaimed</dt><dd id="cx-reclaimed"></dd></div>
+      </dl>
+      <textarea id="cx-hex" rows="4" readonly spellcheck="false"></textarea>
+    </div>
+  </section>
+
+  <!-- STEP 7: VERIFY -->
+  <section id="step-verify" class="panel">
+    <h2>The verifier</h2>
+    <p class="lede">Paste any <code>pearl-sub-bundle:v1</code> signed bundle — yours or the merchant's. The page
+    re-validates the descriptor fingerprint, recomputes every payment txid from the funding plan, checks each
+    signature against its own BIP-341 digest, and confirms amounts, change, locktimes, and sequences. Anything
+    off is reported loudly, per period.</p>
+    <label class="wide">Signed bundle
+      <textarea id="vf-input" rows="10" spellcheck="false" placeholder='paste a pearl-sub-bundle:v1 bundle'></textarea>
+    </label>
+    <div class="row">
+      <button id="vf-run" class="btn primary">Verify bundle</button>
+      <button id="vf-load-mine" class="btn ghost">Load my bundle</button>
+    </div>
+    <div id="vf-err" class="err" hidden></div>
+    <div id="vf-out" class="verdict" hidden></div>
+    <ul id="vf-checks" class="checks"></ul>
+  </section>
+</main>
+
+<footer>
+  <p>Pearl Subscribe · standing orders for the Pearl blockchain ·
+  <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a></p>
+  <p class="donate">Support the build — <code id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+  <button class="btn ghost copy-btn" data-for="donate-addr">Copy</button></p>
+  <p class="hint">Experimental software. Pre-signed payments are consent, not enforcement — test the full flow on testnet before real PRL. Keys are wiped after signing and never stored.</p>
+</footer>
+
+<script src="pearl-subscribe.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
