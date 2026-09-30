@@ -123,10 +123,15 @@
       }
       const releaseScript = E.buildReleaseScript(buyer.xonly, seller.xonly, arbiter.xonly);
       const refundScript = E.buildRefundScript(refund.xonly, lockHeight);
-      const tree = E.taptree2(S.network, buyer.xonly, releaseScript, refundScript);
+      // NUMS internal key — no party knows the discrete log, so keypath
+      // spending is impossible (a party-controlled internal key would leave
+      // a keypath backdoor: the holder can compute d + TapTweak and spend
+      // unilaterally, bypassing both leaves).
+      const internalXOnly = E.numsInternalKeyEscrow(releaseScript, refundScript);
+      const tree = E.taptree2(S.network, internalXOnly, releaseScript, refundScript);
       S.parties = { buyer, seller, arbiter, refund };
       S.lockHeight = lockHeight;
-      S.contract = { releaseScript, refundScript, tree };
+      S.contract = { releaseScript, refundScript, internalXOnly, tree };
       S.utxo = null;
       renderContract();
       goto("contract");
@@ -138,7 +143,7 @@
     $("escrow-address").textContent = tree.address;
     $("release-asm").textContent = E.scriptAsm(releaseScript);
     $("refund-asm").textContent = E.scriptAsm(refundScript);
-    $("kv-internal").textContent = hex(S.parties.buyer.xonly);
+    $("kv-internal").textContent = hex(S.contract.internalXOnly) + "  (NUMS — no known private key)";
     $("kv-leaf0").textContent = hex(tree.leafHashes[0]);
     $("kv-leaf1").textContent = hex(tree.leafHashes[1]);
     $("kv-root").textContent = hex(tree.root);

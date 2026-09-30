@@ -9,6 +9,13 @@ agree on release; the buyer keeps a timelocked refund path if the deal dies.
 
 Two Taproot leaves under a NUMS internal key (no keypath spending possible):
 
+> **Security fix 2026-09-29:** the forge path originally derived the tweaked
+> key from the buyer's party key as the internal key — a keypath backdoor
+> (the buyer could compute `d + TapTweak` and spend unilaterally, bypassing
+> both leaves). It now derives a nothing-up-my-sleeve point from the leaf
+> hashes. HTLC/escrow addresses forged before this fix use the old scheme —
+> always re-verify against the descriptor before funding.
+
 | Leaf | Script | Spends when |
 |---|---|---|
 | Release | `0 <K1> CHECKSIGADD <K2> CHECKSIGADD <K3> CHECKSIGADD 2 EQUAL` | any **2 of 3** (buyer / seller / arbiter) sign |

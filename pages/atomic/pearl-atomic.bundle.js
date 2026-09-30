@@ -1,5 +1,5 @@
-/* Pearl Escrow bundle (window.PearlEscrow) — built with esbuild from src/index.js. Do not edit by hand; run `node build.mjs`. */
-var PearlEscrow = (() => {
+/* Pearl Atomic bundle (window.PearlAtomic) — built with esbuild from src/index.js. Do not edit by hand; run `node build.mjs`. */
+var PearlAtomic = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
   var __getOwnPropNames = Object.getOwnPropertyNames;
@@ -25,40 +25,52 @@ var PearlEscrow = (() => {
     GRAIN_PER_PRL: () => GRAIN_PER_PRL,
     NETWORKS: () => NETWORKS,
     addressToProgram: () => addressToProgram,
+    assembleClaim: () => assembleClaim,
+    assembleRefund: () => assembleRefund,
     broadcastTx: () => broadcastTx,
+    buildClaimScript: () => buildClaimScript,
     buildRefundScript: () => buildRefundScript,
-    buildReleaseScript: () => buildReleaseScript,
-    buildRevealTx: () => buildRevealTx,
     buildScriptPathSpend: () => buildScriptPathSpend,
     bytesToHex: () => bytesToHex,
-    combineReleaseSigs: () => combineReleaseSigs,
-    convertBits: () => convertBits,
-    dblSha: () => dblSha,
+    checkPreimage: () => checkPreimage,
+    classifyHtlcState: () => classifyHtlcState,
     decodeBech32m: () => decodeBech32m,
     encodeBech32m: () => encodeBech32m,
-    encodeScriptNum: () => encodeScriptNum,
+    exportUnsignedBundle: () => exportUnsignedBundle,
+    fetchAddressTxs: () => fetchAddressTxs,
     fetchFeeRateGrainsPerVByte: () => fetchFeeRateGrainsPerVByte,
     fetchTxStatus: () => fetchTxStatus,
     fetchUtxos: () => fetchUtxos,
+    fmtPRL: () => fmtPRL,
+    forgeHtlc: () => forgeHtlc,
     hexToBytes: () => hexToBytes,
+    importUnsignedBundle: () => importUnsignedBundle,
+    makeDescriptor: () => makeDescriptor,
     newMnemonic: () => newMnemonic,
-    numsInternalKeyEscrow: () => numsInternalKeyEscrow,
-    p2trScriptPubKey: () => p2trScriptPubKey,
+    newPreimage: () => newPreimage,
+    numsInternalKeyAtomic: () => numsInternalKeyAtomic,
+    parseDescriptor: () => parseDescriptor,
+    parseHash: () => parseHash,
+    parsePRLtoGrains: () => parsePRLtoGrains,
     parseXOnlyKey: () => parseXOnlyKey,
     partyKeyFromInput: () => partyKeyFromInput,
-    planSpend: () => planSpend,
-    pushData: () => pushData,
+    planClaim: () => planClaim,
+    planRefund: () => planRefund,
     schnorr: () => schnorr,
     scriptAsm: () => scriptAsm,
     scriptPathSigDigestEx: () => scriptPathSigDigestEx,
+    settleDigest: () => settleDigest,
     sha256: () => sha2562,
     signForXOnly: () => signForXOnly,
     spendVBytes: () => spendVBytes,
     taptree2: () => taptree2,
-    txidLE: () => txidLE,
+    timeoutOrderingWarning: () => timeoutOrderingWarning,
+    timeoutRules: () => timeoutRules,
+    validateTimeout: () => validateTimeout,
     verifyControlBlock: () => verifyControlBlock,
     verifySchnorrSig: () => verifySchnorrSig,
-    walletFromMnemonic: () => walletFromMnemonic
+    walletFromMnemonic: () => walletFromMnemonic,
+    walletFromPriv: () => walletFromPriv
   });
 
   // ../sign/lib/noble-hashes/crypto.js
@@ -5737,79 +5749,6 @@ zoo`.split("\n");
     const pre = Uint8Array.from([TAPLEAF_VERSION, ...varint(script.length), ...script]);
     return taggedHash2("TapLeaf", pre);
   }
-  function scriptPathSigDigest(network, commitTxid, commitVout, commitValue, commitProgram, outputs, script, sequence, inputIdx = 0) {
-    const sha = (b) => sha2562(b);
-    const prevouts = sha(Uint8Array.from([...txidLE(commitTxid), ...u32le(commitVout)]));
-    const amounts = sha(Uint8Array.from(u64le(commitValue)));
-    const commitSpk = p2trScriptPubKey(commitProgram);
-    const spks = sha(Uint8Array.from([...varint(commitSpk.length), ...commitSpk]));
-    const seqs = sha(Uint8Array.from(u32le(sequence)));
-    const outs = sha(Uint8Array.from(outputs.flatMap((o) => {
-      const s = p2trScriptPubKey(o.program);
-      return [...u64le(o.value), ...varint(s.length), ...s];
-    })));
-    const leafHash = tapLeafHash(script);
-    const msg = Uint8Array.from([
-      0,
-      0,
-      ...u32le(network.txVersion),
-      ...u32le(0),
-      ...prevouts,
-      ...amounts,
-      ...spks,
-      ...seqs,
-      ...outs,
-      1,
-      // spend_type: script path, no annex
-      ...u32le(inputIdx),
-      ...leafHash,
-      0,
-      255,
-      255,
-      255,
-      255
-      // leaf hash, key version, codesep 0xffffffff
-    ]);
-    return taggedHash2("TapSighash", msg);
-  }
-  function buildRevealTx(network, { commitTxid, commitVout, commitValue, commitProgram, internalPriv, script, controlBlock, outputs, sequence = 4294967295 }) {
-    if (!(script instanceof Uint8Array) || script.length === 0) throw new Error("bad script");
-    if (controlBlock.length !== 33 || (controlBlock[0] & 254) !== TAPLEAF_VERSION) throw new Error("bad control block");
-    const digest = scriptPathSigDigest(network, commitTxid, commitVout, commitValue, commitProgram, outputs, script, sequence);
-    const sig = schnorr.sign(digest, internalPriv, new Uint8Array(32));
-    const core = [
-      ...u32le(network.txVersion),
-      ...varint(1),
-      ...txidLE(commitTxid),
-      ...u32le(commitVout),
-      ...varint(0),
-      ...u32le(sequence),
-      ...varint(outputs.length)
-    ];
-    for (const o of outputs) {
-      const s = p2trScriptPubKey(o.program);
-      core.push(...u64le(o.value), ...varint(s.length), ...s);
-    }
-    core.push(...u32le(0));
-    const txid = bytesToHex(dblSha(Uint8Array.from(core)).reverse());
-    const full = [
-      ...u32le(network.txVersion),
-      0,
-      1,
-      ...varint(1),
-      ...txidLE(commitTxid),
-      ...u32le(commitVout),
-      ...varint(0),
-      ...u32le(sequence),
-      ...varint(outputs.length)
-    ];
-    for (const o of outputs) {
-      const s = p2trScriptPubKey(o.program);
-      full.push(...u64le(o.value), ...varint(s.length), ...s);
-    }
-    full.push(...varint(3), ...varint(sig.length), ...sig, ...varint(script.length), ...script, ...varint(controlBlock.length), ...controlBlock, ...u32le(0));
-    return { txid, hex: bytesToHex(Uint8Array.from(full)), digest: bytesToHex(digest), sig: bytesToHex(sig) };
-  }
   async function bbFetch(base, path, opts = {}) {
     const res = await fetch(base.replace(/\/$/, "") + path, opts);
     if (!res.ok) throw new Error(`blockbook ${res.status} on ${path}`);
@@ -5861,7 +5800,7 @@ zoo`.split("\n");
     return bbFetch(blockbookBase, `/api/v2/tx/${txid}`);
   }
 
-  // src/escrow-core.js
+  // ../escrow/src/escrow-core.js
   var OP = {
     FALSE: 0,
     TWO: 82,
@@ -5906,17 +5845,6 @@ zoo`.split("\n");
     }
     throw new Error("party key must be a 64-hex x-only pubkey or a 12/24-word mnemonic");
   }
-  function buildReleaseScript(k1, k2, k3) {
-    const keys = [k1, k2, k3].map((k) => k instanceof Uint8Array ? k : parseXOnlyKey(k));
-    for (const k of keys) {
-      if (k.length !== 32) throw new Error("party key must be 32 bytes");
-      schnorr.utils.lift_x(bytesToNumberBE2(k));
-    }
-    const s = [OP.FALSE];
-    for (const k of keys) s.push(...pushData(k), OP.CHECKSIGADD);
-    s.push(OP.TWO, OP.EQUAL);
-    return Uint8Array.from(s);
-  }
   function encodeScriptNum(n) {
     if (!Number.isSafeInteger(n) || n < 0) throw new Error("script number must be a non-negative safe integer");
     if (n === 0) return new Uint8Array([OP.FALSE]);
@@ -5944,23 +5872,6 @@ zoo`.split("\n");
     return taggedHash2("TapBranch", Uint8Array.from([...x, ...y]));
   }
   var TE = new TextEncoder();
-  var utf8 = (s) => TE.encode(s);
-  var NUMS_DOMAIN = "PearlEscrowNUMS/v1";
-  function numsInternalKeyEscrow(leafA, leafB) {
-    if (!(leafA instanceof Uint8Array) || leafA.length === 0) throw new Error("bad leaf A");
-    if (!(leafB instanceof Uint8Array) || leafB.length === 0) throw new Error("bad leaf B");
-    const preimage = Uint8Array.from([utf8(NUMS_DOMAIN), tapLeafHash(leafA), tapLeafHash(leafB)].flatMap((x) => [...x]));
-    for (let counter = 0; counter < 256; counter++) {
-      const pre = counter === 0 ? preimage : Uint8Array.from([...preimage, counter]);
-      const h = sha2562(pre);
-      try {
-        schnorr.utils.lift_x(bytesToNumberBE2(h));
-        return h;
-      } catch {
-      }
-    }
-    throw new Error("ESCROW REFUSED: NUMS lift failed (unreachable in practice)");
-  }
   function taptree2(network, internalXOnly, releaseScript, refundScript) {
     if (!(internalXOnly instanceof Uint8Array) || internalXOnly.length !== 32) {
       throw new Error("internal key must be 32 bytes");
@@ -6068,23 +5979,6 @@ zoo`.split("\n");
       return false;
     }
   }
-  function combineReleaseSigs(signatures, digest, keys) {
-    if (!Array.isArray(signatures) || signatures.length !== 2) {
-      throw new Error("release needs exactly 2 of the 3 party signatures");
-    }
-    const seen = /* @__PURE__ */ new Set();
-    const stack = [null, null, null];
-    for (const { keyIndex, sig } of signatures) {
-      if (!Number.isInteger(keyIndex) || keyIndex < 0 || keyIndex > 2) throw new Error("keyIndex must be 0, 1 or 2");
-      if (seen.has(keyIndex)) throw new Error("duplicate signer");
-      seen.add(keyIndex);
-      if (!verifySchnorrSig(sig, digest, keys[keyIndex])) {
-        throw new Error(`signature ${keyIndex} does not verify against party key ${keyIndex}`);
-      }
-      stack[keyIndex] = sig instanceof Uint8Array ? sig : hexToBytes(String(sig));
-    }
-    return [stack[2] || EMPTY, stack[1] || EMPTY, stack[0] || EMPTY];
-  }
   function buildScriptPathSpend(network, input, outputs, leafScript, controlBlock, stackItems, opts = {}) {
     const { sequence = MAX_SEQ, locktime = 0 } = opts;
     if (!(leafScript instanceof Uint8Array) || leafScript.length === 0) throw new Error("bad leaf script");
@@ -6149,36 +6043,6 @@ zoo`.split("\n");
     const base = 4 + 1 + 41 + 1 + nOut * 43 + 4;
     return Math.ceil((base * 3 + (base + 2 + wit)) / 4);
   }
-  function planSpend({ inputValue, payments, feeRateGrainsPerVByte, scriptLen, controlLen, stackLens }) {
-    if (!Number.isSafeInteger(inputValue) || inputValue <= 0) throw new Error("bad input value");
-    if (!Array.isArray(payments) || payments.length === 0) throw new Error("need at least one payment");
-    let paySum = 0;
-    for (const p of payments) {
-      if (!(p.program instanceof Uint8Array) || p.program.length !== 32) throw new Error("payment program must be 32 bytes");
-      if (!Number.isSafeInteger(p.value) || p.value < DUST_GRAIN) throw new Error(`payment below dust (${DUST_GRAIN} grains)`);
-      paySum += p.value;
-    }
-    if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) throw new Error("bad fee rate");
-    const vbytes = (nOut) => spendVBytes({ nOut, scriptLen, controlLen, stackLens });
-    const feeFor = (nOut) => Math.ceil(vbytes(nOut) * feeRateGrainsPerVByte);
-    const need = (f) => paySum + f;
-    let fee = feeFor(payments.length + 1);
-    let change = inputValue - need(fee);
-    let outputs = payments.map((p) => ({ program: p.program, value: p.value }));
-    if (change >= DUST_GRAIN) {
-      outputs.push({ program: null, value: change, change: true });
-    } else {
-      fee = feeFor(payments.length);
-      change = inputValue - need(fee);
-      if (change < 0) throw new Error(`insufficient funds: need ${need(fee)} grains, have ${inputValue}`);
-      if (change > 0) {
-        fee += change;
-        change = 0;
-      }
-    }
-    if (change < 0) throw new Error(`insufficient funds: need ${need(fee)} grains, have ${inputValue}`);
-    return { outputs, fee, vBytes: vbytes(outputs.length), change };
-  }
   function scriptAsm(script) {
     const names = { 82: "2", 117: "DROP", 135: "EQUAL", 136: "EQUALVERIFY", 168: "SHA256", 172: "CHECKSIG", 186: "CHECKSIGADD", 177: "CLTV" };
     const parts = [];
@@ -6222,6 +6086,461 @@ zoo`.split("\n");
     if (hrp !== network.hrp) throw new Error(`wrong network HRP (expected ${network.hrp})`);
     if (version !== 1 || program.length !== 32) throw new Error("escrow pays to P2TR (v1, 32-byte) addresses only");
     return program;
+  }
+
+  // src/atomic-core.js
+  var OP2 = {
+    FALSE: 0,
+    SHA256: 168,
+    EQUALVERIFY: 136,
+    CHECKSIG: 172
+  };
+  var TE2 = new TextEncoder();
+  var utf8 = (s) => TE2.encode(s);
+  var NUMS_DOMAIN = "PearlAtomicNUMS/v1";
+  var DESCRIPTOR_PREFIX = "pearl-atomic:v1:";
+  var MAX_SEQ2 = 4294967295;
+  var REFUND_SEQ = 4294967294;
+  function constEq2(a, b) {
+    if (!(a instanceof Uint8Array) || !(b instanceof Uint8Array) || a.length !== b.length) return false;
+    let d = 0;
+    for (let i = 0; i < a.length; i++) d |= a[i] ^ b[i];
+    return d === 0;
+  }
+  function parseHash(hex) {
+    if (typeof hex !== "string" || !/^[0-9a-fA-F]{64}$/.test(hex.trim())) {
+      throw new Error("hash lock must be 64 hex characters (32 bytes)");
+    }
+    return hexToBytes(hex.trim().toLowerCase());
+  }
+  function buildClaimScript(claimerXOnly, hash32) {
+    const ck = claimerXOnly instanceof Uint8Array ? claimerXOnly : parseXOnlyKey(claimerXOnly);
+    const h = hash32 instanceof Uint8Array ? hash32 : parseHash(hash32);
+    if (ck.length !== 32) throw new Error("claimer key must be 32 bytes");
+    if (h.length !== 32) throw new Error("hash lock must be 32 bytes");
+    schnorr.utils.lift_x(bytesToNumberBE2(ck));
+    return Uint8Array.from([OP2.SHA256, ...pushData(h), OP2.EQUALVERIFY, ...pushData(ck), OP2.CHECKSIG]);
+  }
+  function numsInternalKeyAtomic(claimScript, refundScript) {
+    if (!(claimScript instanceof Uint8Array) || claimScript.length === 0) throw new Error("bad claim script");
+    if (!(refundScript instanceof Uint8Array) || refundScript.length === 0) throw new Error("bad refund script");
+    const preimage = Uint8Array.from(
+      [utf8(NUMS_DOMAIN), tapLeafHash(claimScript), tapLeafHash(refundScript)].flatMap((x) => [...x])
+    );
+    for (let counter = 0; counter < 256; counter++) {
+      const pre = counter === 0 ? preimage : Uint8Array.from([...preimage, counter]);
+      const h = sha2562(pre);
+      try {
+        schnorr.utils.lift_x(bytesToNumberBE2(h));
+        return h;
+      } catch {
+      }
+    }
+    throw new Error("ATOMIC REFUSED: NUMS lift failed (unreachable in practice)");
+  }
+  function forgeHtlc(network, { claimerXOnly, refundeeXOnly, hash, timeout }) {
+    const ck = claimerXOnly instanceof Uint8Array ? claimerXOnly : parseXOnlyKey(claimerXOnly);
+    const rk = refundeeXOnly instanceof Uint8Array ? refundeeXOnly : parseXOnlyKey(refundeeXOnly);
+    if (constEq2(ck, rk)) throw new Error("ATOMIC REFUSED: claimer and refundee keys must differ");
+    const claimScript = buildClaimScript(ck, hash);
+    const refundScript = buildRefundScript(rk, timeout);
+    const internalXOnly = numsInternalKeyAtomic(claimScript, refundScript);
+    const tree = taptree2(network, internalXOnly, claimScript, refundScript);
+    return { claimScript, refundScript, internalXOnly, tree };
+  }
+  function newPreimage() {
+    const c = typeof globalThis.crypto !== "undefined" ? globalThis.crypto : null;
+    if (!c || !c.getRandomValues) throw new Error("no CSPRNG available");
+    const bytes = c.getRandomValues(new Uint8Array(32));
+    return { preimage: bytes, hash: sha2562(bytes) };
+  }
+  function checkPreimage(preimageHex, hash32) {
+    const p = parseHash(preimageHex);
+    const h = hash32 instanceof Uint8Array ? hash32 : parseHash(hash32);
+    if (!constEq2(sha2562(p), h)) {
+      throw new Error("ATOMIC REFUSED: preimage does not hash to the contract's hash lock");
+    }
+    return p;
+  }
+  function timeoutRules(chainHeight) {
+    const h = Number(chainHeight);
+    if (!Number.isSafeInteger(h) || h <= 0) return { min: null, warnBelow: null };
+    return { min: h + 144, warnBelow: h + 720 };
+  }
+  function validateTimeout(timeout, chainHeight) {
+    if (!Number.isSafeInteger(timeout) || timeout <= 0 || timeout >= 5e8) {
+      throw new Error("ATOMIC REFUSED: timeout must be a positive block height (< 500000000)");
+    }
+    const warnings = [];
+    const rules = timeoutRules(chainHeight);
+    if (rules.min !== null) {
+      if (timeout <= chainHeight) {
+        throw new Error(`ATOMIC REFUSED: timeout ${timeout} is not in the future (chain at ${chainHeight})`);
+      }
+      if (timeout < rules.min) {
+        throw new Error(`ATOMIC REFUSED: timeout ${timeout} is under the ${rules.min} minimum (chain + 144 blocks) \u2014 the counterparty could not react in time`);
+      }
+      if (timeout < rules.warnBelow) {
+        warnings.push(`timeout ${timeout} is inside the ${rules.warnBelow} caution band (chain + 720) \u2014 short for a cross-chain swap`);
+      }
+    }
+    return { ok: true, warnings };
+  }
+  function timeoutOrderingWarning(role, prlTimeout, counterpartyTimeout) {
+    const cp = Number(counterpartyTimeout);
+    if (!Number.isSafeInteger(cp) || cp <= 0) return null;
+    if (role === "maker") {
+      if (prlTimeout <= cp) {
+        return `UNSAFE ORDERING: your PRL refund timeout (${prlTimeout}) is not longer than the counterparty leg's refund timeout (${cp}). You lock first \u2014 your timeout must be longer, or the counterparty can claim your PRL and let their leg expire.`;
+      }
+    } else {
+      if (prlTimeout <= cp) {
+        return `UNSAFE ORDERING: the PRL refund timeout (${prlTimeout}) is not longer than your own leg's refund timeout (${cp}). You need time to claim the PRL after revealing the preimage on your leg.`;
+      }
+    }
+    return null;
+  }
+  function canonicalJson(v) {
+    if (v === null || typeof v !== "object") return JSON.stringify(v);
+    if (Array.isArray(v)) return "[" + v.map(canonicalJson).join(",") + "]";
+    return "{" + Object.keys(v).sort().map((k) => JSON.stringify(k) + ":" + canonicalJson(v[k])).join(",") + "}";
+  }
+  function b64urlEncode(bytes) {
+    const b = bytes instanceof Uint8Array ? bytes : utf8(String(bytes));
+    let bin = "";
+    for (let i = 0; i < b.length; i++) bin += String.fromCharCode(b[i]);
+    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function b64urlDecode(s) {
+    const t = String(s).replace(/-/g, "+").replace(/_/g, "/");
+    const bin = atob(t + "=".repeat((4 - t.length % 4) % 4));
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  function makeDescriptor(network, contract, deal) {
+    const d = deal || {};
+    const obj = {
+      app: "pearl-atomic",
+      v: 1,
+      hrp: network.hrp,
+      claimerXOnly: bytesToHex(contract.claimScript && claimerFromClaimScript(contract.claimScript)),
+      refundeeXOnly: bytesToHex(refundeeFromRefundScript(contract.refundScript)),
+      hash: bytesToHex(hashFromClaimScript(contract.claimScript)),
+      timeout: d.timeout ?? timeoutFromRefundScript(contract.refundScript),
+      address: contract.tree.address,
+      internalXOnly: bytesToHex(contract.internalXOnly),
+      claimScript: bytesToHex(contract.claimScript),
+      refundScript: bytesToHex(contract.refundScript),
+      claimControl: bytesToHex(contract.tree.controlBlocks[0]),
+      refundControl: bytesToHex(contract.tree.controlBlocks[1]),
+      amountGrains: d.amountGrains ?? null,
+      label: d.label ?? "",
+      counterparty: {
+        chain: d.counterparty?.chain ?? "",
+        asset: d.counterparty?.asset ?? "",
+        amount: d.counterparty?.amount ?? "",
+        htlcRef: d.counterparty?.htlcRef ?? "",
+        refundTimeout: d.counterparty?.refundTimeout ?? null
+      }
+    };
+    const fingerprint = bytesToHex(sha2562(utf8(canonicalJson(obj)))).slice(0, 16);
+    obj.fingerprint = fingerprint;
+    const string = DESCRIPTOR_PREFIX + b64urlEncode(utf8(canonicalJson(obj)));
+    return { obj, fingerprint, string };
+  }
+  function parseDescriptor(network, str) {
+    const s = String(str || "").trim();
+    if (!s.startsWith(DESCRIPTOR_PREFIX)) {
+      throw new Error("ATOMIC REFUSED: not a pearl-atomic:v1: descriptor");
+    }
+    let obj;
+    try {
+      obj = JSON.parse(new TextDecoder().decode(b64urlDecode(s.slice(DESCRIPTOR_PREFIX.length))));
+    } catch {
+      throw new Error("ATOMIC REFUSED: descriptor is not valid base64url JSON");
+    }
+    if (obj.app !== "pearl-atomic" || obj.v !== 1) throw new Error("ATOMIC REFUSED: unknown descriptor app/version");
+    if (obj.hrp !== network.hrp) throw new Error(`ATOMIC REFUSED: descriptor is for ${obj.hrp}, not ${network.hrp}`);
+    const { fingerprint, ...payload } = obj;
+    const want = bytesToHex(sha2562(utf8(canonicalJson(payload)))).slice(0, 16);
+    if (typeof fingerprint !== "string" || fingerprint.toLowerCase() !== want) {
+      throw new Error("ATOMIC REFUSED: descriptor fingerprint mismatch \u2014 tampered or corrupted");
+    }
+    const claimScript = buildClaimScript(obj.claimerXOnly, obj.hash);
+    const refundScript = buildRefundScript(obj.refundeeXOnly, obj.timeout);
+    if (bytesToHex(claimScript) !== String(obj.claimScript).toLowerCase()) {
+      throw new Error("ATOMIC REFUSED: claim script does not match the descriptor's keys/hash");
+    }
+    if (bytesToHex(refundScript) !== String(obj.refundScript).toLowerCase()) {
+      throw new Error("ATOMIC REFUSED: refund script does not match the descriptor's keys/timeout");
+    }
+    const internalXOnly = numsInternalKeyAtomic(claimScript, refundScript);
+    if (bytesToHex(internalXOnly) !== String(obj.internalXOnly).toLowerCase()) {
+      throw new Error("ATOMIC REFUSED: internal key is not the NUMS derivation \u2014 keypath backdoor risk");
+    }
+    const tree = taptree2(network, internalXOnly, claimScript, refundScript);
+    if (tree.address !== obj.address) throw new Error("ATOMIC REFUSED: address does not re-derive from the descriptor");
+    if (bytesToHex(tree.controlBlocks[0]) !== String(obj.claimControl).toLowerCase() || bytesToHex(tree.controlBlocks[1]) !== String(obj.refundControl).toLowerCase()) {
+      throw new Error("ATOMIC REFUSED: control blocks do not re-derive from the descriptor");
+    }
+    if (!verifyControlBlock(internalXOnly, claimScript, tree.controlBlocks[0], tree.tweakedX) || !verifyControlBlock(internalXOnly, refundScript, tree.controlBlocks[1], tree.tweakedX)) {
+      throw new Error("ATOMIC REFUSED: control-block self-check failed");
+    }
+    return { obj, fingerprint: want, contract: { claimScript, refundScript, internalXOnly, tree } };
+  }
+  function claimerFromClaimScript(script) {
+    if (script.length !== 69 || script[0] !== OP2.SHA256 || script[1] !== 32 || script[34] !== OP2.EQUALVERIFY || script[35] !== 32 || script[68] !== OP2.CHECKSIG) {
+      throw new Error("not a pearl-atomic claim script");
+    }
+    return script.slice(36, 68);
+  }
+  function hashFromClaimScript(script) {
+    if (script.length !== 69 || script[0] !== OP2.SHA256 || script[1] !== 32) {
+      throw new Error("not a pearl-atomic claim script");
+    }
+    return script.slice(2, 34);
+  }
+  function refundeeFromRefundScript(script) {
+    if (script[script.length - 1] !== OP2.CHECKSIG || script[script.length - 34] !== 32) {
+      throw new Error("not a pearl-atomic refund script");
+    }
+    return script.slice(script.length - 33, script.length - 1);
+  }
+  function timeoutFromRefundScript(script) {
+    const op = script[0];
+    let len, hlen;
+    if (op === 0) return 0;
+    if (op <= 75) {
+      len = op;
+      hlen = 1;
+    } else if (op === 76) {
+      len = script[1];
+      hlen = 2;
+    } else if (op === 77) {
+      len = script[1] | script[2] << 8;
+      hlen = 3;
+    } else throw new Error("not a pearl-atomic refund script");
+    const bytes = script.slice(hlen, hlen + len);
+    let n = 0;
+    for (let i = bytes.length - 1; i >= 0; i--) n = n * 256 + bytes[i];
+    return n;
+  }
+  function planClaim({ network, contract, input, preimageHex, destProgram, feeRateGrainsPerVByte }) {
+    const preimage = checkPreimage(preimageHex, hashFromClaimScript(contract.claimScript));
+    if (!(destProgram instanceof Uint8Array) || destProgram.length !== 32) {
+      throw new Error("claim destination must be a 32-byte P2TR program");
+    }
+    const vB = spendVBytes({ nOut: 1, scriptLen: contract.claimScript.length, controlLen: 65, stackLens: [64, 32] });
+    const fee = Math.ceil(vB * feeRateGrainsPerVByte);
+    const payVal = input.value - fee;
+    if (payVal < DUST_GRAIN) throw new Error(`ATOMIC REFUSED: insufficient funds for the claim fee (need ${fee} grains)`);
+    const outputs = [{ program: destProgram, value: payVal }];
+    return {
+      kind: "claim",
+      input,
+      outputs,
+      fee,
+      vBytes: vB,
+      change: 0,
+      leafScript: contract.claimScript,
+      controlBlock: contract.tree.controlBlocks[0],
+      stackLens: [64, 32],
+      sequence: MAX_SEQ2,
+      locktime: 0,
+      preimage
+    };
+  }
+  function planRefund({ network, contract, input, destProgram, feeRateGrainsPerVByte, chainHeight }) {
+    const timeout = timeoutFromRefundScript(contract.refundScript);
+    if (Number.isSafeInteger(chainHeight) && chainHeight < timeout) {
+      throw new Error(`ATOMIC REFUSED: refund is timelocked until block ${timeout} (chain at ${chainHeight})`);
+    }
+    if (!(destProgram instanceof Uint8Array) || destProgram.length !== 32) {
+      throw new Error("refund destination must be a 32-byte P2TR program");
+    }
+    const vB = spendVBytes({ nOut: 1, scriptLen: contract.refundScript.length, controlLen: 65, stackLens: [64] });
+    const fee = Math.ceil(vB * feeRateGrainsPerVByte);
+    const payVal = input.value - fee;
+    if (payVal < DUST_GRAIN) throw new Error(`ATOMIC REFUSED: insufficient funds for the refund fee (need ${fee} grains)`);
+    return {
+      kind: "refund",
+      input,
+      outputs: [{ program: destProgram, value: payVal }],
+      fee,
+      vBytes: vB,
+      change: 0,
+      leafScript: contract.refundScript,
+      controlBlock: contract.tree.controlBlocks[1],
+      stackLens: [64],
+      sequence: REFUND_SEQ,
+      locktime: timeout
+    };
+  }
+  function settleDigest(network, p) {
+    return scriptPathSigDigestEx(network, p.input, p.outputs, p.leafScript, {
+      sequence: p.sequence,
+      locktime: p.locktime
+    });
+  }
+  function assembleClaim(network, p, sigHex, claimerXOnly) {
+    if (!/^[0-9a-fA-F]{128}$/.test(String(sigHex || "").trim())) {
+      throw new Error("claim signature must be 128 hex characters (64 bytes)");
+    }
+    const digest = settleDigest(network, p);
+    if (!verifySchnorrSig(sigHex, digest, claimerXOnly)) {
+      throw new Error("ATOMIC REFUSED: claim signature does not verify against the claimer key");
+    }
+    return buildScriptPathSpend(
+      network,
+      p.input,
+      p.outputs,
+      p.leafScript,
+      p.controlBlock,
+      [hexToBytes(String(sigHex).trim().toLowerCase()), p.preimage],
+      { sequence: p.sequence, locktime: p.locktime }
+    );
+  }
+  function assembleRefund(network, p, sigHex, refundeeXOnly) {
+    if (!/^[0-9a-fA-F]{128}$/.test(String(sigHex || "").trim())) {
+      throw new Error("refund signature must be 128 hex characters (64 bytes)");
+    }
+    const digest = settleDigest(network, p);
+    if (!verifySchnorrSig(sigHex, digest, refundeeXOnly)) {
+      throw new Error("ATOMIC REFUSED: refund signature does not verify against the refundee key");
+    }
+    return buildScriptPathSpend(
+      network,
+      p.input,
+      p.outputs,
+      p.leafScript,
+      p.controlBlock,
+      [hexToBytes(String(sigHex).trim().toLowerCase())],
+      { sequence: p.sequence, locktime: p.locktime }
+    );
+  }
+  function canonicalBundleJson(b) {
+    const o = {
+      bundle: b.bundle,
+      network: b.network,
+      kind: b.kind,
+      input: b.input,
+      outputs: b.outputs,
+      feeGrains: b.feeGrains,
+      vBytes: b.vBytes,
+      sequence: b.sequence,
+      locktime: b.locktime,
+      digest: b.digest,
+      leafScript: b.leafScript,
+      controlBlock: b.controlBlock,
+      descriptor: b.descriptor
+    };
+    return canonicalJson(o);
+  }
+  function exportUnsignedBundle(network, p, descriptor) {
+    const b = {
+      bundle: "pearl-atomic-unsigned:v1:",
+      network: network.hrp,
+      kind: p.kind,
+      input: { txid: p.input.txid, vout: p.input.vout, value: p.input.value },
+      outputs: p.outputs.map((o) => ({
+        address: encodeBech32m(network.hrp, 1, o.program),
+        value: String(o.value)
+      })),
+      feeGrains: String(p.fee),
+      vBytes: p.vBytes,
+      sequence: p.sequence,
+      locktime: p.locktime,
+      digest: bytesToHex(settleDigest(network, p)),
+      leafScript: bytesToHex(p.leafScript),
+      controlBlock: bytesToHex(p.controlBlock),
+      descriptor: descriptor.string
+    };
+    b.fingerprint = bytesToHex(sha2562(utf8(canonicalBundleJson(b)))).slice(0, 16);
+    return b;
+  }
+  function importUnsignedBundle(network, bundleJson, contract) {
+    let b;
+    try {
+      b = JSON.parse(bundleJson);
+    } catch {
+      throw new Error("ATOMIC REFUSED: bundle is not valid JSON");
+    }
+    if (b.bundle !== "pearl-atomic-unsigned:v1:") throw new Error("ATOMIC REFUSED: unknown bundle kind");
+    if (b.network !== network.hrp) throw new Error(`ATOMIC REFUSED: bundle is for ${b.network}, not ${network.hrp}`);
+    const { fingerprint, ...payload } = b;
+    const want = bytesToHex(sha2562(utf8(canonicalBundleJson(payload)))).slice(0, 16);
+    if (String(fingerprint).toLowerCase() !== want) {
+      throw new Error("ATOMIC REFUSED: bundle fingerprint mismatch \u2014 tampered or corrupted");
+    }
+    const parsed = parseDescriptor(network, b.descriptor);
+    const input = { txid: b.input.txid, vout: b.input.vout, value: Number(b.input.value), spk: parsed.contract.tree.spk };
+    const outputs = b.outputs.map((o) => ({ program: addressToProgram(o.address, network), value: Number(o.value) }));
+    const leafScript = hexToBytes(b.leafScript);
+    const recomputed = bytesToHex(scriptPathSigDigestEx(network, input, outputs, leafScript, {
+      sequence: b.sequence,
+      locktime: b.locktime
+    }));
+    if (recomputed !== String(b.digest).toLowerCase()) {
+      throw new Error("ATOMIC REFUSED: bundle digest does not recompute from its inputs/outputs");
+    }
+    return { bundle: b, descriptor: parsed };
+  }
+  async function fetchAddressTxs(blockbookBase, address) {
+    const res = await fetch(blockbookBase.replace(/\/$/, "") + `/api/v2/address/${address}?details=txs&pageSize=50`);
+    if (!res.ok) throw new Error(`blockbook ${res.status} on /api/v2/address/`);
+    const j = await res.json();
+    return Array.isArray(j.txs) ? j.txs : [];
+  }
+  function classifyHtlcState(txs, address, spkHex) {
+    let funding = null, spend = null;
+    const addrLower = address.toLowerCase();
+    for (const t of txs || []) {
+      const isSelf = (x) => String(x.txid || "").toLowerCase() === String(funding?.txid || "").toLowerCase();
+      for (const v of t.vout || []) {
+        const addrs = (v.addresses || []).map((a) => String(a).toLowerCase());
+        const scriptHex = String(v.hex || "").toLowerCase();
+        if (addrs.includes(addrLower) || spkHex && scriptHex === spkHex.toLowerCase()) {
+          const conf = t.confirmations ?? 0;
+          if (!funding && conf > 0) funding = { txid: t.txid, vout: v.n, value: Number(v.value), confirmations: conf, height: t.blockHeight };
+        }
+      }
+    }
+    if (funding) {
+      for (const t of txs || []) {
+        for (const vin of t.vin || []) {
+          if (String(vin.txid || "").toLowerCase() === funding.txid.toLowerCase() && vin.vout === funding.vout) {
+            if (!spend) spend = { txid: t.txid, confirmations: t.confirmations ?? 0, height: t.blockHeight };
+          }
+        }
+      }
+    }
+    return { funding, spend };
+  }
+  function fmtPRL(grains) {
+    const g = BigInt(grains);
+    const neg = g < 0n;
+    const a = neg ? -g : g;
+    const whole = (a / 100000000n).toString();
+    const fracTrim = (a % 100000000n).toString().padStart(8, "0").replace(/0+$/, "");
+    return `${neg ? "-" : ""}${whole}${fracTrim ? "." + fracTrim : ""} PRL`;
+  }
+  function parsePRLtoGrains(s) {
+    const t = String(s || "").trim().toLowerCase().replace(/,/g, "");
+    let grains;
+    const m = t.match(/^([0-9]+(?:\.[0-9]{1,8})?)\s*(prl|grains?)?$/);
+    if (!m) throw new Error("amount must look like 1.25, 1.25 PRL, or 125000000 grains");
+    const [, num2, unit] = m;
+    if (unit && unit.startsWith("grain")) {
+      if (num2.includes(".")) throw new Error("grain amounts must be whole numbers");
+      grains = BigInt(num2);
+    } else {
+      const [w, f = ""] = num2.split(".");
+      grains = BigInt(w) * 100000000n + BigInt((f + "00000000").slice(0, 8));
+    }
+    if (grains < BigInt(DUST_GRAIN)) throw new Error(`amount below dust (${DUST_GRAIN} grains)`);
+    if (grains > 2100000000n * 100000000n) throw new Error("amount exceeds max PRL supply");
+    return Number(grains);
   }
   return __toCommonJS(index_exports);
 })();

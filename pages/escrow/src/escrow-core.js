@@ -69,7 +69,7 @@ const TAPLEAF_VERSION = 0xc0;
 const EMPTY = new Uint8Array(0);
 const MAX_SEQ = 0xffffffff;
 
-function pushData(data) {
+export function pushData(data) {
   const b = data instanceof Uint8Array ? data : Uint8Array.from(data);
   if (b.length === 0) return [OP.FALSE];
   if (b.length <= 75) return [b.length, ...b];
@@ -153,9 +153,43 @@ function tapBranch(a, b) {
   return taggedHash("TapBranch", Uint8Array.from([...x, ...y]));
 }
 
-/** Two-leaf taptree. Internal key: buyer's x-only key. Keypath spending is
- *  impossible for anyone (the tweak scalar is a hash preimage nobody knows),
- *  so the coins can only move via the two script leaves. */
+const TE = new TextEncoder();
+const utf8 = (s) => TE.encode(s);
+const NUMS_DOMAIN = "PearlEscrowNUMS/v1";
+
+/** NUMS internal key: lift_x(SHA-256("PearlEscrowNUMS/v1" || leafHashA || leafHashB)).
+ *  Nobody knows the discrete log, so keypath spending is impossible — coins
+ *  move only through the two script leaves. Deterministic and recomputable
+ *  from the scripts. The counter loop is REQUIRED, not a formality: only
+ *  about half of all 32-byte strings are valid x-coordinates on secp256k1
+ *  (x^3+7 must be a quadratic residue), so the first hash usually fails to
+ *  lift and the search continues.
+ *
+ *  SECURITY (2026-09-29 fix): this replaces the previous construction that
+ *  passed a party key as the internal key. A party-controlled internal key
+ *  leaves a keypath backdoor — the key holder can compute the tweaked
+ *  private key (d + TapTweak scalar) and spend unilaterally, bypassing every
+ *  script. The shipped README always documented a NUMS internal key; the
+ *  code now matches it. */
+export function numsInternalKeyEscrow(leafA, leafB) {
+  if (!(leafA instanceof Uint8Array) || leafA.length === 0) throw new Error("bad leaf A");
+  if (!(leafB instanceof Uint8Array) || leafB.length === 0) throw new Error("bad leaf B");
+  const preimage = Uint8Array.from([utf8(NUMS_DOMAIN), tapLeafHash(leafA), tapLeafHash(leafB)].flatMap((x) => [...x]));
+  for (let counter = 0; counter < 256; counter++) {
+    const pre = counter === 0 ? preimage : Uint8Array.from([...preimage, counter]);
+    const h = sha256(pre);
+    try {
+      schnorr.utils.lift_x(bytesToNumberBE(h));
+      return h;
+    } catch { /* try next counter */ }
+  }
+  throw new Error("ESCROW REFUSED: NUMS lift failed (unreachable in practice)");
+}
+
+/** Two-leaf taptree. Callers MUST pass a NUMS internal key (see
+ *  numsInternalKeyEscrow) — a party-controlled internal key would leave a
+ *  keypath backdoor, since the key holder can compute the tweaked private
+ *  key (d + TapTweak scalar) and spend unilaterally. */
 export function taptree2(network, internalXOnly, releaseScript, refundScript) {
   if (!(internalXOnly instanceof Uint8Array) || internalXOnly.length !== 32) {
     throw new Error("internal key must be 32 bytes");
@@ -367,7 +401,7 @@ export function planSpend({ inputValue, payments, feeRateGrainsPerVByte, scriptL
 
 /** Human-readable script disassembly (for the contract review screen). */
 export function scriptAsm(script) {
-  const names = { 0x52: "2", 0x75: "DROP", 0x87: "EQUAL", 0xac: "CHECKSIG", 0xba: "CHECKSIGADD", 0xb1: "CLTV" };
+  const names = { 0x52: "2", 0x75: "DROP", 0x87: "EQUAL", 0x88: "EQUALVERIFY", 0xa8: "SHA256", 0xac: "CHECKSIG", 0xba: "CHECKSIGADD", 0xb1: "CLTV" };
   const parts = [];
   let i = 0;
   while (i < script.length) {

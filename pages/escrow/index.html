@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pearl Escrow — Bonded Taproot 2-of-3 Escrow for PRL</title>
 <meta name="description" content="Pearl Escrow: lock PRL in a Taproot 2-of-3 escrow between buyer, seller and arbiter, with a timelocked refund path. All crypto runs locally in your browser.">
-<link rel="stylesheet" href="styles.css?v=1">
+<link rel="stylesheet" href="styles.css?v=2">
 </head>
 <body>
 <header class="topbar">
@@ -89,6 +89,11 @@
     <h2>The contract</h2>
     <p class="lede">The escrow address commits to both spending paths. Verify the scripts before anyone funds it —
     the address is fully determined by the three keys, the refund key and the lock height.</p>
+    <div class="warnings" role="note"><strong>Security notice (2026-09-29):</strong> escrow addresses forged
+    <em>before</em> this fix used the buyer's key as the Taproot internal key, which left a keypath backdoor —
+    the buyer could spend unilaterally. This page now derives a NUMS internal key with no known private key
+    (shown below as “NUMS — no known private key”). If you hold an address from an older build, do not fund it;
+    re-forge the contract here and confirm the address changes before depositing.</div>
     <div class="contract-card">
       <div class="addr-row">
         <div>
@@ -109,7 +114,7 @@
       </div>
       <h3>Taptree</h3>
       <dl class="kv">
-        <div><dt>Internal key</dt><dd><code id="kv-internal"></code> <span class="hint-inline">(buyer — keypath spend is impossible for anyone)</span></dd></div>
+        <div><dt>Internal key</dt><dd><code id="kv-internal"></code> <span class="hint-inline">(NUMS — no known private key; keypath spending is impossible for anyone)</span></dd></div>
         <div><dt>Release leaf hash</dt><dd><code id="kv-leaf0"></code></dd></div>
         <div><dt>Refund leaf hash</dt><dd><code id="kv-leaf1"></code></dd></div>
         <div><dt>Merkle root</dt><dd><code id="kv-root"></code></dd></div>
@@ -208,7 +213,7 @@
 </footer>
 
 <script src="qrcode.min.js?v=1"></script>
-<script src="pearl-escrow.bundle.js?v=1"></script>
-<script src="app.js?v=1"></script>
+<script src="pearl-escrow.bundle.js?v=2"></script>
+<script src="app.js?v=2"></script>
 </body>
 </html>

@@ -9,8 +9,9 @@ import assert from "node:assert/strict";
 
 import {
   NETWORKS, DUST_GRAIN, GRAIN_PER_PRL,
-  parseXOnlyKey, partyKeyFromInput,
+  parseXOnlyKey, partyKeyFromInput, pushData,
   buildReleaseScript, buildRefundScript, encodeScriptNum, scriptAsm,
+  numsInternalKeyEscrow,
   taptree2, verifyControlBlock,
   scriptPathSigDigestEx, signForXOnly, verifySchnorrSig,
   combineReleaseSigs, buildScriptPathSpend, planSpend, spendVBytes,
@@ -94,7 +95,49 @@ test("buildRefundScript: exact byte layout + CLTV guards", () => {
   assert.throws(() => buildRefundScript(KEYS[0], 500000000), /positive block height/);
 });
 
-test("taptree2: address, control blocks, order-independence", () => {
+test("numsInternalKeyEscrow: deterministic NUMS point, independent of all party keys", () => {
+  const rel = buildReleaseScript(KEYS[0], KEYS[1], KEYS[2]);
+  const ref = buildRefundScript(KEYS[0], 130000);
+  const k1 = numsInternalKeyEscrow(rel, ref);
+  const k2 = numsInternalKeyEscrow(rel, ref);
+  assert.equal(k1.length, 32);
+  assert.equal(bytesToHex(k1), bytesToHex(k2), "deterministic");
+  // lifts to the curve (valid x-only key)
+  schnorr.utils.lift_x(bytesToNumberBE(k1));
+  // equals the documented construction: first hash of
+  // SHA-256("PearlEscrowNUMS/v1" || leafHashA || leafHashB || counter) that lifts
+  // (only ~half of all hashes are valid x-coordinates — the counter loop is required)
+  const te = new TextEncoder();
+  const pre0 = Uint8Array.from([...te.encode("PearlEscrowNUMS/v1"), ...tapLeafHash(rel), ...tapLeafHash(ref)]);
+  let manual = null;
+  for (let i = 0; i < 256 && !manual; i++) {
+    const pre = i === 0 ? pre0 : Uint8Array.from([...pre0, i]);
+    const h = sha256(pre);
+    try { schnorr.utils.lift_x(bytesToNumberBE(h)); manual = h; } catch { /* next */ }
+  }
+  assert.ok(manual, "counter search found a lifting hash");
+  assert.equal(bytesToHex(k1), bytesToHex(manual));
+  // independent of every party key — no keypath backdoor for anyone
+  for (const k of KEYS) assert.notEqual(bytesToHex(k1), bytesToHex(k));
+  // rejects bad leaves
+  assert.throws(() => numsInternalKeyEscrow(rel, null), /bad leaf B/);
+  assert.throws(() => numsInternalKeyEscrow(new Uint8Array(0), ref), /bad leaf A/);
+});
+
+test("app forge path: NUMS internal key (not a party key) — no keypath backdoor", () => {
+  const rel = buildReleaseScript(KEYS[0], KEYS[1], KEYS[2]);
+  const ref = buildRefundScript(KEYS[0], 130000);
+  // mirrors the app's forge path in app.js
+  const internalXOnly = numsInternalKeyEscrow(rel, ref);
+  const t = taptree2(net, internalXOnly, rel, ref);
+  assert.ok(verifyControlBlock(internalXOnly, rel, t.controlBlocks[0], t.tweakedX));
+  assert.ok(verifyControlBlock(internalXOnly, ref, t.controlBlocks[1], t.tweakedX));
+  // the old buyer-key construction derived a DIFFERENT address — the fix
+  // changed the scheme (descriptors forged before the fix are stale)
+  const oldT = taptree2(net, KEYS[0], rel, ref);
+  assert.notEqual(t.address, oldT.address);
+  assert.notEqual(bytesToHex(internalXOnly), bytesToHex(KEYS[0]));
+});
   const rel = buildReleaseScript(KEYS[0], KEYS[1], KEYS[2]);
   const ref = buildRefundScript(KEYS[0], 130000);
   const t = taptree2(net, KEYS[0], rel, ref);
@@ -106,6 +149,10 @@ test("taptree2: address, control blocks, order-independence", () => {
   const bad = Uint8Array.from(t.controlBlocks[0]);
   bad[40] ^= 0x01;
   assert.equal(verifyControlBlock(KEYS[0], rel, bad, t.tweakedX), false);
+test("taptree2: address, control blocks, order-independence", () => {
+  const rel = buildReleaseScript(KEYS[0], KEYS[1], KEYS[2]);
+  const ref = buildRefundScript(KEYS[0], 130000);
+  const t = taptree2(net, KEYS[0], rel, ref);
   assert.equal(verifyControlBlock(KEYS[0], ref, t.controlBlocks[0], t.tweakedX), false);
   // leaf order must not change the contract
   const t2 = taptree2(net, KEYS[0], ref, rel);

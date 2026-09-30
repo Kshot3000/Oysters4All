@@ -31,6 +31,7 @@
         <a href="pages/gallery/">Gallery</a>
         <a href="pages/etch/">Etch</a>
         <a href="pages/escrow/">Escrow</a>
+        <a href="pages/atomic/">Atomic</a>
         <a href="pages/notary/">Notary</a>
         <a href="pages/gift/">Gift</a>
         <a href="pages/covenant/">Covenant</a>
@@ -399,6 +400,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Escrow — Bonded 2-of-3 Escrow <span class="badge">new</span></h3>
             <p>Trust-minimized escrow on Taproot — buyer, seller and arbiter lock funds behind a 2-of-3 tapscript with native OP_CHECKSIGADD, while the buyer keeps a timelocked CLTV refund path. Build the contract, fund it, collect two signatures locally with per-key verification, and broadcast — keys never leave the page.</p>
             <div class="card-links"><a href="pages/escrow/">Open Pearl Escrow →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Atomic — Cross-Chain HTLC Desk <span class="badge">new</span></h3>
+            <p>Trust-minimized cross-chain swaps on Pearl Taproot — lock PRL behind a hash-time-locked contract (SHA-256 secret preimage + CLTV timeout) with a NUMS internal key, so the counterparty claims with the secret before the timeout or you refund after it. Six-step wizard (Deal → Contract → Fund → Track → Settle → Verify) with tamper-evident descriptors, local Schnorr signing, air-gapped unsigned bundles, and a standalone verifier. Keys never leave the page.</p>
+            <div class="card-links"><a href="pages/atomic/">Open Pearl Atomic →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Sign — Transaction Forge <span class="badge">new</span></h3>

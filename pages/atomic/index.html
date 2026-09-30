@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Atomic — Cross-Chain HTLC Desk for PRL</title>
+<meta name="description" content="Pearl Atomic: trustless cross-chain swaps for Pearl (PRL) with hash-time-locked Taproot contracts. Claim with a preimage or refund after the timeout. All crypto runs locally in your browser.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 32 32" aria-hidden="true"><path d="M4 16h8l2-6 4 12 2-6h8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/><circle cx="16" cy="16" r="13.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="3 3"/></svg>
+    <div>
+      <h1>Pearl Atomic</h1>
+      <p class="tagline">Cross-chain HTLC desk for PRL — the border post</p>
+    </div>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-step="deal" class="active">1 · Deal</button>
+    <button data-step="contract">2 · Contract</button>
+    <button data-step="fund">3 · Fund</button>
+    <button data-step="track">4 · Track</button>
+    <button data-step="settle">5 · Settle</button>
+    <button data-step="verify">6 · Verify</button>
+  </nav>
+</header>
+
+<main>
+  <!-- STEP 1: DEAL -->
+  <section id="step-deal" class="panel active">
+    <h2>The deal</h2>
+    <p class="lede">A hash-time-locked contract (HTLC) locks PRL for a <strong>claimer</strong> who knows the
+    secret preimage. If the swap dies, the <strong>refundee</strong> sweeps everything back after the timeout.
+    No chain on Pearl runs contracts — this is pure Taproot script, enforced by consensus.</p>
+
+    <div class="form-grid">
+      <label>Network
+        <select id="network">
+          <option value="mainnet" selected>Mainnet (prl…)</option>
+          <option value="testnet">Testnet (tprl…)</option>
+        </select>
+      </label>
+      <label class="wide">Blockbook API <span class="hint-inline">(GET-only reads; POST only to broadcast)</span>
+        <input id="blockbook" type="url" spellcheck="false">
+      </label>
+      <label class="wide">Your role
+        <div class="role-pick">
+          <label class="role-card"><input type="radio" name="role" value="maker" checked>
+            <strong>Maker — lock PRL</strong><span>You hold the secret and lock PRL first. The counterparty claims it with the preimage you reveal on their chain.</span></label>
+          <label class="role-card"><input type="radio" name="role" value="taker">
+            <strong>Taker — claim PRL</strong><span>Someone locked PRL for you. Import their descriptor, then claim with the revealed preimage.</span></label>
+        </div>
+      </label>
+    </div>
+
+    <div class="form-grid">
+      <label class="wide"><span id="you-label">Your key — the refundee (64-hex x-only pubkey or 12/24-word mnemonic)</span>
+        <div class="row"><textarea id="key-you" rows="2" spellcheck="false" placeholder="paste your key — mnemonics never leave this page"></textarea>
+        <button id="gen-you" class="btn ghost">Generate</button></div>
+        <span class="key-ok" id="ok-you"></span>
+      </label>
+      <label class="wide"><span id="cp-label">Counterparty key — the claimer (64-hex x-only pubkey)</span>
+        <input id="key-cp" spellcheck="false" placeholder="their 64-hex x-only pubkey">
+      </label>
+    </div>
+
+    <div class="form-grid">
+      <label>Amount of PRL to lock
+        <input id="amount" spellcheck="false" placeholder="e.g. 25 or 2500000000 grains">
+      </label>
+      <label>Refund timeout (block height)
+        <div class="row">
+          <input id="timeout" type="number" min="1" step="1" placeholder="e.g. 130000">
+          <button id="timeout-suggest" class="btn ghost" title="Current height + 1440 blocks (~3.2 days)">Suggest</button>
+        </div>
+      </label>
+      <label>Chain height <span class="hint-inline">(from blockbook)</span>
+        <div class="row">
+          <input id="chain-height" type="number" min="1" step="1" placeholder="—">
+          <button id="fetch-height" class="btn ghost">Fetch</button>
+        </div>
+      </label>
+    </div>
+
+    <div class="secret-box" id="maker-secret-box">
+      <h3>The secret <span class="hint-inline">(maker only — never share until you claim the counterparty leg)</span></h3>
+      <div class="row">
+        <button id="gen-secret" class="btn ghost">Generate fresh secret</button>
+        <button id="copy-secret" class="btn ghost" disabled>Copy</button>
+      </div>
+      <label class="wide">Preimage (64 hex — keep private)
+        <input id="preimage" spellcheck="false" placeholder="generated or pasted 64-hex secret">
+      </label>
+      <label class="wide">Hash lock (SHA-256 of the preimage — this goes in the contract)
+        <div class="row"><input id="hashlock" spellcheck="false" placeholder="auto-computed from the preimage, or paste directly">
+        <button id="hash-from-preimage" class="btn ghost">Hash the preimage</button></div>
+      </label>
+    </div>
+
+    <div class="secret-box" id="taker-secret-box" hidden>
+      <h3>The hash lock <span class="hint-inline">(taker — paste from the maker's descriptor)</span></h3>
+      <label class="wide">Hash lock (64 hex)
+        <input id="hashlock-taker" spellcheck="false" placeholder="64-hex SHA-256 hash from the descriptor">
+      </label>
+      <p class="hint">The preimage itself is revealed later — on the counterparty chain, when the maker claims
+      their side. You will enter it on the Settle step to claim the PRL.</p>
+    </div>
+
+    <h3>Counterparty leg <span class="hint-inline">(memo — the other chain's side of the swap)</span></h3>
+    <div class="form-grid">
+      <label>Chain <input id="cp-chain" spellcheck="false" placeholder="e.g. Ergo"></label>
+      <label>Asset <input id="cp-asset" spellcheck="false" placeholder="e.g. ERG"></label>
+      <label>Amount <input id="cp-amount" spellcheck="false" placeholder="e.g. 50"></label>
+      <label>Their HTLC reference <input id="cp-ref" spellcheck="false" placeholder="txid / box id / …"></label>
+      <label>Their refund timeout (block height on their chain)
+        <input id="cp-timeout" type="number" min="0" step="1" placeholder="optional — enables the ordering check">
+      </label>
+      <label>Deal label <input id="deal-label" spellcheck="false" placeholder="e.g. PRL→ERG with Bob"></label>
+    </div>
+
+    <div id="deal-error" class="error" hidden></div>
+    <div id="deal-warnings" class="warnings" hidden></div>
+    <div class="row end"><button id="to-contract" class="btn primary">Forge the HTLC →</button></div>
+
+    <h3>Saved deals</h3>
+    <div id="deals-list" class="deals"><p class="hint">No saved deals yet.</p></div>
+  </section>
+
+  <!-- STEP 2: CONTRACT -->
+  <section id="step-contract" class="panel">
+    <h2>The contract</h2>
+    <p class="lede">The HTLC address commits to both spending paths. Verify the scripts before anyone funds it —
+    the address is fully determined by the claimer key, the refundee key, the hash lock and the timeout.</p>
+    <div class="contract-card">
+      <div class="addr-row">
+        <div>
+          <div class="field-label">HTLC address</div>
+          <code id="htlc-address" class="addr"></code>
+        </div>
+        <canvas id="htlc-qr" width="132" height="132" title="HTLC address QR"></canvas>
+      </div>
+      <div class="row"><button id="copy-address" class="btn ghost">Copy address</button><span id="funding-status" class="funding"></span></div>
+      <h3>Spending paths</h3>
+      <div class="leaf">
+        <h4>Leaf 0 · Claim <span class="tag">hash-locked</span></h4>
+        <code id="claim-asm" class="asm"></code>
+        <p class="hint">Spends with <code>[signature, preimage, script, control block]</code> — the preimage's
+        SHA-256 must equal the hash lock, then the claimer's Schnorr signature is checked.</p>
+      </div>
+      <div class="leaf">
+        <h4>Leaf 1 · Refund <span class="tag">timelocked</span></h4>
+        <code id="refund-asm" class="asm"></code>
+        <p class="hint">Spends with <code>[signature, script, control block]</code> once the chain reaches the
+        timeout height — refundee signature only.</p>
+      </div>
+      <h3>Taptree</h3>
+      <dl class="kv">
+        <div><dt>Internal key</dt><dd><code id="kv-internal"></code> <span class="hint-inline">(NUMS — no known private key; keypath spending is impossible for anyone)</span></dd></div>
+        <div><dt>Claim leaf hash</dt><dd><code id="kv-leaf0"></code></dd></div>
+        <div><dt>Refund leaf hash</dt><dd><code id="kv-leaf1"></code></dd></div>
+        <div><dt>Merkle root</dt><dd><code id="kv-root"></code></dd></div>
+        <div><dt>Timeout</dt><dd id="kv-timeout"></dd></div>
+      </dl>
+      <div id="ordering-warning" class="warnings" hidden></div>
+      <h3>Control blocks <span class="hint-inline">(the counterparty needs these to verify)</span></h3>
+      <div class="form-grid">
+        <label>Claim control block (65 B)<div class="row"><input id="cb-claim" readonly><button class="btn ghost copy-btn" data-for="cb-claim">Copy</button></div></label>
+        <label>Refund control block (65 B)<div class="row"><input id="cb-refund" readonly><button class="btn ghost copy-btn" data-for="cb-refund">Copy</button></div></label>
+      </div>
+      <h3>Descriptor <span class="hint-inline">(tamper-evident — share this with the counterparty)</span></h3>
+      <dl class="kv">
+        <div><dt>Fingerprint</dt><dd><code id="desc-fp"></code></dd></div>
+      </dl>
+      <label>Descriptor string
+        <div class="row"><textarea id="descriptor" rows="3" readonly spellcheck="false"></textarea>
+        <button id="copy-desc" class="btn ghost">Copy</button></div>
+      </label>
+      <div class="row">
+        <button id="save-deal" class="btn ghost">Save deal</button>
+        <button id="check-funding" class="btn ghost">Check funding</button>
+      </div>
+      <h3>Import a descriptor <span class="hint-inline">(taker path — verify a maker's contract)</span></h3>
+      <label class="wide">Descriptor string
+        <textarea id="desc-import" rows="3" spellcheck="false" placeholder="paste a pearl-atomic:v1: descriptor"></textarea>
+      </label>
+      <div class="row"><button id="desc-import-btn" class="btn ghost">Verify &amp; load descriptor</button></div>
+      <div id="desc-import-out" class="ok" hidden></div>
+      <div id="contract-error" class="error" hidden></div>
+    </div>
+    <div class="row end"><button id="to-fund" class="btn primary">Continue to funding →</button></div>
+  </section>
+
+  <!-- STEP 3: FUND -->
+  <section id="step-fund" class="panel">
+    <h2>Fund the HTLC</h2>
+    <p class="lede">The maker funds the HTLC address from any Pearl wallet (Oyster, Pearl Sign, …).
+    This page only <strong>watches</strong> — it never asks for the funding wallet's keys.</p>
+    <dl class="kv">
+      <div><dt>HTLC address</dt><dd><code id="fund-address" class="addr"></code></dd></div>
+      <div><dt>Expected</dt><dd id="fund-expected"></dd></div>
+    </dl>
+    <div class="row">
+      <button id="fund-refresh" class="btn ghost">Refresh UTXOs</button>
+    </div>
+    <div id="fund-utxos" class="utxo-list"></div>
+    <div id="fund-error" class="error" hidden></div>
+    <h3>Air-gapped funding <span class="hint-inline">(paste the funding outpoint manually)</span></h3>
+    <div class="form-grid">
+      <label class="wide">Funding txid <input id="fund-txid" spellcheck="false" placeholder="64-hex txid"></label>
+      <label>vout <input id="fund-vout" type="number" min="0" step="1" value="0"></label>
+      <label>Value (grains) <input id="fund-value" type="number" min="546" step="1" placeholder="e.g. 2500000000"></label>
+    </div>
+    <div class="row"><button id="fund-manual" class="btn ghost">Use this outpoint</button></div>
+    <div id="fund-pick" class="ok" hidden></div>
+    <div class="row end"><button id="to-track" class="btn primary" disabled>Continue to tracking →</button></div>
+  </section>
+
+  <!-- STEP 4: TRACK -->
+  <section id="step-track" class="panel">
+    <h2>Track the swap</h2>
+    <p class="lede">Watch the HTLC: funding confirmations, any spend (claim or refund), and the countdown
+    to the refund timeout.</p>
+    <div class="row"><button id="track-refresh" class="btn ghost">Refresh state</button><span id="track-updated" class="hint-inline"></span></div>
+    <div id="track-error" class="error" hidden></div>
+    <dl class="kv">
+      <div><dt>Funding</dt><dd id="tr-funding">—</dd></div>
+      <div><dt>Spend</dt><dd id="tr-spend">—</dd></div>
+      <div><dt>Timeout</dt><dd id="tr-timeout">—</dd></div>
+      <div><dt>Countdown</dt><dd id="tr-countdown">—</dd></div>
+    </dl>
+    <h3>Counterparty leg <span class="hint-inline">(your notes — the app cannot see the other chain)</span></h3>
+    <div class="checklist">
+      <label><input type="checkbox" id="ck-funded"> Their HTLC is funded</label>
+      <label><input type="checkbox" id="ck-revealed"> Preimage revealed on their chain</label>
+      <label><input type="checkbox" id="ck-claimed"> I claimed their leg</label>
+    </div>
+    <div class="secret-box">
+      <h3>Revealed preimage <span class="hint-inline">(maker — store the secret you revealed on the other chain)</span></h3>
+      <label class="wide">Preimage (64 hex)
+        <div class="row"><input id="revealed-preimage" spellcheck="false" placeholder="paste the revealed preimage">
+        <button id="store-preimage" class="btn ghost">Verify &amp; store with deal</button></div>
+      </label>
+      <div id="revealed-out" class="ok" hidden></div>
+      <div id="revealed-error" class="error" hidden></div>
+    </div>
+    <div class="row end"><button id="to-settle" class="btn primary">Continue to settlement →</button></div>
+  </section>
+
+  <!-- STEP 5: SETTLE -->
+  <section id="step-settle" class="panel">
+    <h2>Settle</h2>
+    <p class="lede">Two exits, one contract. <strong>Claim</strong> reveals the preimage and pays the claimer;
+    <strong>refund</strong> reclaims everything for the refundee once the timelock opens.</p>
+    <div class="tabs">
+      <button id="tab-claim" class="tab active">Claim (preimage)</button>
+      <button id="tab-refund" class="tab">Refund (after timeout)</button>
+    </div>
+
+    <div id="settle-claim-form">
+      <div class="form-grid">
+        <label class="wide">Preimage (64 hex)
+          <input id="claim-preimage" spellcheck="false" placeholder="the secret — hash-checked before anything is built">
+        </label>
+        <label class="wide">Claim destination (P2TR)
+          <input id="claim-dest" spellcheck="false" placeholder="prl1… address receiving the PRL">
+        </label>
+        <label>Fee rate (grains/vB)
+          <input id="claim-feerate" type="number" min="1" step="1" value="20">
+        </label>
+      </div>
+    </div>
+    <div id="settle-refund-form" hidden>
+      <div class="form-grid">
+        <label class="wide">Refund destination (P2TR)
+          <input id="refund-dest" spellcheck="false" placeholder="defaults to the refundee key">
+        </label>
+        <label>Fee rate (grains/vB)
+          <input id="refund-feerate" type="number" min="1" step="1" value="20">
+        </label>
+      </div>
+      <div class="wide"><span id="refund-lock-status" class="lock-status"></span></div>
+    </div>
+
+    <div class="row"><button id="build-plan" class="btn primary">Build settlement plan</button></div>
+    <div id="settle-error" class="error" hidden></div>
+
+    <div id="plan-card" class="contract-card" hidden>
+      <h3>Settlement plan</h3>
+      <dl class="kv">
+        <div><dt>Path</dt><dd id="plan-kind"></dd></div>
+        <div><dt>Digest to sign</dt><dd><code id="plan-digest" class="digest"></code> <button class="btn ghost copy-btn" data-for="plan-digest">Copy</button></dd></div>
+        <div><dt>Outputs</dt><dd id="plan-outputs"></dd></div>
+        <div><dt>Fee</dt><dd id="plan-fee"></dd></div>
+      </dl>
+      <h3>Sign <span class="hint-inline">(locally — the key never leaves this page)</span></h3>
+      <div class="form-grid">
+        <label>Key (mnemonic or 64-hex privkey) <span class="hint-inline" id="sign-key-hint"></span>
+          <input id="sign-key" type="password" spellcheck="false" autocomplete="off" placeholder="the claimer's key (claim) / the refundee's key (refund)">
+        </label>
+        <label class="wide">…or paste a 128-hex signature
+          <input id="sign-sig" spellcheck="false" placeholder="signed elsewhere against the digest above">
+        </label>
+      </div>
+      <div class="row">
+        <button id="sign-local" class="btn ghost">Sign digest with this key</button>
+        <button id="assemble" class="btn primary">Verify &amp; assemble transaction</button>
+      </div>
+      <div id="sign-out" class="ok" hidden></div>
+      <div id="assemble-error" class="error" hidden></div>
+      <h3>Unsigned bundle <span class="hint-inline">(air-gap: sign on a cold device)</span></h3>
+      <div class="row">
+        <button id="bundle-export" class="btn ghost">Export unsigned bundle</button>
+        <button id="bundle-copy" class="btn ghost">Copy</button>
+      </div>
+      <textarea id="bundle-text" rows="4" readonly spellcheck="false" placeholder="export first"></textarea>
+      <dl class="kv"><div><dt>Bundle fingerprint</dt><dd><code id="bundle-fp"></code></dd></div></dl>
+      <label class="wide">Import a signed/unsigned bundle
+        <textarea id="bundle-import" rows="3" spellcheck="false" placeholder='paste a pearl-atomic-unsigned:v1: bundle'></textarea>
+      </label>
+      <div class="row"><button id="bundle-import-btn" class="btn ghost">Verify bundle</button></div>
+      <div id="bundle-import-out" class="ok" hidden></div>
+      <div id="bundle-import-error" class="error" hidden></div>
+    </div>
+    <div class="row end"><button id="to-verify" class="btn primary" disabled>Continue →</button></div>
+  </section>
+
+  <!-- STEP 6: VERIFY (+ BROADCAST) -->
+  <section id="step-verify" class="panel">
+    <h2>Broadcast &amp; verify</h2>
+    <p class="lede">The fully-signed transaction. Its signature was verified locally before assembly —
+    what you broadcast is exactly what the key approved.</p>
+    <dl class="kv">
+      <div><dt>TXID</dt><dd><code id="final-txid" class="digest"></code></dd></div>
+      <div><dt>vBytes</dt><dd id="final-vbytes"></dd></div>
+      <div><dt>Path</dt><dd id="final-kind"></dd></div>
+    </dl>
+    <label>Signed transaction hex
+      <textarea id="final-hex" rows="6" readonly spellcheck="false"></textarea>
+    </label>
+    <div class="row">
+      <button id="copy-hex" class="btn ghost">Copy hex</button>
+      <button id="broadcast" class="btn primary">Broadcast via blockbook</button>
+    </div>
+    <div class="row"><button id="wipe" class="btn danger">Wipe key material from this page</button> <span id="wipe-msg" class="hint-inline"></span></div>
+    <div id="broadcast-error" class="error" hidden></div>
+    <div id="broadcast-ok" class="ok" hidden></div>
+
+    <h3>Standalone verifier</h3>
+    <p class="hint">Verify any Pearl Atomic descriptor or HTLC state without forging anything.</p>
+    <label class="wide">Descriptor string
+      <textarea id="verify-desc" rows="3" spellcheck="false" placeholder="pearl-atomic:v1:…"></textarea>
+    </label>
+    <div class="row"><button id="verify-desc-btn" class="btn ghost">Verify descriptor</button></div>
+    <div id="verify-desc-out" class="ok" hidden></div>
+    <div id="verify-desc-error" class="error" hidden></div>
+    <div class="form-grid">
+      <label class="wide">HTLC address to inspect <input id="verify-addr" spellcheck="false" placeholder="prl1…"></label>
+    </div>
+    <div class="row"><button id="verify-addr-btn" class="btn ghost">Classify on-chain state</button></div>
+    <div id="verify-addr-out" class="ok" hidden></div>
+    <div id="verify-addr-error" class="error" hidden></div>
+  </section>
+
+  <section class="panel limits">
+    <h2>Honest limits</h2>
+    <ul>
+      <li>Pearl has <strong>no smart contracts</strong> — this HTLC is Taproot script, and the other chain's leg is entirely the counterparty's responsibility. This page cannot see it, fund it, or enforce it.</li>
+      <li><strong>Timeout ordering is on you:</strong> whoever locks first must use the <em>longer</em> refund timeout. The app warns, but it cannot verify the other chain.</li>
+      <li>The maker must keep the preimage secret until they claim the counterparty leg — anyone holding the preimage can claim the PRL.</li>
+      <li>A refund is impossible before the timeout height — that is consensus, not a UI choice.</li>
+      <li>No real swaps were executed while testing this app (needs a live counterparty and funds on both chains).</li>
+      <li>Blockbook reads are GET-only until you press Broadcast; a pasted outpoint is trusted as-is.</li>
+      <li>Saved deals and secrets live in this browser's localStorage — use Wipe, and never reuse a revealed secret.</li>
+    </ul>
+  </section>
+</main>
+
+<footer>
+  <p>Pearl Atomic · cross-chain HTLC desk for the Pearl blockchain ·
+  <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a></p>
+  <p class="donate">Support the build — <code id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+  <button class="btn ghost copy-btn" data-for="donate-addr">Copy</button></p>
+  <p class="hint">Experimental software. Review every transaction before broadcasting. Atomic swaps only work with a counterparty you can hold to the deal.</p>
+</footer>
+
+<script src="qrcode.min.js?v=1"></script>
+<script src="pearl-atomic.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
