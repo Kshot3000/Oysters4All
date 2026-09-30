@@ -51,6 +51,7 @@
         <a href="pages/invoice/">Invoice</a>
         <a href="pages/tax/">Tax</a>
         <a href="pages/batch/">Batch</a>
+        <a href="pages/payroll/">Payroll</a>
         <a href="pages/games/">Games</a>
         <a href="pages/watch/">Watch</a>
         <a href="pages/pool/">Mining pool</a>
@@ -378,6 +379,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Batch — PRL Batch Payments Studio <span class="badge">new</span></h3>
             <p>The freight terminal — dispatch one Pearl transaction to up to 250 recipients: a 5-step wizard (Recipients → Fund → Review → Sign → Broadcast) with bech32m-validated manifests, dust refusal, duplicate merging (or loud refusal), GET-only Blockbook UTXO reads plus an air-gapped paste path, grain-exact fee/change math via the audited keypathTxVBytes sizer, unsigned JSON bundles with 64-bit fingerprints for cold signing, address-match key guard, per-input Schnorr re-verification, double-confirm broadcast, and a standalone txid verifier. No new cryptography — audited Sign core throughout.</p>
             <div class="card-links"><a href="pages/batch/">Open Pearl Batch →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Payroll — PRL Payroll Desk <span class="badge">new</span></h3>
+            <p>The paymaster's office — run PRL payroll through a 6-step wizard (Roster → Schedule → Fund → Review → Sign → Broadcast): a bech32m-validated roster with dust refusal, duplicate merging (or loud refusal) and add/edit/remove rows, a schedule planner with the next 12 pay dates plus a payday countdown (a planner, never auto-pay — Pearl has no smart contracts), GET-only Blockbook UTXO reads plus an air-gapped paste path with a fewer-than-2-runs warning, grain-exact review with a double-confirm gate, unsigned JSON bundles with 64-bit fingerprints for cold signing, an address-match key guard, per-input Schnorr re-verification, key wipe, and a History ledger with per-payee lifetime totals. No new cryptography — audited Sign core throughout.</p>
+            <div class="card-links"><a href="pages/payroll/">Open Pearl Payroll →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Games — Provably-Fair Taproot Games <span class="badge">new</span></h3>

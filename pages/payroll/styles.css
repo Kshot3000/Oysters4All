@@ -1,0 +1,182 @@
+/* Pearl Payroll — the paymaster's office.
+ * Art-deco ledger theme: polished brass (#c9a227) and deep teal (#14a89e)
+ * on near-black (#0a0c0b). Double-rule gold frames, sunburst fan, serif
+ * display type. NOT a clone of the Batch freight or sibling themes. */
+:root {
+  --bg: #0a0c0b;
+  --bg2: #0e1211;
+  --panel: #121615;
+  --panel2: #171c1b;
+  --line: #2b332f;
+  --gold: #c9a227;
+  --gold-hi: #f0d060;
+  --gold-dim: #8a6f1a;
+  --teal: #14a89e;
+  --teal-hi: #7fd8cf;
+  --ink: #f5f1e4;
+  --dim: #a8a396;
+  --faint: #6e6a5e;
+  --go: #3fd68f;
+  --stop: #ff5f6b;
+  --warn: #ffd23e;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --serif: "Playfair Display", "Didot", Georgia, "Times New Roman", serif;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  line-height: 1.55;
+}
+/* deco backdrop: sunburst fan rays + teal/brass glows */
+.deco { position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(1000px 480px at 50% -6%, rgba(201,162,39,.12), transparent 62%),
+    radial-gradient(760px 420px at 92% 20%, rgba(20,168,158,.08), transparent 60%),
+    repeating-conic-gradient(from -90deg at 50% -40px, rgba(201,162,39,.05) 0deg 2deg, transparent 2deg 8deg),
+    var(--bg);
+}
+h1, h2, h3, h4 { font-family: var(--serif); letter-spacing: .06em; }
+h2 .sub { color: var(--gold); font-family: inherit; font-weight: 600; font-size: .58em;
+  text-transform: uppercase; letter-spacing: .24em; margin-left: .7em; }
+.lede { color: var(--dim); max-width: 74ch; }
+.lede code, .hintline code { color: var(--gold-hi); font-family: var(--mono); font-size: .92em; }
+.lede strong { color: var(--ink); }
+
+/* topbar: brass double rule */
+.topbar { border-bottom: 3px double var(--gold-dim); background: rgba(10,12,11,.94);
+  backdrop-filter: blur(6px); position: sticky; top: 0; z-index: 20; }
+.brand { display: flex; gap: 14px; align-items: center; padding: 14px 22px 10px; }
+.seal { width: 42px; height: 42px; flex: none; }
+.brand h1 { margin: 0; font-size: 1.7rem; color: var(--gold-hi); letter-spacing: .14em; text-transform: uppercase; }
+.tagline { margin: 2px 0 0; color: var(--dim); font-size: .85rem; }
+.steps { display: flex; gap: 6px; padding: 0 22px 12px; flex-wrap: wrap; }
+.steps button {
+  background: transparent; color: var(--dim); border: 1px solid var(--line);
+  padding: 7px 13px; cursor: pointer; font-size: .78rem; letter-spacing: .12em;
+  text-transform: uppercase; border-radius: 2px; font-family: var(--serif);
+}
+.steps button:hover { color: var(--gold-hi); border-color: var(--gold-dim); }
+.steps button.active { background: var(--gold); color: #141005; border-color: var(--gold); font-weight: 700; }
+.steps button.ledger { border-color: var(--teal); color: var(--teal-hi); }
+.steps button.ledger.active { background: var(--teal); color: #062522; border-color: var(--teal); }
+
+main { max-width: 1080px; margin: 0 auto; padding: 22px 18px 60px; }
+.panel[hidden] { display: none; }
+
+/* honest limits — engraved brass plaque */
+.limits { border: 1px solid var(--gold-dim); background: var(--bg2); border-radius: 2px;
+  padding: 16px 20px 16px 24px; margin-bottom: 18px; position: relative;
+  box-shadow: inset 0 0 0 3px var(--bg), inset 0 0 0 4px var(--gold-dim); }
+.limits h2 { margin: 0 0 8px; font-size: 1rem; text-transform: uppercase; letter-spacing: .24em; color: var(--gold-hi); }
+.limits ul { margin: 0; padding-left: 18px; color: var(--dim); font-size: .88rem; }
+.limits li { margin: 5px 0; }
+.limits strong { color: var(--gold-hi); }
+
+.config-strip { display: flex; gap: 12px; align-items: end; flex-wrap: wrap;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 2px;
+  padding: 12px 16px; margin-bottom: 18px; }
+.config-strip label { display: flex; flex-direction: column; gap: 4px; font-size: .76rem;
+  text-transform: uppercase; letter-spacing: .12em; color: var(--dim); }
+.config-strip label.wide { flex: 1 1 260px; }
+input, select, textarea {
+  background: #0b0e0d; border: 1px solid var(--line); color: var(--ink);
+  border-radius: 2px; padding: 9px 10px; font-size: .95rem; width: 100%;
+  font-family: inherit;
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 2px rgba(201,162,39,.2); }
+textarea { font-family: var(--mono); font-size: .85rem; resize: vertical; }
+.hintline { color: var(--faint); font-size: .75rem; text-transform: none; letter-spacing: 0; }
+.unit { color: var(--gold); font-size: .72rem; }
+.cfg-msg { color: var(--dim); font-size: .85rem; align-self: center; }
+
+/* deco section titles: gold rule */
+.panel > h2 { font-size: 1.5rem; color: var(--ink);
+  border-bottom: 1px solid var(--gold-dim); box-shadow: 0 3px 0 -2px var(--gold);
+  display: inline-block; padding-bottom: 8px; text-transform: uppercase; letter-spacing: .14em; }
+
+.card { background: var(--bg2); border: 1px solid var(--line); border-radius: 2px;
+  padding: 18px 20px; margin: 16px 0; position: relative;
+  box-shadow: inset 0 0 0 3px var(--bg2), inset 0 0 0 4px rgba(201,162,39,.25); }
+.card > h3 { margin-top: 0; text-transform: uppercase; letter-spacing: .16em; font-size: 1.05rem; color: var(--gold-hi); }
+.card > h4 { text-transform: uppercase; letter-spacing: .16em; font-size: .85rem; color: var(--dim); margin: 18px 0 8px; }
+.card.inset { background: #0b0e0d; }
+.count { color: var(--teal-hi); font-family: var(--mono); }
+
+/* wax seals */
+.stamp { display: inline-block; font-size: .68rem; letter-spacing: .2em; padding: 4px 12px;
+  border: 2px double; border-radius: 20px; margin-left: 10px; vertical-align: middle;
+  font-family: var(--serif); text-transform: uppercase; }
+.stamp.ok { color: var(--go); border-color: var(--go); }
+.stamp.warn { color: var(--warn); border-color: var(--warn); }
+.stamp.bad { color: var(--stop); border-color: var(--stop); }
+
+.kv { display: grid; gap: 6px; margin: 10px 0; }
+.kv > div { display: grid; grid-template-columns: 170px 1fr; gap: 10px; padding: 5px 0; border-bottom: 1px dotted #2b332f; }
+.kv dt { color: var(--dim); font-size: .8rem; text-transform: uppercase; letter-spacing: .1em; }
+.kv dd { margin: 0; font-family: var(--mono); font-size: .9rem; word-break: break-all; }
+.mono-sm { font-size: .78rem; }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.grid2 .wide { grid-column: 1 / -1; }
+@media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } .kv > div { grid-template-columns: 1fr; } }
+.grid2 > label { display: flex; flex-direction: column; gap: 6px; font-size: .85rem; color: var(--dim); }
+.addrow { margin-top: 6px; }
+
+.rowbtns { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 12px 0; }
+.rowbtns.wide { grid-column: 1 / -1; }
+.btn { border: 1px solid var(--gold); background: var(--gold); color: #141005; font-weight: 700;
+  padding: 9px 18px; border-radius: 2px; cursor: pointer; font-size: .88rem; letter-spacing: .06em;
+  font-family: var(--serif); text-transform: uppercase; }
+.btn:hover { filter: brightness(1.1); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn.ghost { background: transparent; color: var(--gold-hi); }
+.btn.ghost:hover { background: rgba(201,162,39,.1); }
+.btn.danger-ghost { background: transparent; color: var(--stop); border-color: var(--stop); }
+.btn.sm { padding: 4px 10px; font-size: .75rem; }
+
+/* payroll ledger tables */
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 2px; }
+table.ledger { width: 100%; border-collapse: collapse; font-size: .85rem; }
+table.ledger th { background: var(--panel2); color: var(--gold-hi); text-transform: uppercase;
+  letter-spacing: .14em; font-family: var(--serif); font-size: .74rem; text-align: left; padding: 9px 10px; white-space: nowrap;
+  border-bottom: 1px solid var(--gold-dim); }
+table.ledger td { padding: 7px 10px; border-top: 1px solid #1a201e; font-family: var(--mono); }
+table.ledger tbody tr:nth-child(even) { background: rgba(255,255,255,.014); }
+table.ledger tbody tr:hover { background: rgba(201,162,39,.06); }
+.addr-short { color: var(--ink); }
+.mut { color: var(--faint); }
+tr.sel { background: rgba(63,214,143,.07) !important; }
+td .rowbtns { margin: 0; gap: 6px; }
+.btn.tiny { padding: 3px 9px; font-size: .72rem; }
+.btn.tiny.danger-ghost { color: var(--stop); border-color: var(--stop); background: transparent; }
+
+.check { display: flex; gap: 8px; align-items: center; color: var(--dim); font-size: .88rem; cursor: pointer; }
+.check input { width: auto; accent-color: var(--gold); }
+.check.big { font-size: 1rem; color: var(--ink); background: #0b0e0d; border: 1px solid var(--warn);
+  padding: 12px 14px; border-radius: 2px; margin: 14px 0; }
+
+.err { color: var(--stop); background: rgba(255,95,107,.08); border: 1px solid var(--stop);
+  padding: 10px 14px; border-radius: 2px; font-size: .9rem; }
+.err[hidden] { display: none; }
+.okmsg { color: var(--go); background: rgba(63,214,143,.08); border: 1px solid var(--go);
+  padding: 10px 14px; border-radius: 2px; font-size: .9rem; }
+.okmsg[hidden] { display: none; }
+.refusal { background: rgba(255,95,107,.1); border: 2px solid var(--stop); color: #ffd7db;
+  padding: 14px 18px; border-radius: 2px; font-weight: 600; }
+.refusal[hidden] { display: none; }
+.note { color: var(--warn); font-size: .88rem; }
+.note[hidden] { display: none; }
+.keyout { color: var(--warn); font-family: var(--mono); font-size: .85rem; word-break: break-all;
+  background: #0b0e0d; border: 1px dashed var(--warn); padding: 10px 14px; border-radius: 2px; }
+.keyout[hidden] { display: none; }
+.cmd { background: #0b0e0d; border: 1px solid var(--line); padding: 12px; border-radius: 2px;
+  font-size: .8rem; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
+
+footer { border-top: 3px double var(--gold-dim); margin-top: 40px; }
+.foot-inner { max-width: 1080px; margin: 0 auto; padding: 22px 18px 40px; color: var(--dim); font-size: .88rem; }
+.foot-brand { color: var(--gold-hi); font-weight: 700; text-transform: uppercase; letter-spacing: .14em; font-family: var(--serif); }
+footer a { color: var(--gold-hi); }
+footer code { font-family: var(--mono); color: var(--ink); font-size: .8rem; word-break: break-all; }
+.foot-note { color: var(--faint); font-size: .8rem; }

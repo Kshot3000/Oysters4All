@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Payroll — PRL Payroll Desk</title>
+<meta name="description" content="Pearl Payroll: the paymaster's office for PRL. Keep a payee roster, plan weekly/biweekly/monthly pay runs on Pearl Taproot, fund from the sender's UTXOs, review the grain-exact manifest, sign locally with one Schnorr keypath transaction, broadcast once, and keep a local history. No smart contracts, no auto-pay — every payday is a manual signed dispatch.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<div class="deco" aria-hidden="true"><i class="g1"></i><i class="g2"></i><i class="fan"></i></div>
+
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 40 40" aria-hidden="true">
+      <circle cx="20" cy="20" r="17" fill="none" stroke="#c9a227" stroke-width="2"/>
+      <circle cx="20" cy="20" r="13.5" fill="none" stroke="#c9a227" stroke-width="1" opacity=".5"/>
+      <path d="M20 8 L22.5 15 H30 L24 19.5 L26 27 L20 22.5 L14 27 L16 19.5 L10 15 H17.5 Z" fill="none" stroke="#7fd8cf" stroke-width="1.6"/>
+      <text x="20" y="34.5" text-anchor="middle" font-size="7" fill="#c9a227" font-family="serif" letter-spacing="1">PRL</text>
+    </svg>
+    <div>
+      <h1>Pearl Payroll</h1>
+      <p class="tagline">the paymaster's office — recurring PRL pay runs on Taproot · no smart contracts · no auto-pay</p>
+    </div>
+  </div>
+  <nav class="steps" aria-label="Payroll steps">
+    <button data-step="roster" id="st-roster" class="active" type="button">1 · Roster</button>
+    <button data-step="schedule" id="st-schedule" type="button">2 · Schedule</button>
+    <button data-step="fund" id="st-fund" type="button">3 · Fund</button>
+    <button data-step="review" id="st-review" type="button">4 · Review</button>
+    <button data-step="sign" id="st-sign" type="button">5 · Sign</button>
+    <button data-step="broadcast" id="st-broadcast" type="button">6 · Broadcast</button>
+    <button id="st-history" type="button" class="ledger">History</button>
+  </nav>
+</header>
+
+<main>
+  <section class="limits" aria-label="Honest limits">
+    <h2>Honest limits — payroll edition</h2>
+    <ul>
+      <li><strong>No auto-pay — ever.</strong> The schedule is a planner, not automation. Every payday is a separate manual signed dispatch you approve on the Review step. Pearl has no smart contracts; nothing can move PRL on a timer.</li>
+      <li><strong>One sender key per run.</strong> Every input of a pay run must be spendable by the single key you sign with. Multi-key payrolls are not supported — split them.</li>
+      <li><strong>Dust is refused, never rounded.</strong> Any payee under 546 grains stops the roster with a loud error. Change under 546 grains is absorbed into the miner fee and disclosed on the review screen — never silently dropped.</li>
+      <li><strong>Labels are off-chain bookkeeping.</strong> Payee names ride along in the unsigned bundle and the local history for your records — they never appear on-chain. Pearl transactions carry no memo field.</li>
+      <li><strong>Blockbook is read-only until the single broadcast POST.</strong> UTXO scans and fee estimates are GET-only against the endpoint you configure. If it is unreachable, the page says so loudly — it never guesses.</li>
+      <li><strong>Secrets live in page memory only.</strong> Keys you paste are wiped automatically after signing, and are never written to storage or sent anywhere. History is this browser's localStorage — exportable to CSV, and yours to clear.</li>
+      <li><strong>Verify addresses out of band. Start on testnet.</strong></li>
+    </ul>
+  </section>
+
+  <section class="config-strip" aria-label="Configuration">
+    <label>Network
+      <select id="network">
+        <option value="mainnet" selected>Mainnet (prl…)</option>
+        <option value="testnet">Testnet (tprl…)</option>
+      </select>
+    </label>
+    <label class="wide">Blockbook API <span class="hintline">GET-only reads; saved in this browser only</span>
+      <input id="blockbook" type="url" spellcheck="false" placeholder="https://blockbook.pearlresearch.ai">
+    </label>
+    <label>Fee rate <span class="unit">grains/vB</span>
+      <input id="feerate" type="number" min="1" step="1" value="20">
+    </label>
+    <button class="btn ghost" id="fee-estimate" type="button">Estimate fee</button>
+    <button class="btn danger-ghost" id="wipe" type="button">Wipe keys</button>
+    <span class="cfg-msg" id="cfg-msg"></span>
+    <span class="cfg-msg" id="wipe-msg"></span>
+  </section>
+
+  <!-- STEP 1: ROSTER -->
+  <section id="step-roster" class="panel active" aria-label="Roster">
+    <h2>Roster <span class="sub">the payroll ledger — who gets paid, and how much</span></h2>
+    <p class="lede">Paste one payee per line — <code>&lt;address&gt;, &lt;amount&gt;, [label]</code> — or import a CSV. Every address is bech32m-validated, every amount is dust-checked (546-grain floor, refused — never rounded), duplicates merge into one payee when merging is on. Labels are your bookkeeping only. Nothing moves on this step.</p>
+    <label class="wide">Payee roster
+      <textarea id="r-text" rows="8" spellcheck="false" placeholder="prl1p…, 1.25, Alice — senior dev&#10;prl1p…, 500000 grains, Bob — bug bounty"></textarea>
+    </label>
+    <div class="rowbtns">
+      <label class="check"><input type="checkbox" id="r-merge" checked> Merge duplicate addresses into one payee</label>
+    </div>
+    <div class="rowbtns">
+      <button class="btn ghost" id="r-sample" type="button">Load sample</button>
+      <button class="btn ghost" id="r-import" type="button">Import CSV file</button>
+      <input type="file" id="r-file" accept=".csv,.txt" hidden>
+      <button class="btn primary" id="r-parse" type="button">Validate roster</button>
+    </div>
+    <p class="err" id="r-err" hidden></p>
+    <div class="card" id="r-out" hidden>
+      <h3>Payroll ledger <span class="stamp ok" id="r-stamp">VALIDATED</span></h3>
+      <dl class="kv">
+        <div><dt>Payees</dt><dd id="r-count"></dd></div>
+        <div><dt>Total per period</dt><dd id="r-total"></dd></div>
+        <div><dt>Duplicates merged</dt><dd id="r-merged"></dd></div>
+      </dl>
+      <div class="tablewrap"><table class="ledger">
+        <thead><tr><th>#</th><th>Payee</th><th>Address</th><th>Per period</th><th></th></tr></thead>
+        <tbody id="r-tbody"></tbody>
+      </table></div>
+      <h4>Add / edit a payee</h4>
+      <div class="grid2 addrow">
+        <label>Address <input id="a-addr" spellcheck="false" placeholder="prl1p…"></label>
+        <label>Amount <span class="unit">PRL</span> <input id="a-amount" spellcheck="false" placeholder="1.25"></label>
+        <label class="wide">Label <span class="hintline">off-chain only, max 64 chars</span> <input id="a-label" spellcheck="false" placeholder="Alice — senior dev"></label>
+        <div class="rowbtns wide">
+          <button class="btn ghost" id="a-add" type="button">Add payee</button>
+          <button class="btn ghost" id="a-cancel" type="button" hidden>Cancel edit</button>
+          <span class="cfg-msg" id="a-msg"></span>
+        </div>
+      </div>
+      <p class="err" id="a-err" hidden></p>
+      <div class="rowbtns">
+        <button class="btn ghost" id="r-export-csv" type="button">Export roster CSV</button>
+        <button class="btn primary" id="r-next" type="button">Plan the schedule →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 2: SCHEDULE -->
+  <section id="step-schedule" class="panel" aria-label="Schedule" hidden>
+    <h2>Schedule <span class="sub">the pay calendar — planner, not automation</span></h2>
+    <p class="lede">Pick a pay period and an anchor payday; the desk lays out the next 12 pay dates with the exact per-run total. <strong>Nothing here moves money.</strong> Each payday is still a manual signed dispatch — the schedule exists so you can plan funding, not to trigger payments.</p>
+    <div class="grid2">
+      <label>Pay period
+        <select id="p-period">
+          <option value="weekly" selected>Weekly</option>
+          <option value="biweekly">Biweekly</option>
+          <option value="monthly">Monthly</option>
+          <option value="custom">Custom days</option>
+        </select>
+      </label>
+      <label>Custom days <span class="hintline">only for "Custom days"</span>
+        <input id="p-custom-days" type="number" min="1" max="365" value="10">
+      </label>
+      <label>Anchor payday <span class="hintline">a reference payday (YYYY-MM-DD, UTC)</span>
+        <input id="p-anchor" type="date">
+      </label>
+      <label>Run label <span class="hintline">stamped on the bundle + history</span>
+        <input id="p-label" spellcheck="false" placeholder="e.g. October payroll">
+      </label>
+    </div>
+    <div class="rowbtns">
+      <button class="btn primary" id="p-plan" type="button">Plan 12 paydays</button>
+    </div>
+    <p class="err" id="p-err" hidden></p>
+    <div class="card" id="p-out" hidden>
+      <h3>Pay calendar <span class="stamp ok">PLANNED</span></h3>
+      <dl class="kv">
+        <div><dt>Period</dt><dd id="p-period-out"></dd></div>
+        <div><dt>Per-run total</dt><dd id="p-total-out"></dd></div>
+        <div><dt>Next payday</dt><dd id="p-countdown"></dd></div>
+      </dl>
+      <div class="tablewrap"><table class="ledger">
+        <thead><tr><th>Run</th><th>Pay date (UTC)</th><th>Day</th><th>Per-run total</th></tr></thead>
+        <tbody id="p-tbody"></tbody>
+      </table></div>
+      <p class="note">No auto-pay: each of these dates needs a fresh signed dispatch from steps 3–6. The calendar plans; you press the button.</p>
+      <div class="rowbtns">
+        <button class="btn primary" id="p-next" type="button">Fund this run →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 3: FUND -->
+  <section id="step-fund" class="panel" aria-label="Fund" hidden>
+    <h2>Fund <span class="sub">the strongbox — load this run's inputs</span></h2>
+    <p class="lede">Point at the sender's <strong>prl1…/tprl1… address</strong>, pull its UTXOs over Blockbook (GET-only) or paste them air-gapped, then pick inputs by hand or let the auto-loader take the largest first. The desk checks coverage for this run's total + fee, and warns if the balance covers fewer than two upcoming runs.</p>
+    <div class="grid2">
+      <label class="wide">Sender PRL address <span class="hintline">must match the key you will sign with</span>
+        <input id="f-sender" spellcheck="false" placeholder="prl1p…">
+      </label>
+      <div class="rowbtns wide">
+        <button class="btn ghost" id="f-fetch" type="button">Fetch UTXOs (Blockbook)</button>
+        <span class="cfg-msg" id="f-fetch-msg"></span>
+      </div>
+      <label class="wide">…or paste UTXOs <span class="hintline">one per line: <code>txid:vout value [prl|grains] [address]</code> — air-gapped</span>
+        <textarea id="f-paste" rows="4" spellcheck="false" placeholder="ab12…:0 150000000"></textarea>
+      </label>
+      <div class="rowbtns wide">
+        <button class="btn ghost" id="f-parse-paste" type="button">Load pasted UTXOs</button>
+      </div>
+    </div>
+    <p class="err" id="f-err" hidden></p>
+    <div class="card" id="f-out" hidden>
+      <h3>Strongbox ledger</h3>
+      <div class="rowbtns">
+        <label class="check"><input type="checkbox" id="f-auto" checked> Auto-load: largest-first coin selection</label>
+        <button class="btn ghost" id="f-all" type="button">Select all</button>
+        <button class="btn ghost" id="f-none" type="button">Select none</button>
+      </div>
+      <div class="tablewrap"><table class="ledger">
+        <thead><tr><th></th><th>#</th><th>TXID</th><th>vout</th><th>Value</th><th>Conf</th></tr></thead>
+        <tbody id="f-tbody"></tbody>
+      </table></div>
+      <h3>Running totals</h3>
+      <dl class="kv" id="f-totals"></dl>
+      <p class="note" id="f-warn" hidden></p>
+      <p class="err" id="f-cover-err" hidden></p>
+      <div class="rowbtns">
+        <button class="btn primary" id="f-next" type="button">Review this run →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 4: REVIEW -->
+  <section id="step-review" class="panel" aria-label="Review" hidden>
+    <h2>Run review <span class="sub">check the pay slip before it seals</span></h2>
+    <p class="lede">The full breakdown before anything is signed. Fee comes from the exact vB formula — <code>fee = keypathTxVBytes(nIn, nOut) × rate</code>, grain-exact. If the numbers don't balance to the grain, the run is refused.</p>
+    <p class="refusal" id="r2-refusal" hidden></p>
+    <div class="card" id="r2-out" hidden>
+      <h3>Pay slip <span class="stamp warn" id="r2-stamp">UNSEALED</span></h3>
+      <dl class="kv" id="r2-summary"></dl>
+      <h4>Payees <span class="count" id="r2-rcount"></span></h4>
+      <div class="tablewrap"><table class="ledger">
+        <thead><tr><th>#</th><th>Payee</th><th>Address</th><th>Amount</th></tr></thead>
+        <tbody id="r2-tbody"></tbody>
+      </table></div>
+      <h4>Inputs <span class="count" id="r2-icount"></span></h4>
+      <div class="tablewrap"><table class="ledger">
+        <thead><tr><th>#</th><th>TXID</th><th>vout</th><th>Value</th></tr></thead>
+        <tbody id="r2-itbody"></tbody>
+      </table></div>
+      <h4>Fee math</h4>
+      <dl class="kv" id="r2-fee"></dl>
+      <p class="note" id="r2-dust-note" hidden></p>
+      <label class="check big"><input type="checkbox" id="r2-confirm"> I verified every payee address and amount out of band. Dispatch exactly this run.</label>
+      <div class="rowbtns">
+        <button class="btn ghost" id="r2-export" type="button">Export unsigned bundle</button>
+        <button class="btn primary" id="r2-next" type="button" disabled>Continue to sign →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 5: SIGN -->
+  <section id="step-sign" class="panel" aria-label="Sign" hidden>
+    <h2>Sign <span class="sub">the paymaster's seal</span></h2>
+    <p class="lede">Export the unsigned bundle to sign on an air-gapped machine, or sign here. The key must derive the sender address or signing is refused — and every Schnorr signature is re-verified locally before the hex is shown. The key is wiped from memory the moment signing succeeds.</p>
+    <div class="grid2">
+      <div class="card">
+        <h3>Unsigned bundle</h3>
+        <dl class="kv"><div><dt>Fingerprint</dt><dd><code id="s-fp"></code></dd></div>
+        <div><dt>Unsigned txid</dt><dd><code id="s-unsigned-txid" class="mono-sm"></code></dd></div></dl>
+        <label class="wide">Bundle JSON <span class="hintline">carry this to the signing machine</span>
+          <textarea id="s-bundle" rows="6" readonly spellcheck="false"></textarea>
+        </label>
+        <div class="rowbtns">
+          <button class="btn ghost" data-copy="s-bundle" type="button">Copy bundle</button>
+          <button class="btn ghost" id="s-download" type="button">Download .json</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Import a bundle</h3>
+        <p class="lede">Paste a bundle exported elsewhere — it is fully re-verified (fingerprint, unsigned-txid digest, fee, vBytes) before anything loads.</p>
+        <label class="wide">Bundle JSON
+          <textarea id="s-import" rows="4" spellcheck="false" placeholder='{"bundle":"pearl-payroll-unsigned:v1:",…}'></textarea>
+        </label>
+        <label class="wide">Expected fingerprint <span class="hintline">from the exporting side — loud refusal on mismatch</span>
+          <input id="s-import-fp" spellcheck="false" placeholder="(optional but recommended)">
+        </label>
+        <div class="rowbtns"><button class="btn ghost" id="s-import-btn" type="button">Verify &amp; load bundle</button></div>
+        <p class="err" id="s-import-err" hidden></p>
+        <p class="okmsg" id="s-import-ok" hidden></p>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Local signing</h3>
+      <div class="grid2">
+        <label class="wide">Sender secret <span class="hintline">12/24-word mnemonic · WIF · 64-hex · xprv/tprv — never leaves this page</span>
+          <input id="s-key" type="password" spellcheck="false" autocomplete="off" placeholder="paste secret">
+        </label>
+        <div class="rowbtns wide">
+          <button class="btn ghost" id="s-gen" type="button">Generate fresh sender key</button>
+          <button class="btn primary" id="s-sign" type="button">Sign pay run</button>
+          <span class="cfg-msg" id="s-key-addr"></span>
+        </div>
+      </div>
+      <p class="err" id="s-err" hidden></p>
+      <p class="keyout" id="s-key-out" hidden></p>
+      <div class="card inset" id="s-out" hidden>
+        <h3>Sealed <span class="stamp ok">SIGNED · N/N VERIFIED</span></h3>
+        <dl class="kv">
+          <div><dt>Signatures</dt><dd id="s-verify"></dd></div>
+          <div><dt>TXID</dt><dd><code id="s-txid" class="mono-sm"></code></dd></div>
+        </dl>
+        <label class="wide">Signed hex <span class="hintline">key already wiped — this hex is safe to carry</span>
+          <textarea id="s-hex" rows="5" readonly spellcheck="false"></textarea>
+        </label>
+        <div class="rowbtns">
+          <button class="btn ghost" data-copy="s-txid" type="button">Copy txid</button>
+          <button class="btn ghost" data-copy="s-hex" type="button">Copy hex</button>
+          <button class="btn primary" id="s-next" type="button">Continue to broadcast →</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 6: BROADCAST -->
+  <section id="step-broadcast" class="panel" aria-label="Broadcast" hidden>
+    <h2>Broadcast <span class="sub">payday — release the run</span></h2>
+    <p class="lede">Two explicit confirmations stand between the signed hex and the network. After broadcast, the page records the run to the local history ledger below.</p>
+    <div class="card" id="b-ready" hidden>
+      <h3>Ready for payday</h3>
+      <dl class="kv">
+        <div><dt>TXID</dt><dd><code id="b-txid" class="mono-sm"></code></dd></div>
+        <div><dt>Run</dt><dd id="b-runlabel"></dd></div>
+        <div><dt>Payees</dt><dd id="b-nrecip"></dd></div>
+        <div><dt>Total out</dt><dd id="b-total"></dd></div>
+        <div><dt>Fee</dt><dd id="b-fee"></dd></div>
+      </dl>
+      <label class="check big"><input type="checkbox" id="b-confirm"> I confirm broadcasting this exact pay run to Pearl <span id="b-net"></span>. Real PRL will move.</label>
+      <div class="rowbtns">
+        <button class="btn primary" id="b-send" type="button" disabled>Broadcast via Blockbook</button>
+      </div>
+      <p class="err" id="b-err" hidden></p>
+      <p class="okmsg" id="b-ok" hidden></p>
+      <div class="inset" id="b-pearld">
+        <h4>…or via your own pearld</h4>
+        <p class="hintline">Run this against your node's RPC (port 44107) — nothing here touches your node.</p>
+        <pre id="b-pearld-cmd" class="cmd"></pre>
+        <button class="btn ghost" data-copy="b-pearld-cmd" type="button">Copy command</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- HISTORY -->
+  <section id="step-history" class="panel" aria-label="History" hidden>
+    <h2>History <span class="sub">the payroll archive — this browser's ledger</span></h2>
+    <p class="lede">Every successfully broadcast pay run is recorded here — date, txid, per-payee amounts, fee. This lives in <strong>this browser's localStorage only</strong>: export it to CSV for your books, clear it any time. If you switch browsers, carry the CSV.</p>
+    <div class="rowbtns">
+      <button class="btn ghost" id="h-export" type="button">Export history CSV</button>
+      <button class="btn danger-ghost" id="h-clear" type="button">Clear history</button>
+      <span class="cfg-msg" id="h-msg"></span>
+    </div>
+    <div class="card" id="h-card">
+      <h3>Past runs <span class="count" id="h-count"></span></h3>
+      <div class="tablewrap"><table class="ledger">
+        <thead><tr><th>Pay date</th><th>Run</th><th>TXID</th><th>Payees</th><th>Fee</th></tr></thead>
+        <tbody id="h-tbody"></tbody>
+      </table></div>
+      <h3>Per-payee totals <span class="count" id="h-tot-count"></span></h3>
+      <div class="tablewrap"><table class="ledger">
+        <thead><tr><th>Payee</th><th>Address</th><th>Total paid</th><th>Runs</th></tr></thead>
+        <tbody id="h-tot-tbody"></tbody>
+      </table></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="foot-inner">
+    <p class="foot-brand">Pearl Payroll — the paymaster's office · built for the Pearl blockchain (PRL)</p>
+    <p>Builder: <a href="https://x.com/kshot9000">@kshot9000</a> · PRL donations: <code id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code> <button class="btn ghost sm" data-copy="donate-addr" type="button">Copy</button></p>
+    <p class="foot-note">Non-custodial. No smart contracts, no auto-pay. All cryptography runs locally in your browser via the audited Pearl Sign core — keys never leave this page. Verify every address and amount out of band.</p>
+  </div>
+</footer>
+
+<script src="pearl-payroll.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
