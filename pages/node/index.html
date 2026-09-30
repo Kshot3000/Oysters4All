@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Node — pearld Operator Console</title>
+<meta name="description" content="Read-only mission-control console for your pearld node: chain status, peers, mempool, mining info over JSON-RPC. Never sends state-changing calls.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="hero">
+  <p class="kicker">Pearl · Node Console</p>
+  <h1>Pearl <span class="sat">Node</span></h1>
+  <p class="sub">A read-only mission-control console for <em>your own pearld node</em> —
+    chain status, peer table, mempool depth, and mining telemetry over JSON-RPC.
+    This page <em>never sends state-changing RPCs</em> and never touches your wallet.</p>
+  <div class="statusbar">
+    <span id="conn-lamp" class="lamp" aria-hidden="true"></span>
+    <span id="conn-label">not connected</span>
+    <button id="btn-refresh">Refresh now</button>
+  </div>
+  <nav id="steps" class="steps" aria-label="Console tabs">
+    <button data-tab="overview" class="active">Overview</button>
+    <button data-tab="peers">Peers</button>
+    <button data-tab="mempool">Mempool</button>
+    <button data-tab="mining">Mining</button>
+    <button data-tab="settings">Settings</button>
+  </nav>
+</header>
+
+<aside class="limits" aria-label="Honest limits">
+  <div class="box">
+    <strong>Honest limits — always true:</strong>
+    <ul>
+      <li>This console is <em>read-only</em>: it only ever calls <code>getinfo</code>, <code>getmininginfo</code>, <code>getmempoolinfo</code>, <code>getpeerinfo</code>, <code>getnettotals</code>, <code>getchaintips</code>. It cannot stop your node, change config, or move funds.</li>
+      <li>Browsers <em>cannot call pearld directly</em> — pearld sends no CORS headers and uses a self-signed TLS cert by default. Run the bundled <code>relay.mjs</code> on the node machine (read-only methods only) and point this page at it. Direct connections will fail loudly, not silently.</li>
+      <li>pearld's RPC is <em>disabled until you set rpcuser + rpcpass</em> (or <code>rpclimituser</code>/<code>rpclimitpass</code>). Without credentials every call returns 401.</li>
+      <li>Health notes are <em>heuristics</em>, not consensus: a green lamp means the node answered and looks sane, not that the chain is final.</li>
+      <li>Credentials live in <em>your browser's localStorage</em> — anyone with your browser profile can read them. Use a dedicated RPC user with a strong password.</li>
+    </ul>
+  </div>
+</aside>
+
+<main>
+  <!-- OVERVIEW -->
+  <section id="tab-overview" class="tab active" aria-label="Overview">
+    <div id="overview-empty" class="empty">
+      <b>No node connected.</b><br>
+      Open <b>Settings</b>, point the console at your relay (or test it), and press Refresh.
+    </div>
+    <div id="overview-live" style="display:none">
+      <p id="mismatch-warn" class="err" style="display:none" role="alert"></p>
+      <h2>Node health</h2>
+      <ul id="health-notes" class="notes"></ul>
+      <div id="overview-cards" class="cards"></div>
+      <div class="panel">
+        <h2>Chain tips <span class="tag">getchaintips</span></h2>
+        <div id="tips-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PEERS -->
+  <section id="tab-peers" class="tab" aria-label="Peers">
+    <div class="panel">
+      <h2>Connected peers <span class="tag">getpeerinfo</span></h2>
+      <p id="peers-summary" class="hint">No data yet — connect a node and refresh.</p>
+      <div style="overflow-x:auto">
+      <table class="peers" id="peers-table" style="display:none">
+        <thead><tr>
+          <th data-sort="addr">Address</th>
+          <th data-sort="ping">Ping</th>
+          <th>Dir</th>
+          <th data-sort="height">Height</th>
+          <th data-sort="age">Conn age</th>
+          <th data-sort="sent">Sent</th>
+          <th data-sort="recv">Recv</th>
+          <th>User agent</th>
+        </tr></thead>
+        <tbody id="peers-body"></tbody>
+      </table>
+      </div>
+      <p class="hint">Click a column header to sort. <span class="badge sync">SYNC</span> marks the sync peer. Peers silent &gt;10 min are flagged stale — ping times are microseconds from the node, shown in ms.</p>
+    </div>
+  </section>
+
+  <!-- MEMPOOL -->
+  <section id="tab-mempool" class="tab" aria-label="Mempool">
+    <div class="panel">
+      <h2>Mempool <span class="tag">getmempoolinfo</span></h2>
+      <div id="mempool-cards" class="cards"></div>
+      <p id="mempool-note" class="hint"></p>
+      <p class="hint">pearld exposes mempool <em>size and bytes only</em> — there is no fee histogram endpoint, so this console shows depth, not fee pressure. Average tx size is bytes ÷ count.</p>
+    </div>
+  </section>
+
+  <!-- MINING -->
+  <section id="tab-mining" class="tab" aria-label="Mining">
+    <div class="panel">
+      <h2>Mining telemetry <span class="tag">getmininginfo</span></h2>
+      <div id="mining-cards" class="cards"></div>
+      <p id="mining-errors" class="err"></p>
+      <p class="hint"><code>generate</code> tells whether this node is set to mine locally; <code>hashespersec</code> is its own recent rate while generating. <code>networkhashps</code> is the whole network's estimate. Pearl has no staking — don't look for it here.</p>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="tab-settings" class="tab" aria-label="Settings">
+    <div class="panel">
+      <h2>RPC connection</h2>
+      <div class="row">
+        <button id="preset-mainnet">Mainnet</button>
+        <button id="preset-testnet">Testnet</button>
+        <button id="preset-testnet2">Testnet2</button>
+      </div>
+      <label><span class="fl">Relay endpoint (this page talks to the relay, the relay talks to pearld)</span>
+        <input id="set-endpoint" type="text" spellcheck="false" placeholder="http://127.0.0.1:44120/rpc"></label>
+      <label><span class="fl">RPC user</span>
+        <input id="set-user" type="text" spellcheck="false" autocomplete="off" placeholder="rpcuser"></label>
+      <label><span class="fl">RPC password</span>
+        <input id="set-pass" type="password" autocomplete="off" placeholder="rpcpass"></label>
+      <label><span class="fl">Network preset (labels the dashboard; the node itself reports testnet via getinfo)</span>
+        <select id="set-network">
+          <option value="mainnet">mainnet — pearld RPC 44107</option>
+          <option value="testnet">testnet — pearld RPC 44109</option>
+          <option value="testnet2">testnet2 — pearld RPC 44111</option>
+        </select></label>
+      <label><span class="fl">Auto-refresh every N seconds (0 = off)</span>
+        <input id="set-poll" type="number" min="0" max="3600" step="1" value="30"></label>
+      <div class="row">
+        <button id="btn-save" class="primary">Save settings</button>
+        <button id="btn-test">Test connection</button>
+        <button id="btn-clear" class="danger">Clear saved settings</button>
+      </div>
+      <p id="set-msg" class="okmsg"></p>
+      <p id="set-err" class="err" role="alert"></p>
+      <p class="hint">Saved in this browser's localStorage under <code>pearl-node-settings</code>. The password is stored as typed — treat this browser profile as holding a credential.</p>
+    </div>
+
+    <div class="panel">
+      <h2>Run the relay <span class="tag">relay.mjs</span></h2>
+      <p class="hint">On the machine running pearld (zero dependencies, Node 18+):</p>
+      <pre class="relay">PEARLD_RPC=http://127.0.0.1:44107 \
+PEARLD_USER=your-rpcuser PEARLD_PASS=your-rpcpass \
+node relay.mjs
+# → listening on http://127.0.0.1:44120 (loopback only)</pre>
+      <p class="hint">The relay forwards <em>only</em> the six read-only methods this console uses, adds CORS headers, and binds to 127.0.0.1. For testnet use <code>PEARLD_RPC=http://127.0.0.1:44109</code>; for a <code>--notls</code> node the http:// URL is correct. If you run pearld with default TLS, keep the relay on the same host — it accepts the node's self-signed cert on your behalf; the browser never sees it.</p>
+    </div>
+
+    <div class="panel">
+      <h2>Enable RPC on pearld</h2>
+      <p class="hint">RPC is disabled unless credentials are set. In <code>pearl.conf</code>:</p>
+      <pre class="relay">rpcuser=your-rpcuser
+rpcpass=a-long-random-password
+# optional: rpclisten=127.0.0.1:44107</pre>
+      <p class="hint">Restart pearld after changing the config. Method names and ports verified against upstream <code>node/docs/json_rpc_api.md</code> (mainnet RPC 44107 / P2P 44108, testnet 44109/44110, testnet2 44111/44112).</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>Built by <a href="https://x.com/kshot9000">@kshot9000</a> · tips:
+    <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code></p>
+  <p class="dim">Pearl Node — read-only console. It never sends state-changing RPCs and never touches wallets. Verify every number against your own node.</p>
+</footer>
+
+<script src="pearl-node.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>

@@ -44,6 +44,7 @@
         <a href="pages/circle/">Circle</a>
         <a href="pages/bounty/">Bounty</a>
         <a href="pages/charity/">Charity</a>
+        <a href="pages/node/">Node</a>
         <a href="pages/raffle/">Raffle</a>
         <a href="pages/swap/">Swap</a>
         <a href="pages/auction/">Auction</a>
@@ -326,6 +327,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Charity — Transparent Donation Desk <span class="badge">new</span></h3>
             <p>Run transparent donation campaigns on Pearl — donations go straight to the charity's own Taproot address; this page never holds, moves, or broadcasts funds. Forge a campaign (tamper-evident descriptor with 64-bit fingerprint, optional organizer signature with key wipe), track funding against the goal with live Blockbook stats and lifecycle classification, issue hash-bound donation receipts with CSV/JSON export, and independently verify any descriptor or receipt cross-checked against the chain. Launch → Fund → Receipts → Track → Verify. Keys never leave the page.</p>
             <div class="card-links"><a href="pages/charity/">Open Pearl Charity →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Node — pearld Operator Console <span class="badge">new</span></h3>
+            <p>Mission control for your own pearld node — chain status, sortable peer table, mempool depth, and mining telemetry over JSON-RPC. Strictly read-only: it only ever calls the six read-only RPC methods (getinfo, getmininginfo, getmempoolinfo, getpeerinfo, getnettotals, getchaintips), never sends state-changing calls, and never touches wallets. Ships with a zero-dependency relay.mjs (browsers can't call pearld directly — no CORS, self-signed TLS), health heuristics with honest warn/error lamps, and a loud network-mismatch guard. Overview → Peers → Mempool → Mining → Settings.</p>
+            <div class="card-links"><a href="pages/node/">Open Pearl Node →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Rain — Batch-Send PRL Airdrops <span class="badge">new</span></h3>
