@@ -66,6 +66,7 @@
         <a href="pages/lend/">Lend</a>
         <a href="pages/dividend/">Dividend</a>
         <a href="pages/split/">Split</a>
+        <a href="pages/quorum/">Quorum</a>
       </nav>
       <a class="btn btn-small" href="https://github.com/pearl-research-labs/pearl" target="_blank" rel="noopener">GitHub ↗</a>
     </div>
@@ -441,6 +442,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Split — Group Expense Settlement Desk <span class="badge">new</span></h3>
             <p>The dark tavern-ledger desk — split group expenses in PRL with grain-exact shares (equal, weighted shares, or percentages with deterministic remainder distribution), compute the minimal who-pays-whom transfer set, and have each debtor sign their own payment locally with BIP-340 Schnorr (air-gapped unsigned bundles, keys wiped after signing, double-confirm broadcast) — plus a local ledger book of settled tabs with CSV export. Loud dust refusal; honest about what the desk can and cannot know.</p>
             <div class="card-links"><a href="pages/split/">Open Pearl Split →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Quorum — n-of-m Multisig Shared-Custody Desk <span class="badge">new</span></h3>
+            <p>The council chamber — shared custody for PRL on pure Taproot script: forge a 1-of-1 to 7-of-7 vault from cosigner public keys (m-of-n CHECKSIGADD leaf under a NUMS internal key, no keypath backdoor by default), fund it, plan grain-exact spends, and collect Schnorr signatures slot by slot — including remote cosigners via tamper-evident signature bundles that are re-verified before counting — then finalize at quorum and broadcast with double-confirm. Keys never leave the page and are wiped after every signing. Honest about the one thing code can't check: that your cosigners are really distinct people.</p>
+            <div class="card-links"><a href="pages/quorum/">Open Pearl Quorum →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Sign — Transaction Forge <span class="badge">new</span></h3>

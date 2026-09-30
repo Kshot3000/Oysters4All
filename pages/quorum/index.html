@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Quorum — m-of-n Taproot Multisig Shared-Custody Desk for PRL</title>
+<meta name="description" content="Pearl Quorum: forge m-of-n Taproot multisig vaults for PRL behind one CHECKSIGADD script leaf under a NUMS internal key, fund them, coordinate cosigner signing rounds as tamper-evident JSON bundles, and broadcast at quorum. The council chamber — no single key moves alone.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 48 48" aria-hidden="true">
+      <circle cx="24" cy="24" r="19" fill="none" stroke="currentColor" stroke-width="2.5"/>
+      <circle cx="24" cy="24" r="12.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="4.4 3.2"/>
+      <circle cx="24" cy="24" r="4" fill="currentColor"/>
+    </svg>
+    <div>
+      <h1>Pearl Quorum</h1>
+      <p class="tagline">the council chamber — m-of-n shared custody in PRL · no single key moves alone</p>
+    </div>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-step="vault" class="active">1 · Vault</button>
+    <button data-step="fund" disabled>2 · Fund</button>
+    <button data-step="spend" disabled>3 · Spend</button>
+    <button data-step="cosign" disabled>4 · Cosign</button>
+    <button data-step="broadcast" disabled>5 · Broadcast</button>
+    <button data-step="ledger">6 · Ledger</button>
+  </nav>
+</header>
+
+<main>
+  <!-- STEP 1: VAULT -->
+  <section id="step-vault" class="panel active">
+    <h2>Convene the council</h2>
+    <p class="lede">Name the vault, seat <strong>1–5 cosigners</strong> by their public keys
+    (<code>x-only</code> 64-hex, or compressed 66-hex — normalized in-browser), and set the
+    <strong>threshold m</strong>. The desk forges one CHECKSIGADD tapscript leaf
+    (<code>0 &lt;K1&gt; CHECKSIGADD … &lt;Kn&gt; CHECKSIGADD &lt;m&gt; EQUAL</code>) sealed under a
+    <strong>NUMS internal key</strong> — nobody knows its discrete log, so there is no keypath
+    backdoor: coins move only through the quorum script. No secrets are collected here; keys
+    stay with their owners.</p>
+    <div class="form-grid">
+      <label>Network
+        <select id="v-network"><option value="mainnet" selected>Mainnet (prl1…)</option><option value="testnet">Testnet (tprl1…)</option></select></label>
+      <label>Vault name <input id="v-name" autocomplete="off" spellcheck="false" placeholder="Ops treasury" maxlength="80"></label>
+      <label>Threshold m <span class="hint">signatures required.</span>
+        <select id="v-m"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option></select></label>
+      <label>Cosigners n <span class="hint">1–5.</span>
+        <select id="v-n"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select></label>
+      <label class="wide">Internal key
+        <select id="v-ikmode">
+          <option value="nums" selected>NUMS — no keypath backdoor (recommended)</option>
+          <option value="cosigner">Designated cosigner key — KEYPATH BACKDOOR (understand the risk)</option>
+        </select></label>
+      <label class="wide" id="v-ikslot-wrap" hidden>Designated slot <span class="hint">that cosigner can spend unilaterally.</span>
+        <select id="v-ikslot"></select></label>
+    </div>
+    <h3>Cosigner public keys <span class="hint">slot order = script order. Distinct keys only.</span></h3>
+    <div id="v-keys"></div>
+    <div class="row">
+      <button id="v-sample" class="ghost">Load sample council (testnet, BIP-340 test keys)</button>
+    </div>
+    <div id="vault-error" class="error" hidden></div>
+    <div class="row">
+      <button id="v-forge" class="primary">Forge vault →</button>
+    </div>
+    <div id="vault-result" hidden>
+      <h3>The seal is set</h3>
+      <dl class="kv">
+        <div><dt>Vault address</dt><dd><code id="v-r-addr" class="addr"></code> <button id="v-copy-addr" class="ghost small">Copy</button></dd></div>
+        <div><dt>Descriptor fingerprint</dt><dd><code id="v-r-fp"></code></dd></div>
+        <div><dt>Script</dt><dd><code id="v-r-asm" class="asm"></code></dd></div>
+        <div><dt>Control block</dt><dd><code id="v-r-cb" class="asm"></code> <span class="hint">single leaf · 33 bytes · no path</span></dd></div>
+      </dl>
+      <div id="v-r-backdoor" class="warn" hidden></div>
+      <div class="row">
+        <button id="v-save" class="ghost">Save vault to ledger</button>
+        <button id="v-export" class="ghost">Export descriptor</button>
+      </div>
+      <label>Descriptor (text) <span class="hint">share this with cosigners — it contains only public data.</span>
+        <textarea id="v-desc-out" rows="9" readonly spellcheck="false"></textarea></label>
+      <div class="form-grid">
+        <label class="wide">Import a descriptor <span class="hint">paste text or JSON — re-derived and tamper-checked.</span>
+          <textarea id="v-desc-in" rows="4" spellcheck="false" placeholder="pearl-quorum:v1:&#10;name: …"></textarea></label>
+      </div>
+      <div class="row">
+        <button id="v-import" class="ghost">Verify &amp; load descriptor</button>
+      </div>
+      <div id="vault-import-error" class="error" hidden></div>
+    </div>
+  </section>
+
+  <!-- STEP 2: FUND -->
+  <section id="step-fund" class="panel">
+    <h2>Fill the treasury</h2>
+    <p class="lede">Send PRL to the vault address. The desk reads the balance and UTXOs live from
+    Blockbook (<strong>GET-only</strong>), or you can paste a UTXO list air-gapped. Use the
+    <strong>recompute</strong> check to prove the address matches the descriptor before anyone funds it.</p>
+    <div class="form-grid">
+      <label class="wide">Vault address <span class="hint">fund this address.</span>
+        <code id="f-addr" class="addr"></code></label>
+      <label>Blockbook base URL <span class="hint">GET-only reads. Leave empty to stay offline.</span>
+        <input id="f-blockbook" autocomplete="off" spellcheck="false" placeholder="https://blockbook.pearlresearch.ai"></label>
+    </div>
+    <div class="fund-row">
+      <canvas id="f-qr" width="168" height="168" aria-label="vault address QR"></canvas>
+      <div class="fund-side">
+        <div class="row">
+          <button id="f-copy" class="ghost">Copy address</button>
+          <button id="f-recompute" class="ghost">Recompute &amp; verify address</button>
+        </div>
+        <div id="f-verify" class="note" hidden></div>
+        <div class="row">
+          <button id="f-fetch" class="primary">Fetch balance &amp; UTXOs</button>
+        </div>
+      </div>
+    </div>
+    <div id="fund-error" class="error" hidden></div>
+    <div id="fund-result" hidden>
+      <dl class="kv">
+        <div><dt>Confirmed balance</dt><dd id="f-r-bal"></dd></div>
+        <div><dt>UTXOs</dt><dd id="f-r-count"></dd></div>
+      </dl>
+      <div class="table-wrap"><table>
+        <thead><tr><th></th><th>Txid</th><th>Vout</th><th>Value (PRL)</th><th>Confs</th></tr></thead>
+        <tbody id="f-utxos"></tbody>
+      </table></div>
+    </div>
+    <h3>Air-gapped UTXO list</h3>
+    <div class="form-grid">
+      <label class="wide">Paste UTXOs (JSON) <span class="hint">[{"txid":"…","vout":0,"value":grains}]</span>
+        <textarea id="f-paste" rows="3" spellcheck="false" placeholder='[{"txid":"…","vout":0,"value":100000000}]'></textarea></label>
+    </div>
+    <div class="row"><button id="f-apply" class="ghost">Use pasted UTXOs</button></div>
+  </section>
+
+  <!-- STEP 3: SPEND -->
+  <section id="step-spend" class="panel">
+    <h2>Draft the motion</h2>
+    <p class="lede">Choose the vault's UTXOs to spend, name the recipients, and set a fee rate. The desk
+    builds an <strong>unsigned bundle</strong> (<code>pearl-quorum-unsigned:v1:</code>) carrying a
+    64-bit fingerprint and the per-input BIP-341 script-path sighash (SIGHASH_DEFAULT). Change returns
+    to the vault; dust change is absorbed into the fee and disclosed. Nothing is signed here.</p>
+    <div class="form-grid">
+      <label>Fee rate (grains/vB) <input id="s-feerate" type="number" min="1" step="any" value="2"></label>
+      <label>Blockbook base URL <span class="hint">for fee estimates (optional).</span>
+        <input id="s-blockbook" autocomplete="off" spellcheck="false" placeholder="https://blockbook.pearlresearch.ai"></label>
+    </div>
+    <h3>Recipients</h3>
+    <div id="s-outputs"></div>
+    <div class="row"><button id="s-add-out" class="ghost">+ Add recipient</button></div>
+    <div id="spend-error" class="error" hidden></div>
+    <div class="row">
+      <button id="s-estimate" class="ghost">Fetch fee estimate</button>
+      <button id="s-build" class="primary">Build unsigned bundle →</button>
+    </div>
+    <div id="spend-result" hidden>
+      <h3>The motion on the table</h3>
+      <dl class="kv">
+        <div><dt>Bundle fingerprint</dt><dd><code id="s-r-fp"></code></dd></div>
+        <div><dt>Inputs</dt><dd id="s-r-ins"></dd></div>
+        <div><dt>To recipients</dt><dd id="s-r-out"></dd></div>
+        <div><dt>Change → vault</dt><dd id="s-r-change"></dd></div>
+        <div><dt>Fee</dt><dd id="s-r-fee"></dd></div>
+        <div><dt>Size</dt><dd id="s-r-vb"></dd></div>
+        <div><dt>Threshold</dt><dd id="s-r-thr"></dd></div>
+      </dl>
+      <div id="s-r-dust" class="warn" hidden></div>
+      <h4>Per-input sighashes <span class="hint">BIP-341 script-path · SIGHASH_DEFAULT</span></h4>
+      <ul id="s-r-digests" class="digests"></ul>
+      <div class="row">
+        <button id="s-export" class="ghost">Download unsigned bundle</button>
+        <button id="s-copy" class="ghost">Copy bundle JSON</button>
+      </div>
+      <label>Unsigned bundle <span class="hint">send this to the cosigners.</span>
+        <textarea id="s-bundle" rows="6" readonly spellcheck="false"></textarea></label>
+    </div>
+  </section>
+
+  <!-- STEP 4: COSIGN -->
+  <section id="step-cosign" class="panel">
+    <h2>Gather the seals</h2>
+    <p class="lede">Each cosigner signs the <strong>same</strong> per-input sighash with their own key —
+    no MuSig ceremony, no key aggregation (this is script-path multisig, so the witness is larger;
+    see Honest limits). Sign locally below, or import signature bundles from cosigners on other
+    machines. <strong>Every imported signature is re-verified before it counts.</strong></p>
+    <div class="cosign-grid">
+      <div class="ring-wrap">
+        <svg id="q-ring" viewBox="0 0 120 120" aria-label="quorum ring"></svg>
+        <div id="q-count" class="ring-count">0/m</div>
+      </div>
+      <div class="cosign-side">
+        <h3>Sign locally</h3>
+        <div class="form-grid">
+          <label class="wide">Unsigned bundle <span class="hint">paste the bundle to sign.</span>
+            <textarea id="c-bundle" rows="4" spellcheck="false" placeholder='{"bundle":"pearl-quorum-unsigned:v1:",…}'></textarea></label>
+          <label>Your slot <select id="c-slot"></select></label>
+          <label class="wide">Your private key <span class="hint">64-hex — memory only, wiped after signing.</span>
+            <input id="c-key" type="password" autocomplete="off" spellcheck="false" placeholder="paste secret to sign"></label>
+        </div>
+        <div class="row">
+          <button id="c-import" class="ghost">Verify &amp; load bundle</button>
+          <button id="c-sign" class="primary">Sign as this slot</button>
+          <button id="c-wipe" class="ghost">Wipe key</button>
+        </div>
+        <div id="cosign-error" class="error" hidden></div>
+        <label>Your signature bundle <span class="hint">send this back to the coordinator.</span>
+          <textarea id="c-sigs-out" rows="4" readonly spellcheck="false"></textarea></label>
+      </div>
+    </div>
+    <h3>Collect cosigner signatures</h3>
+    <div class="form-grid">
+      <label class="wide">Paste a cosigner's signature bundle
+        <textarea id="c-sigs-in" rows="3" spellcheck="false" placeholder='{"bundle":"pearl-quorum-sigs:v1:",…}'></textarea></label>
+    </div>
+    <div class="row"><button id="c-add" class="primary">Verify &amp; add signatures</button></div>
+    <div id="c-collect-error" class="error" hidden></div>
+    <div id="c-slots"></div>
+    <div class="row">
+      <button id="c-finalize" class="primary" disabled>Assemble at quorum →</button>
+    </div>
+    <div id="c-final" hidden>
+      <h3>Quorum reached — the motion carries</h3>
+      <dl class="kv">
+        <div><dt>Txid</dt><dd><code id="c-r-txid" class="addr"></code></dd></div>
+        <div><dt>Signers</dt><dd id="c-r-slots"></dd></div>
+        <div><dt>Fee</dt><dd id="c-r-fee"></dd></div>
+        <div><dt>Signatures re-verified</dt><dd id="c-r-sigs"></dd></div>
+      </dl>
+      <label>Signed hex <textarea id="c-r-hex" rows="4" readonly spellcheck="false"></textarea></label>
+    </div>
+  </section>
+
+  <!-- STEP 5: BROADCAST -->
+  <section id="step-broadcast" class="panel">
+    <h2>Carry the motion</h2>
+    <p class="lede">Broadcast waits behind a <strong>double-confirm</strong> gate. The desk posts the
+    signed hex to Blockbook <code>/api/sendtx</code> and then tracks confirmations.</p>
+    <div class="form-grid">
+      <label>Blockbook base URL
+        <input id="b-blockbook" autocomplete="off" spellcheck="false" placeholder="https://blockbook.pearlresearch.ai"></label>
+    </div>
+    <div id="bcast-error" class="error" hidden></div>
+    <div class="row">
+      <button id="b-arm" class="primary">Arm broadcast</button>
+      <button id="b-confirm" class="ghost" hidden>Confirm broadcast</button>
+    </div>
+    <div id="bcast-result" hidden>
+      <dl class="kv">
+        <div><dt>Status</dt><dd id="b-r-status"></dd></div>
+        <div><dt>Txid</dt><dd><code id="b-r-txid" class="addr"></code></dd></div>
+        <div><dt>Confirmations</dt><dd id="b-r-confs"></dd></div>
+      </dl>
+      <div class="row">
+        <button id="b-track" class="ghost">Check confirmations</button>
+        <button id="b-record" class="ghost">Record in ledger</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 6: LEDGER -->
+  <section id="step-ledger" class="panel">
+    <h2>The council records</h2>
+    <p class="lede">Vaults and carried motions are recorded locally in this browser. Nothing leaves the
+    machine. Export as CSV for your own books.</p>
+    <div class="row">
+      <button id="l-csv-vaults" class="ghost">Export vaults CSV</button>
+      <button id="l-csv-spends" class="ghost">Export spends CSV</button>
+      <button id="l-clear" class="ghost">Clear ledger</button>
+    </div>
+    <div id="ledger-error" class="error" hidden></div>
+    <h3>Vaults</h3>
+    <div id="l-vaults"></div>
+    <h3>Spends</h3>
+    <div id="l-spends"></div>
+  </section>
+
+  <!-- HONEST LIMITS -->
+  <section class="panel limits">
+    <h2>Honest limits</h2>
+    <ul>
+      <li><strong>Script-path multisig, not MuSig.</strong> Every signer produces their own Schnorr
+      signature over the same sighash, and the witness carries all m signatures plus the full script.
+      A quorum spend is therefore <strong>larger and costlier</strong> than a MuSig keypath spend of the
+      same threshold. What you gain: no interactive key-setup ceremony, and every signature is
+      independently verifiable against its cosigner's key.</li>
+      <li><strong>Cosigners must be real, distinct parties holding their own keys.</strong> The desk
+      refuses duplicate keys, but it cannot tell whether two "cosigners" are the same person with two
+      keypairs. A 2-of-3 where one person holds two keys is a 1-of-1 wearing a costume.</li>
+      <li><strong>Verify the vault address independently.</strong> Before funding, recompute the address
+      from the descriptor on a second machine (or with the recompute button) and confirm every cosigner
+      sees the same address. A wrong address means the money is gone.</li>
+      <li><strong>Designated-cosigner internal keys are a backdoor.</strong> NUMS is the default and has
+      no keypath spend. If you choose a cosigner's key as the internal key, that cosigner can spend
+      unilaterally — the desk stamps the warning on the descriptor and every screen.</li>
+      <li><strong>Keys.</strong> Pasted private keys live in memory only and are wiped after signing.
+      Prefer signing on an offline machine and importing the signature bundle.</li>
+      <li><strong>Fees move.</strong> The fee rate is an estimate at planning time; a broadcast tx can
+      linger if the mempool is hot. No real broadcast is performed by any test.</li>
+    </ul>
+  </section>
+</main>
+
+<footer>
+  <p>Built for the Pearl blockchain (PRL) · <a href="https://x.com/kshot9000">@kshot9000</a></p>
+  <p>Support the build: <code id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code></p>
+  <p class="fine">Pearl has no smart contracts — every quorum spend here is a plain Taproot script-path spend, planned grain-exact and signed in your browser.</p>
+</footer>
+
+<script src="qrcode.min.js?v=1"></script>
+<script src="pearl-quorum.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
