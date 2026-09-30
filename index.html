@@ -48,6 +48,7 @@
         <a href="pages/oracle/">Oracle</a>
         <a href="pages/treasury/">Treasury</a>
         <a href="pages/names/">Names</a>
+        <a href="pages/fees/">Fees</a>
         <a href="pages/id/">ID</a>
         <a href="pages/raffle/">Raffle</a>
         <a href="pages/swap/">Swap</a>
@@ -346,6 +347,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Names — Human-readable names for Pearl addresses <span class="badge">new</span></h3>
             <p>Give your Taproot address a name — bind a memorable <code>name.prl</code> to your prl1… address by signing a canonical registration record with the BIP-86 key that controls it, then seal it on-chain in a <code>prl-name</code> Taproot inscription envelope: Register → Directory → Verify → Export. Name rules (3–63 chars, reserved list), wrong-key refusal on signing, standalone VALID/INVALID verifier that re-derives the address from the key and re-checks the BIP-340 signature, first-seen conflict resolution in the local directory, full commit→reveal planning with grain-exact fees, and witness self-verification before broadcast. No new cryptography — audited Sign/Etch cores throughout; keys in memory only.</p>
             <div class="card-links"><a href="pages/names/">Open Pearl Names →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Fees — the fee-rate desk for PRL <span class="badge">new</span></h3>
+            <p>Stop guessing what a Pearl transaction costs. Point the desk at your pearld RPC and it reads the live mempool, ranks every transaction in grains per vbyte, and gives you four honest bands — next block, ~10 minutes, ~1 hour, economy — each with a rough confirmation ETA from a real packing model (~1 MB blocks, 3m14s target). The size estimator plans P2TR key-spend transactions to the vbyte, and the bump planner fetches a stuck txid, measures its exact vsize from the raw bytes, and tells you what an RBF replacement or CPFP child must pay — including whether the original even signaled RBF. Read-only throughout: no signing, no broadcasting, no keys anywhere near the page; sample-data mode is always loudly labeled when no node is connected.</p>
+            <div class="card-links"><a href="pages/fees/">Open Pearl Fees →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl ID — Sign-in with Pearl <span class="badge">new</span></h3>

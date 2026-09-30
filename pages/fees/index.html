@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Fees — the fee-rate desk for PRL</title>
+<meta name="description" content="Live mempool fee-rate histogram for Pearl (PRL): connect your pearld node, read real fee percentiles, plan P2TR transaction sizes, and build fee-bump plans for stuck transactions. Read-only — keys never touch this page.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="hero">
+  <div class="seal" aria-hidden="true">◍</div>
+  <div class="hero-inner">
+    <p class="kicker">Pearl · Fees Desk</p>
+    <h1>Pearl Fees</h1>
+    <p class="sub">The fee-rate desk for PRL. Point it at your <em>pearld</em> node's
+      RPC and it reads the live mempool, ranks every transaction by
+      <em>grains per vbyte</em>, and tells you what to pay for next-block,
+      ~10-minute, ~1-hour, or economy confirmation. Plan P2TR transaction sizes,
+      and build an honest fee-bump plan for a stuck transaction. Read-only —
+      <em>keys never touch this page</em>.</p>
+    <nav id="steps" class="steps" aria-label="Workflow steps">
+      <button data-step="mempool" class="active">1 · Mempool</button>
+      <button data-step="estimator">2 · Size Estimator</button>
+      <button data-step="bump">3 · Bump Planner</button>
+      <button data-step="settings">4 · Settings</button>
+    </nav>
+  </div>
+</header>
+
+<aside class="limits" aria-label="Honest limits">
+  <div>
+    <strong>Honest limits — always true:</strong>
+    <ul>
+      <li>Pearl has <em>no smart contracts</em> and no fee market oracle: rates come
+        from <em>your own node's mempool</em> via <code>getrawmempool(verbose=true)</code>,
+        or from clearly-labeled <em>sample data</em> when no node is connected.</li>
+      <li>Confirmation estimates are a rough model (fee-rate-priority packing into
+        ~1 MB blocks, ~3m14s block target). Miners may order transactions however
+        they like — treat every ETA as a guess, not a promise.</li>
+      <li>The bump planner <em>plans numbers only</em> — it never signs, never
+        broadcasts, and cannot see your wallet. RBF only works if the stuck tx
+        signaled it and your node's policy accepts replacements.</li>
+      <li>RPC credentials stay in this browser's localStorage. Nothing is sent
+        anywhere except to the endpoint you configure.</li>
+    </ul>
+  </div>
+</aside>
+
+<main>
+  <!-- ============ 1 · MEMPOOL ============ -->
+  <section id="step-mempool" class="panel active">
+    <h2>Live mempool fee rates</h2>
+    <div class="bar">
+      <span id="conn-badge"></span>
+      <button id="refresh">↻ Refresh mempool</button>
+      <span id="m-status" class="hint"></span>
+    </div>
+    <div id="m-stats" class="stats"></div>
+    <h3>Fee-rate distribution <span class="dim">(grains per vbyte, log scale)</span></h3>
+    <canvas id="m-hist" aria-label="Fee rate histogram"></canvas>
+    <h3>What should I pay?</h3>
+    <div id="m-recs" class="recs"></div>
+    <h3>Top of the mempool <span class="dim">by fee rate</span></h3>
+    <div class="table-wrap"><div id="m-table"></div></div>
+  </section>
+
+  <!-- ============ 2 · ESTIMATOR ============ -->
+  <section id="step-estimator" class="panel">
+    <h2>Transaction size &amp; fee estimator</h2>
+    <p class="hint">Sizes are for Pearl's native <strong>P2TR key-path (BIP-86)</strong>
+      spends: 57.5 vB per input, 43 vB per P2TR output, 11 vB overhead. If your wallet
+      uses script-path spends, sizes will be larger — treat these as a floor.</p>
+    <div class="grid">
+      <label>Inputs (P2TR key-spend)<input id="e-nin" type="number" min="0" value="1" class="mono"></label>
+      <label>Outputs (P2TR)<input id="e-nout" type="number" min="1" value="2" class="mono"></label>
+      <label>Est. size<input id="e-vsize" class="mono" readonly value="—" tabindex="-1"></label>
+    </div>
+    <div id="e-presets" class="row">
+      <span class="hint">Presets:</span>
+      <button data-nin="1" data-nout="2">Simple send · 1 in / 2 out</button>
+      <button data-nin="3" data-nout="2">Consolidation · 3 in / 2 out</button>
+      <button data-nin="10" data-nout="1">Sweep · 10 in / 1 out</button>
+    </div>
+    <h3>Target confirmation speed</h3>
+    <div id="e-targets" class="radio-row"></div>
+    <div class="grid">
+      <label>Fee rate (grains/vB)<input id="e-rate" type="number" min="1" value="50" class="mono"></label>
+    </div>
+    <div id="e-fee" class="fee-card"></div>
+  </section>
+
+  <!-- ============ 3 · BUMP PLANNER ============ -->
+  <section id="step-bump" class="panel">
+    <h2>Stuck-transaction bump planner</h2>
+    <p class="hint">Paste a stuck transaction's txid. The desk fetches it from your
+      connected node, measures its exact vsize from the raw bytes, and tells you
+      what a replacement (RBF) or CPFP child must pay to reach your target rate —
+      plus whether the original even signaled RBF.</p>
+    <div class="grid">
+      <label style="grid-column: 1 / -1">Stuck txid<input id="b-txid" class="mono" spellcheck="false" placeholder="64 hex characters"></label>
+      <label>Fee it paid<input id="b-fee" type="number" min="0" step="any" class="mono" placeholder="e.g. 141"></label>
+      <label>Fee unit
+        <select id="b-feeunit">
+          <option value="grains" selected>grains</option>
+          <option value="prl">PRL</option>
+        </select>
+      </label>
+      <label>Target rate<select id="b-target" class="mono"></select></label>
+    </div>
+    <div class="row">
+      <button id="b-run" class="primary">Build bump plan</button>
+      <span id="b-err" class="err" role="alert"></span>
+    </div>
+    <div id="b-out"></div>
+  </section>
+
+  <!-- ============ 4 · SETTINGS ============ -->
+  <section id="step-settings" class="panel">
+    <h2>Node connection</h2>
+    <p class="hint">Pearl's RPC is disabled by default. Enable it in
+      <code>pearld.conf</code> with <code>rpcuser</code> / <code>rpcpass</code>
+      (RPC listens on port <code>44107</code> mainnet / <code>44109</code> testnet,
+      TLS on by default). Everything stays between this page and your node.</p>
+    <div class="grid">
+      <label style="grid-column: 1 / -1">RPC endpoint<input id="s-endpoint" spellcheck="false" placeholder="https://127.0.0.1:44107"></label>
+      <label>RPC user<input id="s-user" autocomplete="off"></label>
+      <label>RPC password<input id="s-pass" type="password" autocomplete="off"></label>
+    </div>
+    <div class="row">
+      <button id="s-connect" class="primary">Save &amp; connect</button>
+      <label class="radio"><input type="checkbox" id="s-auto"> Auto-refresh every 30s</label>
+      <span id="s-err" class="err" role="alert"></span>
+    </div>
+    <p class="hint">Leave the endpoint empty and the desk runs on clearly-labeled
+      sample data — the estimator and math all still work.</p>
+  </section>
+</main>
+
+<footer>
+  <div>Built by <a href="https://x.com/kshot9000">@kshot9000</a> for the Pearl (PRL) ecosystem.</div>
+  <div>Donations: <span class="donate" id="foot-donate"></span></div>
+  <div class="dim">pearld RPC: getmempoolinfo · getrawmempool(verbose) · getrawtransaction · MaxBlockVsize 1,000,000 vB · 3m14s blocks · 1 PRL = 10⁸ grains</div>
+</footer>
+
+<script src="pearl-fees.bundle.js?v=1"></script>
+</body>
+</html>
