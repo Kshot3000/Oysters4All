@@ -46,6 +46,7 @@
         <a href="pages/charity/">Charity</a>
         <a href="pages/node/">Node</a>
         <a href="pages/oracle/">Oracle</a>
+        <a href="pages/id/">ID</a>
         <a href="pages/raffle/">Raffle</a>
         <a href="pages/swap/">Swap</a>
         <a href="pages/auction/">Auction</a>
@@ -333,6 +334,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Node — pearld Operator Console <span class="badge">new</span></h3>
             <p>Mission control for your own pearld node — chain status, sortable peer table, mempool depth, and mining telemetry over JSON-RPC. Strictly read-only: it only ever calls the six read-only RPC methods (getinfo, getmininginfo, getmempoolinfo, getpeerinfo, getnettotals, getchaintips), never sends state-changing calls, and never touches wallets. Ships with a zero-dependency relay.mjs (browsers can't call pearld directly — no CORS, self-signed TLS), health heuristics with honest warn/error lamps, and a loud network-mismatch guard. Overview → Peers → Mempool → Mining → Settings.</p>
             <div class="card-links"><a href="pages/node/">Open Pearl Node →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl ID — Sign-in with Pearl <span class="badge">new</span></h3>
+            <p>Your key is your account — Pearl has no usernames, passwords, or OAuth. A site shows you a domain + challenge; you sign it with the BIP-340 Schnorr key that also controls your prl1… address and hand back an expiring credential anyone can verify: Keys → Sign in → Verify → Integrate. The verifier recomputes the address from the key (the username really is the key), checks the domain binding and expiry, and rules VALID / INVALID. No new cryptography — the audited Sign core throughout. Honest limits up front: a signature proves key control, not identity; credentials replay until expiry, so relying parties use single-use challenges and minute-scale lifetimes.</p>
+            <div class="card-links"><a href="pages/id/">Open Pearl ID →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Oracle — Signed Price-Feed Ticker Desk <span class="badge">new</span></h3>

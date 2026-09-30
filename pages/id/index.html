@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl ID — Sign-in with Pearl</title>
+<meta name="description" content="Sign-in with Pearl: your BIP-86 PRL key is your account. Sign a relying party's challenge with a BIP-340 Schnorr signature; anyone can verify it. No passwords, no OAuth, no accounts.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="top">
+  <div class="seal">⚿</div>
+  <h1>Pearl ID</h1>
+  <p class="tagline">Sign-in with Pearl — your key is your account. Sign a site's challenge, prove you hold the key, log in as your prl1… address. No passwords. No OAuth.</p>
+</header>
+
+<div class="wrap">
+  <aside class="limits" aria-label="Honest limits">
+    <h2>Honest limits</h2>
+    <ul>
+      <li>A signature proves <b>control of a key</b> — not a real-world identity, not trustworthiness, not humanity.</li>
+      <li>A credential <b>replays until it expires</b>. Relying parties must use single-use ≥128-bit challenges and short expiries — the math can't enforce that for them.</li>
+      <li><b>Read the domain line before you sign.</b> Signing moves no PRL and broadcasts nothing, but never sign a challenge from a site you don't trust.</li>
+      <li>Keys live in this page's memory only. <b>Wipe them</b> when you're done on a shared machine.</li>
+    </ul>
+  </aside>
+
+  <nav id="tabs" aria-label="Pearl ID steps">
+    <button data-tab="keys" class="active">1 · Keys</button>
+    <button data-tab="signin">2 · Sign in</button>
+    <button data-tab="verify">3 · Verify</button>
+    <button data-tab="integrate">4 · Integrate</button>
+  </nav>
+
+  <div class="layout">
+    <main class="maincol">
+      <!-- ============ TAB 1: KEYS ============ -->
+      <section class="tab active" id="tab-keys">
+        <div class="panel">
+          <h2>Your identity key</h2>
+          <p class="lede">Your Pearl ID <em>is</em> a BIP-86 key. Its identity is the <b>tweaked keypath x-only pubkey</b> — the same key that controls its PRL address. Sites see your <b>prl1… address as your username</b>.</p>
+          <div class="btnrow">
+            <button class="btn" id="pid-gen12">Generate new identity key (12 words)</button>
+          </div>
+          <div class="field">
+            <label for="pid-import-input">…or load an existing secret — 12/24-word mnemonic, WIF, or hex private key (auto-detected)</label>
+            <textarea id="pid-import-input" placeholder="12 or 24 word mnemonic, WIF, or 64-hex private key…" autocomplete="off" spellcheck="false"></textarea>
+            <div class="hint">Stays in this page's memory only. Never sent anywhere. Never written to disk by this page. Signing happens locally.</div>
+          </div>
+          <div class="btnrow">
+            <button class="btn" id="pid-import">Load identity key</button>
+            <button class="btn danger" id="pid-wipe" hidden>Wipe keys from memory</button>
+          </div>
+          <div class="alert error" id="pid-identity-err" hidden></div>
+          <div id="pid-key-out" hidden>
+            <h3>Identity</h3>
+            <div class="kv">
+              <dt>Key source</dt><dd id="pid-key-source"></dd>
+              <dt>Username <span class="hint">(your prl1… address — this is what sites see)</span></dt>
+              <dd><div class="addr-row"><code id="pid-address"></code> <button class="copy-btn" data-for="pid-address">Copy</button></div></dd>
+              <dt>Identity x-only pubkey <span class="hint">(tweaked keypath — the signing identity)</span></dt>
+              <dd><div class="addr-row"><code id="pid-xonly"></code> <button class="copy-btn" data-for="pid-xonly">Copy</button></div></dd>
+              <dt>Network</dt><dd id="pid-network"></dd>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ TAB 2: SIGN IN ============ -->
+      <section class="tab" id="tab-signin">
+        <div class="panel">
+          <h2>Sign a login challenge</h2>
+          <p class="lede">A site that wants you to log in shows you a <b>domain</b> and a <b>challenge</b>. Paste them here, check the domain is really the site you mean to log in to, and sign. What you hand the site is a credential anyone can verify — and it expires.</p>
+          <div class="field">
+            <label for="pid-domain">Relying-party domain (must match the site exactly)</label>
+            <input id="pid-domain" type="text" placeholder="shop.example.com" autocomplete="off" spellcheck="false">
+          </div>
+          <div class="field">
+            <label for="pid-challenge">Challenge (32 or 64 hex chars — the site's single-use randomness)</label>
+            <div class="addr-row">
+              <input id="pid-challenge" type="text" placeholder="64 hex chars…" autocomplete="off" spellcheck="false" style="flex:1">
+              <button class="btn" id="pid-new-challenge">Generate</button>
+              <button class="btn ghost" id="pid-fill-demo" title="Fill a demo domain + fresh challenge so you can try the full loop without a relying party">Demo values</button>
+            </div>
+            <div class="hint">"Generate" mints a fresh 256-bit challenge for testing. A real site gives you its own — paste that instead.</div>
+          </div>
+          <div class="field">
+            <label for="pid-expiry">Credential lifetime</label>
+            <select id="pid-expiry">
+              <option value="300">5 minutes (recommended)</option>
+              <option value="3600">1 hour</option>
+              <option value="86400">24 hours</option>
+            </select>
+            <div class="hint">Shorter is safer: a leaked credential replays until it expires.</div>
+          </div>
+          <div class="btnrow">
+            <button class="btn primary" id="pid-sign">Review &amp; sign credential</button>
+          </div>
+          <div class="alert error" id="pid-sign-err" hidden></div>
+          <div id="pid-confirm" hidden>
+            <h3>Confirm what you're signing</h3>
+            <div class="kv">
+              <dt>Logging in to</dt><dd><b id="pid-confirm-domain"></b></dd>
+              <dt>As</dt><dd><code id="pid-confirm-address"></code></dd>
+              <dt>Challenge</dt><dd><code id="pid-confirm-challenge"></code></dd>
+              <dt>Expires</dt><dd id="pid-confirm-expiry"></dd>
+            </div>
+            <div class="btnrow">
+              <button class="btn primary" id="pid-confirm-sign">Sign — log me in</button>
+              <button class="btn ghost" id="pid-confirm-cancel">Cancel</button>
+            </div>
+          </div>
+          <div id="pid-cred-out" hidden>
+            <h3>Signed credential <span class="fp">fingerprint <code id="pid-cred-fingerprint"></code></span></h3>
+            <p class="hint">Hand this JSON to the site (paste it into their login box). It proves you hold the key for <code id="pid-cred-address"></code> and nothing else.</p>
+            <pre id="pid-cred-json" class="code"></pre>
+            <div class="btnrow">
+              <button class="btn" id="pid-copy-cred">Copy credential</button>
+              <button class="btn ghost" id="pid-download-cred">Download .json</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ TAB 3: VERIFY ============ -->
+      <section class="tab" id="tab-verify">
+        <div class="panel">
+          <h2>Verify a credential</h2>
+          <p class="lede">Standalone verifier — no key needed. Paste any Pearl ID credential: the page recomputes the canonical bytes, checks the 64-bit fingerprint, verifies the BIP-340 signature, <b>recomputes the address from the key</b> (the username really is the key), checks the domain binding and expiry, and rules VALID / INVALID.</p>
+          <div class="field">
+            <label for="pid-verify-input">Credential JSON</label>
+            <textarea id="pid-verify-input" placeholder='{"protocol":"prl-id",…}' autocomplete="off" spellcheck="false" rows="8"></textarea>
+          </div>
+          <div class="field">
+            <label for="pid-verify-domain">Expected domain (optional — relying parties: always set this)</label>
+            <input id="pid-verify-domain" type="text" placeholder="shop.example.com" autocomplete="off" spellcheck="false">
+          </div>
+          <div class="btnrow">
+            <button class="btn primary" id="pid-verify-btn">Verify credential</button>
+          </div>
+          <div id="pid-verify-result" hidden>
+            <h3>Verdict: <span id="pid-verdict" class="verdict"></span></h3>
+            <p class="hint">Credential id: <code id="pid-verify-id"></code></p>
+            <div id="pid-verify-checks"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ TAB 4: INTEGRATE ============ -->
+      <section class="tab" id="tab-integrate">
+        <div class="panel">
+          <h2>Relying-party integration</h2>
+          <p class="lede">Add "Sign in with Pearl" to your site in an afternoon. The protocol is four steps; the verifier is twenty lines.</p>
+          <h3>The protocol</h3>
+          <ol class="steps">
+            <li><b>Issue:</b> generate 32 random bytes (hex), store them server-side as single-use with a ≤5-minute TTL, and show the user your domain + the challenge.</li>
+            <li><b>Collect:</b> the user returns a <code>prl-id</code> credential (this page's Sign-in tab produces one).</li>
+            <li><b>Verify:</b> run the snippet below. It checks the signature, the address↔key binding, the domain, and the expiry.</li>
+            <li><b>Consume:</b> check the credential's challenge equals the one you issued, then <b>burn it</b> — never accept the same challenge twice. The <code>address</code> field is the user's account id.</li>
+          </ol>
+          <h3>Verifier snippet <span class="hint">(needs <code>pearl-id.bundle.js</code> → <code>window.PearlID</code>)</span></h3>
+          <pre id="pid-snippet-verify" class="code"></pre>
+          <div class="btnrow"><button class="btn" id="pid-copy-snippet-verify">Copy verifier snippet</button></div>
+          <h3>Issuer snippet (node)</h3>
+          <pre id="pid-snippet-issuer" class="code"></pre>
+          <div class="btnrow"><button class="btn" id="pid-copy-snippet-issuer">Copy issuer snippet</button></div>
+          <h3>Security notes</h3>
+          <ul class="notes">
+            <li>Challenges MUST be ≥128-bit CSPRNG output, single-use, and bound to one domain. Reused challenges are replayable logins.</li>
+            <li>Keep credential lifetimes in minutes. A leaked credential is a bearer token until <code>expires_at</code>.</li>
+            <li>Always pass <code>expectedDomain</code> — a credential for another domain must not log anyone in here.</li>
+            <li>Signatures prove key control, not personhood. If you need humans, that's your problem to solve — the math won't.</li>
+            <li>Phishing: only ever sign challenges on the domain you intend to log in to. This page shows the domain big before signing for exactly that reason.</li>
+          </ul>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<footer class="foot">
+  <p>Pearl ID · sign-in with Pearl · built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a></p>
+  <p class="donate">PRL tips: <code id="foot-prl">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code> <button class="copy-btn" data-for="foot-prl">Copy</button></p>
+</footer>
+
+<script src="pearl-id.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
