@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Channels — Off-Chain PRL Payment Channels</title>
+<meta name="description" content="Pearl Channels: off-chain PRL payment channels with no smart contracts. Open a 2-of-2 Taproot channel, exchange signed commitment transactions off-chain, close cooperatively or unilaterally with a CSV delay. Keys never leave your browser.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 32 32" aria-hidden="true"><path d="M4 16h6l3-8 4 16 3-8h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="16" cy="16" r="13.5" fill="none" stroke="currentColor" stroke-width="1.4" opacity="0.45"/></svg>
+    <div>
+      <h1>Pearl Channels</h1>
+      <p class="tagline">Off-chain PRL payment channels — the switchboard desk</p>
+    </div>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-step="open" class="active">1 · Open</button>
+    <button data-step="fund" disabled>2 · Fund</button>
+    <button data-step="state" disabled>3 · State</button>
+    <button data-step="close" disabled>4 · Close</button>
+    <button data-step="track" disabled>5 · Track</button>
+    <button data-step="verify">6 · Verify</button>
+  </nav>
+</header>
+
+<main>
+  <!-- STEP 1: OPEN -->
+  <section id="step-open" class="panel active">
+    <h2>Open a channel</h2>
+    <p class="lede">Lock PRL into a 2-of-2 Taproot output shared with one counterparty. Pearl has no smart
+    contracts, so the channel is pure script: <strong>both of you must sign</strong> to move the funds —
+    on-chain via a cooperative close, or off-chain by exchanging signed commitment transactions that either
+    of you can broadcast. Your money, your keys, no custodian.</p>
+
+    <div class="form-grid">
+      <label>Your key <span class="hint">64-hex x-only pubkey or 12/24-word mnemonic (BIP-86). Needed to sign — kept in memory only, never stored.</span>
+        <input id="open-mykey" type="password" autocomplete="off" spellcheck="false" placeholder="x-only pubkey or mnemonic"></label>
+      <label>Peer x-only pubkey <span class="hint">64 hex characters. Their half of the 2-of-2.</span>
+        <input id="open-peerkey" autocomplete="off" spellcheck="false" placeholder="peer x-only pubkey"></label>
+      <label>Your payout address <span class="hint">prl1… address where your balance lands on close.</span>
+        <input id="open-mypayout" autocomplete="off" spellcheck="false" placeholder="prl1…"></label>
+      <label>Peer payout address <span class="hint">prl1… address where their balance lands. Immediate on every commitment.</span>
+        <input id="open-peerpayout" autocomplete="off" spellcheck="false" placeholder="prl1…"></label>
+      <label>Your capacity (PRL) <input id="open-mycap" type="number" min="0" step="any" value="10"></label>
+      <label>Peer capacity (PRL) <input id="open-peercap" type="number" min="0" step="any" value="5"></label>
+      <label>CSV delay (blocks) <span class="hint">How long your unilateral-close claim waits. 144 ≈ 8h. 1–65535.</span>
+        <input id="open-csv" type="number" min="1" max="65535" value="144"></label>
+      <label>Fee rate (grains/vB) <input id="open-feerate" type="number" min="0.1" step="any" value="2"></label>
+    </div>
+    <div class="row">
+      <button id="open-build" class="primary">Open channel</button>
+      <button id="open-restore" class="ghost">Restore from descriptor</button>
+    </div>
+    <div id="open-error" class="error" hidden></div>
+    <div id="open-result" hidden>
+      <h3>Channel open</h3>
+      <dl class="kv">
+        <div><dt>Channel address</dt><dd><code id="open-address" class="addr"></code></dd></div>
+        <div><dt>Short descriptor</dt><dd><code id="open-shortdesc"></code></dd></div>
+        <div><dt>64-bit fingerprint</dt><dd><code id="open-fp"></code></dd></div>
+        <div><dt>Capacity</dt><dd id="open-cap"></dd></div>
+        <div><dt>CSV delay</dt><dd id="open-csvshow"></dd></div>
+      </dl>
+      <details><summary>Funding script (2-of-2 CHECKSIGADD)</summary><pre id="open-script" class="asm"></pre></details>
+      <details><summary>Full descriptor JSON (share with your peer)</summary><pre id="open-descriptor" class="json"></pre>
+        <div class="row"><button id="open-copydesc" class="ghost">Copy descriptor</button>
+        <button id="open-dl" class="ghost">Download descriptor</button></div></details>
+      <div class="note">Fund this address (step 2) to activate the channel. Until the funding transaction
+      confirms, no state is valid — commitment transactions spend a funding output that does not exist yet.</div>
+    </div>
+    <div id="open-restorebox" hidden>
+      <h3>Restore</h3>
+      <p class="lede">Paste a channel descriptor JSON exported earlier. It is re-derived from the keys and
+      refused unless every byte matches.</p>
+      <textarea id="open-restorejson" rows="8" spellcheck="false" placeholder='{"kind":"pearl-channel-descriptor:v1",…}'></textarea>
+      <div class="row"><button id="open-dorestore" class="primary">Verify &amp; restore</button></div>
+      <div id="open-restoreerror" class="error" hidden></div>
+    </div>
+  </section>
+
+  <!-- STEP 2: FUND -->
+  <section id="step-fund" class="panel">
+    <h2>Fund the channel</h2>
+    <p class="lede">Send your capacity to the channel address in one transaction. The fee comes from your
+    wallet, not the channel — commitment balances always sum to the full capacity.</p>
+    <div class="form-grid">
+      <label>Blockbook base URL <span class="hint">GET-only reads. Stored locally.</span>
+        <input id="fund-blockbook" autocomplete="off" spellcheck="false" placeholder="https://blockbook.pearl.example"></label>
+      <label>Fee rate (grains/vB) <input id="fund-feerate" type="number" min="0.1" step="any" value="2"></label>
+    </div>
+    <div class="row">
+      <button id="fund-scan" class="primary">Scan my UTXOs</button>
+      <button id="fund-pastebtn" class="ghost">Paste UTXOs instead</button>
+    </div>
+    <div id="fund-pastebox" hidden>
+      <textarea id="fund-paste" rows="6" spellcheck="false" placeholder='[{"txid":"…","vout":0,"value":"…","spk":"…"}, …]'></textarea>
+    </div>
+    <div id="fund-utxos"></div>
+    <div class="row">
+      <label class="inline">Signing key <input id="fund-key" type="password" autocomplete="off" spellcheck="false" placeholder="your mnemonic or WIF privkey"></label>
+      <button id="fund-build" class="primary">Build &amp; sign funding tx</button>
+      <button id="fund-wipe" class="ghost">Wipe key</button>
+    </div>
+    <div id="fund-error" class="error" hidden></div>
+    <div id="fund-result" hidden>
+      <h3>Funding transaction</h3>
+      <dl class="kv">
+        <div><dt>txid</dt><dd><code id="fund-txid" class="addr"></code></dd></div>
+        <div><dt>Fee</dt><dd id="fund-fee"></dd></div>
+        <div><dt>Change</dt><dd id="fund-change"></dd></div>
+      </dl>
+      <textarea id="fund-hex" rows="4" readonly spellcheck="false"></textarea>
+      <div class="row">
+        <button id="fund-broadcast" class="primary">Broadcast (double-confirm)</button>
+        <button id="fund-confirm" class="ghost">Mark funded — I broadcast elsewhere</button>
+      </div>
+      <div id="fund-broadcast-note" class="note" hidden></div>
+    </div>
+    <div id="fund-manual" hidden>
+      <h3>Already funded?</h3>
+      <p class="lede">Paste the funding txid (and vout, usually 0) if you funded the channel address from another wallet.</p>
+      <div class="row">
+        <label class="inline">Funding txid <input id="fund-manualtxid" size="66" autocomplete="off" spellcheck="false"></label>
+        <label class="inline">vout <input id="fund-manualvout" type="number" min="0" value="0" style="width:5em"></label>
+        <button id="fund-manualgo" class="primary">Use this funding</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 3: STATE -->
+  <section id="step-state" class="panel">
+    <h2>Channel state</h2>
+    <p class="lede">Each payment is a new <strong>state</strong>: both balances, a fresh pair of commitment
+    transactions, and revoked old secrets. Propose a payment, sign your copies, exchange with your peer
+    (export / import below), then revoke the old state. The latest fully-signed state is the truth.</p>
+    <div id="state-current" class="statecard" hidden>
+      <div class="statehead"><span id="state-version"></span><span id="state-fp" class="fp"></span></div>
+      <div class="splitbar"><div id="state-minebar"></div><div id="state-peerbar"></div></div>
+      <div class="splitlabels"><span id="state-minelabel"></span><span id="state-peerlabel"></span></div>
+      <div id="state-sigs" class="sigstatus"></div>
+    </div>
+    <h3>Propose a payment</h3>
+    <div class="form-grid">
+      <label>Direction
+        <select id="pay-direction"><option value="out">I pay the peer</option><option value="in">Peer pays me</option></select></label>
+      <label>Amount (PRL) <input id="pay-amount" type="number" min="0" step="any" placeholder="0.5"></label>
+      <label>Fee rate (grains/vB) <input id="pay-feerate" type="number" min="0.1" step="any" value="2"></label>
+      <label>Peer's revocation hash160 <span class="hint">40 hex chars, sent by your peer for this state. Leave blank only while testing — a placeholder is generated and clearly labeled, and replaced when their bundle arrives.</span>
+        <input id="pay-peerhash" autocomplete="off" spellcheck="false" placeholder="optional — 40 hex chars"></label>
+    </div>
+    <div class="row">
+      <button id="pay-propose" class="primary">Propose state</button>
+    </div>
+    <div id="pay-error" class="error" hidden></div>
+    <div id="pay-result" hidden>
+      <h3>Proposed state <span id="pay-version"></span></h3>
+      <dl class="kv">
+        <div><dt>Your balance</dt><dd id="pay-mine"></dd></div>
+        <div><dt>Peer balance</dt><dd id="pay-peer"></dd></div>
+        <div><dt>Your commitment fee</dt><dd id="pay-fee"></dd></div>
+        <div><dt>Your revocation hash160</dt><dd><code id="pay-revhash"></code></dd></div>
+      </dl>
+      <div class="note" id="pay-notes"></div>
+      <div class="row">
+        <label class="inline">Signing key <input id="pay-key" type="password" autocomplete="off" spellcheck="false" placeholder="your mnemonic or privkey"></label>
+        <button id="pay-sign" class="primary">Sign my copies</button>
+        <button id="pay-wipe" class="ghost">Wipe key</button>
+      </div>
+      <div id="pay-signstatus" class="sigstatus"></div>
+      <h4>Exchange with your peer</h4>
+      <div class="row">
+        <button id="pay-export" class="ghost">Export state bundle</button>
+        <label class="filebtn ghost">Import peer bundle<input type="file" id="pay-importfile" accept=".json,application/json" hidden></label>
+      </div>
+      <textarea id="pay-bundle" rows="8" spellcheck="false" placeholder="State bundle JSON appears here — send it to your peer; paste theirs below."></textarea>
+      <div class="row"><button id="pay-importtext" class="ghost">Import pasted bundle</button></div>
+      <h4>Peer's signatures</h4>
+      <p class="lede">Paste your peer's two signatures (one per commitment copy) from their bundle, or import
+      their bundle above to fill them automatically.</p>
+      <div class="form-grid">
+        <label>Peer sig — your commitment <input id="pay-peersig-mine" autocomplete="off" spellcheck="false" placeholder="128 hex chars"></label>
+        <label>Peer sig — their commitment <input id="pay-peersig-theirs" autocomplete="off" spellcheck="false" placeholder="128 hex chars"></label>
+      </div>
+      <div class="row"><button id="pay-assemble" class="primary">Verify &amp; assemble both commitments</button></div>
+      <div id="pay-assembled" hidden>
+        <h4>Fully-signed commitments</h4>
+        <dl class="kv">
+          <div><dt>Your commitment txid</dt><dd><code id="pay-txid-mine" class="addr"></code></dd></div>
+          <div><dt>Their commitment txid</dt><dd><code id="pay-txid-theirs" class="addr"></code></dd></div>
+        </dl>
+        <textarea id="pay-hex-mine" rows="3" readonly spellcheck="false"></textarea>
+        <textarea id="pay-hex-theirs" rows="3" readonly spellcheck="false"></textarea>
+        <div class="row"><button id="pay-activate" class="primary">Activate this state (revoke the old one)</button></div>
+      </div>
+    </div>
+    <div id="state-revokebox" hidden>
+      <h3>Revocation</h3>
+      <p class="lede">Activating a new state revokes the old one. Reveal your old revocation secret to your
+      peer — with it, they can penalize you if you ever broadcast the revoked state. Record the secret
+      they reveal to you.</p>
+      <dl class="kv">
+        <div><dt>Reveal to peer (your old secret)</dt><dd><code id="revoke-mine" class="addr"></code> <button id="revoke-copy" class="ghost">Copy</button></dd></div>
+      </dl>
+      <div class="row">
+        <label class="inline">Peer's revealed secret <input id="revoke-theirs" size="64" autocomplete="off" spellcheck="false" placeholder="64 hex chars"></label>
+        <button id="revoke-record" class="primary">Record</button>
+      </div>
+      <div id="revoke-status" class="note"></div>
+    </div>
+    <div id="state-history"><h3>History</h3><div id="state-historylist" class="history"></div></div>
+  </section>
+
+  <!-- STEP 4: CLOSE -->
+  <section id="step-close" class="panel">
+    <h2>Close the channel</h2>
+    <p class="lede">Two ways out. <strong>Cooperative</strong> needs both signatures but settles immediately.
+    <strong>Unilateral</strong> needs only you: broadcast your latest fully-signed commitment, wait out the
+    CSV delay, then claim your output. Never broadcast an old state — your peer holds the revocation secret.</p>
+    <div class="closegrid">
+      <div class="closecard">
+        <h3>Cooperative close</h3>
+        <p class="lede">Immediate outputs to both payout addresses. Fee split equally.</p>
+        <div class="row"><button id="close-coop-build" class="primary">Build cooperative close</button></div>
+        <div id="close-coop-error" class="error" hidden></div>
+        <div id="close-coop-result" hidden>
+          <dl class="kv">
+            <div><dt>txid</dt><dd><code id="close-coop-txid" class="addr"></code></dd></div>
+            <div><dt>Fee</dt><dd id="close-coop-fee"></dd></div>
+            <div><dt>Your output</dt><dd id="close-coop-mine"></dd></div>
+            <div><dt>Peer output</dt><dd id="close-coop-peer"></dd></div>
+          </dl>
+          <div class="row">
+            <label class="inline">Signing key <input id="close-coop-key" type="password" autocomplete="off" spellcheck="false"></label>
+            <button id="close-coop-sign" class="primary">Sign</button>
+          </div>
+          <label>Peer signature <input id="close-coop-peersig" autocomplete="off" spellcheck="false" placeholder="128 hex chars"></label>
+          <div class="row">
+            <button id="close-coop-assemble" class="primary">Verify &amp; assemble</button>
+            <button id="close-coop-broadcast" class="ghost">Broadcast (double-confirm)</button>
+          </div>
+          <textarea id="close-coop-hex" rows="3" readonly spellcheck="false" hidden></textarea>
+        </div>
+      </div>
+      <div class="closecard">
+        <h3>Unilateral close</h3>
+        <p class="lede">Broadcast your latest commitment, then claim after the CSV delay.</p>
+        <div class="row"><button id="close-uni-build" class="primary">Build claim tx</button></div>
+        <div id="close-uni-error" class="error" hidden></div>
+        <div id="close-uni-result" hidden>
+          <dl class="kv">
+            <div><dt>Commitment txid</dt><dd><code id="close-uni-ctid" class="addr"></code></dd></div>
+            <div><dt>Claim txid</dt><dd><code id="close-uni-txid" class="addr"></code></dd></div>
+            <div><dt>CSV delay</dt><dd id="close-uni-csv"></dd></div>
+            <div><dt>Claim fee</dt><dd id="close-uni-fee"></dd></div>
+          </dl>
+          <div class="row">
+            <label class="inline">Signing key <input id="close-uni-key" type="password" autocomplete="off" spellcheck="false"></label>
+            <button id="close-uni-sign" class="primary">Sign claim</button>
+            <button id="close-uni-broadcast" class="ghost">Broadcast claim (double-confirm)</button>
+          </div>
+          <textarea id="close-uni-hex" rows="3" readonly spellcheck="false" hidden></textarea>
+          <div class="note">Broadcast the commitment transaction first and wait for it to confirm. Only
+          broadcast the claim after <span id="close-uni-csv2"></span> blocks have passed since the
+          commitment confirmed — otherwise the network rejects it and you pay a fee for nothing.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 5: TRACK -->
+  <section id="step-track" class="panel">
+    <h2>Track the channel</h2>
+    <p class="lede">GET-only Blockbook reads. Nothing here can move funds.</p>
+    <div class="form-grid">
+      <label>Blockbook base URL <input id="track-blockbook" autocomplete="off" spellcheck="false"></label>
+    </div>
+    <div class="row"><button id="track-refresh" class="primary">Refresh</button></div>
+    <div id="track-error" class="error" hidden></div>
+    <div id="track-result" hidden>
+      <dl class="kv">
+        <div><dt>Chain tip</dt><dd id="track-tip"></dd></div>
+        <div><dt>Funding tx</dt><dd id="track-funding"></dd></div>
+        <div><dt>Channel address</dt><dd id="track-addr"></dd></div>
+        <div><dt>Active state</dt><dd id="track-state"></dd></div>
+        <div><dt>Unilateral claim status</dt><dd id="track-claim"></dd></div>
+      </dl>
+    </div>
+    <div class="note">This page is not a watchtower: it only checks when you ask. If you go offline with an
+    open channel, your peer could broadcast a revoked state. For always-on monitoring, use
+    <a href="../watch/">Pearl Watch</a> on the funding and commitment txids.</div>
+  </section>
+
+  <!-- STEP 6: VERIFY -->
+  <section id="step-verify" class="panel">
+    <h2>Verify</h2>
+    <p class="lede">Standalone verifier. Paste a channel descriptor and any signed channel transaction —
+    every signature is re-checked, outputs are matched against the expected state, and the verdict is
+    <strong>PROVEN</strong> or <strong>NOT PROVEN</strong> with reasons. No keys needed.</p>
+    <div class="form-grid">
+      <label>Funding txid <input id="verify-fundingtxid" autocomplete="off" spellcheck="false" placeholder="64 hex chars"></label>
+      <label>Funding vout <input id="verify-fundingvout" type="number" min="0" value="0"></label>
+      <label>State version <input id="verify-version" type="number" min="0" value="0"></label>
+      <label>Your balance (grains) <input id="verify-mine" type="number" min="0" step="1"></label>
+      <label>Peer balance (grains) <input id="verify-peer" type="number" min="0" step="1"></label>
+      <label>Your payout address <input id="verify-mypayout" autocomplete="off" spellcheck="false" placeholder="prl1…"></label>
+      <label>Fee rate (grains/vB) <input id="verify-feerate" type="number" min="0.1" step="any" value="2"></label>
+      <label>Your revocation hash160 <span class="hint">40 hex — needed to match commitment txs. From the state bundle.</span>
+        <input id="verify-myhash" autocomplete="off" spellcheck="false" placeholder="optional — 40 hex chars"></label>
+      <label>Peer revocation hash160 <span class="hint">40 hex — needed to match commitment txs. From the state bundle.</span>
+        <input id="verify-peerhash" autocomplete="off" spellcheck="false" placeholder="optional — 40 hex chars"></label>
+    </div>
+    <label>Channel descriptor JSON <textarea id="verify-descriptor" rows="6" spellcheck="false" placeholder='{"kind":"pearl-channel-descriptor:v1",…}'></textarea></label>
+    <label>Signed transaction hex <textarea id="verify-hex" rows="4" spellcheck="false" placeholder="0200000001…"></textarea></label>
+    <div class="row"><button id="verify-go" class="primary">Verify transaction</button>
+    <button id="verify-desc" class="ghost">Verify descriptor only</button></div>
+    <div id="verify-error" class="error" hidden></div>
+    <div id="verify-result" hidden>
+      <h3 id="verify-verdict"></h3>
+      <div id="verify-kind" class="note"></div>
+      <h4>Checks</h4><ul id="verify-checks" class="checklist"></ul>
+      <h4>Failures</h4><ul id="verify-failures" class="checklist bad"></ul>
+    </div>
+  </section>
+
+  <aside class="limits" id="limits">
+    <h3>Honest limits</h3>
+    <ul>
+      <li>No routing, no multi-hop, no invoices — one channel, one peer, fixed capacity set at open.</li>
+      <li>State exchange is manual: export a bundle, send it to your peer however you like, import theirs.</li>
+      <li>This page is not a watchtower. If you are offline, your peer can broadcast a revoked state — use <a href="../watch/">Pearl Watch</a> for monitoring.</li>
+      <li>The penalty model is opt-in training wheels: revocation secrets are exchanged by hand, and the claim delay is in blocks, not wall-clock time.</li>
+      <li>Commitment fees are fixed when a state is signed; if chain fees spike, a unilateral close can get expensive.</li>
+      <li>Broadcasting a revoked state lets your peer take your entire to_local output. Don't.</li>
+    </ul>
+  </aside>
+</main>
+
+<footer>
+  <p>Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> · Pearl Channels — off-chain PRL, no smart contracts, keys never leave your browser.</p>
+  <p class="donate">Support the build — <code id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+  <button id="donate-copy" class="ghost">Copy</button></p>
+</footer>
+
+<script src="pearl-channels.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
