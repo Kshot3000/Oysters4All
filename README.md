@@ -28,6 +28,7 @@ and Plonky2 zk-SNARK block certificates.
 | `pages/mining/` | ✅ built | PRL mining profitability calculator: exact upstream emission formula, hashrate-share rewards, emission-schedule charts, optional live node data |
 | `guides/rpc-cheatsheet.md` | ✅ done | `pearld` JSON-RPC cheatsheet with `curl` examples, verified against upstream docs |
 | `guides/running-pearld.md` | ✅ done | Running a Pearl node: prebuilt installer vs source build, first sync, networks + ports, enabling RPC, connectivity, Oyster wallet, mining hookup — all facts verified against upstream docs |
+| `pages/psbt/` | ✅ built | Taproot PSBT signing workbench — create/inspect/sign/combine/finalize BIP-174 PSBTs with exact BIP-341 sighashes (keypath + scriptpath); crypto vendored from the audited sign core, 39 tests / 158 assertions |
 
 ## How the 24/7 builder loop works
 

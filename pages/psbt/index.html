@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl PSBT — the Taproot PSBT signing workbench</title>
+<meta name="description" content="Pearl PSBT: create, inspect, sign, combine and finalize Taproot PSBTs (BIP-174) for Pearl — keypath and scriptpath, exact BIP-341 sighashes, all client-side.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="hero">
+  <div class="blueprint" aria-hidden="true"></div>
+  <div class="hero-inner">
+    <p class="kicker">Pearl · Signing Workbench</p>
+    <h1><span class="psbt-glyph" aria-hidden="true">⚙</span> Pearl PSBT</h1>
+    <p class="sub">The machine-shop desk for <strong>Taproot PSBTs</strong>. Draft an
+      unsigned PSBT from your UTXOs, inspect every input's sighash and leaf, sign
+      keypath or scriptpath with your key, combine co-signer PSBTs, and finalize
+      to a broadcast-ready transaction — all in your browser, all client-side.
+      This desk never broadcasts and never holds keys past the signing click.</p>
+    <nav id="tabs" class="tabs" aria-label="Desk sections">
+      <button data-tab="create" class="active">1 · Create</button>
+      <button data-tab="inspect">2 · Inspect</button>
+      <button data-tab="sign">3 · Sign</button>
+      <button data-tab="combine">4 · Combine</button>
+      <button data-tab="finalize">5 · Finalize</button>
+      <button data-tab="method">6 · Method</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <!-- ============ 1 · CREATE ============ -->
+  <section id="tab-create" class="panel active">
+    <h2>1 · Create — draft the unsigned PSBT</h2>
+    <p class="lede">Assemble a PSBT from UTXOs you control. Every input carries its witness
+      UTXO (amount + scriptPubKey) so any signer can verify the sighash. Amounts
+      are whole <strong>grains</strong> (1 PRL = 10<sup>8</sup> grains) — exact BigInt math, no floats.</p>
+    <div class="row">
+      <button id="c-demo" class="primary">Load demo PSBT</button>
+      <span class="hint">2 inputs (keypath + CLTV scriptpath) · 2 outputs (P2TR + OP_RETURN) — test keys only</span>
+    </div>
+    <h3>Inputs <span class="hint">one per line: <code class="mono">txid:vout:amountGrains:internalKeyHex</code> + optional leaf ASM</span></h3>
+    <div class="field">
+      <label for="c-inputs">UTXOs to spend</label>
+      <textarea id="c-inputs" class="mono tall" spellcheck="false" placeholder="aabbcc…ee:0:250000000:74b2857d…&#10;ff0011…22:1:100000000:53a514a8…:500000 OP_CHECKLOCKTIMEVERIFY OP_DROP &lt;53a514a8…&gt; OP_CHECKSIG"></textarea>
+    </div>
+    <h3>Outputs <span class="hint">one per line: <code class="mono">prl1…:amountGrains</code> or <code class="mono">OP_RETURN:hexdata</code></span></h3>
+    <div class="field">
+      <label for="c-outputs">Payment destinations</label>
+      <textarea id="c-outputs" class="mono" spellcheck="false" placeholder="prl1p…:300000000&#10;OP_RETURN:706561726c"></textarea>
+    </div>
+    <div class="grid2">
+      <div class="field">
+        <label for="c-locktime">Locktime <span class="hint">0 = none</span></label>
+        <input id="c-locktime" type="text" class="mono" value="0" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="c-sighash">Default sighash for signers</label>
+        <select id="c-sighash" class="mono">
+          <option value="0">DEFAULT (0x00)</option>
+          <option value="1">ALL (0x01)</option>
+          <option value="2">NONE (0x02)</option>
+          <option value="3">SINGLE (0x03)</option>
+          <option value="129">ALL|ANYONECANPAY (0x81)</option>
+          <option value="130">NONE|ANYONECANPAY (0x82)</option>
+          <option value="131">SINGLE|ANYONECANPAY (0x83)</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <button id="c-build" class="primary">Build unsigned PSBT</button>
+      <span id="c-err" class="err" role="alert"></span>
+    </div>
+    <div id="c-out" class="out hidden">
+      <div class="stats">
+        <div class="stat"><span class="num" id="c-nin">0</span><span class="lbl">inputs</span></div>
+        <div class="stat"><span class="num" id="c-nout">0</span><span class="lbl">outputs</span></div>
+        <div class="stat"><span class="num" id="c-in">0</span><span class="lbl">in (PRL)</span></div>
+        <div class="stat"><span class="num" id="c-out-amt">0</span><span class="lbl">out (PRL)</span></div>
+        <div class="stat"><span class="num" id="c-fee">0</span><span class="lbl">fee (PRL)</span></div>
+      </div>
+      <div class="kv"><span>Unsigned txid (preview)</span><code id="c-txid" class="mono wrap"></code></div>
+      <h3>PSBT (base64)</h3>
+      <pre id="c-b64" class="mono scroll"></pre>
+      <div class="row">
+        <button id="c-copy" class="ghost">copy base64</button>
+        <button id="c-download" class="ghost">download .psbt</button>
+        <button id="c-to-inspect" class="ghost">open in Inspect →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 2 · INSPECT ============ -->
+  <section id="tab-inspect" class="panel">
+    <h2>2 · Inspect — read every byte before you sign</h2>
+    <p class="lede">Paste any PSBT (this desk's or another wallet's). The inspector parses the
+      BIP-174 maps, decodes each input's witness UTXO, internal key, tap leaves and
+      partial signatures, and flags anything suspicious — <em>before</em> a key
+      ever touches it.</p>
+    <div class="field">
+      <label for="i-b64">PSBT (base64)</label>
+      <textarea id="i-b64" class="mono tall" spellcheck="false" placeholder="cHNidP8B…"></textarea>
+    </div>
+    <div class="row">
+      <button id="i-use-current" class="ghost">use current PSBT</button>
+      <button id="i-parse" class="primary">Inspect PSBT</button>
+      <span id="i-err" class="err" role="alert"></span>
+    </div>
+    <div id="i-out" class="out hidden">
+      <h3>Global</h3>
+      <div id="i-global"></div>
+      <h3>Inputs</h3>
+      <div id="i-inputs"></div>
+      <h3>Outputs</h3>
+      <div id="i-outputs"></div>
+      <h3>Issues</h3>
+      <ul id="i-issues" class="checklist"></ul>
+    </div>
+  </section>
+
+  <!-- ============ 3 · SIGN ============ -->
+  <section id="tab-sign" class="panel">
+    <h2>3 · Sign — one input, one key, verified before it sticks</h2>
+    <p class="lede">Sign a single input. The desk computes the exact BIP-341 sighash, signs with
+      BIP-340 Schnorr, then <strong>re-verifies the signature before writing it into the
+      PSBT</strong>. The private key lives in memory only for the signing call and is
+      wiped immediately after.</p>
+    <div class="warn"><strong>Key hygiene:</strong> pasting a key into any website is dangerous.
+      Prefer signing on an air-gapped machine, and assume a pasted key is burned afterward.</div>
+    <div class="field">
+      <label for="s-b64">PSBT to sign (base64)</label>
+      <textarea id="s-b64" class="mono" spellcheck="false" placeholder="cHNidP8B…"></textarea>
+    </div>
+    <div class="row">
+      <button id="s-use-current" class="ghost">use current PSBT</button>
+    </div>
+    <div class="grid2">
+      <div class="field">
+        <label for="s-index">Input index</label>
+        <input id="s-index" type="text" class="mono" value="0" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="s-sighash">Sighash type</label>
+        <select id="s-sighash" class="mono">
+          <option value="0">DEFAULT (0x00)</option>
+          <option value="1">ALL (0x01)</option>
+          <option value="2">NONE (0x02)</option>
+          <option value="3">SINGLE (0x03)</option>
+          <option value="129">ALL|ANYONECANPAY (0x81)</option>
+          <option value="130">NONE|ANYONECANPAY (0x82)</option>
+          <option value="131">SINGLE|ANYONECANPAY (0x83)</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label for="s-key">Private key <span class="hint">64-char hex or mainnet WIF — wiped after signing</span></label>
+      <input id="s-key" type="password" class="mono" spellcheck="false" autocomplete="off" placeholder="hex or WIF">
+    </div>
+    <div class="row">
+      <button id="s-gen" class="ghost">generate test key</button>
+      <button id="s-wipe" class="ghost">wipe key</button>
+      <button id="s-sign" class="primary">Sign input</button>
+      <span id="s-err" class="err" role="alert"></span>
+    </div>
+    <div id="s-out" class="out hidden">
+      <div class="kv"><span>Spend path</span><code id="s-mode" class="mono"></code></div>
+      <div class="kv"><span>Key note</span><code id="s-keynote" class="mono wrap"></code></div>
+      <div class="kv"><span>Sighash (BIP-341)</span><code id="s-sighash-hex" class="mono wrap"></code></div>
+      <div class="kv"><span>Signature</span><code id="s-sig" class="mono wrap"></code></div>
+      <div class="kv"><span>Verified before write</span><code id="s-verified" class="mono"></code></div>
+      <h3>Signed PSBT (base64)</h3>
+      <pre id="s-b64out" class="mono scroll"></pre>
+      <div class="row">
+        <button id="s-copy" class="ghost">copy base64</button>
+        <button id="s-make-current" class="ghost">make current PSBT</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 4 · COMBINE ============ -->
+  <section id="tab-combine" class="panel">
+    <h2>4 · Combine — merge co-signer PSBTs</h2>
+    <p class="lede">Two signers, two PSBTs, one transaction. Combining requires byte-identical
+      unsigned transactions and refuses conflicting signatures — the merge is
+      order-independent and idempotent.</p>
+    <div class="field">
+      <label for="cb-a">PSBT A (base64)</label>
+      <textarea id="cb-a" class="mono" spellcheck="false" placeholder="cHNidP8B…"></textarea>
+    </div>
+    <div class="field">
+      <label for="cb-b">PSBT B (base64)</label>
+      <textarea id="cb-b" class="mono" spellcheck="false" placeholder="cHNidP8B…"></textarea>
+    </div>
+    <div class="row">
+      <button id="cb-a-current" class="ghost">A ← current</button>
+      <button id="cb-b-current" class="ghost">B ← current</button>
+      <button id="cb-go" class="primary">Combine</button>
+      <span id="cb-err" class="err" role="alert"></span>
+    </div>
+    <div id="cb-out" class="out hidden">
+      <div id="cb-summary"></div>
+      <h3>Combined PSBT (base64)</h3>
+      <pre id="cb-b64" class="mono scroll"></pre>
+      <div class="row">
+        <button id="cb-copy" class="ghost">copy base64</button>
+        <button id="cb-make-current" class="ghost">make current PSBT</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 5 · FINALIZE ============ -->
+  <section id="tab-finalize" class="panel">
+    <h2>5 · Finalize — verify everything, emit the transaction</h2>
+    <p class="lede">Finalizing re-verifies <strong>every</strong> signature against its own
+      BIP-341 sighash, assembles the witnesses (<code class="mono">[sig]</code> for keypath,
+      <code class="mono">[sig, script, control block]</code> for scriptpath), and serializes the
+      complete transaction. Nothing is broadcast — broadcasting is your node's job.</p>
+    <div class="field">
+      <label for="f-b64">Combined PSBT (base64)</label>
+      <textarea id="f-b64" class="mono tall" spellcheck="false" placeholder="cHNidP8B…"></textarea>
+    </div>
+    <div class="row">
+      <button id="f-use-current" class="ghost">use current PSBT</button>
+      <button id="f-go" class="primary">Finalize &amp; extract</button>
+      <span id="f-err" class="err" role="alert"></span>
+    </div>
+    <div id="f-out" class="out hidden">
+      <h3>Finalize report</h3>
+      <ul id="f-report" class="checklist"></ul>
+      <div class="kv big"><span>Transaction id</span><code id="f-txid" class="mono wrap"></code></div>
+      <div class="kv"><span>Virtual size</span><code id="f-vsize" class="mono"></code></div>
+      <h3>Raw transaction (hex)</h3>
+      <pre id="f-hex" class="mono scroll"></pre>
+      <div class="row">
+        <button id="f-copy" class="ghost">copy tx hex</button>
+        <button id="f-download" class="ghost">download .txhex</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 6 · METHOD ============ -->
+  <section id="tab-method" class="panel">
+    <h2>6 · Methodology &amp; honest limits</h2>
+    <h3>What this desk does</h3>
+    <ul class="notes">
+      <li><strong>Create</strong> — builds a BIP-174 PSBT: global unsigned tx, per-input witness
+        UTXOs, Taproot internal keys, and single-leaf tap scripts with their control blocks.
+        Amounts are exact BigInt grains (1 PRL = 10<sup>8</sup>).</li>
+      <li><strong>Inspect</strong> — parses every BIP-174 map, decodes witness UTXOs, checks each
+        leaf's control block against its internal key, and names every partial signature's
+        sighash type. Read it before you sign it.</li>
+      <li><strong>Sign</strong> — computes the exact BIP-341 sighash (all 7 sighash types),
+        signs BIP-340 Schnorr, and <strong>re-verifies before mutating the PSBT</strong>.
+        Keypath accepts the internal key (desk applies the TapTweak) or an already-tweaked
+        key; scriptpath requires the key to appear as a 32-byte push in a declared leaf.</li>
+      <li><strong>Combine</strong> — merges PSBT maps key-wise; requires byte-identical unsigned
+        transactions; rejects conflicting signatures and duplicate keys.</li>
+      <li><strong>Finalize</strong> — re-verifies every signature against its own sighash,
+        strips partial-sig metadata per BIP-174, and emits the witness transaction.</li>
+      <li><strong>Address rules</strong> — BIP-350 bech32m, HRP <code class="mono">prl</code>, witness
+        version 1, 32-byte program, canonical re-encode — same rules as the audited Names desk.</li>
+    </ul>
+    <h3>Crypto lineage</h3>
+    <ul class="notes">
+      <li><strong>No new cryptography.</strong> Every primitive is vendored from the audited
+        <code class="mono">sign/src/crypto.js</code> core (pearlpurse lineage): SHA-256, tagged
+        hashes, the TapTweak (<code class="mono">tapTweak</code> / <code class="mono">tweakPrivKeypath</code>),
+        BIP-340 Schnorr, and bech32m.</li>
+      <li>The PSBT sighash construction is <strong>differentially pinned</strong> against the audited
+        <code class="mono">keypathSigDigestEx</code> — byte-identical digests for SIGHASH_DEFAULT and
+        SIGHASH_SINGLE|ANYONECANPAY across inputs. The test suite re-runs that pinning.</li>
+      <li>PSBT serialization, the BIP-341 message layout, script assembly and witness building are
+        <strong>new code</strong> in <code class="mono">src/psbt-core.js</code> — covered by 39 tests
+        (158 assertions), including malformed-PSBT rejections, 1-bit tamper tests, and
+        combine conflict rejection.</li>
+    </ul>
+  </section>
+</main>
+
+<aside class="limits" aria-label="Honest limits">
+  <div>
+    <strong>Honest limits — always true:</strong>
+    <ul>
+      <li>This desk <strong>never broadcasts</strong>. Finalize hands you raw tx hex; broadcasting is your own node's job.</li>
+      <li>Private keys are <strong>in-memory only</strong>, used for one signing call, then wiped. A pasted key should be considered burned.</li>
+      <li><strong>No MuSig2.</strong> Multi-party signing is sequential combine, not interactive key aggregation.</li>
+      <li>Scriptpath finalize supports <strong>single-leaf trees only</strong> — the desk creates them; foreign multi-leaf PSBTs inspect fine but finalize may refuse.</li>
+      <li>The demo PSBT uses <strong>deterministic test keys</strong> — never fund them, never reuse them.</li>
+      <li>Working PSBTs live in <strong>your browser's localStorage only</strong>; nothing leaves the machine.</li>
+    </ul>
+  </div>
+</aside>
+
+<footer>
+  <p>Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a></p>
+  <p class="donate">Donate PRL: <code id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+    <button id="donate-copy" class="ghost">copy</button></p>
+  <p class="hint">Pearl PSBT · BIP-174 Taproot signing workbench · pure client-side, no network calls</p>
+</footer>
+
+<script src="pearl-psbt.bundle.js?v=1"></script>
+</body>
+</html>

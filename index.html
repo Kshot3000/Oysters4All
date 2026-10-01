@@ -54,6 +54,7 @@
         <a href="pages/paywall/">Paywall</a>
         <a href="pages/monetary/">Monetary</a>
         <a href="pages/drop/">Drop</a>
+        <a href="pages/psbt/">PSBT</a>
         <a href="pages/id/">ID</a>
         <a href="pages/raffle/">Raffle</a>
         <a href="pages/swap/">Swap</a>
@@ -562,6 +563,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Drop — PRL-20 Airdrop Campaign Desk <span class="badge">new</span></h3>
             <p>The raindrop-storm desk for PRL-20 airdrops — define a campaign with a SHA-256 campaign id, paste a recipient CSV with strict bech32m address validation and first-seen-wins dedupe, hash the list into a sorted-pair Merkle tree, seal a tamper-evident drop descriptor (with a prl-drop inscription envelope ready for Pearl Etch), and let anyone verify their claim against the sealed root. Six tabs: Campaign → Recipients → Merkle → Seal → Claim → Method, with a standalone PROVEN / NOT PROVEN seal verifier. Pure client-side, honest limits always visible: the desk never holds funds, allocations are pledged amounts, distribution is manual.</p>
             <div class="card-links"><a href="pages/drop/">Open Pearl Drop →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl PSBT — Taproot PSBT Signing Workbench <span class="badge">new</span></h3>
+            <p>The machine-shop desk for Taproot PSBTs — draft an unsigned PSBT from your UTXOs, inspect every input's witness UTXO, sighash and tap leaves before a key touches it, sign keypath or scriptpath with exact BIP-341 sighashes (re-verified before the PSBT is mutated), combine co-signer PSBTs, and finalize to broadcast-ready tx hex. Six tabs: Create → Inspect → Sign → Combine → Finalize → Method. No new cryptography: every primitive is vendored from the audited sign core, and the sighash construction is differentially pinned byte-equal against it. Pure client-side — the desk never broadcasts and keys live in memory for one signing call only.</p>
+            <div class="card-links"><a href="pages/psbt/">Open Pearl PSBT →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Foundry — Mining Pool <span class="badge">new</span></h3>
