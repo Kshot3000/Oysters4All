@@ -56,6 +56,7 @@
         <a href="pages/drop/">Drop</a>
         <a href="pages/psbt/">PSBT</a>
         <a href="pages/hedge/">Hedge</a>
+        <a href="pages/policy/">Policy</a>
         <a href="pages/id/">ID</a>
         <a href="pages/raffle/">Raffle</a>
         <a href="pages/swap/">Swap</a>
@@ -571,9 +572,14 @@ cd miner && uv run pearl-miner \
             <div class="card-links"><a href="pages/psbt/">Open Pearl PSBT →</a></div>
           </article>
           <article class="card reveal">
-            <h3>Pearl Hedge — Taproot Options Desk <span class="badge">new</span></h3>
+            <h3>Pearl Hedge — Taproot Options Desk</h3>
             <p>The storm-chart trading desk for PRL options — covered calls and protective puts in pure Taproot with no smart contracts: the writer locks collateral in a 2-leaf vault under a NUMS internal key (hashlocked exercise leaf for the buyer, CLTV refund leaf for the writer), the desk verifies the buyer's strike payment on Blockbook before the buyer's exercise tx is built, and both spends are locally signed with per-signature re-verification. Five steps: Write → Fund → Exercise → Track → Verify, with tamper-evident descriptors, a sealed commitment, and a standalone PROVEN / NOT PROVEN verifier. Honest about the one thing scripts can't prove: the strike leg is verified off-chain, never atomically on-chain.</p>
             <div class="card-links"><a href="pages/hedge/">Open Pearl Hedge →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Policy — Taproot Policy-Tree Studio <span class="badge">new</span></h3>
+            <p>The blueprint studio for PRL authorization — design a Taproot script tree from audited templates only (KeyLock byte-identical to the Bounty award leaf, TimelockRefund byte-identical to the Escrow refund leaf, MultiSig from the Covenant pattern), under a NUMS, BIP-86, or pasted internal key. Five steps: Design → Address → Verify → Export → Learn: real P2TR address, spend-ready per-leaf control blocks with an SVG tree map, a standalone PROVEN / NOT PROVEN descriptor verifier, shareable #p= links, and an honest explainer of what policy trees prove versus what they don't. Fully offline — this page never moves PRL and never broadcasts.</p>
+            <div class="card-links"><a href="pages/policy/">Open Pearl Policy →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Foundry — Mining Pool <span class="badge">new</span></h3>

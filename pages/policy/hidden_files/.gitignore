@@ -1,0 +1,3 @@
+# Run-specific QA scratch — never committed (per builder convention).
+*
+!.gitignore

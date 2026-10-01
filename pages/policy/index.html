@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Policy — Taproot policy-tree builder &amp; visualizer for PRL</title>
+<meta name="description" content="Pearl Policy: design a Taproot script tree for PRL from audited templates, compute the P2TR address and per-leaf control blocks, verify descriptors standalone. Fully offline.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 64 64" aria-hidden="true">
+      <circle cx="32" cy="10" r="6" class="node"/>
+      <line x1="32" y1="16" x2="14" y2="34" class="wire"/>
+      <line x1="32" y1="16" x2="50" y2="34" class="wire"/>
+      <rect x="8" y="34" width="12" height="16" class="leaf"/>
+      <rect x="44" y="34" width="12" height="16" class="leaf"/>
+      <line x1="14" y1="50" x2="14" y2="56" class="wire"/>
+      <line x1="50" y1="50" x2="50" y2="56" class="wire"/>
+      <rect x="26" y="40" width="12" height="10" class="leaf"/>
+      <line x1="32" y1="16" x2="32" y2="40" class="wire"/>
+    </svg>
+    <div>
+      <h1>Pearl Policy</h1>
+      <p class="tagline">Taproot policy-tree builder &amp; visualizer for PRL · blueprint studio</p>
+    </div>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-step="design" class="active">1 · Design</button>
+    <button data-step="address" class="">2 · Address</button>
+    <button data-step="verify" class="">3 · Verify</button>
+    <button data-step="export" class="">4 · Export</button>
+    <button data-step="learn" class="">5 · Learn</button>
+  </nav>
+</header>
+
+<div class="margin-strip" aria-hidden="true"><span>FIG. 01 — AUTHORIZATION BLUEPRINT · SHEET PRL-341 · SCALE 1:1 · ALL DIMENSIONS IN GRAINS-OF-TRUST</span></div>
+
+<main>
+  <!-- STEP 1: DESIGN -->
+  <section id="step-design" class="panel active">
+    <h2>Design the tree</h2>
+    <p class="lede">Draft a Taproot script tree from <strong>audited templates only</strong>: the KeyLock leaf is
+    byte-identical to the audited Pearl Bounty award leaf, the TimelockRefund leaf to the audited Pearl Escrow
+    refund leaf, and the MultiSig leaf follows the audited Pearl Covenant multisig pattern. No new cryptography —
+    every digest is BIP-340/BIP-341 from the audited Sign core.</p>
+
+    <div class="form-grid">
+      <label>Network
+        <select id="d-network">
+          <option value="mainnet" selected>Mainnet (prl…)</option>
+          <option value="testnet">Testnet (tprl…)</option>
+        </select>
+      </label>
+    </div>
+
+    <h3>Internal key — who (if anyone) can use the keypath</h3>
+    <div class="radio-row">
+      <label class="radio"><input type="radio" name="d-src" id="d-src-nums" checked>
+        <span><strong>NUMS</strong> — nothing-up-my-sleeve point (<code>PearlPolicyNUMS/v1</code>). Nobody's key: the keypath is <em>intentionally unspendable</em>. Recommended.</span></label>
+      <label class="radio"><input type="radio" name="d-src" id="d-src-bip86">
+        <span><strong>BIP-86</strong> — your own x-only key from a mnemonic. The keypath <em>is</em> spendable by whoever holds it.</span></label>
+      <label class="radio"><input type="radio" name="d-src" id="d-src-key">
+        <span><strong>Paste key</strong> — an x-only pubkey you supply. Spendable by its holder.</span></label>
+    </div>
+    <div class="form-grid">
+      <label class="wide" id="d-mnemonic-wrap" hidden>BIP-86 mnemonic (kept in memory only — wiped on demand)
+        <input id="d-mnemonic" type="text" autocomplete="off" spellcheck="false" placeholder="12 or 24 words">
+      </label>
+      <label class="wide" id="d-key-wrap" hidden>Pasted x-only public key (64-hex)
+        <input id="d-key" type="text" autocomplete="off" spellcheck="false" placeholder="64-hex x-only pubkey">
+      </label>
+    </div>
+    <div class="row">
+      <button id="d-gen-mnemonic" class="ghost" hidden>Generate mnemonic</button>
+      <button id="d-wipe" class="ghost" hidden>Wipe mnemonic from memory</button>
+    </div>
+
+    <h3>Leaves <span class="hint-inline" id="d-leaf-count">(1 of 8)</span></h3>
+    <p class="hint">1–8 leaves. Each leaf is one authorization path — a distinct way the coins can move. Expert mode
+    (custom script hex) is available per leaf; anything you paste there is <strong>unreviewed</strong>.</p>
+    <div id="d-leaves"></div>
+    <div class="row">
+      <button id="d-add-leaf" class="ghost">+ Add leaf</button>
+    </div>
+
+    <div class="row">
+      <button id="d-draft" class="primary">Draft blueprint</button>
+    </div>
+    <p class="err" id="d-err" hidden></p>
+
+    <div id="d-out" hidden>
+      <h3>Blueprint drafted</h3>
+      <dl class="review" id="d-review"></dl>
+      <h4>Tree</h4>
+      <div id="d-tree" class="treebox"></div>
+      <h4>Leaves</h4>
+      <div id="d-leaf-detail"></div>
+      <h4>Canonical descriptor</h4>
+      <div class="row"><textarea id="d-descriptor" rows="4" readonly spellcheck="false"></textarea></div>
+      <div class="row">
+        <button class="copy-btn" data-for="d-descriptor">Copy</button>
+        <button id="d-to-address" class="ghost">Continue to Address →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 2: ADDRESS -->
+  <section id="step-address" class="panel">
+    <h2>Address &amp; control blocks</h2>
+    <p class="lede" id="a-lede">Draft a blueprint in the Design step first — the address, the tweaked key, and the
+    spend-ready control blocks land here.</p>
+    <div id="a-out" hidden>
+      <div class="addr">
+        <h4>P2TR address</h4>
+        <p><code id="a-addr" class="mono big"></code> <button class="copy-btn" data-for="a-addr">Copy</button></p>
+        <div id="a-qr" class="qr"></div>
+      </div>
+      <dl class="review" id="a-review"></dl>
+      <h4>Tree</h4>
+      <div id="a-tree" class="treebox"></div>
+      <h3>Spend-ready leaves <span class="hint-inline">control blocks verify against the tweaked key</span></h3>
+      <div id="a-leaves"></div>
+      <div class="row">
+        <button id="a-reverify" class="ghost">Re-verify all control blocks</button>
+      </div>
+      <p class="ok" id="a-reverify-out" hidden></p>
+    </div>
+  </section>
+
+  <!-- STEP 3: VERIFY -->
+  <section id="step-verify" class="panel">
+    <h2>Verify a blueprint</h2>
+    <p class="lede">Standalone verifier — paste a <code>pearl-policy:v1:…</code> descriptor, the address it claims,
+    and optionally the sealed commitment. Everything is recomputed from scratch: PROVEN only when the descriptor is
+    canonical and re-derives the claimed address exactly. Any tampering moves the address — loudly.</p>
+    <div class="form-grid">
+      <label class="wide">Descriptor
+        <textarea id="v-descriptor" rows="4" spellcheck="false" placeholder="pearl-policy:v1:prl:…"></textarea>
+      </label>
+      <label class="wide">Claimed P2TR address
+        <input id="v-address" type="text" autocomplete="off" spellcheck="false" placeholder="prl1p…">
+      </label>
+      <label class="wide">Sealed commitment (optional — <code>pearl-policy:v1:&lt;hrp&gt;:&lt;hash&gt;</code>)
+        <input id="v-sealed" type="text" autocomplete="off" spellcheck="false" placeholder="pearl-policy:v1:prl:…">
+      </label>
+    </div>
+    <div class="row">
+      <button id="v-check" class="primary">Verify</button>
+    </div>
+    <p class="err" id="v-err" hidden></p>
+    <div id="v-out" hidden>
+      <div id="v-verdict" class="verdict"></div>
+      <dl class="review" id="v-review"></dl>
+    </div>
+  </section>
+
+  <!-- STEP 4: EXPORT -->
+  <section id="step-export" class="panel">
+    <h2>Export</h2>
+    <p class="lede">Take the drafted blueprint with you: machine-readable JSON, a shareable link that carries the
+    descriptor in the URL hash (nothing is uploaded — the page never phones home), and a markdown summary for docs.</p>
+    <p class="err" id="x-err" hidden></p>
+    <div id="x-out" hidden>
+      <h3>Descriptor JSON</h3>
+      <div class="row"><textarea id="x-json" rows="12" readonly spellcheck="false"></textarea></div>
+      <div class="row">
+        <button class="copy-btn" data-for="x-json">Copy</button>
+        <button id="x-download" class="ghost">Download JSON</button>
+      </div>
+      <h3>Shareable link</h3>
+      <div class="row"><input id="x-share" type="text" readonly spellcheck="false"></div>
+      <div class="row">
+        <button class="copy-btn" data-for="x-share">Copy link</button>
+      </div>
+      <h3>Markdown summary</h3>
+      <div class="row"><textarea id="x-md" rows="12" readonly spellcheck="false"></textarea></div>
+      <div class="row">
+        <button class="copy-btn" data-for="x-md">Copy markdown</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 5: LEARN -->
+  <section id="step-learn" class="panel">
+    <h2>Learn — what a policy tree proves (and doesn't)</h2>
+    <div class="learn">
+      <h3>What Taproot policy trees prove</h3>
+      <ul>
+        <li><strong>Authorization paths.</strong> A tree commits to a fixed set of leaves; each leaf is a script that says
+        <em>who</em> can move the coins and under <em>what on-chain conditions</em> (a signature, a block height, m-of-n keys).</li>
+        <li><strong>Deterministic addresses.</strong> The P2TR address is a pure function of the internal key and the leaf
+        scripts. Anyone with the descriptor recomputes the identical address — no registry, no server.</li>
+        <li><strong>Unspendable keypaths, by construction.</strong> With a NUMS internal key, nobody knows the discrete log,
+        so the keypath cannot be used. Coins move only through the script leaves you drafted.</li>
+        <li><strong>Tamper evidence.</strong> Change one bit of one leaf and the address changes. The Verify tab turns that
+        property into a standalone PROVEN / NOT PROVEN check.</li>
+      </ul>
+      <h3>What they don't prove</h3>
+      <ul>
+        <li><strong>Why</strong> the coins should move. Scripts authorize keys; they know nothing about prices, invoices,
+        identities, or any off-chain fact. Authorization is not endorsement.</li>
+        <li><strong>Off-chain reality.</strong> Pearl script cannot check a bank transfer, a delivery, or a price feed.
+        Anything real-world must be verified off-chain (see Pearl Hedge's strike-payment check for the pattern).</li>
+        <li><strong>That custom scripts are safe.</strong> Expert-mode hex is yours alone — audit it, test it on testnet,
+        never fund what you can't read.</li>
+        <li><strong>Funding.</strong> An address is just an address until someone funds it. This page never touches funds;
+        fund from Pearl Sign or Pearl Vault, and double-check the address character by character.</li>
+      </ul>
+      <h3>Reading a blueprint</h3>
+      <ul>
+        <li>The <strong>descriptor</strong> (<code>pearl-policy:v1:&lt;hrp&gt;:&lt;source&gt;:&lt;leaves&gt;</code>) is the whole
+        design in one line — every field that moves the address is in it.</li>
+        <li>A <strong>control block</strong> is a leaf's proof of membership in the tree: the internal key plus the sibling
+        hashes up to the root. Paste it into Pearl Sign to spend via that leaf.</li>
+        <li>The <strong>sealed commitment</strong> (<code>pearl-policy:v1:&lt;hrp&gt;:&lt;sha256(descriptor)&gt;</code>) binds the
+        full descriptor into 32 bytes — publish it to commit to a policy before revealing the leaves.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- HONEST LIMITS -->
+  <section id="honest-limits" class="panel limits">
+    <h2>Honest limits</h2>
+    <ul>
+      <li>This page <strong>never moves PRL and never broadcasts</strong> a transaction. It computes addresses and data — funding and spending happen in Pearl Sign or your wallet.</li>
+      <li>A <strong>NUMS internal key</strong> is intentionally unspendable on the keypath. Lose every leaf key and the funds are unspendable — treat that as permanent.</li>
+      <li>Templates are <strong>authorization-only</strong>: they prove who can move coins, never why, never at what price, never any off-chain fact.</li>
+      <li><strong>Expert custom scripts are unreviewed.</strong> Verify them yourself; never fund a tree you can't fully read.</li>
+      <li>No new cryptography: BIP-340, BIP-341 digests, taggedHash, bech32m — all audited Sign/Escrow/Bounty/Covenant lineage. The desk runs fully offline; it makes zero network requests.</li>
+    </ul>
+  </section>
+</main>
+
+<footer>
+  <p>Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> for the Pearl ecosystem · All cryptography runs locally in your browser — keys never leave this page.</p>
+  <p>Donations: <code id="donate">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code> <button class="copy-btn" data-for="donate">Copy</button></p>
+</footer>
+
+<script src="qrcode.min.js?v=1"></script>
+<script src="pearl-policy.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
