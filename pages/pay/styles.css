@@ -310,6 +310,7 @@ button.btn { font-family: var(--font); }
 /* Form controls */
 label { display: block; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem 1.25rem; margin-bottom: 1rem; }
+.grid2 > * { min-width: 0; } /* let grid items shrink below intrinsic content width (e.g. <pre>) so code blocks scroll internally instead of blowing out the viewport on mobile */
 .grid2 > label { display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.95rem; font-weight: 600; }
 .row { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; }
 .input {
