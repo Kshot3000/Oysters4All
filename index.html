@@ -55,6 +55,7 @@
         <a href="pages/monetary/">Monetary</a>
         <a href="pages/drop/">Drop</a>
         <a href="pages/psbt/">PSBT</a>
+        <a href="pages/hedge/">Hedge</a>
         <a href="pages/id/">ID</a>
         <a href="pages/raffle/">Raffle</a>
         <a href="pages/swap/">Swap</a>
@@ -565,9 +566,14 @@ cd miner && uv run pearl-miner \
             <div class="card-links"><a href="pages/drop/">Open Pearl Drop →</a></div>
           </article>
           <article class="card reveal">
-            <h3>Pearl PSBT — Taproot PSBT Signing Workbench <span class="badge">new</span></h3>
+            <h3>Pearl PSBT — Taproot PSBT Signing Workbench</h3>
             <p>The machine-shop desk for Taproot PSBTs — draft an unsigned PSBT from your UTXOs, inspect every input's witness UTXO, sighash and tap leaves before a key touches it, sign keypath or scriptpath with exact BIP-341 sighashes (re-verified before the PSBT is mutated), combine co-signer PSBTs, and finalize to broadcast-ready tx hex. Six tabs: Create → Inspect → Sign → Combine → Finalize → Method. No new cryptography: every primitive is vendored from the audited sign core, and the sighash construction is differentially pinned byte-equal against it. Pure client-side — the desk never broadcasts and keys live in memory for one signing call only.</p>
             <div class="card-links"><a href="pages/psbt/">Open Pearl PSBT →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Hedge — Taproot Options Desk <span class="badge">new</span></h3>
+            <p>The storm-chart trading desk for PRL options — covered calls and protective puts in pure Taproot with no smart contracts: the writer locks collateral in a 2-leaf vault under a NUMS internal key (hashlocked exercise leaf for the buyer, CLTV refund leaf for the writer), the desk verifies the buyer's strike payment on Blockbook before the buyer's exercise tx is built, and both spends are locally signed with per-signature re-verification. Five steps: Write → Fund → Exercise → Track → Verify, with tamper-evident descriptors, a sealed commitment, and a standalone PROVEN / NOT PROVEN verifier. Honest about the one thing scripts can't prove: the strike leg is verified off-chain, never atomically on-chain.</p>
+            <div class="card-links"><a href="pages/hedge/">Open Pearl Hedge →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Foundry — Mining Pool <span class="badge">new</span></h3>

@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Hedge — Taproot options desk for PRL</title>
+<meta name="description" content="Pearl Hedge: write covered calls and protective puts on PRL in pure Taproot — no smart contracts. Hashlocked exercise leaf, CLTV refund leaf, NUMS internal key, local signing, Blockbook-verified strike payments.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 64 40" aria-hidden="true">
+      <rect x="4" y="6" width="7" height="14" class="c-up"/><line x1="7.5" y1="4" x2="7.5" y2="36" class="wick"/>
+      <rect x="15" y="14" width="7" height="12" class="c-down"/><line x1="18.5" y1="10" x2="18.5" y2="30" class="wick"/>
+      <rect x="26" y="4" width="7" height="18" class="c-up"/><line x1="29.5" y1="2" x2="29.5" y2="26" class="wick"/>
+      <rect x="37" y="12" width="7" height="16" class="c-down"/><line x1="40.5" y1="8" x2="40.5" y2="32" class="wick"/>
+      <rect x="48" y="8" width="7" height="14" class="c-up"/><line x1="51.5" y1="5" x2="51.5" y2="26" class="wick"/>
+      <line x1="2" y1="28" x2="60" y2="10" class="trend"/>
+    </svg>
+    <div>
+      <h1>Pearl Hedge</h1>
+      <p class="tagline">Taproot options desk for PRL · covered calls &amp; protective puts</p>
+    </div>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-step="write" class="active">1 · Write</button>
+    <button data-step="fund" class="">2 · Fund</button>
+    <button data-step="exercise" class="">3 · Exercise</button>
+    <button data-step="track" class="">4 · Track</button>
+    <button data-step="verify" class="">5 · Verify</button>
+  </nav>
+</header>
+
+<div class="ticker" aria-hidden="true"><div class="ticker-inner" id="ticker"></div></div>
+
+<main>
+  <!-- STEP 1: WRITE -->
+  <section id="step-write" class="panel active">
+    <h2>Write the option</h2>
+    <p class="lede">The <strong id="locker-role">writer</strong> locks <strong>qty PRL</strong> collateral in a two-leaf
+    Taproot vault under a nothing-up-my-sleeve internal key. The <strong id="holder-role">buyer</strong> can take the
+    collateral at or after the expiry block by revealing a secret preimage and signing; after expiry the
+    <span class="locker-role2">writer</span> can reclaim it. Pearl has no smart contracts — this is pure Taproot script.</p>
+    <div class="form-grid">
+      <label>Network
+        <select id="w-network">
+          <option value="mainnet" selected>Mainnet (prl…)</option>
+          <option value="testnet">Testnet (tprl…)</option>
+        </select>
+      </label>
+      <label>Product
+        <select id="w-kind">
+          <option value="C" selected>Covered call — writer locks collateral, buyer exercises</option>
+          <option value="P">Protective put — holder locks underlying, put writer exercises</option>
+        </select>
+      </label>
+      <label class="wide"><span class="locker-label" id="locker-label">Writer (collateral locker)</span> — PRL address, 64-hex x-only key, or 12/24-word mnemonic
+        <input id="w-writer" type="text" autocomplete="off" spellcheck="false" placeholder="prl1p… (recommended) · 64-hex key · mnemonic">
+      </label>
+      <label class="wide"><span class="holder-label" id="holder-label">Buyer (exercise-right holder)</span> — PRL address, 64-hex x-only key, or 12/24-word mnemonic
+        <input id="w-buyer" type="text" autocomplete="off" spellcheck="false" placeholder="prl1p… · 64-hex key · mnemonic">
+      </label>
+      <label>Underlying qty (PRL, locked as collateral)
+        <input id="w-qty" type="number" min="0" step="any" value="1">
+      </label>
+      <label>Strike
+        <select id="w-strike-mode">
+          <option value="prl" selected>in PRL</option>
+          <option value="usd">in USD (via manual rate)</option>
+        </select>
+        <input id="w-strike" type="number" min="0" step="any" value="2.5">
+      </label>
+      <label id="w-rate-wrap" hidden>PRL/USD rate (pinned at write time — manual oracle, not a live feed)
+        <input id="w-rate" type="number" min="0" step="any" placeholder="e.g. 0.42">
+      </label>
+      <label>Expiry (days from anchor block)
+        <input id="w-days" type="number" min="0.01" step="any" value="30">
+      </label>
+      <label>Anchor block height <span class="hint-inline">(expiry = anchor + ⌈days·86400/194⌉)</span>
+        <input id="w-anchor" type="number" min="1" step="1" placeholder="paste tip height or fetch">
+      </label>
+      <label class="wide">Buyer preimage (64-hex, 32 bytes) — paste the buyer's secret, or generate one
+        <input id="w-preimage-in" type="text" autocomplete="off" spellcheck="false" placeholder="64-hex secret (revealed only at exercise)">
+      </label>
+      <label>Premium (grains, pledged off-chain — the desk never escrows it)
+        <input id="w-premium" type="number" min="0" step="1" value="0">
+      </label>
+    </div>
+    <div class="form-grid">
+      <label class="wide">Blockbook endpoint (tip, funding scans, fee rates — GET only)
+        <input id="w-blockbook" type="text" autocomplete="off" spellcheck="false" placeholder="https://blockbook.pearlresearch.ai">
+      </label>
+    </div>
+    <div class="row">
+      <button id="w-tip" class="ghost">Fetch chain tip</button>
+      <button id="w-hashlock" class="ghost">Generate buyer hashlock secret</button>
+      <button id="w-write" class="primary">Write option</button>
+    </div>
+    <p class="err" id="w-err" hidden></p>
+    <div id="w-hashlock-out" class="note" hidden>
+      <p><strong>Buyer hashlock secret (32 bytes)</strong> — hand this to the buyer and keep no copy. It is revealed only at exercise.</p>
+      <p><code id="w-preimage" class="mono"></code> <button class="copy-btn" data-for="w-preimage">Copy</button></p>
+      <p class="hint">Lock hash committed in the exercise leaf: <code id="w-lockhash" class="mono"></code></p>
+    </div>
+    <div id="w-out" hidden>
+      <h3>Option vault</h3>
+      <dl class="review" id="w-review"></dl>
+      <h4>Exercise leaf</h4>
+      <pre id="w-asm-e" class="asm"></pre>
+      <h4>Refund leaf</h4>
+      <pre id="w-asm-x" class="asm"></pre>
+      <h3>Canonical descriptor</h3>
+      <div class="row"><textarea id="w-descriptor" rows="3" readonly spellcheck="false"></textarea></div>
+      <div class="row">
+        <button class="copy-btn" data-for="w-descriptor">Copy</button>
+        <button id="w-descriptor-download" class="ghost">Download JSON</button>
+        <button id="w-to-fund" class="ghost">Continue to Fund →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 2: FUND -->
+  <section id="step-fund" class="panel">
+    <h2>Fund the vault</h2>
+    <p class="lede">Send exactly the collateral to the vault address. The descriptor fully determines the address —
+    re-derive it here from the pasted descriptor before funding a single grain.</p>
+    <div class="form-grid">
+      <label class="wide">Option descriptor
+        <textarea id="f-descriptor" rows="3" spellcheck="false" placeholder="pearl-hedge:v1:prl:…"></textarea>
+      </label>
+      <label class="wide">Blockbook endpoint
+        <input id="f-blockbook" type="text" autocomplete="off" spellcheck="false" placeholder="https://blockbook.pearlresearch.ai">
+      </label>
+    </div>
+    <div class="row">
+      <button id="f-load" class="primary">Re-derive vault</button>
+      <button id="f-scan" class="ghost">Scan funding</button>
+    </div>
+    <p class="err" id="f-err" hidden></p>
+    <div id="f-out" hidden>
+      <dl class="review" id="f-review"></dl>
+      <h3>Vault address — fund exactly the collateral</h3>
+      <p class="addr"><code id="f-address" class="mono"></code> <button class="copy-btn" data-for="f-address">Copy</button></p>
+      <div id="f-qr" class="qr"></div>
+      <h3>Sealed commitment</h3>
+      <p class="hint">Hand the counterparty the sealed descriptor — it commits to every term without revealing the full script details.</p>
+      <p><code id="f-sealed" class="mono"></code> <button class="copy-btn" data-for="f-sealed">Copy</button></p>
+      <h3>Spend cost planner (exact vBytes)</h3>
+      <div class="row">
+        <label>Fee rate (grains/vB)
+          <input id="f-feerate" type="number" min="1" step="any" value="2" style="max-width:10rem">
+        </label>
+        <button id="f-fees-refresh" class="ghost">Recompute</button>
+      </div>
+      <dl class="review" id="f-fees"></dl>
+      <p class="hint">Dust floor: <span id="f-dust"></span> grains. Funding below the exercise/refund spend cost is refused, not burned.</p>
+    </div>
+  </section>
+
+  <!-- STEP 3: EXERCISE -->
+  <section id="step-exercise" class="panel">
+    <h2>Exercise or refund</h2>
+    <p class="lede">The buyer exercises by revealing the preimage and signing — after the desk verifies the strike
+    payment on Blockbook. The writer refunds after expiry. Keys are in-memory only and wiped after use.</p>
+    <div class="form-grid">
+      <label class="wide">Option descriptor
+        <textarea id="x-descriptor" rows="3" spellcheck="false" placeholder="pearl-hedge:v1:prl:…"></textarea>
+      </label>
+      <label class="wide">Blockbook endpoint
+        <input id="x-blockbook" type="text" autocomplete="off" spellcheck="false" placeholder="https://blockbook.pearlresearch.ai">
+      </label>
+      <label class="wide">Vault UTXO — <code>txid:vout:value-in-grains</code>
+        <input id="x-utxo" type="text" autocomplete="off" spellcheck="false" placeholder="…:0:100000000">
+      </label>
+      <label>Fee rate (grains/vB)
+        <input id="x-feerate" type="number" min="1" step="any" placeholder="auto">
+      </label>
+    </div>
+    <div class="row">
+      <button id="x-load" class="primary">Load option</button>
+      <button id="x-import-utxo" class="ghost">Import UTXO from Blockbook</button>
+    </div>
+    <p class="err" id="x-err" hidden></p>
+    <div id="x-option" hidden>
+      <dl class="review" id="x-review"></dl>
+    </div>
+
+    <div class="cols">
+      <div class="col">
+        <h3>Buyer exercise</h3>
+        <div class="form-grid">
+          <label class="wide">Strike payment txid (buyer → writer, ≥1 confirmation)
+            <input id="x-strike-txid" type="text" autocomplete="off" spellcheck="false" placeholder="64-hex txid">
+          </label>
+          <label class="wide">Writer's strike-receiving PRL address
+            <input id="x-strike-addr" type="text" autocomplete="off" spellcheck="false" placeholder="prl1p…">
+          </label>
+          <label class="wide">Buyer secret — 12/24-word mnemonic or WIF (in-memory only)
+            <input id="x-buyer-secret" type="password" autocomplete="off" spellcheck="false" placeholder="mnemonic or WIF">
+          </label>
+          <label>Buyer key mode
+            <select id="x-buyer-mode">
+              <option value="address" selected>PRL address / mnemonic (keypath)</option>
+              <option value="raw">raw x-only key</option>
+            </select>
+          </label>
+          <label class="wide">Preimage (64-hex, 32 bytes)
+            <input id="x-preimage" type="text" autocomplete="off" spellcheck="false" placeholder="the buyer's hashlock secret">
+          </label>
+          <label class="wide">Buyer payout address (collateral destination)
+            <input id="x-buyer-dest" type="text" autocomplete="off" spellcheck="false" placeholder="prl1p…">
+          </label>
+        </div>
+        <div class="row">
+          <button id="x-verify-strike" class="ghost">1 · Verify strike payment</button>
+          <button id="x-exercise" class="primary">2 · Build &amp; sign exercise</button>
+          <button id="x-buyer-clear" class="ghost">Clear secrets</button>
+        </div>
+        <p class="ok" id="x-strike-ok" hidden></p>
+      </div>
+      <div class="col">
+        <h3>Writer refund</h3>
+        <div class="form-grid">
+          <label class="wide">Writer secret — 12/24-word mnemonic or WIF (in-memory only)
+            <input id="x-writer-secret" type="password" autocomplete="off" spellcheck="false" placeholder="mnemonic or WIF">
+          </label>
+          <label>Writer key mode
+            <select id="x-writer-mode">
+              <option value="address" selected>PRL address / mnemonic (keypath)</option>
+              <option value="raw">raw x-only key</option>
+            </select>
+          </label>
+          <label class="wide">Writer payout address (refund destination)
+            <input id="x-writer-dest" type="text" autocomplete="off" spellcheck="false" placeholder="prl1p…">
+          </label>
+        </div>
+        <div class="row">
+          <button id="x-refund" class="primary">Build &amp; sign refund</button>
+          <button id="x-writer-clear" class="ghost">Clear secrets</button>
+        </div>
+        <p class="hint">Refunds are refused before the expiry block — the script enforces it on-chain.</p>
+      </div>
+    </div>
+
+    <div id="x-signed" hidden>
+      <h3>Signed transaction</h3>
+      <dl class="review" id="x-signed-dl"></dl>
+      <h4>Script</h4>
+      <pre id="x-asm" class="asm"></pre>
+      <textarea id="x-hex" rows="4" readonly spellcheck="false"></textarea>
+      <div class="row">
+        <button class="copy-btn" data-for="x-hex">Copy</button>
+        <button id="x-broadcast" class="primary">Broadcast via Blockbook</button>
+      </div>
+      <p class="hint" id="x-txid" hidden></p>
+    </div>
+  </section>
+
+  <!-- STEP 4: TRACK -->
+  <section id="step-track" class="panel">
+    <h2>Track the option</h2>
+    <p class="lede">Paste a descriptor to re-derive the vault address and read its lifecycle from Blockbook
+    (GET-only). Expiry countdown is in blocks (~194 s each — approximate).</p>
+    <div class="form-grid">
+      <label class="wide">Option descriptor
+        <textarea id="t-descriptor" rows="3" spellcheck="false" placeholder="pearl-hedge:v1:prl:…"></textarea>
+      </label>
+      <label class="wide">Blockbook endpoint
+        <input id="t-blockbook" type="text" autocomplete="off" spellcheck="false" placeholder="https://blockbook.pearlresearch.ai">
+      </label>
+    </div>
+    <div class="row">
+      <button id="t-scan" class="primary">Scan lifecycle</button>
+    </div>
+    <p class="err" id="t-err" hidden></p>
+    <div id="t-out" hidden>
+      <dl class="review" id="t-review"></dl>
+      <div id="t-countdown" class="countdown"></div>
+    </div>
+  </section>
+
+  <!-- STEP 5: VERIFY -->
+  <section id="step-verify" class="panel">
+    <h2>Verify a descriptor</h2>
+    <p class="lede">Standalone verifier: paste a full descriptor (and, optionally, the sealed commitment handed to
+    you at write time). The desk re-derives the vault address from scratch and rules on every term.</p>
+    <div class="form-grid">
+      <label class="wide">Full descriptor
+        <textarea id="v-descriptor" rows="3" spellcheck="false" placeholder="pearl-hedge:v1:prl:…"></textarea>
+      </label>
+      <label class="wide">Sealed commitment (optional — <code>pearl-hedge:v1:&lt;hrp&gt;:&lt;hash&gt;</code>)
+        <input id="v-sealed" type="text" autocomplete="off" spellcheck="false" placeholder="pearl-hedge:v1:prl:…">
+      </label>
+    </div>
+    <div class="row">
+      <button id="v-check" class="primary">Verify</button>
+    </div>
+    <p class="err" id="v-err" hidden></p>
+    <div id="v-out" hidden>
+      <div id="v-verdict" class="verdict"></div>
+      <dl class="review" id="v-review"></dl>
+    </div>
+  </section>
+
+  <section id="honest-limits" class="panel limits">
+    <h2>Honest limits</h2>
+    <ul>
+      <li>The Taproot script enforces <strong>collateral routing only</strong>: buyer-with-preimage at/after expiry, or writer after expiry. It cannot atomically verify the buyer's off-chain strike payment on-chain — the desk checks the strike txid on Blockbook before the buyer's exercise tx is built.</li>
+      <li>No real options were exercised in testing — all exercise/refund flows were verified against synthetic UTXOs in a real browser.</li>
+      <li>The premium is a pledged off-chain payment. The desk never escrows it and cannot enforce it.</li>
+      <li>Exercise before the expiry block is impossible on-chain (CLTV). Refunds before expiry are refused. After expiry there is a race: the writer should confirm no buyer exercise before refunding.</li>
+      <li>Expiry is a block height; the days→blocks conversion uses ~194 s/block and is approximate. Only deal with counterparties you trust.</li>
+      <li>Not financial advice. Test on testnet first.</li>
+    </ul>
+  </section>
+</main>
+
+<footer>
+  <p>Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> for the Pearl ecosystem · All cryptography runs locally in your browser — keys never leave this page.</p>
+  <p>Donations: <code id="donate">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code> <button class="copy-btn" data-for="donate">Copy</button></p>
+</footer>
+
+<script src="qrcode.min.js?v=1"></script>
+<script src="pearl-hedge.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
