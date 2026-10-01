@@ -54,8 +54,9 @@
   td.addr{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   tr:hover td{background:rgba(255,154,60,.04)}
   .empty{color:var(--faint);padding:22px;text-align:center;border:1px dashed var(--line);border-radius:12px;font-size:14px}
-  .cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-  @media(max-width:860px){.cols{grid-template-columns:1fr}}
+  #minerTable,#roundList,#balanceList{overflow-x:auto} /* wide tables scroll inside on small screens instead of breaking layout */
+  .cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+  @media(max-width:860px){.cols{grid-template-columns:minmax(0,1fr)}}
   pre.cfg{background:#0a0806;border:1px solid var(--line);border-radius:12px;padding:16px;font-family:var(--mono);
     font-size:12.5px;overflow-x:auto;color:#ffd9a8;line-height:1.7}
   pre.cfg .c{color:var(--faint)}

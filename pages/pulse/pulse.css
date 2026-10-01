@@ -121,6 +121,8 @@ tbody tr:hover td { background: rgba(62,240,200,.03); }
 .settings-grid label { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
 .settings-grid label.check { display: flex; align-items: center; gap: 8px; }
 .settings-grid input { width: 100%; }
+.settings-grid select { width: 100%; min-width: 0; } /* long option text must not force the track wider than the screen */
+.settings-grid label { min-width: 0; } /* let grid tracks shrink on small screens */
 input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--teal); }
 
 /* footer */

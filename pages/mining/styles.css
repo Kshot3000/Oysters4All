@@ -140,6 +140,7 @@ select.input { appearance: none; cursor: pointer; }
 
 /* milestone table */
 .mtable { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.milestones { overflow-x: auto; } /* wide milestone table scrolls on small screens instead of breaking layout */
 .mtable th, .mtable td { text-align: left; padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--line); }
 .mtable th { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.07em; }
 .mtable td.mono { color: var(--gold); }
