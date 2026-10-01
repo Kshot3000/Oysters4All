@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Burn — Provable-burn desk for PRL</title>
+<meta name="description" content="Pearl Burn: derive provably-unspendable Taproot burn addresses from a public tag (NUMS-style), plan the exact unsigned burn tx with real vByte fee math, seal a tamper-evident burn certificate, and verify past burns against Blockbook. Fully offline except optional Blockbook lookups.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 64 64" aria-hidden="true">
+      <defs>
+        <radialGradient id="ember" cx="50%" cy="65%" r="60%">
+          <stop offset="0%" stop-color="#ffd166"/>
+          <stop offset="45%" stop-color="#ff6b35"/>
+          <stop offset="100%" stop-color="#c1121f"/>
+        </radialGradient>
+      </defs>
+      <circle cx="32" cy="32" r="27" class="ring"/>
+      <path d="M32 12 C26 24 20 30 20 40 a12 12 0 0 0 24 0 C44 30 38 24 32 12 Z" fill="url(#ember)" class="flame"/>
+      <path d="M32 30 C29 35 26 38 26 43 a6 6 0 0 0 12 0 C38 38 35 35 32 30 Z" fill="#2b2d42" class="core"/>
+    </svg>
+    <div>
+      <h1>Pearl Burn</h1>
+      <p class="tagline">Provable-burn desk for PRL · burn addresses by construction, certificates by math</p>
+    </div>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-step="generate" class="active">1 · Generate</button>
+    <button data-step="plan" class="">2 · Plan</button>
+    <button data-step="certify" class="">3 · Certify</button>
+    <button data-step="verify" class="">4 · Verify</button>
+  </nav>
+</header>
+
+<div class="margin-strip" aria-hidden="true"><span>BURN REGISTER · FOLIO 01 · ENTRY PRL-B-001 · NUMS INTERNAL KEYS ONLY — NO PRIVATE KEY EXISTS</span></div>
+
+<aside class="limits" id="honest-limits">
+  <h3>Honest limits — read before burning</h3>
+  <ul>
+    <li><strong>Burns are irreversible:</strong> coins sent to a burn address can never be spent by anyone — that is the entire point. Double-check the tag and amount before you broadcast.</li>
+    <li><strong>Unspendable by construction:</strong> the burn internal key is <code>lift_x(SHA-256("PearlBurnNUMS/v1:" || tag))</code> — a hash of a public tag, so nobody knows the private key. Anyone can recompute tag → address and confirm it.</li>
+    <li><strong>This page never holds your keys and never signs:</strong> the planner builds an <em>unsigned</em> tx hex from a UTXO you paste. Sign it in your own wallet, then broadcast it yourself — this page broadcasts nothing.</li>
+    <li><strong>On-chain confirmation needs a live Blockbook:</strong> the Verify tab's txid lookup is GET-only against the Blockbook endpoint. If the endpoint is down, the math still verifies offline — the chain state is just "unknown".</li>
+    <li><strong>A "pending" certificate proves the math, not the burn:</strong> PROVEN means the seal recomputes and the address derives from the tag. Only a confirmed on-chain output proves coins actually burned.</li>
+  </ul>
+</aside>
+
+<main>
+  <!-- STEP 1: GENERATE -->
+  <section id="step-generate" class="panel active">
+    <h2>Generate a burn address</h2>
+    <p class="lede">Pick a public tag — a cause, a date, a meme. The burn address is derived from it
+    with <strong>no secret material anywhere</strong>: <code>internal = lift_x(SHA-256("PearlBurnNUMS/v1:" || tag))</code>,
+    then the standard TapTweak to the P2TR output key. Because nobody knows the discrete log of a hash output,
+    the tweaked key is equally unspendable. Same tag always gives the same address — that is what makes the burn provable.</p>
+
+    <div class="form-grid">
+      <label>Network
+        <select id="g-network">
+          <option value="mainnet" selected>Mainnet (prl…)</option>
+          <option value="testnet">Testnet (tprl…)</option>
+        </select>
+      </label>
+      <label class="wide">Burn tag (public, max 64 bytes)
+        <input id="g-tag" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. pearl-genesis-burn" maxlength="64" value="pearl-genesis-burn">
+      </label>
+    </div>
+    <div class="row">
+      <button id="g-generate" class="primary">Derive burn address</button>
+    </div>
+    <div id="g-result" class="result-box" hidden>
+      <div class="kv"><span>Burn address</span><code id="g-address" class="addr"></code><button class="copy secondary" data-copy="#g-address">copy</button></div>
+      <div class="kv"><span>NUMS internal key</span><code id="g-internal"></code><button class="copy secondary" data-copy="#g-internal">copy</button></div>
+      <div class="kv"><span>Tweaked output key (P2TR)</span><code id="g-output"></code><button class="copy secondary" data-copy="#g-output">copy</button></div>
+      <div class="kv"><span>TapTweak t</span><code id="g-tweak"></code></div>
+      <div class="qr-wrap"><div id="g-qr" class="qr"></div><p class="hint">QR of the burn address — scan to fund the burn.</p></div>
+      <p class="note-box">Unspendability proof: the internal key above is <code>SHA-256("PearlBurnNUMS/v1:" + tag)</code> lifted to the curve.
+      It is a <em>public</em> hash — there is no private key to know, lose, or leak, and the TapTweak adds only a public hash commitment.
+      Recompute it anywhere to confirm.</p>
+    </div>
+  </section>
+
+  <!-- STEP 2: PLAN -->
+  <section id="step-plan" class="panel">
+    <h2>Plan the burn transaction</h2>
+    <p class="lede">Enter the PRL to burn and the UTXO that funds it. The desk builds the <strong>exact unsigned
+    transaction</strong>: one P2TR output to the burn address plus one P2TR change output, with real vByte fee math
+    (154 vB for 2 outputs, 111 vB for 1). The burn output can never be below the 546-grain dust floor, and a
+    dust-valued change is refused loudly — sweep it into the burn instead.</p>
+
+    <div class="form-grid">
+      <label>Network
+        <select id="p-network">
+          <option value="mainnet" selected>Mainnet (prl…)</option>
+          <option value="testnet">Testnet (tprl…)</option>
+        </select>
+      </label>
+      <label>Burn tag
+        <input id="p-tag" type="text" autocomplete="off" spellcheck="false" placeholder="same tag as step 1" maxlength="64">
+      </label>
+      <label>Amount to burn (PRL)
+        <input id="p-amount" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. 1.5">
+      </label>
+      <label>Fee rate (grains/vB)
+        <input id="p-feerate" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. 10" value="10">
+      </label>
+      <label class="wide">Funding UTXO txid (64-hex — paste from your wallet)
+        <input id="p-txid" type="text" autocomplete="off" spellcheck="false" placeholder="64-hex txid of the UTXO you will spend">
+      </label>
+      <label>UTXO vout
+        <input id="p-vout" type="text" autocomplete="off" spellcheck="false" placeholder="0">
+      </label>
+      <label>UTXO value (grains)
+        <input id="p-value" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. 100000000">
+      </label>
+      <label class="wide">Change address (your P2TR address — the leftover returns here)
+        <input id="p-change" type="text" autocomplete="off" spellcheck="false" placeholder="prl1p…">
+      </label>
+    </div>
+    <div class="row">
+      <button id="p-plan" class="primary">Build unsigned burn tx</button>
+    </div>
+    <div id="p-result" class="result-box" hidden>
+      <div class="kv"><span>Burn address</span><code id="p-burnaddr" class="addr"></code></div>
+      <div class="kv"><span>Burn output</span><code id="p-burnout"></code></div>
+      <div class="kv"><span>Change output</span><code id="p-changeout"></code></div>
+      <div class="kv"><span>Tx size</span><code id="p-vbytes"></code></div>
+      <div class="kv"><span>Fee</span><code id="p-fee"></code></div>
+      <div class="kv"><span>Unsigned tx hex</span><textarea id="p-hex" rows="4" readonly></textarea><button class="copy secondary" data-copy="#p-hex">copy</button></div>
+      <p class="note-box">This hex is <strong>unsigned</strong>. Sign it in your own wallet (any PRL signer that accepts raw hex),
+      then broadcast the signed tx. The desk re-verified the hex by decoding it before showing it to you — outputs, values and fee all match the plan.</p>
+    </div>
+    <div id="p-error" class="error-box" hidden></div>
+  </section>
+
+  <!-- STEP 3: CERTIFY -->
+  <section id="step-certify" class="panel">
+    <h2>Seal a burn certificate</h2>
+    <p class="lede">The certificate binds <strong>tag → address → amount → txid</strong> under one hash:
+    <code>seal = pearl-burn:v1:&lt;hrp&gt;:SHA-256("pearl-burn:v1:&lt;hrp&gt;:&lt;tag&gt;:&lt;address&gt;:&lt;grains&gt;:&lt;txid&gt;")</code>.
+    Use <code>pending</code> as the txid before broadcast, then re-seal with the real txid after the burn confirms.
+    Anyone holding the certificate can re-verify it offline.</p>
+
+    <div class="form-grid">
+      <label>Network
+        <select id="c-network">
+          <option value="mainnet" selected>Mainnet (prl…)</option>
+          <option value="testnet">Testnet (tprl…)</option>
+        </select>
+      </label>
+      <label>Burn tag
+        <input id="c-tag" type="text" autocomplete="off" spellcheck="false" placeholder="same tag as step 1" maxlength="64">
+      </label>
+      <label>Amount burned (PRL)
+        <input id="c-amount" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. 1.5">
+      </label>
+      <label>Txid (or blank = pending)
+        <input id="c-txid" type="text" autocomplete="off" spellcheck="false" placeholder="64-hex, or leave blank">
+      </label>
+    </div>
+    <div class="row">
+      <button id="c-build" class="primary">Seal certificate</button>
+    </div>
+    <div id="c-result" class="result-box" hidden>
+      <textarea id="c-cert" rows="8" readonly></textarea>
+      <div class="row"><button class="copy secondary" data-copy="#c-cert">copy certificate</button></div>
+    </div>
+    <div id="c-error" class="error-box" hidden></div>
+  </section>
+
+  <!-- STEP 4: VERIFY -->
+  <section id="step-verify" class="panel">
+    <h2>Verify a burn</h2>
+    <p class="lede">Two independent checks. <strong>Certificate:</strong> paste any Pearl Burn certificate — the desk
+    recomputes tag → address and the seal hash, and returns PROVEN only if every field matches.
+    <strong>On-chain:</strong> paste a txid and the expected burn address + amount — the desk queries Blockbook
+    (GET-only) and confirms the output really exists, with its block height and timestamp.</p>
+
+    <h3>Certificate check (fully offline)</h3>
+    <label class="wide">Paste certificate
+      <textarea id="v-cert" rows="8" spellcheck="false" placeholder="pearl-burn:v1 certificate&#10;tag: …"></textarea>
+    </label>
+    <div class="row"><button id="v-check" class="primary">Verify certificate</button></div>
+    <div id="v-result" class="verdict-box" hidden></div>
+
+    <h3>On-chain check (Blockbook, GET-only)</h3>
+    <div class="form-grid">
+      <label class="wide">Burn txid (64-hex)
+        <input id="o-txid" type="text" autocomplete="off" spellcheck="false" placeholder="64-hex txid">
+      </label>
+      <label class="wide">Expected burn address
+        <input id="o-address" type="text" autocomplete="off" spellcheck="false" placeholder="prl1p…">
+      </label>
+      <label>Expected amount (PRL)
+        <input id="o-amount" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. 1.5">
+      </label>
+      <label>Blockbook endpoint
+        <input id="o-endpoint" type="text" autocomplete="off" spellcheck="false" value="https://blockbook.pearlresearch.ai">
+      </label>
+    </div>
+    <div class="row"><button id="o-check" class="primary">Look up burn on-chain</button></div>
+    <div id="o-result" class="verdict-box" hidden></div>
+  </section>
+</main>
+
+<footer>
+  <p>Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> for the Pearl blockchain · tips: <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code></p>
+  <p class="fine">Client-side cryptography only. This page never holds keys, never signs, never broadcasts. Burns are irreversible — verify before you broadcast.</p>
+</footer>
+
+<script src="qrcode.min.js?v=1"></script>
+<script src="pearl-burn.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
