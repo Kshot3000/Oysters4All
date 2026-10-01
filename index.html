@@ -58,6 +58,7 @@
         <a href="pages/hedge/">Hedge</a>
         <a href="pages/policy/">Policy</a>
         <a href="pages/mesh/">Mesh</a>
+        <a href="pages/will/">Will</a>
         <a href="pages/id/">ID</a>
         <a href="pages/raffle/">Raffle</a>
         <a href="pages/swap/">Swap</a>
@@ -583,9 +584,14 @@ cd miner && uv run pearl-miner \
             <div class="card-links"><a href="pages/policy/">Open Pearl Policy →</a></div>
           </article>
           <article class="card reveal">
-            <h3>Pearl Mesh — MuSig2 Collaborative Keypath Desk <span class="badge">new</span></h3>
+            <h3>Pearl Mesh — MuSig2 Collaborative Keypath Desk</h3>
             <p>The weaver's loom for shared PRL custody — an n-of-n MuSig2 aggregate Schnorr key whose funds look exactly like a single-key Taproot payment (no scripts, nothing on-chain to mark it as shared). Five steps: Setup → Aggregate → Fund → Sign → Verify: sorted-key aggregation with rogue-key-proof coefficients and even-y normalization, a TapTweaked P2TR address, an interactive signing ceremony (nonce-commitment bundles → per-member local signing → aggregated partials, one BIP-340 signature), a sealed <code>pearl-mesh:v1</code> descriptor, and standalone PROVEN / NOT PROVEN verifiers. The page never moves PRL and never broadcasts — keys stay on each member's own device.</p>
             <div class="card-links"><a href="pages/mesh/">Open Pearl Mesh →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Will — Taproot Inheritance Vaults <span class="badge">new</span></h3>
+            <p>The testamentary vault for PRL — a 2-leaf Taproot desk under a NUMS internal key: the owner reclaims anytime via leaf O, and m-of-n heirs claim only at/after an unlock block via the CLTV-gated leaf H. Five steps: Draft → Fund → Watch → Claim → Verify: canonical heir-key sorting, sealed descriptors with a standalone PROVEN / NOT PROVEN verifier, live Blockbook funding/tip, exact vByte fee previews for both claim paths, and a claim builder that refuses before the unlock block and re-verifies every spend from its decoded hex. Not legal advice — the scripts enforce routing, not intent.</p>
+            <div class="card-links"><a href="pages/will/">Open Pearl Will →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Foundry — Mining Pool <span class="badge">new</span></h3>

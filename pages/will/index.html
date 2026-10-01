@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Will — Taproot inheritance vaults for PRL</title>
+<meta name="description" content="Pearl Will: lock PRL in a 2-leaf Taproot vault. The owner can reclaim at any time; m-of-n heirs can claim only after the unlock block (CLTV-gated). NUMS internal key, sealed descriptors, standalone verifier. Fully offline except optional Blockbook lookups.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 64 64" aria-hidden="true">
+      <circle cx="32" cy="32" r="27" class="ring"/>
+      <circle cx="32" cy="32" r="20" class="ring thin"/>
+      <path d="M32 18 L32 40 M24 26 L40 26" class="key"/>
+      <circle cx="32" cy="44" r="5" class="bow"/>
+      <path d="M14 50 Q32 58 50 50" class="wax"/>
+    </svg>
+    <div>
+      <h1>Pearl Will</h1>
+      <p class="tagline">Taproot inheritance vaults for PRL · owner always, heirs after the unlock block</p>
+    </div>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-step="draft" class="active">1 · Draft</button>
+    <button data-step="fund" class="">2 · Fund</button>
+    <button data-step="watch" class="">3 · Watch</button>
+    <button data-step="claim" class="">4 · Claim</button>
+    <button data-step="verify" class="">5 · Verify</button>
+  </nav>
+</header>
+
+<div class="margin-strip" aria-hidden="true"><span>FOLIO 01 — TESTAMENTARY VAULT REGISTER · ENTRY PRL-W-001 · ALL KEYS IN X-ONLY FORM</span></div>
+
+<aside class="limits" id="honest-limits">
+  <h3>Honest limits — read before drafting</h3>
+  <ul>
+    <li><strong>This page enforces routing, not intent:</strong> the scripts guarantee <em>who</em> can move the coins and <em>when</em> — they cannot verify that your heirs are the right people. Key custody is on you.</li>
+    <li><strong>Unlock is a block height, not a date:</strong> heirs can claim at/after the unlock block (CLTV-gated, enforced by consensus). The "~days" estimates use Pearl's ≈194 s block target and drift.</li>
+    <li><strong>The owner can always move the funds</strong> — until the moment the heirs claim them. There is no dead-man's switch on-chain; if you spend the vault, the heirs' claim becomes worthless. Tell them how to watch the vault.</li>
+    <li><strong>Not legal advice:</strong> this is a key-management tool, not a legal will. No probate, no executor, no estate law — just Taproot.</li>
+    <li><strong>This page never holds your keys:</strong> mnemonics and private keys live in this page's memory only and are never sent anywhere. Broadcasts go through Blockbook only with your double-confirm.</li>
+  </ul>
+</aside>
+
+<main>
+  <!-- STEP 1: DRAFT -->
+  <section id="step-draft" class="panel active">
+    <h2>Draft the vault</h2>
+    <p class="lede">Two leaves under a NUMS internal key (nobody's key — no keypath backdoor):
+    the <strong>owner leaf</strong> (<code>&lt;owner&gt; CHECKSIG</code>, spendable any time) and the
+    <strong>heir leaf</strong> (<code>&lt;unlock&gt; CLTV DROP m-of-n CHECKSIGADD</code>, spendable only at/after the unlock block).</p>
+
+    <div class="form-grid">
+      <label>Network
+        <select id="d-network">
+          <option value="mainnet" selected>Mainnet (prl…)</option>
+          <option value="testnet">Testnet (tprl…)</option>
+        </select>
+      </label>
+      <label>Vault label (optional)
+        <input id="d-label" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. family vault 2031" maxlength="64">
+      </label>
+    </div>
+
+    <h3>Owner key</h3>
+    <p class="lede">The owner reclaims at any time. Paste a 64-hex x-only pubkey, or derive one locally.</p>
+    <div class="form-grid">
+      <label class="wide">Owner x-only pubkey (64-hex)
+        <input id="d-owner" type="text" autocomplete="off" spellcheck="false" placeholder="64-hex x-only pubkey">
+      </label>
+    </div>
+    <div class="row">
+      <button id="d-owner-new" class="secondary">Generate local owner wallet</button>
+      <button id="d-owner-from-mnemonic" class="secondary">Derive from mnemonic</button>
+    </div>
+    <div id="d-owner-mnemonic-box" class="note-box" hidden>
+      <strong>Local wallet (memory only — write it down, then clear this box):</strong>
+      <code id="d-owner-mnemonic"></code>
+      <div class="row"><button id="d-owner-clear-mnemonic" class="danger">Wipe from memory</button></div>
+    </div>
+    <p class="field-note">Generated wallets derive <code>m/86'/808276'/0'/0/0</code> (Pearl BIP-86). The owner private key can also sign the reclaim on the Claim tab.</p>
+
+    <h3>Heirs (1–5)</h3>
+    <p class="lede">Each heir contributes an x-only pubkey. Heir keys are <strong>sorted lexicographically</strong> in the script, so the vault is canonical — the same descriptor always rebuilds the same address, byte for byte.</p>
+    <div id="d-heirs"></div>
+    <div class="row">
+      <button id="d-heir-add" class="secondary">Add heir</button>
+    </div>
+
+    <h3>Threshold &amp; unlock</h3>
+    <div class="form-grid">
+      <label>Heir threshold (m)
+        <select id="d-m"></select>
+      </label>
+      <label>Unlock mode
+        <select id="d-unlock-mode">
+          <option value="height" selected>Block height</option>
+          <option value="days">Days from now (≈194 s/block)</option>
+        </select>
+      </label>
+      <label id="d-unlock-height-wrap">Unlock block height
+        <input id="d-unlock-height" type="number" min="1" placeholder="e.g. 240000">
+      </label>
+      <label id="d-unlock-days-wrap" hidden>Unlock in N days
+        <input id="d-unlock-days" type="number" min="1" step="1" placeholder="e.g. 365">
+      </label>
+      <label id="d-unlock-tip-wrap" hidden>Current chain tip height (for days → blocks)
+        <input id="d-unlock-tip" type="number" min="0" placeholder="e.g. 200000">
+      </label>
+    </div>
+    <p class="field-note" id="d-unlock-note">Enter the absolute block height at/after which heirs may claim. Heirs are refused loudly before it.</p>
+
+    <div class="row">
+      <button id="d-seal" class="primary">Seal the draft →</button>
+    </div>
+    <p class="err" id="d-err" hidden></p>
+
+    <div id="d-result" class="result-card" hidden>
+      <h3>Sealed vault</h3>
+      <dl class="kv">
+        <dt>Vault address</dt><dd><code id="d-addr"></code> <button class="copy" data-copy="d-addr">copy</button></dd>
+        <dt>Sealed commitment</dt><dd><code id="d-sealed" class="long"></code> <button class="copy" data-copy="d-sealed">copy</button></dd>
+        <dt>Descriptor</dt><dd><code id="d-desc" class="long"></code> <button class="copy" data-copy="d-desc">copy</button></dd>
+        <dt>Unlock block</dt><dd><span id="d-unlock-out"></span></dd>
+        <dt>Owner leaf</dt><dd><code id="d-owner-asm" class="long"></code></dd>
+        <dt>Heir leaf</dt><dd><code id="d-heir-asm" class="long"></code></dd>
+        <dt>NUMS internal key</dt><dd><code id="d-nums"></code></dd>
+        <dt>Control blocks</dt><dd><code id="d-cb" class="long"></code></dd>
+      </dl>
+      <div class="row">
+        <button id="d-save" class="secondary">Save draft locally</button>
+        <button id="d-goto-fund" class="primary">Continue to Fund →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 2: FUND -->
+  <section id="step-fund" class="panel">
+    <h2>Fund the vault</h2>
+    <p class="lede">Send PRL to the vault address. Check its balance with a GET-only Blockbook lookup, or tally air-gapped UTXOs offline.</p>
+    <div class="form-grid">
+      <label class="wide">Blockbook URL (GET-only, stored locally)
+        <input id="f-blockbook" type="text" autocomplete="off" spellcheck="false" placeholder="https://blockbook.pearl… (leave empty for offline mode)">
+      </label>
+    </div>
+    <div id="f-vault-card" class="result-card">
+      <dl class="kv">
+        <dt>Vault address</dt><dd><code id="f-addr"></code></dd>
+        <dt>Balance</dt><dd><span id="f-balance">—</span></dd>
+        <dt>QR</dt><dd><div id="f-qr" class="qr"></div></dd>
+      </dl>
+      <div class="row">
+        <button id="f-refresh" class="primary">Refresh balance</button>
+      </div>
+      <p class="err" id="f-err" hidden></p>
+    </div>
+    <h3>Air-gapped UTXO tally (offline)</h3>
+    <p class="lede">One per line: <code>txid:vout amount-PRL address</code>. Nothing leaves your machine.</p>
+    <textarea id="f-utxos" rows="4" spellcheck="false" placeholder="a3f1…:0 1.50000000 prl1…"></textarea>
+    <div class="row"><button id="f-tally" class="secondary">Tally</button></div>
+    <p id="f-tally-out" class="note"></p>
+    <h3>Claim fee preview</h3>
+    <p class="lede">Exact vBytes for each claim path at your fee rate — no surprises when the day comes.</p>
+    <div class="form-grid">
+      <label>Fee rate (grains/vByte)
+        <input id="f-feerate" type="number" min="1" value="10">
+      </label>
+      <label>Outputs per claim
+        <input id="f-nout" type="number" min="1" value="2">
+      </label>
+    </div>
+    <div class="row"><button id="f-plan" class="secondary">Estimate fees</button></div>
+    <dl class="kv" id="f-plan-out" hidden>
+      <dt>Owner reclaim</dt><dd><span id="f-plan-owner"></span></dd>
+      <dt>Heir claim</dt><dd><span id="f-plan-heir"></span></dd>
+    </dl>
+  </section>
+
+  <!-- STEP 3: WATCH -->
+  <section id="step-watch" class="panel">
+    <h2>Watch the vault</h2>
+    <p class="lede">Lifecycle at a glance: funded or empty, spent or sealed, and the countdown to the unlock block.</p>
+    <div class="row">
+      <button id="w-refresh" class="primary">Refresh from Blockbook</button>
+    </div>
+    <p class="err" id="w-err" hidden></p>
+    <dl class="kv" id="w-out" hidden>
+      <dt>Chain tip</dt><dd><span id="w-tip"></span></dd>
+      <dt>Unlock block</dt><dd><span id="w-unlock"></span></dd>
+      <dt>Countdown</dt><dd><span id="w-countdown"></span></dd>
+      <dt>Status</dt><dd><span id="w-status"></span></dd>
+      <dt>Confirmed balance</dt><dd><span id="w-balance"></span></dd>
+      <dt>Recent txs</dt><dd><span id="w-txs"></span></dd>
+    </dl>
+    <h3>Manual countdown (offline)</h3>
+    <p class="lede">No Blockbook? Paste the current chain tip height and the desk counts the blocks for you.</p>
+    <div class="form-grid">
+      <label>Current chain tip height
+        <input id="w-tip-manual" type="number" min="0" placeholder="e.g. 200000">
+      </label>
+    </div>
+    <div class="row"><button id="w-count" class="secondary">Count down</button></div>
+    <p id="w-count-out" class="note"></p>
+  </section>
+
+  <!-- STEP 4: CLAIM -->
+  <section id="step-claim" class="panel">
+    <h2>Claim</h2>
+    <p class="lede">Two paths, one vault. <strong>Owner reclaim</strong> works at any height. <strong>Heir claim</strong> is refused — loudly, before any bytes are built — until the chain reaches the unlock block.</p>
+    <div class="form-grid">
+      <label class="wide">Vault descriptor (paste to load)
+        <textarea id="c-desc" rows="3" spellcheck="false" placeholder="pearl-will:v1:prl:2-of-3:…"></textarea>
+      </label>
+    </div>
+    <div class="row">
+      <button id="c-load" class="primary">Load vault</button>
+    </div>
+    <p class="err" id="c-err" hidden></p>
+    <div id="c-vault" class="result-card" hidden>
+      <dl class="kv">
+        <dt>Address</dt><dd><code id="c-addr"></code></dd>
+        <dt>Threshold</dt><dd><span id="c-threshold"></span></dd>
+        <dt>Unlock</dt><dd><span id="c-unlock"></span></dd>
+        <dt>Sealed</dt><dd><code id="c-sealed" class="long"></code></dd>
+      </dl>
+    </div>
+
+    <div class="claim-cols">
+      <div class="claim-col">
+        <h3>Owner reclaim</h3>
+        <div class="form-grid">
+          <label class="wide">Owner private key (WIF, 64-hex, or mnemonic)
+            <input id="co-priv" type="password" autocomplete="off" spellcheck="false" placeholder="memory only — never leaves this page">
+          </label>
+          <label class="wide">Destination address
+            <input id="co-dest" type="text" autocomplete="off" spellcheck="false" placeholder="prl1…">
+          </label>
+          <label class="wide">Change address
+            <input id="co-change" type="text" autocomplete="off" spellcheck="false" placeholder="prl1…">
+          </label>
+          <label class="wide">Funding UTXO <span class="field-note">txid:vout:value-grains</span>
+            <input id="co-utxo" type="text" autocomplete="off" spellcheck="false" placeholder="a3f1…:0:150000000">
+          </label>
+          <label>Fee rate (grains/vByte)
+            <input id="co-feerate" type="number" min="1" value="10">
+          </label>
+        </div>
+        <div class="row"><button id="co-build" class="primary">Build owner claim</button></div>
+        <p class="err" id="co-err" hidden></p>
+        <div id="co-out" class="result-card" hidden>
+          <dl class="kv">
+            <dt>Signed txid</dt><dd><code id="co-txid"></code></dd>
+            <dt>Fee</dt><dd><span id="co-fee"></span></dd>
+            <dt>Signed hex</dt><dd><textarea id="co-hex" rows="5" readonly spellcheck="false"></textarea></dd>
+          </dl>
+          <div class="row">
+            <button id="co-broadcast" class="danger">Broadcast via Blockbook (double-confirm)</button>
+          </div>
+          <p class="err" id="co-broadcast-err" hidden></p>
+        </div>
+      </div>
+      <div class="claim-col">
+        <h3>Heir claim</h3>
+        <div class="form-grid">
+          <label class="wide">Chain tip height <span class="field-note">Blockbook or pasted — the timelock gate reads this first</span>
+            <input id="ch-tip" type="number" min="0" placeholder="e.g. 240000">
+          </label>
+          <label class="wide">Destination address
+            <input id="ch-dest" type="text" autocomplete="off" spellcheck="false" placeholder="prl1…">
+          </label>
+          <label class="wide">Change address
+            <input id="ch-change" type="text" autocomplete="off" spellcheck="false" placeholder="prl1…">
+          </label>
+          <label class="wide">Funding UTXO <span class="field-note">txid:vout:value-grains</span>
+            <input id="ch-utxo" type="text" autocomplete="off" spellcheck="false" placeholder="a3f1…:0:150000000">
+          </label>
+          <label>Fee rate (grains/vByte)
+            <input id="ch-feerate" type="number" min="1" value="10">
+          </label>
+        </div>
+        <p class="lede">Heir signatures (64-hex Schnorr). Each heir signs the digest shown below with their own key — locally, or paste a pre-computed signature. Empty slots are non-signers.</p>
+        <div class="row"><button id="ch-digest" class="secondary">Compute claim digest</button></div>
+        <p class="err" id="ch-err" hidden></p>
+        <div id="ch-sigs" hidden>
+          <p><strong>Claim digest to sign:</strong> <code id="ch-digest-out" class="long"></code> <button class="copy" data-copy="ch-digest-out">copy</button></p>
+          <div id="ch-sig-list"></div>
+          <div class="form-grid">
+            <label class="wide">…or sign locally: heir private key (WIF/hex/mnemonic)
+              <input id="ch-priv" type="password" autocomplete="off" spellcheck="false" placeholder="signs the digest for the matching heir slot">
+            </label>
+          </div>
+          <div class="row"><button id="ch-sign-local" class="secondary">Sign locally → fill my slot</button></div>
+          <div class="row"><button id="ch-build" class="primary">Build heir claim</button></div>
+        </div>
+        <div id="ch-out" class="result-card" hidden>
+          <dl class="kv">
+            <dt>Signed txid</dt><dd><code id="ch-txid"></code></dd>
+            <dt>Locktime</dt><dd><span id="ch-locktime"></span></dd>
+            <dt>Fee</dt><dd><span id="ch-fee"></span></dd>
+            <dt>Signed hex</dt><dd><textarea id="ch-hex" rows="5" readonly spellcheck="false"></textarea></dd>
+          </dl>
+          <div class="row">
+            <button id="ch-broadcast" class="danger">Broadcast via Blockbook (double-confirm)</button>
+          </div>
+          <p class="err" id="ch-broadcast-err" hidden></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 5: VERIFY -->
+  <section id="step-verify" class="panel">
+    <h2>Verify</h2>
+    <p class="lede">Standalone verifier. Paste a <code>pearl-will:v1</code> descriptor and it re-derives <strong>everything</strong> — scripts, NUMS key, taptree, address — and rules <strong>PROVEN</strong> or <strong>NOT PROVEN</strong>. Trust the re-derivation, not the claim.</p>
+    <div class="form-grid">
+      <label class="wide">Descriptor
+        <textarea id="v-desc" rows="3" spellcheck="false" placeholder="pearl-will:v1:prl:2-of-3:…"></textarea>
+      </label>
+      <label class="wide">Claimed vault address
+        <input id="v-addr" type="text" autocomplete="off" spellcheck="false" placeholder="prl1…">
+      </label>
+      <label class="wide">Sealed commitment (optional)
+        <input id="v-sealed" type="text" autocomplete="off" spellcheck="false" placeholder="pearl-will:v1:prl:…">
+      </label>
+    </div>
+    <div class="row"><button id="v-check" class="primary">Verify descriptor</button></div>
+    <p class="err" id="v-err" hidden></p>
+    <div id="v-result" class="result-card" hidden>
+      <h3 id="v-verdict"></h3>
+      <ul id="v-checks" class="checks"></ul>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>Built for the Pearl blockchain (PRL) · <a href="https://x.com/kshot9000">@kshot9000</a> · donate PRL: <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code></p>
+  <p class="fine">Pearl Will is a key-management tool, not legal advice. Scripts are built locally and verified before broadcast; nothing here moves coins until you double-confirm a broadcast.</p>
+</footer>
+
+<script src="qrcode.min.js?v=1"></script>
+<script src="pearl-will.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
