@@ -6567,7 +6567,7 @@ zoo`.split("\n");
         continue;
       }
       if (seen.has(canon)) {
-        duplicates.push({ address: canon, line: lineNo, firstLine: seen.get(canon) });
+        duplicates.push({ address: canon, line: lineNo, firstLine: seen.get(canon), units });
         continue;
       }
       seen.set(canon, lineNo);

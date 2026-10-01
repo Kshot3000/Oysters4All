@@ -78,6 +78,7 @@ textarea { font-family: ui-monospace, Menlo, Consolas, monospace; resize: vertic
 .addr.small { font-size: .8rem; }
 .qr-wrap { margin: 1rem 0; }
 .qr-wrap > div { display: inline-block; background: #fff; border-radius: 8px; padding: 6px; }
+.qr-wrap img { max-width: 100%; height: auto; display: block; }
 table.keys { width: 100%; border-collapse: collapse; margin: .8rem 0; font-size: .85rem; }
 table.keys th, table.keys td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--line); }
 table.keys th { color: var(--muted); font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; }
@@ -104,4 +105,5 @@ footer .donate code { font-size: .75rem; color: var(--amber-hi); word-break: bre
   .pay-row { grid-template-columns: 1fr; }
   .summary .krow { grid-template-columns: 1fr; }
   .topbar { position: static; }
+  table.keys { display: block; overflow-x: auto; }
 }

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pearl Covenant — m-of-n Taproot Multisig Vaults for PRL</title>
 <meta name="description" content="Pearl Covenant: forge m-of-n Taproot multisig vaults on Pearl, coordinate air-gapped cosigner signing rounds, and finalize spends. All crypto runs locally in your browser.">
-<link rel="stylesheet" href="styles.css?v=1">
+<link rel="stylesheet" href="styles.css?v=2">
 </head>
 <body>
 <header class="topbar">
@@ -173,6 +173,14 @@
         <label class="wide">Signature (128 hex) <input id="cosig-sig" spellcheck="false" placeholder="128-hex Schnorr signature"></label>
       </div>
       <div class="row"><button class="btn ghost" id="add-cosig">Import signature</button></div>
+      <h3>Export round with signatures</h3>
+      <p class="hint">Hand this to the next cosigner — or back to the coordinator. It carries every
+      signature collected so far and stays tamper-evident: any edit invalidates the digest.</p>
+      <textarea id="sign-round-export" rows="6" spellcheck="false" readonly></textarea>
+      <div class="row">
+        <button class="btn ghost copy-btn" data-for="sign-round-export">Copy JSON</button>
+        <button class="btn ghost" id="download-signed-round">Download .json</button>
+      </div>
       <h3>Finalize</h3>
       <div class="row">
         <button class="btn primary" id="finalize-btn">Finalize transaction</button>
@@ -202,6 +210,6 @@
 
 <script src="qrcode.min.js?v=1"></script>
 <script src="pearl-covenant.bundle.js?v=2"></script>
-<script src="app.js?v=1"></script>
+<script src="app.js?v=2"></script>
 </body>
 </html>

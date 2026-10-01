@@ -118,7 +118,8 @@ export function validateHolderAddress(addr, network = NETWORKS.mainnet) {
  *  starting with "address" is skipped. Amounts are parsed with parseTokenUnits
  *  and must be > 0. Returns { holders, errors, duplicates, totalUnits }.
  *  holders: [{ address, units (BigInt), line }]. Duplicates are NOT merged
- *  here — they are reported so the UI can offer merge-or-refuse. */
+ *  here — they are reported as [{ address, line, firstLine, units (BigInt) }]
+ *  so the UI can offer merge-or-refuse with the true summed totals. */
 export function parseSnapshotCsv(text, { network = NETWORKS.mainnet, decimals = 8 } = {}) {
   const raw = String(text ?? "").split(/\r?\n/);
   const holders = [];
@@ -147,7 +148,9 @@ export function parseSnapshotCsv(text, { network = NETWORKS.mainnet, decimals = 
     catch (e) { errors.push(`line ${lineNo}: ${e.message}`); continue; }
     if (units <= 0n) { errors.push(`line ${lineNo}: balance must be positive`); continue; }
     if (seen.has(canon)) {
-      duplicates.push({ address: canon, line: lineNo, firstLine: seen.get(canon) });
+      // Keep the duplicate row's units so merge-or-refuse can sum them —
+      // dropping them silently would lie about the merged total.
+      duplicates.push({ address: canon, line: lineNo, firstLine: seen.get(canon), units });
       continue;
     }
     seen.set(canon, lineNo);

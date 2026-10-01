@@ -39,12 +39,16 @@
     }
   }
   document.querySelectorAll("button.copy").forEach((b) => {
+    const origLabel = b.textContent;
     b.addEventListener("click", () => {
       const el = $(b.dataset.copy);
+      if (!el) return;
       const t = el.tagName === "TEXTAREA" || el.tagName === "INPUT" ? el.value : el.textContent;
-      navigator.clipboard.writeText(t).catch(() => {});
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(t).catch(() => {});
+      }
       b.textContent = "copied";
-      setTimeout(() => { b.textContent = "copy"; }, 1200);
+      setTimeout(() => { b.textContent = origLabel; }, 1200);
     });
   });
 
@@ -163,8 +167,17 @@
     box.hidden = false;
     box.classList.remove("proven", "unproven");
     box.innerHTML = '<p class="hint">Querying Blockbook (GET-only)…</p>';
+    let amountGrains;
     try {
-      const amountGrains = B.prlToGrains($("#o-amount").value);
+      amountGrains = B.prlToGrains($("#o-amount").value);
+    } catch (e) {
+      // local validation failure, not a Blockbook failure — say so honestly
+      verdictBox("#o-result", "NOT PROVEN", [
+        "Invalid expected amount: " + String(e.message || e).replace(/^BURN REFUSED: /, ""),
+      ]);
+      return;
+    }
+    try {
       const r = await B.verifyBurnTx($("#o-endpoint").value.trim().replace(/\/+$/, ""), {
         txid: $("#o-txid").value.trim(),
         address: $("#o-address").value.trim(),

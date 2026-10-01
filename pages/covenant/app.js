@@ -199,6 +199,7 @@
     const tb = $("utxo-rows");
     if (!S.utxos.length) {
       tb.innerHTML = "<tr><td colspan=\"5\" class=\"hint\">No UTXOs loaded yet.</td></tr>";
+      $("vault-balance").textContent = "";
       return;
     }
     tb.innerHTML = "";
@@ -371,6 +372,8 @@
     $("quorum-bar").style.width = Math.min(100, (st.have / st.need) * 100) + "%";
     $("quorum-label").textContent = "Quorum: " + st.have + " of " + st.need + " signatures" + (st.ready ? " — ready to finalize" : "");
     $("finalize-btn").disabled = !st.ready;
+    // Keep the exportable round in sync: cosigners pass THIS json onward.
+    $("sign-round-export").value = E.serializeRound(S.round);
   }
 
   $("verify-round").addEventListener("click", () => {
@@ -426,6 +429,15 @@
       $("cosig-sig").value = "";
       renderSignStatus();
     } catch (err) { showErr("sign-error", err.message); }
+  });
+
+  $("download-signed-round").addEventListener("click", () => {
+    const blob = new Blob([$("sign-round-export").value], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "covenant-round-signed.json";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   });
 
   $("finalize-btn").addEventListener("click", () => {

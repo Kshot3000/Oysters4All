@@ -111,10 +111,21 @@
   });
 
   function sealSnapshot(csvText, merge) {
-    const parsed = P.parseSnapshotCsv(csvText, { network: net(), tick: $("tok-tick").value.trim() || "token" });
-    if (parsed.duplicates.length && !merge) { S.pendingDup = { csvText, parsed }; showDups(parsed.duplicates); return; }
-    const holders = merge ? P.mergeDuplicateHolders(parsed.holders) : parsed.holders;
     const meta = S.token || {};
+    // The token's decimals (step 1) govern parsing: an 18-decimal token's
+    // fractional balances must parse with 18 decimals, not the default 8.
+    const parsed = P.parseSnapshotCsv(csvText, { network: net(), decimals: meta.decimals ?? 8 });
+    if (parsed.errors.length) {
+      throw new Error(`snapshot refused — ${parsed.errors.length} bad line${parsed.errors.length > 1 ? "s" : ""}: ` +
+        parsed.errors.slice(0, 3).join("; "));
+    }
+    if (parsed.duplicates.length && !merge) { S.pendingDup = { csvText, parsed }; showDups(parsed.duplicates); return; }
+    // Merge sums the duplicate rows' balances (parseSnapshotCsv reports them
+    // with units instead of folding them into holders).
+    const holders = merge
+      ? P.mergeDuplicateHolders(parsed.holders.concat(
+        parsed.duplicates.map((d) => ({ address: d.address, units: d.units, line: d.line }))))
+      : parsed.holders;
     const sealed = P.buildSnapshotDescriptor({
       network: net(), tick: meta.tick || $("tok-tick").value.trim() || "token",
       decimals: meta.decimals ?? 8, holders,
@@ -132,13 +143,26 @@
     unlock("plan");
   }
   function supplyLine(sc) {
-    if (!sc || sc.status === "unknown") return "unknown (no supply metadata)";
-    if (sc.status === "over") return "OVER MAX SUPPLY — refusing to continue until resolved";
-    return sc.status === "ok" ? "ok — total within max supply" : sc.status;
+    // buildSnapshotDescriptor stores supplyCheck as a plain string tag.
+    if (!sc || sc === "UNKNOWN") return "unknown (no supply metadata)";
+    if (sc === "FAIL") return "OVER MAX SUPPLY — refusing to continue until resolved";
+    if (sc === "PASS") return "ok — total within max supply";
+    return String(sc);
   }
   function showDups(dups) {
-    $("snap-dups-list").innerHTML = dups.map((d) =>
-      `<li>${esc(d.address.slice(0, 20))}… — ${d.count} entries, total ${esc(d.totalUnits)}</li>`).join("");
+    // Group duplicate rows per address: entry count and summed units, so the
+    // merge/refuse choice is made on real numbers, never "undefined".
+    const dec = (S.token && S.token.decimals) ?? 8;
+    const byAddr = new Map();
+    for (const d of dups) {
+      let g = byAddr.get(d.address);
+      if (!g) { g = { address: d.address, firstLine: d.firstLine, count: 1, units: 0n }; byAddr.set(d.address, g); }
+      g.count += 1;
+      g.units += BigInt(d.units);
+    }
+    $("snap-dups-list").innerHTML = [...byAddr.values()].map((g) =>
+      `<li><code>${esc(g.address.slice(0, 24))}…</code> — ${g.count} entries (first line ${g.firstLine}), ` +
+      `total ${esc(P.formatTokenUnits(g.units, dec))} on merge</li>`).join("");
     $("snap-dups").hidden = false;
     err("snap-error", "Duplicate addresses found — choose merge or refuse above.");
   }
@@ -180,14 +204,13 @@
         rule: $("plan-rule").value,
         fixedPRL: $("plan-fixed").value || "0",
         poolPRL: $("plan-pool").value || "0",
-        dustPRL: $("plan-dust").value || "0",
+        dustFloorPRL: $("plan-dust").value || "0",
         feeRate: $("plan-feerate").value || "2",
         maxOutputsPerTx: parseInt($("plan-maxtx").value, 10) || 250,
         exclusions: $("plan-exclusions").value.split(/\r?\n/).map((s) => s.trim()).filter(Boolean),
-        minBalanceUnits: ($("plan-minbal").value.trim() || "0"),
+        minBalance: ($("plan-minbal").value.trim() || "0"),
         treasuryAddress: treasury,
-        funderAddress: funder,
-        memo: $("plan-note").value.trim(),
+        note: $("plan-note").value.trim(),
       });
       // drift check against the step-1 read, when available
       let drift = "";
@@ -210,7 +233,13 @@
       const exCount = (plan.shares && plan.shares.excludedCount) || 0;
       $("plan-r-counts").textContent = `${d.eligibleCount.toLocaleString()} eligible · ${d.paidCount.toLocaleString()} paid · ${dd.count.toLocaleString()} dust-dropped · ${exCount.toLocaleString()} excluded`;
       $("plan-r-total").textContent = grainsToPRL(d.totals.recipientsGrains) + " PRL";
-      $("plan-r-remainder").textContent = grainsToPRL(d.remainderGrains) + " PRL → " + (d.remainderTo === "treasury" ? "treasury" : d.remainderTo === "funder-change-output" ? "funder (explicit output)" : "folded into funder change");
+      // remainderTo is a tag ("funder-change-output" / "funder-change-folded")
+      // or the treasury address itself when the remainder goes to treasury.
+      const rt = d.remainderTo;
+      const rtLabel = rt === "funder-change-output" ? "funder (explicit output)"
+        : rt === "funder-change-folded" ? "folded into funder change"
+        : "treasury (explicit output)";
+      $("plan-r-remainder").textContent = grainsToPRL(d.remainderGrains) + " PRL → " + rtLabel;
       $("plan-r-dust").textContent = grainsToPRL(dd.grains) + " PRL across " + dd.count + " holders";
       $("plan-r-chunks").textContent = String(d.chunks.length);
       $("plan-r-fees").textContent = "≈ " + grainsToPRL(plan.chunks.reduce((a, c) => a + BigInt(c.estFeeGrains), 0n)) + " PRL (estimate)";
@@ -321,7 +350,7 @@
         return;
       }
       S.imported = imp;
-      err("sign-error", `Bundle verified: fingerprint, fee, vBytes and wire digest all match. ${imp.plan.outputs.length} outputs, ${imp.inputs.length} inputs. Safe to sign.`);
+      err("sign-error", `Bundle verified: fingerprint, fee, vBytes and wire digest all match. ${imp.plan.outputs.length} outputs, ${imp.plan.inputs.length} inputs. Safe to sign.`);
     } catch (e) { err("sign-error", e.message); }
   });
   $("sign-sign").addEventListener("click", async () => {

@@ -23,8 +23,10 @@ rounds — fully client-side, no backend, no custody, no smart contracts (Pearl 
 4. **Sign & finalize** — each cosigner verifies the round independently (the digest
    is recomputed from the descriptor and outputs — a forged round is rejected),
    signs locally, and imports the others' signatures. Every signature is
-   Schnorr-verified against the round digest before it is accepted. At m-of-n the
-   round finalizes into a signed transaction, ready to broadcast via Blockbook.
+   Schnorr-verified against the round digest before it is accepted. The page
+   always shows the round **with the signatures collected so far** (copy or
+   download it to hand to the next cosigner). At m-of-n the round finalizes
+   into a signed transaction, ready to broadcast via Blockbook.
 
 ## Crypto lineage
 
