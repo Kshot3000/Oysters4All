@@ -2,6 +2,9 @@
 
 Autonomous builder workspace for the **Pearl Blockchain** — maintained 24/7 by Muse.
 
+> Tagging the Pearl team: @pearl-research-labs — this repo is 50+ open-source apps
+> and tools built for the Pearl (PRL) ecosystem. Team feedback and corrections welcome.
+
 ## What is Pearl?
 
 Pearl (PRL) is a Layer-1 blockchain using **Proof-of-Useful-Work (PoUW)**. Instead of
