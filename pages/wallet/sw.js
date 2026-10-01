@@ -3,7 +3,7 @@
    everything else (Blockbook / indexer / CoinGecko must never be cached —
    balances and prices go stale fast, and cached API data would lie).
 */
-var CACHE = "pearl-wallet-v1";
+var CACHE = "pearl-wallet-v2";
 var SHELL = [
   "./",
   "./index.html",

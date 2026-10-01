@@ -765,9 +765,11 @@ export function verifyChannelTx(networkId, chan, txHex, fundingTxid, fundingVout
   const fail = (m) => failures.push(m);
   const ok = (m) => checks.push(m);
   let kind = "unknown";
+  let txid = "";
   try {
     // Decode and check the funding spend directly.
     const dec = decodeRawTx(txHex);
+    txid = dec.txid || "";
     if (dec.inputs.length !== 1) fail(`expected 1 input, found ${dec.inputs.length}`);
     else {
       const inp = dec.inputs[0];
@@ -827,7 +829,7 @@ export function verifyChannelTx(networkId, chan, txHex, fundingTxid, fundingVout
   } catch (e) {
     fail(`verifier error: ${e.message}`);
   }
-  return { ok: failures.length === 0, kind, checks, failures };
+  return { ok: failures.length === 0, kind, checks, failures, txid };
 }
 
 /** Wipe a private key object in place. */

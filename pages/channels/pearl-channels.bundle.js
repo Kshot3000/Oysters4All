@@ -7037,8 +7037,10 @@ zoo`.split("\n");
     const fail = (m) => failures.push(m);
     const ok = (m) => checks.push(m);
     let kind = "unknown";
+    let txid = "";
     try {
       const dec = decodeRawTx(txHex);
+      txid = dec.txid || "";
       if (dec.inputs.length !== 1) fail(`expected 1 input, found ${dec.inputs.length}`);
       else {
         const inp = dec.inputs[0];
@@ -7114,7 +7116,7 @@ zoo`.split("\n");
     } catch (e) {
       fail(`verifier error: ${e.message}`);
     }
-    return { ok: failures.length === 0, kind, checks, failures };
+    return { ok: failures.length === 0, kind, checks, failures, txid };
   }
   function wipeKey(k) {
     try {

@@ -30,6 +30,7 @@
 
 /* 3-column form grid */
 .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1rem; }
+.grid3 > * { min-width: 0; } /* let grid items shrink below intrinsic content width so long labels/inputs can't blow out the viewport */
 .grid3 > label { display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.95rem; font-weight: 600; }
 
 /* Snippet preview + code */
