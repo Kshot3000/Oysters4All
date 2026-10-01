@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Paywall — put your content behind PRL</title>
+<meta name="description" content="Content paywall desk for Pearl (PRL): seal a tamper-evident paywall descriptor, get paid the exact PRL price on-chain, buyers mint Schnorr-signed access tokens with the funding key, and anyone can verify — no accounts, no Stripe, no server.">
+<link rel="stylesheet" href="styles.css?v=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23160a12'/%3E%3Cpath d='M8 6 v20 M8 10 c4 3 12 3 16 0' stroke='%23d9a441' stroke-width='2.5' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='8' cy='6' r='2.4' fill='%23d9a441'/%3E%3C/svg%3E">
+</head>
+<body>
+<div class="rope" aria-hidden="true"><div class="rope-inner" id="rope-line"></div></div>
+
+<header class="hero">
+  <div class="hero-inner">
+    <p class="kicker">Pearl · Paywall Desk</p>
+    <h1>Pearl Paywall</h1>
+    <p class="sub">Put your content behind PRL — <em>no accounts, no Stripe, no server</em>.
+      Seal a tamper-evident paywall descriptor, take the exact PRL price on-chain,
+      and buyers mint a Schnorr-signed access token with the funding key.
+      Verify payment + signature against public Blockbook data, or drop the
+      dependency-free snippet on your own site. Five steps:
+      <strong>Create → Pay → Token → Verify → Snippet</strong>.</p>
+    <nav id="steps" class="steps" aria-label="Workflow steps">
+      <button data-tab="create" class="active">1 · Create</button>
+      <button data-tab="pay">2 · Pay</button>
+      <button data-tab="token">3 · Token</button>
+      <button data-tab="verify">4 · Verify</button>
+      <button data-tab="snippet">5 · Snippet</button>
+    </nav>
+  </div>
+</header>
+
+<aside class="limits" aria-label="Honest limits">
+  <div>
+    <strong>Honest limits — always true:</strong>
+    <ul>
+      <li>The embed snippet is <em>snippet-level protection</em> (view-source can find
+        the hidden markup) — strong for soft/manual delivery (email lists, download-link
+        rotation, community access), <em>not DRM</em>.</li>
+      <li>Keep your snippet config as <em>private</em> as your use allows; Blockbook is
+        a third-party read source.</li>
+      <li>Buyers must control the <em>funding key</em>: tokens only mint from a P2TR
+        keypath key that funded the payment. A token is a backstage pass — it can be
+        photocopied, so bind delivery to the buyer where it matters.</li>
+      <li>Descriptors are <em>commitments, not signatures</em>: they prove what the
+        paywall promised, not who promised it. Publish them where your audience can
+        check them.</li>
+      <li>The page never moves real PRL and never broadcasts anything; funding keys live
+        in memory only and are wiped on demand.</li>
+    </ul>
+  </div>
+</aside>
+
+<main>
+  <!-- ============ CREATE ============ -->
+  <section id="tab-create" class="tab" aria-label="Create paywall">
+    <div class="grid2">
+      <div class="card">
+        <h2>Paywall definition</h2>
+        <label>Network
+          <select id="c-hrp">
+            <option value="prl">prl — Pearl mainnet</option>
+            <option value="tprl">tprl — Pearl testnet</option>
+          </select>
+        </label>
+        <label>Title
+          <input id="c-title" type="text" maxlength="120" placeholder="e.g. Backstage pass: studio session stems">
+        </label>
+        <div class="row2">
+          <label>Price (PRL, grain-exact)
+            <input id="c-price" type="text" inputmode="decimal" placeholder="e.g. 2.5">
+          </label>
+          <label>Expiry (optional)
+            <input id="c-expiry" type="date">
+          </label>
+        </div>
+        <label>Receiving address — your P2TR prl1… address
+          <input id="c-address" type="text" autocomplete="off" spellcheck="false" placeholder="prl1…">
+        </label>
+        <label>Deliverable — what the buyer gets, in plain words
+          <textarea id="c-deliverable" rows="3" maxlength="500" placeholder="e.g. WAV stems + project file, delivered by email within 48h of payment."></textarea>
+        </label>
+        <label>Blockbook endpoint
+          <input id="c-blockbook" type="text" value="https://blockbook.pearlresearch.ai" spellcheck="false">
+        </label>
+        <div class="btnrow">
+          <button id="c-build" class="primary">Seal paywall →</button>
+        </div>
+        <p id="c-err" class="err" role="alert"></p>
+      </div>
+
+      <div class="card ticket" id="c-commit-card" hidden>
+        <h2>Paywall commitment</h2>
+        <p class="muted small">Share this descriptor <em>before</em> anyone pays. It commits to the
+          title, price, receiving address, deliverable, expiry, and network.</p>
+        <label>Descriptor <span class="mono" id="c-descriptor" style="word-break:break-all"></span></label>
+        <div class="btnrow">
+          <button id="c-copy-desc" class="ghost">Copy descriptor</button>
+          <button id="c-copy-canonical" class="ghost">Copy canonical JSON</button>
+          <button id="c-dl-paywall" class="ghost">Download paywall JSON</button>
+        </div>
+        <h3>Canonical JSON</h3>
+        <pre class="mono small" id="c-canonical" style="white-space:pre-wrap;word-break:break-all"></pre>
+        <p class="muted small">Descriptor <span class="mono">pearl-paywall:v1:&lt;hrp&gt;:&lt;hash&gt;</span>,
+          hash = SHA-256 over the canonical JSON above. Anyone can recompute it;
+          the Verify tab answers <strong>PROVEN</strong> or a loud
+          <strong>NOT PROVEN</strong>.</p>
+        <div class="btnrow">
+          <button id="c-load-pay" class="primary">Continue to Pay →</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PAY ============ -->
+  <section id="tab-pay" class="tab" aria-label="Pay" hidden>
+    <div class="grid2">
+      <div class="card">
+        <h2>Payment request</h2>
+        <div class="btnrow">
+          <button id="p-load-created" class="ghost">Load the paywall I just created</button>
+        </div>
+        <p id="p-price-line" class="priceline mono"></p>
+        <label>pearl: URI <span class="mono small" id="p-uri" style="word-break:break-all"></span></label>
+        <div class="btnrow">
+          <button id="p-copy-uri" class="ghost">Copy payment URI</button>
+        </div>
+        <div id="p-qr" class="qr"></div>
+        <p id="p-qr-note" class="muted small"></p>
+      </div>
+      <div class="card">
+        <h2>Watch for payment</h2>
+        <p class="muted small">Paste the buyer's paying txid and check it against Blockbook
+          (GET-only), or poll it on an interval. Unconfirmed (0-conf) payments are
+          flagged as provisional — never treat them as settled.</p>
+        <label>Paying txid (64 hex)
+          <input id="p-txid" type="text" spellcheck="false" placeholder="…">
+        </label>
+        <div class="row2">
+          <label class="check"><input id="p-auto" type="checkbox"> Auto-refresh</label>
+          <label>Interval
+            <select id="p-interval">
+              <option value="15000">15 s</option>
+              <option value="30000" selected>30 s</option>
+              <option value="60000">60 s</option>
+            </select>
+          </label>
+        </div>
+        <div class="btnrow">
+          <button id="p-check" class="primary">Check payment</button>
+          <button id="p-addr-refresh" class="ghost">List recent payments to this address</button>
+        </div>
+        <p id="p-err" class="err" role="alert"></p>
+        <div id="p-out"></div>
+        <h3>Recent payments</h3>
+        <p id="p-recent-note" class="muted small">Newest first, from Blockbook (GET-only).</p>
+        <div id="p-recent"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TOKEN ============ -->
+  <section id="tab-token" class="tab" aria-label="Mint access token" hidden>
+    <div class="grid2">
+      <div class="card">
+        <h2>Mint access token</h2>
+        <p class="muted small">The buyer signs <em>locally</em> with the key that funded the payment
+          (WIF, 64-hex, or BIP-86 mnemonic — in-memory only, never stored). The page
+          <strong>refuses loudly</strong> unless the key controls a P2TR input address
+          of the paying txid: the token signature must verify against an input address
+          of the payment.</p>
+        <div class="btnrow">
+          <button id="t-load-pay" class="ghost">Load descriptor + txid from the Pay tab</button>
+        </div>
+        <label>Paywall descriptor
+          <input id="t-descriptor" type="text" spellcheck="false" placeholder="pearl-paywall:v1:…">
+        </label>
+        <label>Paying txid (64 hex)
+          <input id="t-txid" type="text" spellcheck="false" placeholder="…">
+        </label>
+        <label>Funding key — WIF, hex privkey, or BIP-86 mnemonic
+          <input id="t-key" type="password" autocomplete="off" spellcheck="false" placeholder="in-memory only">
+        </label>
+        <div class="btnrow">
+          <button id="t-wipe" class="ghost">Wipe key</button>
+          <button id="t-mint" class="primary">Mint token →</button>
+        </div>
+        <p id="t-err" class="err" role="alert"></p>
+      </div>
+      <div class="card ticket" id="t-token-card" hidden>
+        <h2>Access token</h2>
+        <p class="muted small" id="t-pubkey-line"></p>
+        <label>Token JSON <span class="mono small" id="t-token" style="word-break:break-all"></span></label>
+        <div class="btnrow">
+          <button id="t-copy-token" class="ghost">Copy token</button>
+          <button id="t-dl-token" class="ghost">Download token JSON</button>
+        </div>
+        <p class="muted small">Bound to this paywall descriptor and this payment only. Paste it on
+          the Verify tab, or hand it to the creator's snippet-gated page. A token is a
+          backstage pass — whoever holds it can use it.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ VERIFY ============ -->
+  <section id="tab-verify" class="tab" aria-label="Verify token" hidden>
+    <div class="card">
+      <h2>Standalone verifier</h2>
+      <p class="muted small">Paste a descriptor, its canonical paywall JSON, and an access token.
+        The verifier recomputes the descriptor, fetches the payment from Blockbook,
+        confirms it paid ≥ price to the paywall address, confirms the token key is a
+        paying input address, and re-verifies the BIP-340 signature — then answers
+        <strong>PROVEN</strong> or a loud <strong>NOT PROVEN</strong>.</p>
+      <label>Descriptor <input id="v-desc" type="text" spellcheck="false" placeholder="pearl-paywall:v1:…"></label>
+      <label>Canonical paywall JSON <textarea id="v-canonical" rows="4" spellcheck="false"></textarea></label>
+      <label>Access token JSON <textarea id="v-token" rows="5" spellcheck="false"></textarea></label>
+      <div class="btnrow"><button id="v-run" class="primary">Verify</button></div>
+      <p id="v-err" class="err" role="alert"></p>
+      <div id="v-out"></div>
+    </div>
+  </section>
+
+  <!-- ============ SNIPPET ============ -->
+  <section id="tab-snippet" class="tab" aria-label="Embed snippet" hidden>
+    <div class="grid2">
+      <div class="card">
+        <h2>Embed-config generator</h2>
+        <p class="muted small">Generates a <em>dependency-free</em> static snippet for your own site:
+          it fetches the token's payment from public Blockbook, verifies payment +
+          signature, then reveals your content. No external scripts, no build step.</p>
+        <div class="btnrow">
+          <button id="s-load-created" class="ghost">Load the paywall I just created</button>
+        </div>
+        <div class="row2">
+          <label>Content element id <input id="s-content-id" type="text" value="pw-content" spellcheck="false"></label>
+          <label>Token input id <input id="s-token-input-id" type="text" value="pw-token" spellcheck="false"></label>
+        </div>
+        <div class="row2">
+          <label>Verify button id <input id="s-verify-button-id" type="text" value="pw-verify" spellcheck="false"></label>
+          <label>Result element id <input id="s-result-id" type="text" value="pw-result" spellcheck="false"></label>
+        </div>
+        <label>Blockbook endpoint
+          <input id="s-blockbook" type="text" value="https://blockbook.pearlresearch.ai" spellcheck="false">
+        </label>
+        <div class="btnrow"><button id="s-generate" class="primary">Generate snippet →</button></div>
+        <p id="s-err" class="err" role="alert"></p>
+      </div>
+      <div class="card" id="s-snippet-card" hidden>
+        <h2>Your snippet</h2>
+        <p class="muted small">Paste this where your locked content lives, with a hidden element
+          (<span class="mono">id="<span id="s-echo-content">pw-content</span>" style="display:none"</span>),
+          a token input, and a verify button using the ids above. Honest limits apply:
+          snippet-level protection, not DRM.</p>
+        <pre class="mono small" id="s-snippet" style="white-space:pre-wrap;word-break:break-all;max-height:320px;overflow:auto"></pre>
+        <div class="btnrow">
+          <button id="s-copy-snippet" class="ghost">Copy snippet</button>
+          <button id="s-dl-snippet" class="ghost">Download snippet.html</button>
+          <button id="s-test-snippet" class="ghost">Self-test snippet crypto in this page</button>
+        </div>
+        <p id="s-test-out" class="muted small"></p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>Built for the Pearl blockchain (PRL) ·
+    <a href="https://x.com/kshot9000">@kshot9000</a> ·
+    <a href="https://github.com/Kshot3000/Pearl-Muse-24-7-Ai-builder">Pearl-Muse-24-7-Ai-builder</a></p>
+  <p class="donate">Support the build:
+    <code class="mono" id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+    <button id="copy-donate" class="ghost small">copy</button></p>
+  <p class="muted small">Content paywalls on Pearl Taproot. No accounts, no Stripe, no server —
+    tamper-evident descriptors, exact-price PRL payments, Schnorr-signed access tokens
+    bound to the funding key. Snippet-level protection: strong for soft delivery, not DRM.</p>
+</footer>
+
+<script src="qrcode.min.js?v=1"></script>
+<script src="pearl-paywall.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>

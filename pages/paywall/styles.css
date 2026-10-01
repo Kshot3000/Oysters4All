@@ -1,0 +1,185 @@
+/* Pearl Paywall — "velvet-rope backstage" identity.
+ * Deep plum/oxblood, gold-foil accents, tabular numerals, serif display type.
+ * Distinct from Predict (near-black ink + amber ticker) and Games (emerald casino). */
+:root {
+  --plum: #160a12;
+  --plum2: #221019;
+  --plum3: #2e1420;
+  --oxblood: #4a1526;
+  --line: #3d1f2e;
+  --gold: #d9a441;
+  --gold-dim: #a87e2e;
+  --gold-bright: #f0d089;
+  --gold-glow: rgba(217, 164, 65, 0.14);
+  --velvet: #f5e9d4;
+  --velvet-dim: #c9b393;
+  --velvet-faint: #8d7a63;
+  --up: #8fd694;
+  --down: #e06c5c;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --serif: Georgia, "Times New Roman", serif;
+}
+* { box-sizing: border-box; }
+html { background: var(--plum); }
+body {
+  margin: 0;
+  background:
+    radial-gradient(1100px 480px at 50% -120px, rgba(217, 164, 65, 0.08), transparent 70%),
+    radial-gradient(900px 600px at 85% 110%, rgba(74, 21, 38, 0.5), transparent 70%),
+    var(--plum);
+  color: var(--velvet);
+  font-family: var(--sans);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.55;
+}
+
+/* ---- velvet rope divider ---- */
+.rope { overflow: hidden; border-bottom: 1px solid var(--line); background: #100710; }
+.rope-inner {
+  height: 14px;
+  background:
+    radial-gradient(circle at 8px 7px, var(--gold) 3px, transparent 3.5px),
+    repeating-linear-gradient(90deg, transparent 0 34px, rgba(217,164,65,.55) 34px 36px);
+  background-size: 72px 14px, auto;
+  opacity: 0.7;
+}
+
+/* ---- hero ---- */
+.hero { border-bottom: 1px solid var(--line); }
+.hero-inner { max-width: 1080px; margin: 0 auto; padding: 40px 20px 28px; }
+.kicker {
+  font-family: var(--mono); font-size: 12px; letter-spacing: 0.22em;
+  text-transform: uppercase; color: var(--gold); margin: 0 0 10px;
+}
+h1 {
+  margin: 0 0 12px; font-family: var(--serif); font-weight: 700;
+  font-size: clamp(36px, 5vw, 56px); letter-spacing: 0.01em;
+  background: linear-gradient(100deg, var(--gold-bright) 20%, var(--gold) 55%, #b98a35 80%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  text-shadow: 0 0 44px rgba(217, 164, 65, 0.18);
+}
+h1::after {
+  content: ""; display: block; width: 120px; height: 3px; margin-top: 12px;
+  background: linear-gradient(90deg, var(--gold), transparent);
+}
+.sub { max-width: 72ch; color: var(--velvet-dim); margin: 0 0 22px; }
+.sub em { color: var(--velvet); font-style: normal; border-bottom: 1px dotted var(--gold-dim); }
+.sub strong { color: var(--gold-bright); }
+
+/* ---- steps nav ---- */
+.steps { display: flex; flex-wrap: wrap; gap: 8px; }
+.steps button {
+  font-family: var(--mono); font-size: 13px; letter-spacing: 0.04em;
+  background: var(--plum2); color: var(--velvet-dim);
+  border: 1px solid var(--line); border-radius: 6px;
+  padding: 9px 14px; cursor: pointer; transition: all 0.15s;
+}
+.steps button:hover { border-color: var(--gold-dim); color: var(--velvet); }
+.steps button.active {
+  background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+  border-color: var(--gold); color: #2a1a08;
+  font-weight: 700; box-shadow: 0 0 18px rgba(217, 164, 65, 0.35);
+}
+
+/* ---- honest limits ---- */
+.limits {
+  border-bottom: 1px solid var(--line);
+  background: repeating-linear-gradient(-45deg, #1c0d16, #1c0d16 14px, #180b13 14px, #180b13 28px);
+}
+.limits > div { max-width: 1080px; margin: 0 auto; padding: 14px 20px; font-size: 13.5px; color: var(--velvet-dim); }
+.limits strong { color: var(--gold-bright); }
+.limits ul { margin: 8px 0 0; padding-left: 20px; }
+.limits li { margin: 4px 0; }
+.limits em { color: var(--velvet); }
+
+/* ---- layout ---- */
+main { max-width: 1080px; margin: 0 auto; padding: 24px 20px 60px; }
+.tab[hidden] { display: none; }
+.card {
+  background: linear-gradient(180deg, var(--plum2), #180c14);
+  border: 1px solid var(--line); border-radius: 10px;
+  padding: 20px 22px; margin-bottom: 18px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+}
+.card h2 { margin: 0 0 10px; font-family: var(--serif); font-size: 22px; color: var(--gold-bright); }
+.card h2::before { content: "❧ "; color: var(--gold-dim); }
+.card h3 { margin: 18px 0 8px; font-size: 15px; color: var(--gold); font-family: var(--mono); letter-spacing: 0.05em; }
+/* ticket-stub card: perforated gold edge for commitments */
+.card.ticket { border: 1px dashed var(--gold-dim); background: linear-gradient(180deg, #241118, #1a0c13); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+@media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 560px) { .row2 { grid-template-columns: 1fr; } }
+
+/* ---- forms ---- */
+label { display: block; margin: 10px 0; font-size: 14px; color: var(--velvet-dim); }
+label .mono { color: var(--velvet); }
+label.check { display: flex; align-items: center; gap: 8px; }
+label.check input { width: auto; }
+input[type="text"], input[type="number"], input[type="password"], input[type="date"], textarea, select {
+  display: block; width: 100%; margin-top: 5px;
+  background: #100710; border: 1px solid var(--line); border-radius: 6px;
+  color: var(--velvet); padding: 9px 11px; font-size: 14px; font-family: var(--mono);
+}
+input:focus, textarea:focus, select:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold-glow); }
+input[type="password"] { letter-spacing: 0.1em; }
+.btnrow { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 4px; }
+button {
+  font-family: var(--sans); font-size: 14px; cursor: pointer;
+  border-radius: 6px; padding: 10px 16px; border: 1px solid var(--line);
+  background: var(--plum3); color: var(--velvet); transition: all 0.15s;
+}
+button:hover { border-color: var(--gold-dim); }
+button.primary {
+  background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+  border-color: var(--gold); color: #2a1a08; font-weight: 700;
+}
+button.primary:hover { box-shadow: 0 0 18px rgba(217, 164, 65, 0.4); }
+button.ghost { background: transparent; }
+button.danger { background: transparent; border-color: var(--down); color: var(--down); }
+button.small { padding: 5px 10px; font-size: 12px; }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+.err { color: var(--down); font-size: 14px; white-space: pre-wrap; }
+.muted { color: var(--velvet-dim); }
+.small { font-size: 13px; }
+.mono { font-family: var(--mono); }
+.priceline { font-size: 18px; color: var(--gold-bright); }
+.qr { margin: 12px 0; }
+.qr svg { max-width: 240px; height: auto; border: 6px solid #fff; border-radius: 6px; background: #fff; }
+
+/* ---- payment state ---- */
+.paystate {
+  border-radius: 8px; padding: 14px 16px; margin: 12px 0;
+  font-family: var(--mono); font-size: 14px;
+}
+.paystate.paid { background: rgba(143, 214, 148, 0.08); border: 1px solid var(--up); color: var(--up); }
+.paystate.pending { background: rgba(217, 164, 65, 0.08); border: 1px solid var(--gold-dim); color: var(--gold-bright); }
+.paystate.short { background: rgba(224, 108, 92, 0.08); border: 1px solid var(--down); color: var(--down); }
+.paystate.unknown { background: rgba(141, 122, 99, 0.08); border: 1px dashed var(--velvet-faint); color: var(--velvet-dim); }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-family: var(--mono); font-size: 13px; margin: 10px 0; }
+.kv dt { color: var(--velvet-faint); }
+.kv dd { margin: 0; color: var(--velvet); word-break: break-all; }
+.txrow {
+  border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; margin: 6px 0;
+  font-family: var(--mono); font-size: 12.5px; color: var(--velvet-dim);
+}
+.txrow b { color: var(--gold-bright); }
+.txrow .use { float: right; }
+
+/* ---- verdicts ---- */
+.verdict {
+  border-radius: 8px; padding: 16px 18px; margin: 14px 0;
+  font-family: var(--mono); font-size: 15px;
+}
+.verdict.proven { background: rgba(143, 214, 148, 0.08); border: 1px solid var(--up); color: var(--up); }
+.verdict.notproven { background: rgba(224, 108, 92, 0.08); border: 2px solid var(--down); color: var(--down); }
+.verdict ul { margin: 10px 0 0; padding-left: 20px; font-size: 13px; }
+
+/* ---- footer ---- */
+footer {
+  border-top: 1px solid var(--line); max-width: 1080px; margin: 0 auto;
+  padding: 22px 20px 40px; font-size: 13.5px; color: var(--velvet-dim);
+}
+footer a { color: var(--gold); }
+footer .donate code { font-size: 12px; word-break: break-all; }

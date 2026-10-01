@@ -51,6 +51,7 @@
         <a href="pages/fees/">Fees</a>
         <a href="pages/commons/">Commons</a>
         <a href="pages/predict/">Predict</a>
+        <a href="pages/paywall/">Paywall</a>
         <a href="pages/id/">ID</a>
         <a href="pages/raffle/">Raffle</a>
         <a href="pages/swap/">Swap</a>
@@ -541,9 +542,14 @@ cd miner && uv run pearl-miner \
             <div class="card-links"><a href="pages/wallet/">Open Pearl Wallet →</a></div>
           </article>
           <article class="card reveal">
-            <h3>Pearl Predict — Prediction-Market Desk <span class="badge">new</span></h3>
+            <h3>Pearl Predict — Prediction-Market Desk</h3>
             <p>The after-hours trading floor — prediction markets on pure Taproot with no smart contracts: each outcome gets a deterministic funding address under a 2-leaf taptree (arbiter award leaf + CLTV refund leaf, both byte-identical to audited lineage), traders fund their side, and after the trading deadline the arbiter signs one proportional-payout transaction — winners split the whole pot pro-rata, grain-exact. Five steps: Create → Fund → Resolve → Track → Verify, with tamper-evident descriptors and a standalone PROVEN / NOT PROVEN verifier. Keys never leave the page. Honest about the one thing scripts can't prove: the arbiter signs honest payouts.</p>
             <div class="card-links"><a href="pages/predict/">Open Pearl Predict →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Paywall — Content Paywall Desk <span class="badge">new</span></h3>
+            <p>The velvet-rope backstage — put your content behind PRL with no accounts, no Stripe, no server: seal a tamper-evident paywall descriptor, take the exact PRL price on-chain, and buyers mint a Schnorr-signed access token with the funding key, bound to that paywall and that payment only. Five steps: Create → Pay → Token → Verify → Snippet, with a standalone PROVEN / NOT PROVEN verifier and a dependency-free embed snippet for your own site. Funding keys live in memory only and are wiped on demand. Honest about the one thing scripts can't prove: snippet-level protection is strong for soft delivery, not DRM.</p>
+            <div class="card-links"><a href="pages/paywall/">Open Pearl Paywall →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Foundry — Mining Pool <span class="badge">new</span></h3>
