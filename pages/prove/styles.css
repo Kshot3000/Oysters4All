@@ -63,6 +63,11 @@ code {
 .topnav { display: flex; gap: 16px; align-items: center; font-size: .95em; }
 .topnav a { color: var(--ink-soft); text-decoration: none; }
 .topnav a:hover { color: var(--wax); }
+@media (max-width: 720px) {
+  .topbar-in { flex-wrap: wrap; gap: 6px 14px; }
+  .brand-tag { display: none; } /* topbar must fit 375px: brand + nav share the row */
+  .topnav { gap: 12px; font-size: .88em; }
+}
 .net-badge {
   border: 1px solid var(--brass-soft); color: var(--brass);
   border-radius: 999px; padding: 2px 12px; font-size: .82em; font-style: italic;
@@ -165,8 +170,9 @@ textarea { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .85
 }
 .proofdump { white-space: pre-wrap; margin-top: 12px; }
 
-.fieldgrid { display: grid; grid-template-columns: 170px 1fr; gap: 8px 16px; margin: 12px 0; }
+.fieldgrid { display: grid; grid-template-columns: 170px minmax(0,1fr); gap: 8px 16px; margin: 12px 0; }
 .fieldgrid .k { color: var(--ink-soft); font-family: Georgia, serif; }
+.fieldgrid .v { word-break: break-all; overflow-wrap: anywhere; min-width: 0; } /* 64-hex values must wrap on small screens */
 .fieldgrid .v { word-break: break-all; }
 .workline { margin-top: 12px; padding: 12px 14px; border-radius: 8px; font-weight: bold; }
 .workline.pass { background: rgba(47,122,61,.10); border: 1px solid var(--green); color: var(--green); }

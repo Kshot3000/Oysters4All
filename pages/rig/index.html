@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pearl Rig — GPU Mining Profitability Planner (PRL)</title>
 <meta name="description" content="Plan Pearl (PRL) GPU mining profitability: rig power, electricity, pool fees and live PRL price against the exact upstream block-subsidy formula.">
-<link rel="stylesheet" href="styles.css?v=1.0.0">
+<link rel="stylesheet" href="styles.css?v=1.0.1">
 </head>
 <body>
 <div class="embers" aria-hidden="true"><span class="ember e1"></span><span class="ember e2"></span><span class="ember e3"></span><span class="ember e4"></span><span class="ember e5"></span></div>
@@ -91,11 +91,11 @@
     <h2><span class="sec-ico">&#9881;</span> Your rig</h2>
     <p class="card-sub">Wall power is the honest cost basis — measured at the wall, not
     the GPU's spec sheet. Add each GPU model in your fleet.</p>
-    <table class="fleet" id="fleetTable">
+    <div class="tablewrap"><table class="fleet" id="fleetTable">
       <thead><tr><th>GPU model</th><th>Count</th><th>Wall W each</th><th>Total W</th><th></th></tr></thead>
       <tbody id="fleetBody"></tbody>
       <tfoot><tr><td colspan="3">Fleet total</td><td id="fleetTotal">0 W</td><td></td></tr></tfoot>
-    </table>
+    </table></div>
     <div class="add-row">
       <select id="gpuPreset" aria-label="GPU preset">
         <option value="custom">Custom GPU…</option>
@@ -167,10 +167,10 @@
       <div class="result"><span class="r-label">Power share of revenue</span><span class="r-value" id="rPowerShare">—</span></div>
     </div>
     <h3>Price sensitivity <span class="hint">(net $/day at other PRL prices)</span></h3>
-    <table class="sens" id="sensTable">
+    <div class="tablewrap"><table class="sens" id="sensTable">
       <thead><tr><th>PRL price</th><th>−50%</th><th>−25%</th><th>current</th><th>+25%</th><th>+50%</th></tr></thead>
       <tbody><tr id="sensRow"><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr></tbody>
-    </table>
+    </table></div>
     <p class="note">Sensitivity holds output, fees, power and capex fixed — only the
     PRL price moves. Mining is volatile: this is a planning aid, not financial advice.</p>
   </section>
@@ -211,6 +211,6 @@
   </footer>
 </main>
 
-<script type="module" src="js/app.js?v=1.0.0"></script>
+<script type="module" src="js/app.js?v=1.0.1"></script>
 </body>
 </html>

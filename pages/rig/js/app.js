@@ -226,7 +226,12 @@ function bindInputs() {
   const str = (id, key) => $(id).addEventListener('input', (e) => {
     state[key] = e.target.value; save(); recalc();
   });
-  num('priceManual', 'priceManual');
+  // manual price re-renders the price display too (the big $ figure must follow
+  // what the user types, not just the results table)
+  $('priceManual').addEventListener('input', (e) => {
+    state.priceManual = e.target.value === '' ? '' : Number(e.target.value);
+    save(); renderPrice(); recalc();
+  });
   str('proxyBase', 'proxyBase');
   num('chainHeight', 'chainHeight');
   num('prlPerDay', 'prlPerDay');

@@ -14,6 +14,11 @@
  *      content endpoint returns encoding "base64" with bodyBase64 (+bodyHex,
  *      +safe bodyText only for text/plain|application/json|*+json or prl-20).
  */
+// IIFE wrapper: top-level `const`/`function` in a classic script would otherwise
+// leak into the shared global lexical scope and collide with app.js's
+// destructured imports (SyntaxError: Identifier 'X' has already been declared).
+// The module contract (window.__galleryCore / module.exports) is unchanged.
+(() => {
 "use strict";
 
 const DONATE_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
@@ -218,3 +223,4 @@ if (typeof window !== "undefined") window.__galleryCore = __galleryExports;
 if (typeof module !== "undefined" && module.exports) {
   module.exports = __galleryExports;
 }
+})();

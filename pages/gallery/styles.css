@@ -202,6 +202,7 @@ input:focus { outline: 2px solid var(--brass-dim); border-color: var(--brass); }
 .addr {
   cursor: pointer; background: #0e120e; border: 1px solid var(--line);
   padding: 6px 12px; border-radius: 8px; user-select: all; color: var(--ink);
+  max-width: 100%; overflow-wrap: anywhere; word-break: break-all; /* the prl1 address is one long unbroken string — must wrap on mobile */
 }
 .addr:hover { border-color: var(--brass); }
 

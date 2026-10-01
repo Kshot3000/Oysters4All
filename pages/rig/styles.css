@@ -140,6 +140,7 @@ input:focus, select:focus { outline: none; border-color: var(--molten); box-shad
 .stat-mini strong { font-family: var(--mono); color: var(--ink); }
 
 /* fleet table */
+.tablewrap { overflow-x: auto; -webkit-overflow-scrolling: touch; } /* wide tables scroll inside on small screens instead of breaking layout */
 table.fleet, table.sens { width: 100%; border-collapse: collapse; font-size: .93rem; }
 .fleet th, .fleet td, .sens th, .sens td {
   text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line);
