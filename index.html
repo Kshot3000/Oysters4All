@@ -63,6 +63,7 @@
         <a href="pages/pact/">Pact</a>
         <a href="pages/sighash/">Sighash</a>
         <a href="pages/hush/">Hush</a>
+        <a href="pages/payjoin/">Payjoin</a>
         <a href="pages/id/">ID</a>
         <a href="pages/raffle/">Raffle</a>
         <a href="pages/swap/">Swap</a>
@@ -613,9 +614,14 @@ cd miner && uv run pearl-miner \
             <div class="card-links"><a href="pages/sighash/">Open Sighash Studio →</a></div>
           </article>
           <article class="card reveal">
-            <h3>Pearl Hush — Silent Payments Desk <span class="badge">new</span></h3>
+            <h3>Pearl Hush — Silent Payments Desk</h3>
             <p>The midnight desk for BIP-352 silent payments — one static <code>sp1…</code> address, a whisper of unlinkable taproot outputs. Five steps: Setup → Send → Scan → Labels → Verify: generate scan/spend keys locally, derive exact sender outputs with <code>prl1…</code> addresses, replay the receiver scan to find and spend your payments (labeled ones too), mint quiet sub-addresses per label, and prove the page's own math byte-exact against the official BIP-352 vectors. Forward-looking standards reference — no wallet support yet; this page never signs, never broadcasts.</p>
             <div class="card-links"><a href="pages/hush/">Open Pearl Hush →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Payjoin — BIP-78 Transaction Desk <span class="badge">new</span></h3>
+            <p>The duet desk for two-party PRL transactions — the receiver publishes a payjoin offer, the sender funds and signs the original, the receiver answers with a proposal that adds their own input, and the sender runs the full 15-check BIP-78 verification before re-signing and finalizing. Exact integer-grain fee policy with bounded payment deductions, loud refusals on every protocol violation, and an in-page self-test that replays the whole dance with the public test vectors. One transaction, two wallets, no common-input-ownership heuristic.</p>
+            <div class="card-links"><a href="pages/payjoin/">Open Pearl Payjoin →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Foundry — Mining Pool <span class="badge">new</span></h3>

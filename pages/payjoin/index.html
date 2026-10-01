@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Payjoin — BIP-78 two-party transaction desk for PRL</title>
+<meta name="description" content="A BIP-78 payjoin lab for Pearl (PRL): build offers, fund and sign originals, craft receiver proposals, run the 15-check sender verification, and finalize collaborative Taproot transactions.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="pj-hero">
+  <div class="pj-hero-inner">
+    <p class="pj-kicker">Pearl &middot; BIP-78</p>
+    <h1>Pearl <span class="duet">Payjoin</span></h1>
+    <p class="pj-sub">Two wallets, one transaction. The receiver's input joins the sender's payment in a single Taproot transaction — breaking the common-input-ownership heuristic, on Pearl rails.</p>
+    <nav class="pj-tabs" role="tablist" aria-label="Payjoin workflow">
+      <button role="tab" data-tab="receiver" aria-selected="true">1 · Receiver</button>
+      <button role="tab" data-tab="sender" aria-selected="false">2 · Sender</button>
+      <button role="tab" data-tab="proposal" aria-selected="false">3 · Proposal</button>
+      <button role="tab" data-tab="verify" aria-selected="false">4 · Verify</button>
+      <button role="tab" data-tab="sign" aria-selected="false">5 · Sign</button>
+    </nav>
+  </div>
+</header>
+
+<main class="pj-main">
+
+  <!-- ============ TAB 1 · RECEIVER ============ -->
+  <section id="tab-receiver" class="pj-tab" role="tabpanel">
+    <div class="pj-card">
+      <h2>Receiver — publish a payjoin offer</h2>
+      <p class="pj-lede">The receiver creates the offer: how much PRL they want, where it goes, and the fee terms they accept. The offer becomes a <em>template PSBT</em> (zero inputs, one payment output) plus a query string a real payjoin endpoint would serve at <code>?v=2&amp;…</code>.</p>
+      <div class="pj-grid2">
+        <label>Amount to receive
+          <input id="r-amount" inputmode="decimal" placeholder="e.g. 1 PRL or 100000000" value="1 PRL">
+        </label>
+        <label>Your PRL address (prl1…, Taproot)
+          <input id="r-address" spellcheck="false" placeholder="prl1…">
+        </label>
+        <label>Max extra fee you'll absorb (grains)
+          <input id="r-maxadd" inputmode="numeric" value="1000">
+          <small><code>maxadditionalfeecontribution</code> — the most the payment output may shrink to cover added weight.</small>
+        </label>
+        <label>Minimum fee rate (grains/vB)
+          <input id="r-minfeerate" inputmode="decimal" value="1">
+          <small><code>minfeerate</code> — proposals below this rate are refused.</small>
+        </label>
+      </div>
+      <label class="pj-check"><input type="checkbox" id="r-nosub"> Disable output substitution <small>(when checked, the receiver must not touch your payment output at all)</small></label>
+      <div class="pj-actions">
+        <button id="r-build" class="pj-btn primary">Build offer</button>
+        <button id="r-fill-lab" class="pj-btn ghost" title="Fill with a lab-only address for experimenting">Fill lab address</button>
+      </div>
+      <div id="r-error" class="pj-error" hidden></div>
+      <div id="r-out" hidden>
+        <h3>Endpoint query string</h3>
+        <p class="pj-lede">A real payjoin server would serve this template at <code>https://your-endpoint/payjoin</code> with this query:</p>
+        <div class="pj-copyrow"><code id="r-query" class="pj-mono"></code><button class="pj-btn small" data-copy="r-query">Copy</button></div>
+        <h3>Offer envelope <small>(send this to the sender)</small></h3>
+        <div class="pj-copyrow"><textarea id="r-envelope" class="pj-mono" rows="6" readonly></textarea><button class="pj-btn small" data-copy="r-envelope">Copy</button></div>
+        <h3>Template PSBT (base64)</h3>
+        <div class="pj-copyrow"><textarea id="r-psbt" class="pj-mono" rows="4" readonly></textarea><button class="pj-btn small" data-copy="r-psbt">Copy</button></div>
+        <div id="r-summary" class="pj-kv"></div>
+      </div>
+    </div>
+    <div class="pj-card pj-note">
+      <h3>Honest limits</h3>
+      <ul>
+        <li>This is a <strong>lab</strong>: it builds the exact BIP-78 offer a server would serve, but it is not a server. A production receiver endpoint must also authenticate the sender and rate-limit requests.</li>
+        <li>Only PRL Taproot (<code>prl1…</code>) addresses are accepted — never testnet or foreign prefixes.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============ TAB 2 · SENDER ============ -->
+  <section id="tab-sender" class="pj-tab" role="tabpanel" hidden>
+    <div class="pj-card">
+      <h2>Sender — validate, fund, sign the original</h2>
+      <p class="pj-lede">Paste the receiver's offer. The desk validates the template, then you fund it with your own UTXOs, pay an exact fee, and <strong>sign + finalize every input</strong> — that signed original is what BIP-78 says you hand to the receiver.</p>
+      <label>Paste the receiver's offer (envelope JSON or bare template PSBT)
+        <textarea id="s-offer" class="pj-mono" rows="5" spellcheck="false" placeholder='{"kind":"pearl-payjoin-offer",…}  or  cHNidP8BAg…'></textarea>
+      </label>
+      <div class="pj-actions">
+        <button id="s-validate" class="pj-btn primary">Validate offer</button>
+      </div>
+      <div id="s-error" class="pj-error" hidden></div>
+      <div id="s-offerinfo" class="pj-kv" hidden></div>
+    </div>
+
+    <div class="pj-card" id="s-fund-card" hidden>
+      <h3>Your inputs</h3>
+      <p class="pj-lede">Enter UTXOs manually, or derive addresses from a mnemonic and look them up on the Pearl blockbook (live network call, clearly labeled).</p>
+      <div class="pj-grid2">
+        <label>Mnemonic (optional, stays in this page)
+          <input id="s-mnemonic" type="password" spellcheck="false" autocomplete="off" placeholder="abandon abandon …">
+        </label>
+        <label>Derive first N BIP-86 addresses
+          <input id="s-scan" inputmode="numeric" value="5">
+        </label>
+      </div>
+      <div class="pj-actions">
+        <button id="s-derive" class="pj-btn">Derive addresses</button>
+        <button id="s-wipe" class="pj-btn danger-ghost">Wipe keys</button>
+      </div>
+      <div id="s-derived" class="pj-kv" hidden></div>
+      <div id="utxo-list"></div>
+      <div class="pj-actions"><button id="utxo-add" class="pj-btn small">+ Add UTXO manually</button></div>
+      <div class="pj-grid2">
+        <label>Change address (your prl1…; empty = no change)
+          <input id="s-change" spellcheck="false" placeholder="prl1…">
+        </label>
+        <label>Fee rate (grains/vB)
+          <input id="s-feerate" inputmode="decimal" value="2">
+        </label>
+      </div>
+      <div class="pj-actions">
+        <button id="s-estimate" class="pj-btn ghost">Fetch network fee estimate (live)</button>
+        <button id="s-build" class="pj-btn primary">Build &amp; sign original</button>
+      </div>
+      <div id="s-build-error" class="pj-error" hidden></div>
+      <div id="s-out" hidden>
+        <h3>Signed original <small>(send this envelope to the receiver)</small></h3>
+        <div class="pj-copyrow"><textarea id="s-envelope" class="pj-mono" rows="6" readonly></textarea><button class="pj-btn small" data-copy="s-envelope">Copy</button></div>
+        <h3>Original PSBT (base64)</h3>
+        <div class="pj-copyrow"><textarea id="s-psbt" class="pj-mono" rows="4" readonly></textarea><button class="pj-btn small" data-copy="s-psbt">Copy</button></div>
+        <div id="s-summary" class="pj-kv"></div>
+        <div class="pj-actions">
+          <button id="s-to-proposal" class="pj-btn">Continue to Proposal →</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TAB 3 · PROPOSAL ============ -->
+  <section id="tab-proposal" class="pj-tab" role="tabpanel" hidden>
+    <div class="pj-card">
+      <h2>Proposal — the receiver answers</h2>
+      <p class="pj-lede">Paste the sender's signed original. The desk re-verifies the sender's signatures, then the receiver adds their own input (signed + finalized), inserts it at a random position, and computes the exact fee split. Deductions from the payment output are bounded by <code>maxadditionalfeecontribution</code> — anything more is refused, loudly.</p>
+      <label>Paste the sender's signed original (envelope JSON)
+        <textarea id="p-original" class="pj-mono" rows="5" spellcheck="false" placeholder='{"kind":"pearl-payjoin-original",…}'></textarea>
+      </label>
+      <div class="pj-actions"><button id="p-load" class="pj-btn primary">Load &amp; check original</button></div>
+      <div id="p-error" class="pj-error" hidden></div>
+      <div id="p-originfo" class="pj-kv" hidden></div>
+    </div>
+    <div class="pj-card" id="p-build-card" hidden>
+      <h3>Receiver's contribution</h3>
+      <label>Receiver mnemonic (optional, stays in this page)
+        <input id="p-mnemonic" type="password" spellcheck="false" autocomplete="off" placeholder="only needed to sign the receiver input">
+      </label>
+      <div id="putxo-list"></div>
+      <div class="pj-actions"><button id="putxo-add" class="pj-btn small">+ Add receiver UTXO</button></div>
+      <label>Receiver change address (prl1…, empty = none)
+        <input id="p-change" spellcheck="false" placeholder="prl1…">
+      </label>
+      <div class="pj-actions">
+        <button id="p-build" class="pj-btn primary">Build proposal</button>
+        <button id="p-wipe" class="pj-btn danger-ghost">Wipe keys</button>
+      </div>
+      <div id="p-build-error" class="pj-error" hidden></div>
+      <div id="p-out" hidden>
+        <h3>Proposal envelope <small>(send this back to the sender)</small></h3>
+        <div class="pj-copyrow"><textarea id="p-envelope" class="pj-mono" rows="6" readonly></textarea><button class="pj-btn small" data-copy="p-envelope">Copy</button></div>
+        <h3>Proposal PSBT (base64)</h3>
+        <div class="pj-copyrow"><textarea id="p-psbt" class="pj-mono" rows="4" readonly></textarea><button class="pj-btn small" data-copy="p-psbt">Copy</button></div>
+        <h3>Fee math (exact grains)</h3>
+        <div id="p-fee" class="pj-kv"></div>
+        <div class="pj-actions"><button id="p-to-verify" class="pj-btn">Continue to Verify →</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TAB 4 · VERIFY ============ -->
+  <section id="tab-verify" class="pj-tab" role="tabpanel" hidden>
+    <div class="pj-card">
+      <h2>Verify — the sender's checklist</h2>
+      <p class="pj-lede">Paste the receiver's proposal (the original is carried over from the earlier tabs). The desk runs the full BIP-78 sender checklist — 15 checks, each PASS/FAIL with the exact reason. <strong>A failing proposal must never be signed.</strong></p>
+      <label>Proposal envelope (or bare proposal PSBT)
+        <textarea id="v-proposal" class="pj-mono" rows="5" spellcheck="false" placeholder='{"kind":"pearl-payjoin-proposal",…}'></textarea>
+      </label>
+      <div class="pj-actions"><button id="v-run" class="pj-btn primary">Run verification</button></div>
+      <div id="v-error" class="pj-error" hidden></div>
+      <div id="v-verdict" hidden></div>
+      <table id="v-table" class="pj-table" hidden>
+        <thead><tr><th>Check</th><th>Result</th><th>Detail</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="pj-actions" id="v-to-sign-row" hidden>
+        <button id="v-to-sign" class="pj-btn">Continue to Sign →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TAB 5 · SIGN ============ -->
+  <section id="tab-sign" class="pj-tab" role="tabpanel" hidden>
+    <div class="pj-card">
+      <h2>Sign — finalize and broadcast</h2>
+      <p class="pj-lede">The proposal is re-verified first — verification failure refuses to sign, no exceptions. Then your sender inputs are re-signed with fresh SIGHASH_DEFAULT signatures and every input is finalized. Out comes the broadcast-ready transaction.</p>
+      <label>Proposal envelope <small>(carried over from Verify)</small>
+        <textarea id="g-proposal" class="pj-mono" rows="4" spellcheck="false"></textarea>
+      </label>
+      <label>Your sender mnemonic
+        <input id="g-mnemonic" type="password" spellcheck="false" autocomplete="off" placeholder="the mnemonic that funded the original">
+      </label>
+      <div class="pj-actions">
+        <button id="g-sign" class="pj-btn primary">Verify + sign + finalize</button>
+        <button id="g-wipe" class="pj-btn danger-ghost">Wipe keys</button>
+      </div>
+      <div id="g-error" class="pj-error" hidden></div>
+      <div id="g-out" hidden>
+        <div id="g-summary" class="pj-kv"></div>
+        <h3>Final transaction (hex)</h3>
+        <div class="pj-copyrow"><textarea id="g-hex" class="pj-mono" rows="5" readonly></textarea><button class="pj-btn small" data-copy="g-hex">Copy</button></div>
+        <h3>Final PSBT (base64)</h3>
+        <div class="pj-copyrow"><textarea id="g-psbt" class="pj-mono" rows="3" readonly></textarea><button class="pj-btn small" data-copy="g-psbt">Copy</button></div>
+        <div class="pj-broadcast">
+          <h3>Broadcast <small>(live — Pearl mainnet via public blockbook)</small></h3>
+          <p class="pj-lede">This sends the real transaction to the real network. There is no undo.</p>
+          <label class="pj-check"><input type="checkbox" id="g-confirm"> I understand this broadcasts a real transaction on Pearl mainnet.</label>
+          <div class="pj-actions">
+            <button id="g-broadcast" class="pj-btn danger" disabled>Broadcast transaction</button>
+          </div>
+          <div id="g-broadcast-out" class="pj-kv" hidden></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SELF-TEST ============ -->
+  <section class="pj-card">
+    <h2>Lab self-test</h2>
+    <p class="pj-lede">Runs the whole protocol in this page — offer → signed original → proposal → 15 checks → sign → final transaction — with the public BIP-39 test vectors (<code>abandon … about</code> / <code>legal … yellow</code>). No network, no real funds. Then re-verifies every witness signature against the final sighash independently.</p>
+    <div class="pj-actions"><button id="t-run" class="pj-btn">Run self-test</button></div>
+    <div id="t-out" class="pj-testlog" hidden></div>
+  </section>
+
+  <section class="pj-card pj-note">
+    <h3>What this is, honestly</h3>
+    <ul>
+      <li><strong>A BIP-78 lab, not a wallet and not a server.</strong> It performs the exact sender/receiver protocol steps with real cryptography (BIP-340/341, BIP-86, BIP-174) and refuses protocol violations loudly — but there is no payjoin endpoint here, no coin selection beyond what you enter, and no privacy beyond what one joined transaction buys you.</li>
+      <li><strong>Keys never leave the page.</strong> Mnemonics you type are used in-memory only. Wipe them when done. Nothing is stored: no localStorage, no cookies, no analytics.</li>
+      <li><strong>Network calls are opt-in and labeled.</strong> UTXO lookups, fee estimates, and broadcast use the public Pearl blockbook and are marked <em>live</em> where they appear.</li>
+      <li><strong>Broadcast is double-gated.</strong> The broadcast button stays disabled until you check the explicit confirmation box.</li>
+    </ul>
+  </section>
+</main>
+
+<footer class="pj-footer">
+  <p>Pearl Payjoin · BIP-78 two-party transaction desk for PRL · built by <a href="https://x.com/kshot9000" rel="noopener">@kshot9000</a></p>
+  <p class="pj-tip">Tip the build: <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code> <button class="pj-btn small" data-copytext="prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d">Copy</button></p>
+</footer>
+
+<script src="pearl-payjoin.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
