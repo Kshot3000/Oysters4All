@@ -63,6 +63,7 @@
         <a href="pages/pact/">Pact</a>
         <a href="pages/sighash/">Sighash</a>
         <a href="pages/hush/">Hush</a>
+        <a href="pages/descriptor/">Atlas</a>
         <a href="pages/payjoin/">Payjoin</a>
         <a href="pages/id/">ID</a>
         <a href="pages/raffle/">Raffle</a>
@@ -619,12 +620,17 @@ cd miner && uv run pearl-miner \
             <div class="card-links"><a href="pages/hush/">Open Pearl Hush →</a></div>
           </article>
           <article class="card reveal">
-            <h3>Pearl Payjoin — BIP-78 Transaction Desk <span class="badge">new</span></h3>
+            <h3>Pearl Payjoin — BIP-78 Transaction Desk</h3>
             <p>The duet desk for two-party PRL transactions — the receiver publishes a payjoin offer, the sender funds and signs the original, the receiver answers with a proposal that adds their own input, and the sender runs the full 15-check BIP-78 verification before re-signing and finalizing. Exact integer-grain fee policy with bounded payment deductions, loud refusals on every protocol violation, and an in-page self-test that replays the whole dance with the public test vectors. One transaction, two wallets, no common-input-ownership heuristic.</p>
             <div class="card-links"><a href="pages/payjoin/">Open Pearl Payjoin →</a></div>
           </article>
           <article class="card reveal">
-            <h3>Pearl Foundry — Mining Pool <span class="badge">new</span></h3>
+            <h3>Pearl Atlas — BIP-380 Output-Descriptor Desk <span class="badge">new</span></h3>
+            <p>The cartographer's map-room for output descriptors — paste any descriptor and watch it get charted: grammar parse, BIP-380 checksum state, every key with origin, type, and range, and the full Taproot tree (internal key, Merkle root, output key, per-leaf control blocks). Add or verify checksums, derive addresses over an index range per BIP-386 (<code>tr()</code> and <code>addr()</code> are Pearl-spendable on the Taproot-only chain), chart five template shapes, and run a pinned self-test battery that replays the official BIP-380/BIP-393 vectors byte-exact. Fully offline — keys never leave the page.</p>
+            <div class="card-links"><a href="pages/descriptor/">Open Pearl Atlas →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Foundry — Mining Pool</h3>
             <p>The open-source PRL stratum pool — HeroMiners/LuckyPool/Kryptex dialects, real zk-pow share verification, vardiff, PPLNS payouts to the grain, and a live dashboard. Run it yourself.</p>
             <div class="card-links"><a href="pages/pool/">Open pool dashboard →</a></div>
           </article>
