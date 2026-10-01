@@ -169,6 +169,7 @@ function tokenCard(t) {
 async function loadTokens() {
   const box = $("tokens");
   $("token-detail").innerHTML = "";
+  if (!store.api) { box.innerHTML = emptyBox("Configure the indexer API above to list PRL-20 tokens."); return; }
   box.innerHTML = emptyBox("Loading tokens…");
   const r = await api("/tokens");
   if (!r.ok) { box.innerHTML = `<div class="err">Failed to load: ${esc(r.error)}</div>`; return; }
@@ -186,6 +187,7 @@ async function loadTokenDetail(ticker) {
   const t = (ticker || "").toLowerCase().trim();
   if (!t) return;
   box.innerHTML = emptyBox("Loading token…");
+  if (!store.api) { box.innerHTML = emptyBox("Configure the indexer API above to list PRL-20 tokens."); return; }
   const r = await api("/tokens/" + encodeURIComponent(t));
   if (!r.ok) {
     box.innerHTML = r.error === "HTTP_404"
@@ -206,7 +208,7 @@ async function loadTokenDetail(ticker) {
     ["Deploy inscription", d.deployInscriptionId ? `<code class="mono">${esc(short(d.deployInscriptionId))}</code>` : "—"],
     ["Deploy block", fmtNum(d.deployBlockHeight ?? d.deployBlock)],
     ["Deploy tx", d.deployTxid ? `<code class="mono">${esc(short(d.deployTxid))}</code>` : "—"]
-  ].filter(([, v]) => v !== "—" || true);
+  ];
   box.innerHTML = `<div class="detail"><h3>Token detail</h3>
     <dl class="dl">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join("")}</dl></div>`;
   safeScroll(box);
@@ -231,6 +233,7 @@ function inscCard(i) {
 async function loadInscriptions() {
   const box = $("inscriptions");
   $("insc-detail").innerHTML = "";
+  if (!store.api) { box.innerHTML = emptyBox("Configure the indexer API above to browse inscriptions."); return; }
   box.innerHTML = emptyBox("Loading inscriptions…");
   const r = await api("/inscriptions", { order: "desc", limit: 24 });
   if (!r.ok) { box.innerHTML = `<div class="err">Failed to load: ${esc(r.error)}</div>`; return; }
@@ -248,6 +251,7 @@ async function loadInscDetail(id) {
   const box = $("insc-detail");
   if (!id) return;
   box.innerHTML = emptyBox("Loading inscription…");
+  if (!store.api) { box.innerHTML = emptyBox("Configure the indexer API above to browse inscriptions."); return; }
   const [meta, loc] = await Promise.all([
     api("/inscriptions/" + encodeURIComponent(id)),
     api("/inscriptions/" + encodeURIComponent(id) + "/location")
@@ -278,6 +282,7 @@ async function loadInscDetail(id) {
 async function loadOperations() {
   const box = $("operations");
   const filter = $("op-filter").value;
+  if (!store.api) { box.innerHTML = emptyBox("Configure the indexer API above to browse operations."); return; }
   box.innerHTML = emptyBox("Loading operations…");
   const r = await api("/operations", { limit: 25 });
   if (!r.ok) { box.innerHTML = `<div class="err">Failed to load: ${esc(r.error)}</div>`; return; }
@@ -312,6 +317,7 @@ async function loadOperations() {
 async function loadAddress(addr) {
   const box = $("addr-result");
   box.innerHTML = emptyBox("Loading address data…");
+  if (!store.api) { box.innerHTML = emptyBox("Configure the indexer API above to look up an address."); return; }
   const enc = encodeURIComponent(addr);
   const [bal, lots, utxos, insc] = await Promise.all([
     api("/addresses/" + enc + "/balances"),
