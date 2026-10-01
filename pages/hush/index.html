@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Hush — BIP-352 Silent Payments desk for PRL</title>
+<meta name="description" content="Pearl Hush: a BIP-352 silent payments desk for the Pearl blockchain. Generate a silent-payment address, derive unlinkable taproot outputs, scan for payments, manage labels, and verify everything against the official BIP-352 test vectors. Fully client-side.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg class="moon" viewBox="0 0 64 64" width="52" height="52" aria-hidden="true">
+      <circle cx="32" cy="32" r="26" class="halo"/>
+      <path d="M42 10 A24 24 0 1 0 42 54 A19 19 0 1 1 42 10 Z" class="crescent"/>
+      <circle cx="46" cy="20" r="1.6" class="star"/>
+      <circle cx="52" cy="34" r="1.1" class="star"/>
+      <circle cx="14" cy="46" r="1.3" class="star"/>
+    </svg>
+    <div>
+      <h1>Pearl Hush</h1>
+      <p class="tagline">BIP-352 silent payments desk for PRL · one static address, a whisper of unlinkable outputs</p>
+    </div>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-step="setup" class="active">1 · Setup</button>
+    <button data-step="send" class="">2 · Send</button>
+    <button data-step="scan" class="">3 · Scan</button>
+    <button data-step="labels" class="">4 · Labels</button>
+    <button data-step="verify" class="">5 · Verify</button>
+  </nav>
+</header>
+
+<aside class="limits" id="honest-limits">
+  <h3>Honest limits — read before you hush</h3>
+  <ul>
+    <li><strong>Forward-looking standards desk, not a wallet:</strong> BIP-352 is not yet supported by Pearl wallet software (Oyster). This page implements the published BIP-352 math byte-exact — pinned against the official test vectors — so the ecosystem has a correct reference when support lands.</li>
+    <li><strong>Derived <code>prl1…</code> outputs are valid Pearl Taproot addresses</strong> for manual sweeping: each is a well-formed bech32m v1 32-byte address. This page never signs and never broadcasts — moving funds is on you, with a real wallet.</li>
+    <li><strong>Silent-payment addresses use <code>sp1…</code>/<code>tsp1…</code></strong> exactly as published in BIP-352. No Pearl-specific HRP was invented.</li>
+    <li><strong>Keys live in this page's memory only</strong> and the Send tab wipes pasted input secrets after deriving. Anyone watching your screen or with access to this browser session sees them. Wipe when done.</li>
+    <li><strong>Quiet about skips:</strong> per the BIP-352 reference, inputs that can't contribute to the shared secret are skipped, not failed — the Send tab still refuses non-taproot inputs loudly, because this desk only speaks taproot.</li>
+  </ul>
+  <div class="row"><button class="danger" id="wipe-keys">Wipe all pasted keys from this page</button></div>
+</aside>
+
+<main>
+  <!-- ============ STEP 1: SETUP ============ -->
+  <section class="panel active" id="step-setup">
+    <h2><span class="fig">NIGHT · 01</span> Setup — your silent keys</h2>
+    <p class="lede">Two secrets: a <strong>scan secret</strong> (may live on an always-online watcher) and a <strong>spend secret</strong> (stays cold).
+    Together they publish one static <code>sp1…</code> address. Every payment to it lands on a fresh, unlinkable taproot output only you can find.</p>
+    <div class="row">
+      <button class="primary" id="su-gen">Generate new key material</button>
+      <button class="secondary" id="su-derive">Derive address from pasted secrets</button>
+      <span class="hint">Generated locally with <code>crypto.getRandomValues</code> — nothing leaves this page.</span>
+    </div>
+    <div class="form-grid">
+      <label>Scan secret <span class="sub">64 hex chars</span>
+        <input id="su-bscan" type="text" spellcheck="false" placeholder="leave empty and generate, or paste">
+      </label>
+      <label>Spend secret <span class="sub">64 hex chars — keep cold</span>
+        <input id="su-bspend" type="text" spellcheck="false" placeholder="leave empty and generate, or paste">
+      </label>
+    </div>
+    <div id="su-result" hidden>
+      <h3>Your silent-payment address</h3>
+      <div class="addr-row">
+        <code id="su-address" class="big-addr"></code>
+        <button class="copy" data-copy="su-address">copy</button>
+      </div>
+      <div class="qr-wrap"><div id="su-qr" class="qr"></div>
+        <p class="hint">Share the <code>sp1…</code> address freely — it reveals nothing about your outputs.</p>
+      </div>
+      <div class="key-grid">
+        <div><span class="k">Scan public key B<sub>scan</sub></span><code id="su-bscan-pub"></code></div>
+        <div><span class="k">Spend public key B<sub>spend</sub></span><code id="su-bspend-pub"></code></div>
+      </div>
+    </div>
+    <p class="err" id="su-error" hidden></p>
+  </section>
+
+  <!-- ============ STEP 2: SEND ============ -->
+  <section class="panel" id="step-send">
+    <h2><span class="fig">NIGHT · 02</span> Send — derive unlinkable outputs</h2>
+    <p class="lede">Describe the inputs you will spend from and the silent-payment address(es) you are paying.
+    The desk runs the BIP-352 sender math and hands you the exact taproot outputs to include in your transaction.
+    <strong>This desk only derives from taproot key-path inputs</strong> — anything else is refused loudly.</p>
+    <h3>Inputs <button class="mini" id="se-add-input">+ add input</button></h3>
+    <div class="table-wrap"><table class="draft" id="se-inputs">
+      <thead><tr><th>#</th><th>txid (64 hex)</th><th>vout</th><th>scriptPubKey (hex)</th><th>scriptSig (hex)</th><th>witness (hex)</th><th>input secret (64 hex)</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <p class="hint">For taproot inputs the secret is the private key of the taproot <em>output</em> key (parity is handled for you). scriptSig / witness may be empty for key-path spends. Secrets are wiped from these fields after deriving.</p>
+    <h3>Recipients <span class="sub">one <code>sp1…</code>/<code>tsp1…</code> address per line</span></h3>
+    <textarea id="se-recipients" rows="3" spellcheck="false" placeholder="sp1qq…"></textarea>
+    <div class="row">
+      <button class="primary" id="se-derive">Derive outputs</button>
+      <span class="hint">Outputs are deterministic for these inputs — the receiver finds them by scanning.</span>
+    </div>
+    <p class="err" id="se-error" hidden></p>
+    <div id="se-result" hidden>
+      <h3>Derived outputs</h3>
+      <div class="table-wrap"><table class="draft" id="se-outputs">
+        <thead><tr><th>k</th><th>taproot output key (x-only)</th><th>Pearl address (prl1…)</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <div class="key-grid">
+        <div><span class="k">input_hash</span><code id="se-inputhash"></code></div>
+        <div><span class="k">shared secret(s) ser<sub>P</sub>(ecdh)</span><code id="se-secrets"></code></div>
+      </div>
+      <p class="hint" id="se-skipped"></p>
+    </div>
+  </section>
+
+  <!-- ============ STEP 3: SCAN ============ -->
+  <section class="panel" id="step-scan">
+    <h2><span class="fig">NIGHT · 03</span> Scan — find your payments</h2>
+    <p class="lede">Paste a transaction's inputs and its taproot outputs. With your scan secret the desk replays the
+    receiver scan: it finds every output meant for you — including labeled ones — and derives the private key that spends each.</p>
+    <div class="form-grid">
+      <label>Scan secret <input id="sc-bscan" type="text" spellcheck="false" placeholder="64 hex chars"></label>
+      <label>Spend secret <input id="sc-bspend" type="text" spellcheck="false" placeholder="64 hex chars"></label>
+      <label>Labels to check <span class="sub">comma-separated integers; m = 0 change is always checked</span>
+        <input id="sc-labels" type="text" spellcheck="false" placeholder="e.g. 1, 2, 1001337">
+      </label>
+    </div>
+    <h3>Transaction inputs <span class="sub">JSON array: [{txid, vout, prevoutSpk, scriptSig, txinwitness}]</span></h3>
+    <textarea id="sc-vins" rows="4" spellcheck="false" placeholder='[{"txid":"…","vout":0,"prevoutSpk":"5120…","scriptSig":"","txinwitness":""}]'></textarea>
+    <h3>Taproot outputs to check <span class="sub">one x-only key (64 hex) per line</span></h3>
+    <textarea id="sc-outputs" rows="4" spellcheck="false" placeholder="3e9fce73d4e77a4809908e3c3a2e54ee147b9312dc5044a193d1fc85de46e3c1"></textarea>
+    <div class="row"><button class="primary" id="sc-scan">Scan for my payments</button></div>
+    <p class="err" id="sc-error" hidden></p>
+    <div id="sc-result" hidden>
+      <h3>Found payments</h3>
+      <div class="table-wrap"><table class="draft" id="sc-matches">
+        <thead><tr><th>k</th><th>label</th><th>output key</th><th>Pearl address</th><th>spend secret (keep cold)</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <p class="hint">Each spend secret is <code>(b<sub>spend</sub> + t<sub>k</sub> + label)</code> normalized to even Y — the key-path key for that output.</p>
+    </div>
+  </section>
+
+  <!-- ============ STEP 4: LABELS ============ -->
+  <section class="panel" id="step-labels">
+    <h2><span class="fig">NIGHT · 04</span> Labels — quiet sub-addresses</h2>
+    <p class="lede">A label <code>m</code> tweaks your spend key into a sub-address
+    <code>B<sub>m</sub> = B<sub>spend</sub> + Hash<sub>BIP0352/Label</sub>(b<sub>scan</sub> ‖ m)·G</code>.
+    Label <code>0</code> is reserved for change. Hand each contact their own labeled address; your scanner tells them apart.</p>
+    <div class="form-grid">
+      <label>Scan secret <input id="la-bscan" type="text" spellcheck="false" placeholder="64 hex chars"></label>
+      <label>Spend secret <input id="la-bspend" type="text" spellcheck="false" placeholder="64 hex chars"></label>
+      <label>Label m <span class="sub">integer ≥ 0</span>
+        <input id="la-m" type="text" spellcheck="false" value="1">
+      </label>
+    </div>
+    <div class="row"><button class="primary" id="la-derive">Derive labeled address</button></div>
+    <p class="err" id="la-error" hidden></p>
+    <div id="la-result" hidden>
+      <h3>Labeled address <span class="sub" id="la-m-echo"></span></h3>
+      <div class="addr-row">
+        <code id="la-address" class="big-addr"></code>
+        <button class="copy" data-copy="la-address">copy</button>
+      </div>
+      <div class="qr-wrap"><div id="la-qr" class="qr"></div></div>
+      <div class="key-grid">
+        <div><span class="k">Label tweak scalar</span><code id="la-tweak"></code></div>
+        <div><span class="k">Labeled spend key B<sub>m</sub></span><code id="la-bm"></code></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ STEP 5: VERIFY ============ -->
+  <section class="panel" id="step-verify">
+    <h2><span class="fig">NIGHT · 05</span> Verify — trust, but check</h2>
+    <p class="lede">Two independent checks. Decode any silent-payment address to inspect its guts, or run the
+    pinned official BIP-352 vectors through this very page — if the math drifts by a single bit, the proof fails.</p>
+    <h3>Decode a silent-payment address</h3>
+    <div class="form-grid">
+      <label>Address <input id="ve-address" type="text" spellcheck="false" placeholder="sp1qq…" size="60"></label>
+    </div>
+    <div class="row"><button class="secondary" id="ve-decode">Decode</button></div>
+    <p class="err" id="ve-error" hidden></p>
+    <div id="ve-decode-result" hidden>
+      <div class="key-grid">
+        <div><span class="k">HRP / version</span><code id="ve-hrpver"></code></div>
+        <div><span class="k">B<sub>scan</sub></span><code id="ve-bscan"></code></div>
+        <div><span class="k">B<sub>m</sub></span><code id="ve-bm"></code></div>
+      </div>
+    </div>
+    <h3>Official BIP-352 vectors, in this page</h3>
+    <p class="hint">Runs pinned send + receive vectors (including label and change cases) through the bundled crypto and compares byte-for-byte.</p>
+    <div class="row"><button class="primary" id="ve-selftest">Run vector self-test</button></div>
+    <div id="ve-selftest-result" hidden>
+      <p class="proof" id="ve-proof"></p>
+      <p class="hint" id="ve-proof-detail"></p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a> for the Pearl blockchain · tips: <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code></p>
+  <p class="fine">Client-side cryptography only. This page never holds keys beyond your session, never signs, never broadcasts. Verify the vectors, then verify again before real funds.</p>
+</footer>
+
+<script src="qrcode.min.js?v=1"></script>
+<script src="pearl-hush.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>

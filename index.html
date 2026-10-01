@@ -62,6 +62,7 @@
         <a href="pages/burn/">Burn</a>
         <a href="pages/pact/">Pact</a>
         <a href="pages/sighash/">Sighash</a>
+        <a href="pages/hush/">Hush</a>
         <a href="pages/id/">ID</a>
         <a href="pages/raffle/">Raffle</a>
         <a href="pages/swap/">Swap</a>
@@ -607,9 +608,14 @@ cd miner && uv run pearl-miner \
             <div class="card-links"><a href="pages/pact/">Open Pearl Pact →</a></div>
           </article>
           <article class="card reveal">
-            <h3>Pearl Sighash Studio <span class="badge">new</span></h3>
+            <h3>Pearl Sighash Studio</h3>
             <p>The drafting table for Taproot signatures — build a spending scenario and watch the exact BIP-342 sighash digest being assembled byte by byte. Five steps: Build → Anatomy → Compare → Sign → Verify, with a full intermediate-hash walkthrough, a side-by-side diff of all seven sighash flags (why NONE omits sha_outputs, what ANYONECANPAY drops), BIP-340 Schnorr signing, tamper-evident <code>pearl-sighash:v1</code> descriptors with a standalone PROVEN / NOT PROVEN verifier, and a live replay of the official BIP-341 wallet test vectors, byte-exact. Educational reference implementation — review the source before trusting it with real money.</p>
             <div class="card-links"><a href="pages/sighash/">Open Sighash Studio →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Hush — Silent Payments Desk <span class="badge">new</span></h3>
+            <p>The midnight desk for BIP-352 silent payments — one static <code>sp1…</code> address, a whisper of unlinkable taproot outputs. Five steps: Setup → Send → Scan → Labels → Verify: generate scan/spend keys locally, derive exact sender outputs with <code>prl1…</code> addresses, replay the receiver scan to find and spend your payments (labeled ones too), mint quiet sub-addresses per label, and prove the page's own math byte-exact against the official BIP-352 vectors. Forward-looking standards reference — no wallet support yet; this page never signs, never broadcasts.</p>
+            <div class="card-links"><a href="pages/hush/">Open Pearl Hush →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Foundry — Mining Pool <span class="badge">new</span></h3>
