@@ -53,6 +53,7 @@
         <a href="pages/predict/">Predict</a>
         <a href="pages/paywall/">Paywall</a>
         <a href="pages/monetary/">Monetary</a>
+        <a href="pages/drop/">Drop</a>
         <a href="pages/id/">ID</a>
         <a href="pages/raffle/">Raffle</a>
         <a href="pages/swap/">Swap</a>
@@ -556,6 +557,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Monetary — Issuance &amp; Halving Desk <span class="badge">new</span></h3>
             <p>The central bank of Pearl — the exact block-subsidy formula from upstream validate.go recomputed grain-for-grain in your browser (BigInt, pinned to the emission_test.go vectors): live era, block subsidy and next decay-milestone countdown from Blockbook with a labeled stale-snapshot fallback, SVG issuance curve with a you-are-here marker, era-by-era subsidy schedule, and height/date/grains/maturity explorer tools. Client-side only, honest about every estimate.</p>
             <div class="card-links"><a href="pages/monetary/">Open Pearl Monetary →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Drop — PRL-20 Airdrop Campaign Desk <span class="badge">new</span></h3>
+            <p>The raindrop-storm desk for PRL-20 airdrops — define a campaign with a SHA-256 campaign id, paste a recipient CSV with strict bech32m address validation and first-seen-wins dedupe, hash the list into a sorted-pair Merkle tree, seal a tamper-evident drop descriptor (with a prl-drop inscription envelope ready for Pearl Etch), and let anyone verify their claim against the sealed root. Six tabs: Campaign → Recipients → Merkle → Seal → Claim → Method, with a standalone PROVEN / NOT PROVEN seal verifier. Pure client-side, honest limits always visible: the desk never holds funds, allocations are pledged amounts, distribution is manual.</p>
+            <div class="card-links"><a href="pages/drop/">Open Pearl Drop →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Foundry — Mining Pool <span class="badge">new</span></h3>

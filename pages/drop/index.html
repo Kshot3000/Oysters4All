@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Drop — the PRL-20 airdrop campaign desk</title>
+<meta name="description" content="Pearl Drop: design PRL-20 airdrop campaigns, hash recipient lists into Merkle roots, seal tamper-evident drop descriptors, and let anyone verify a claim — all client-side.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="hero">
+  <div class="rain" aria-hidden="true"></div>
+  <div class="hero-inner">
+    <p class="kicker">Pearl · Airdrop Desk</p>
+    <h1><span class="drop-glyph" aria-hidden="true">💧</span> Pearl Drop</h1>
+    <p class="sub">The raindrop-storm desk for <strong>PRL-20 airdrops</strong>. Define a
+      campaign, paste a recipient list, hash it into a Merkle tree, seal a
+      tamper-evident drop descriptor, and let anyone verify their claim — all in
+      your browser, all client-side. This desk never holds funds and never moves
+      PRL: allocations are <em>pledged amounts</em>, distribution is a manual
+      transfer by the operator.</p>
+    <nav id="tabs" class="tabs" aria-label="Desk sections">
+      <button data-tab="campaign" class="active">1 · Campaign</button>
+      <button data-tab="recipients">2 · Recipients</button>
+      <button data-tab="merkle">3 · Merkle</button>
+      <button data-tab="seal">4 · Seal</button>
+      <button data-tab="claim">5 · Claim</button>
+      <button data-tab="method">6 · Method</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <!-- ============ 1 · CAMPAIGN ============ -->
+  <section id="tab-campaign" class="panel active">
+    <h2>1 · The campaign</h2>
+    <p class="lede">Name the storm, pick the PRL-20 token tick, and set the claim window.
+      Composing the header freezes its canonical bytes and SHA-256 campaign id.</p>
+    <div class="grid2">
+      <div class="field">
+        <label for="c-name">Campaign name</label>
+        <input id="c-name" type="text" maxlength="80" placeholder="Genesis Storm" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="c-tick">PRL-20 token tick <span class="hint">1–8 uppercase A–Z 0–9</span></label>
+        <input id="c-tick" type="text" maxlength="8" placeholder="PEARL" class="mono" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="c-start">Claim window opens</label>
+        <input id="c-start" type="date" value="2026-10-01">
+      </div>
+      <div class="field">
+        <label for="c-end">Claim window closes</label>
+        <input id="c-end" type="date" value="2026-10-31">
+      </div>
+      <div class="field span2">
+        <label for="c-contact">Operator contact <span class="hint">optional, self-declared</span></label>
+        <input id="c-contact" type="text" maxlength="200" placeholder="e.g. @kshot9000 on X" autocomplete="off">
+      </div>
+    </div>
+    <div class="row">
+      <button id="c-compose" class="primary">Compose campaign header</button>
+      <span id="c-err" class="err" role="alert"></span>
+    </div>
+    <div id="c-out" class="out hidden">
+      <h3>Canonical campaign header</h3>
+      <pre id="c-json" class="mono scroll"></pre>
+      <div class="kv"><span>Campaign id (SHA-256)</span><code id="c-id" class="mono wrap"></code></div>
+      <div class="kv"><span>Fingerprint</span><code id="c-fp" class="mono"></code></div>
+      <div class="row">
+        <button id="c-copy" class="ghost">copy header JSON</button>
+      </div>
+    </div>
+    <h3>Lifecycle</h3>
+    <p class="lede">Status: <span id="c-status" class="status-badge">draft</span></p>
+    <div class="row">
+      <button id="c-open" class="ghost">open campaign</button>
+      <button id="c-close" class="ghost">close campaign</button>
+      <button id="c-reopen" class="ghost">re-open</button>
+      <span id="c-status-err" class="err" role="alert"></span>
+    </div>
+    <p class="hint">Sealing happens in the <a href="#seal" data-goto="seal">Seal tab</a> after the Merkle root is computed.
+      Recipients and the campaign header lock the moment the root is computed.</p>
+  </section>
+
+  <!-- ============ 2 · RECIPIENTS ============ -->
+  <section id="tab-recipients" class="panel">
+    <h2>2 · Recipients</h2>
+    <p class="lede">Paste <code>address,amount</code> lines — amounts in PRL, up to 8 decimals.
+      Header rows, blank lines and <code>#</code> comments are skipped. First-seen address wins;
+      later repeats are reported as duplicates.</p>
+    <div id="r-locked" class="lock hidden">🔒 Recipient list is <strong>sealed</strong> — the Merkle root was computed.
+      <button id="r-unlock" class="ghost">reset tree to edit</button></div>
+    <div class="field">
+      <label for="r-csv">Recipient CSV</label>
+      <textarea id="r-csv" class="mono tall" spellcheck="false" placeholder="address,amount&#10;prl1…,1.5&#10;prl1…,0.25"></textarea>
+    </div>
+    <div class="row">
+      <button id="r-sample" class="ghost">load sample</button>
+      <button id="r-parse" class="primary">Parse &amp; validate</button>
+      <span id="r-err" class="err" role="alert"></span>
+    </div>
+    <div id="r-out" class="out hidden">
+      <div class="stats">
+        <div class="stat"><span class="num" id="r-count">0</span><span class="lbl">unique recipients</span></div>
+        <div class="stat"><span class="num" id="r-total">0</span><span class="lbl">total PRL pledged</span></div>
+        <div class="stat"><span class="num" id="r-invalid-n">0</span><span class="lbl">invalid rows</span></div>
+        <div class="stat"><span class="num" id="r-dup-n">0</span><span class="lbl">duplicates skipped</span></div>
+      </div>
+      <h3>Recipients <span class="hint">(index · address · PRL)</span></h3>
+      <div class="tablewrap"><table id="r-table" class="mono">
+        <thead><tr><th>#</th><th>address</th><th>amount (PRL)</th><th>grains</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <h3>Invalid rows</h3>
+      <ul id="r-invalid" class="checklist"></ul>
+      <h3>Duplicates</h3>
+      <ul id="r-dups" class="checklist"></ul>
+    </div>
+  </section>
+
+  <!-- ============ 3 · MERKLE ============ -->
+  <section id="tab-merkle" class="panel">
+    <h2>3 · Merkle tree</h2>
+    <p class="lede">Leaf <em>i</em> is SHA-256 over the canonical bytes
+      <code class="mono">drop-v1:&lt;index&gt;:&lt;address&gt;:&lt;amountGrains&gt;</code>
+      (index = position after dedupe, 0-based). Parents hash the
+      <strong>sorted pair</strong> — <code class="mono">SHA-256(min‖max)</code> — and an odd level
+      duplicates its last leaf.</p>
+    <div class="row">
+      <button id="m-compute" class="primary">Compute Merkle root</button>
+      <button id="m-reset" class="ghost">reset</button>
+      <span id="m-err" class="err" role="alert"></span>
+    </div>
+    <div id="m-out" class="out hidden">
+      <div class="kv big"><span>Merkle root</span><code id="m-root" class="mono wrap"></code></div>
+      <div class="stats">
+        <div class="stat"><span class="num" id="m-depth">0</span><span class="lbl">tree depth</span></div>
+        <div class="stat"><span class="num" id="m-leaves">0</span><span class="lbl">leaves</span></div>
+        <div class="stat"><span class="num" id="m-total">0</span><span class="lbl">total PRL</span></div>
+      </div>
+      <div class="row">
+        <button id="m-export" class="ghost">export all proofs (JSON)</button>
+      </div>
+      <h3>Proof lookup</h3>
+      <div class="field">
+        <label for="m-addr">prl1… address</label>
+        <input id="m-addr" type="text" class="mono" spellcheck="false" autocomplete="off" placeholder="prl1…">
+      </div>
+      <div class="row">
+        <button id="m-lookup" class="ghost">show proof</button>
+        <span id="m-proof-err" class="err" role="alert"></span>
+      </div>
+      <pre id="m-proof" class="mono scroll hidden"></pre>
+    </div>
+  </section>
+
+  <!-- ============ 4 · SEAL ============ -->
+  <section id="tab-seal" class="panel">
+    <h2>4 · Seal</h2>
+    <p class="lede">Sealing freezes the campaign: the seal document binds the campaign id,
+      the token tick, the Merkle root, the leaf count and the pledged total under one
+      SHA-256 seal id. Campaign status becomes <strong>sealed</strong>.</p>
+    <div class="row">
+      <button id="s-compose" class="primary">Compose seal document</button>
+      <span id="s-err" class="err" role="alert"></span>
+    </div>
+    <div id="s-out" class="out hidden">
+      <h3>Seal document (canonical)</h3>
+      <pre id="s-doc" class="mono scroll"></pre>
+      <div class="kv"><span>Seal id (SHA-256)</span><code id="s-sealid" class="mono wrap"></code></div>
+      <div class="row">
+        <button id="s-copy" class="ghost">copy seal JSON</button>
+        <button id="s-download" class="ghost">download seal JSON</button>
+      </div>
+      <h3><code class="mono">prl-drop</code> inscription envelope</h3>
+      <p class="lede">Ready to inscribe via Pearl Etch — preparing the payload is this desk's job;
+        commit/reveal is Etch's. Marker <code class="mono">prl-drop</code> is deliberately
+        <em>not</em> <code class="mono">prl-20</code> so PRL-20 indexers never mistake the seal for a token op.</p>
+      <pre id="s-envelope" class="mono scroll"></pre>
+      <div class="row">
+        <button id="s-copy-env" class="ghost">copy envelope body</button>
+        <a class="btn-link" href="../etch/" target="_blank" rel="noopener">Open Pearl Etch →</a>
+      </div>
+    </div>
+    <h3>Verify a sealed campaign</h3>
+    <p class="lede">Paste a seal document plus the recipient CSV it was sealed against — the desk
+      re-derives the campaign id, rebuilds the Merkle tree from scratch, and rules
+      <strong>PROVEN</strong> / <strong>NOT PROVEN</strong>.</p>
+    <div class="field">
+      <label for="s-seal-json">Seal document JSON</label>
+      <textarea id="s-seal-json" class="mono tall" spellcheck="false" placeholder='{"v":1,"campaign_id":"…",…}'></textarea>
+    </div>
+    <div class="field">
+      <label for="s-verify-csv">Recipient CSV</label>
+      <textarea id="s-verify-csv" class="mono tall" spellcheck="false" placeholder="address,amount"></textarea>
+    </div>
+    <div class="row">
+      <button id="s-verify" class="primary">Verify seal package</button>
+    </div>
+    <div id="s-verdict" class="verdict hidden"></div>
+    <ul id="s-checks" class="checklist"></ul>
+  </section>
+
+  <!-- ============ 5 · CLAIM ============ -->
+  <section id="tab-claim" class="panel">
+    <h2>5 · Claim check</h2>
+    <p class="lede">Works for <em>any</em> campaign: paste its seal document and recipient CSV, enter an
+      address, and the desk looks up the allocation, rebuilds the Merkle proof, and
+      recomputes it to the sealed root.</p>
+    <div class="field">
+      <label for="cl-seal-json">Seal document JSON</label>
+      <textarea id="cl-seal-json" class="mono" spellcheck="false" placeholder='{"v":1,"campaign_id":"…",…}'></textarea>
+    </div>
+    <div class="field">
+      <label for="cl-csv">Recipient CSV</label>
+      <textarea id="cl-csv" class="mono" spellcheck="false" placeholder="address,amount"></textarea>
+    </div>
+    <div class="field">
+      <label for="cl-addr">Your prl1… address</label>
+      <input id="cl-addr" type="text" class="mono" spellcheck="false" autocomplete="off" placeholder="prl1…">
+    </div>
+    <div class="row">
+      <button id="cl-use-current" class="ghost">use current campaign's seal + list</button>
+      <button id="cl-check" class="primary">Verify claim</button>
+    </div>
+    <div id="cl-verdict" class="verdict hidden"></div>
+    <div id="cl-detail" class="out hidden">
+      <div class="kv"><span>Allocation</span><code id="cl-amount" class="mono"></code></div>
+      <div class="kv"><span>Leaf index</span><code id="cl-index" class="mono"></code></div>
+      <div class="kv"><span>Leaf hash</span><code id="cl-leaf" class="mono wrap"></code></div>
+      <h3>Merkle proof</h3>
+      <pre id="cl-proof" class="mono scroll"></pre>
+      <div class="row">
+        <button id="cl-copy-proof" class="ghost">copy proof JSON</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 6 · METHOD ============ -->
+  <section id="tab-method" class="panel">
+    <h2>6 · Methodology &amp; honest limits</h2>
+    <h3>What this desk does</h3>
+    <ul class="notes">
+      <li><strong>Campaign header</strong> — canonical JSON, fixed field order
+        <code class="mono">v,name,tick,starts_at,ends_at,contact</code>; campaign id = SHA-256 of those bytes.</li>
+      <li><strong>Leaf format</strong> — <code class="mono">drop-v1:&lt;index&gt;:&lt;address&gt;:&lt;amountGrains&gt;</code>,
+        UTF-8, index 0-based after dedupe. Amounts are exact BigInt grains (1 PRL = 10<sup>8</sup> grains).</li>
+      <li><strong>Pair-sorting convention</strong> — each parent is
+        <code class="mono">SHA-256(min‖max)</code> over the lexicographically sorted child pair;
+        an odd level duplicates its last leaf. Proofs carry the sibling at each level.</li>
+      <li><strong>Address validation</strong> — BIP-350 bech32m, HRP <code class="mono">prl</code>, witness
+        version 1, 32-byte program, canonical re-encode — same rules as the audited
+        Names desk core.</li>
+      <li><strong>Seal document</strong> — fixed field order
+        <code class="mono">v,campaign_id,tick,merkle_root,leaf_count,total_grains,sealed_at,campaign</code>;
+        seal id = SHA-256 of the canonical bytes. The embedded full header lets anyone
+        re-derive <code class="mono">campaign_id</code> without trusting it.</li>
+      <li><strong>Inscription</strong> — the seal is inscribed under marker <code class="mono">prl-drop</code>
+        (never <code class="mono">prl-20</code>). Preparing the envelope is this desk's job;
+        commit/reveal happens in Pearl Etch.</li>
+    </ul>
+    <h3>Crypto lineage</h3>
+    <ul class="notes">
+      <li>No new cryptography. SHA-256 is the byte-identical
+        <code class="mono">snipSha256Bytes</code> from the Paywall desk, a mechanical minimization of the
+        audited Sign-core <code class="mono">@noble/hashes/sha256</code> — differentially tested there and
+        pinned to known vectors here. bech32m is copied verbatim from the audited
+        <code class="mono">sign/src/crypto.js</code> (from pearlpurse).</li>
+    </ul>
+  </section>
+</main>
+
+<aside class="limits" aria-label="Honest limits">
+  <div>
+    <strong>Honest limits — always true:</strong>
+    <ul>
+      <li>This desk <strong>never holds funds</strong>. Allocations are pledged amounts; distribution is a
+        manual PRL-20 transfer by the operator — Pearl has no smart contracts to escrow with.</li>
+      <li>Campaign state and the recipient directory live in <strong>your browser's localStorage only</strong>;
+        nothing here is published or shared.</li>
+      <li><strong>No public <code class="mono">prl-drop</code> claim indexer exists yet</strong>, so redemptions
+        are verified off-chain — claimants check their own proof against the sealed root.</li>
+      <li>Names, addresses and the operator contact are <strong>self-declared</strong>; a valid proof shows
+        membership in the sealed list, not identity.</li>
+    </ul>
+  </div>
+</aside>
+
+<footer>
+  <p>Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a></p>
+  <p class="donate">Donate PRL: <code id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+    <button id="donate-copy" class="ghost">copy</button></p>
+  <p class="hint">Pearl Drop · uses the audited sign/names crypto core · pure client-side, no network calls</p>
+</footer>
+
+<script src="pearl-drop.bundle.js?v=1"></script>
+</body>
+</html>
