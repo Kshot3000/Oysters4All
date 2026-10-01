@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Mesh — MuSig2 collaborative keypath signing desk for PRL</title>
+<meta name="description" content="Pearl Mesh: weave 2–7 PRL keyholders into one MuSig2 aggregate key that spends like a single Taproot key. Guided nonce ceremony, sealed descriptor, standalone verifiers. Fully offline except an optional balance lookup.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 64 64" aria-hidden="true">
+      <ellipse cx="32" cy="32" rx="26" ry="20" class="loom"/>
+      <line x1="10" y1="22" x2="54" y2="22" class="warp"/>
+      <line x1="10" y1="32" x2="54" y2="32" class="warp"/>
+      <line x1="10" y1="42" x2="54" y2="42" class="warp"/>
+      <path d="M8 14 Q32 32 56 50" class="weft"/>
+      <path d="M8 50 Q32 32 56 14" class="weft"/>
+      <circle cx="32" cy="32" r="4" class="knot"/>
+    </svg>
+    <div>
+      <h1>Pearl Mesh</h1>
+      <p class="tagline">MuSig2 collaborative keypath desk for PRL · many weavers, one key</p>
+    </div>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-step="setup" class="active">1 · Setup</button>
+    <button data-step="aggregate" class="">2 · Aggregate</button>
+    <button data-step="fund" class="">3 · Fund</button>
+    <button data-step="sign" class="">4 · Sign</button>
+    <button data-step="verify" class="">5 · Verify</button>
+  </nav>
+</header>
+
+<div class="margin-strip" aria-hidden="true"><span>FIG. 01 — COLLABORATIVE KEYPATH LOOM · SHEET PRL-327 · SCALE 1:1 · ALL KEYS IN X-ONLY FORM</span></div>
+
+<aside class="limits" id="limits">
+  <h3>Honest limits — read before weaving</h3>
+  <ul>
+    <li><strong>MuSig2 is n-of-n:</strong> every member must take part in every signing ceremony. If one key is lost, the funds are locked. This is not a threshold scheme.</li>
+    <li><strong>The ceremony is interactive:</strong> members exchange nonce bundles and partial signatures with the coordinator. Anyone who sees a member's <em>secret</em> nonce (not the bundle — the secret) alongside their partial can recover that member's private key. Keep secrets on-device; share only bundles and partials.</li>
+    <li><strong>Simulation is demo-grade:</strong> the in-page simulator uses throwaway keys and is for learning the flow only — it proves the math, not a real ceremony.</li>
+    <li><strong>This page never moves PRL:</strong> it builds keys, addresses, and signatures. It does not construct transactions, hold custody, or broadcast anything.</li>
+  </ul>
+</aside>
+
+<main>
+  <!-- STEP 1: SETUP -->
+  <section id="step-setup" class="panel active">
+    <h2>Gather the weavers</h2>
+    <p class="lede">A mesh holds <strong>2–7 members</strong>. Each member contributes an x-only (32-byte) public
+    key — pasted from any wallet, or derived here from a fresh local BIP-86 mnemonic
+    (<code>m/86'/808276'/0'/0/i</code>). Only members whose key was derived <em>on this device</em> can sign
+    in the guided ceremony below; pasted-key members sign on their own machines and paste their bundles back.</p>
+
+    <div class="form-grid">
+      <label>Network
+        <select id="s-network">
+          <option value="mainnet" selected>Mainnet (prl…)</option>
+          <option value="testnet">Testnet (tprl…)</option>
+        </select>
+      </label>
+    </div>
+
+    <h3>Add a member</h3>
+    <div class="form-grid">
+      <label>Member name
+        <input id="s-name" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. Ada">
+      </label>
+      <label class="wide">X-only public key (64-hex)
+        <input id="s-pubkey" type="text" autocomplete="off" spellcheck="false" placeholder="64-hex x-only pubkey">
+      </label>
+    </div>
+    <div class="row">
+      <button id="s-add" class="primary">Add member</button>
+    </div>
+
+    <h3>Or derive a local member key</h3>
+    <p class="lede">Generates a mnemonic <em>in this page's memory only</em> and derives one BIP-86 member key
+    from it. The mnemonic and secret never leave your device and are wiped when you leave the page.</p>
+    <div class="row">
+      <button id="s-gen-mnemonic" class="ghost">Generate mnemonic</button>
+      <button id="s-wipe-mnemonic" class="ghost">Wipe mnemonic</button>
+    </div>
+    <div class="form-grid">
+      <label class="wide">Mnemonic (memory only)
+        <input id="s-mnemonic" type="text" autocomplete="off" spellcheck="false" placeholder="12 or 24 words — generate or paste">
+      </label>
+      <label>Key index
+        <input id="s-index" type="number" min="0" max="1000" value="0">
+      </label>
+    </div>
+    <div class="row">
+      <button id="s-derive" class="ghost">Derive member key &amp; add</button>
+    </div>
+    <p class="err" id="s-err" hidden></p>
+
+    <h3>Members <span class="hint-inline" id="s-count">(0 of 2–7)</span></h3>
+    <div id="s-list" class="member-list"><p class="empty">No members yet — add at least two above.</p></div>
+    <div class="row">
+      <button id="s-continue" class="primary">Weave the aggregate key →</button>
+    </div>
+  </section>
+
+  <!-- STEP 2: AGGREGATE -->
+  <section id="step-aggregate" class="panel">
+    <h2>The woven key</h2>
+    <p class="lede">Every member key is sorted, hashed into <code>L</code>, and weighted by its own
+    <strong>key coefficient</strong> — this is what makes MuSig2 secure against rogue-key attacks.
+    The weighted sum is normalized to even-y (the aggregate internal key), then TapTweaked into the
+    final key the address pays to. Funds sent here look exactly like a single-key Taproot payment.</p>
+    <p class="err" id="a-err" hidden></p>
+    <div id="a-body">
+      <h3>Aggregate address</h3>
+      <div class="addr-row">
+        <code id="a-address" class="addr"></code>
+        <button class="copy-btn ghost" data-for="a-address">Copy</button>
+      </div>
+      <h3>Sealed descriptor</h3>
+      <div class="addr-row">
+        <code id="a-sealed" class="addr small"></code>
+        <button class="copy-btn ghost" data-for="a-sealed">Copy</button>
+      </div>
+      <h3>Members &amp; coefficients</h3>
+      <div id="a-members" class="member-list"></div>
+      <div class="kv">
+        <div><span>KeyAgg hash L</span><code id="a-L"></code></div>
+        <div><span>Aggregate internal key</span><code id="a-agg"></code></div>
+        <div><span>TapTweak t</span><code id="a-tweak"></code></div>
+        <div><span>Parity flags</span><code id="a-parity"></code></div>
+      </div>
+      <h3>Canonical descriptor <span class="hint-inline">(byte-identical everywhere)</span></h3>
+      <pre id="a-descriptor" class="descriptor"></pre>
+      <div class="row">
+        <button class="copy-btn ghost" data-for="a-descriptor">Copy descriptor</button>
+      </div>
+      <h3>Recompute &amp; compare</h3>
+      <p class="lede">Paste a descriptor someone sent you. Pearl Mesh re-derives everything from the member
+      keys and tells you whether the address and sealed commitment match — no trust required.</p>
+      <label class="wide">Descriptor JSON to check
+        <textarea id="a-check-input" rows="6" spellcheck="false" placeholder='{"kind":"pearl-mesh","v":1,…}'></textarea>
+      </label>
+      <div class="row">
+        <button id="a-check" class="ghost">Recompute &amp; compare</button>
+      </div>
+      <div id="a-check-result" class="verdict-box" hidden></div>
+    </div>
+    <div class="row nav-row">
+      <button id="a-back" class="ghost">← Setup</button>
+      <button id="a-continue" class="primary">Continue to Fund →</button>
+    </div>
+  </section>
+
+  <!-- STEP 3: FUND -->
+  <section id="step-fund" class="panel">
+    <h2>Fund the mesh</h2>
+    <p class="lede">Send PRL to the aggregate address. It behaves like an ordinary Taproot address —
+    <strong>no script is revealed</strong> and no observer can tell it is a mesh. This page only
+    <em>looks up</em> balances; it never moves funds.</p>
+    <p class="err" id="f-err" hidden></p>
+    <div class="fund-grid">
+      <div>
+        <div class="addr-row">
+          <code id="f-address" class="addr"></code>
+          <button class="copy-btn ghost" data-for="f-address">Copy</button>
+        </div>
+        <div id="f-qr" class="qr"></div>
+      </div>
+      <div>
+        <h3>Balance lookup <span class="hint-inline">(GET-only, optional)</span></h3>
+        <div class="form-grid">
+          <label class="wide">Blockbook base URL
+            <input id="f-blockbook" type="text" spellcheck="false" value="https://blockbook.pearlresearch.ai">
+          </label>
+        </div>
+        <div class="row">
+          <button id="f-check" class="ghost">Check balance</button>
+        </div>
+        <div id="f-balance" class="kv" hidden></div>
+        <h3>Air-gapped UTXOs</h3>
+        <p class="lede">No network? Paste UTXOs (one per line: <code>txid:vout value address</code>) and the
+        balance is tallied locally.</p>
+        <label class="wide">UTXO list
+          <textarea id="f-utxos" rows="4" spellcheck="false" placeholder="ab12…:0 1.5 prl prl1p…"></textarea>
+        </label>
+        <div class="row">
+          <button id="f-tally" class="ghost">Tally pasted UTXOs</button>
+        </div>
+        <div id="f-tally-result" class="kv" hidden></div>
+      </div>
+    </div>
+    <div class="row nav-row">
+      <button id="f-back" class="ghost">← Aggregate</button>
+      <button id="f-continue" class="primary">Continue to Sign →</button>
+    </div>
+  </section>
+
+  <!-- STEP 4: SIGN -->
+  <section id="step-sign" class="panel">
+    <h2>The signing ceremony</h2>
+    <p class="lede">Three rounds, coordinated here: <strong>①</strong> every member commits a pair of public
+    nonces (a bundle) · <strong>②</strong> the coordinator aggregates them into one challenge
+    <strong>③</strong> every member signs locally with their secret key and the coordinator aggregates the
+    partials into one BIP-340 signature. Members with <span class="badge-local">local key</span> badges commit
+    and sign on this device; everyone else does it on their own machine and pastes their bundles back.</p>
+    <p class="err" id="g-err" hidden></p>
+
+    <h3>Message to sign</h3>
+    <div class="form-grid">
+      <label class="wide">Message (plain text is hashed to 32 bytes; or paste a 64-hex digest)
+        <textarea id="g-msg" rows="2" spellcheck="false" placeholder="e.g. mesh spends 2.5 PRL to prl1p… (or 64-hex digest)"></textarea>
+      </label>
+      <label>Session salt (fresh per ceremony)
+        <input id="g-salt" type="text" readonly spellcheck="false">
+      </label>
+    </div>
+    <div class="row">
+      <button id="g-new-salt" class="ghost">Fresh salt</button>
+    </div>
+
+    <h3>Round ① — Nonce commitments</h3>
+    <div id="g-local-commit" class="ceremony-box"></div>
+    <div class="form-grid">
+      <label class="wide">Paste ALL members' nonce bundles (one JSON per line — locals + remotes)
+        <textarea id="g-bundles" rows="5" spellcheck="false" placeholder='{"kind":"pearl-mesh/nonce1",…}'></textarea>
+      </label>
+    </div>
+    <div class="row">
+      <button id="g-aggregate-nonces" class="primary">Aggregate nonces → challenge</button>
+    </div>
+    <div id="g-aggbundle" class="kv" hidden></div>
+
+    <h3>Round ② — Partial signatures</h3>
+    <div id="g-local-sign" class="ceremony-box"></div>
+    <div class="form-grid">
+      <label class="wide">Paste ALL members' partial signatures (one JSON per line)
+        <textarea id="g-partials" rows="5" spellcheck="false" placeholder='{"kind":"pearl-mesh/partial1",…}'></textarea>
+      </label>
+    </div>
+    <div class="row">
+      <button id="g-aggregate-partials" class="primary">Aggregate &amp; verify signature</button>
+    </div>
+    <div id="g-final" class="verdict-box" hidden></div>
+
+    <h3>Local simulation <span class="hint-inline">demo-grade — throwaway keys, learning only</span></h3>
+    <div class="sim-box">
+      <p class="lede">Runs the entire ceremony in-page with fresh random keys for every member. Proves the
+      math end-to-end; it is <strong>not</strong> a real ceremony and its keys must never hold funds.</p>
+      <div class="row">
+        <button id="g-simulate" class="ghost">Run local simulation</button>
+      </div>
+      <div id="g-sim-result" class="kv" hidden></div>
+    </div>
+
+    <div class="row nav-row">
+      <button id="g-back" class="ghost">← Fund</button>
+      <button id="g-continue" class="primary">Continue to Verify →</button>
+    </div>
+  </section>
+
+  <!-- STEP 5: VERIFY -->
+  <section id="step-verify" class="panel">
+    <h2>Verify, trustlessly</h2>
+    <p class="lede">Two standalone verifiers. They recompute everything from first principles — hand them a
+    descriptor or a signature from <em>any</em> source and they rule <strong>PROVEN</strong> or
+    <strong>NOT PROVEN</strong>, loudly.</p>
+    <p class="err" id="v-err" hidden></p>
+
+    <h3>Descriptor verifier</h3>
+    <div class="form-grid">
+      <label class="wide">Descriptor JSON
+        <textarea id="v-desc" rows="6" spellcheck="false" placeholder='{"kind":"pearl-mesh","v":1,…}'></textarea>
+      </label>
+      <label class="wide">Claimed address
+        <input id="v-addr" type="text" spellcheck="false" placeholder="prl1p…">
+      </label>
+      <label class="wide">Claimed sealed descriptor (optional)
+        <input id="v-sealed" type="text" spellcheck="false" placeholder="pearl-mesh:v1:prl:…">
+      </label>
+    </div>
+    <div class="row">
+      <button id="v-check-desc" class="primary">Verify descriptor</button>
+    </div>
+    <div id="v-desc-result" class="verdict-box" hidden></div>
+
+    <h3>Signature verifier</h3>
+    <div class="form-grid">
+      <label class="wide">Signature (128-hex: R ‖ s)
+        <input id="v-sig" type="text" spellcheck="false" placeholder="128-hex Schnorr signature">
+      </label>
+      <label class="wide">Message (text or 64-hex digest)
+        <input id="v-msg" type="text" spellcheck="false" placeholder="message that was signed">
+      </label>
+      <label class="wide">Aggregate key (address or 64-hex x-only)
+        <input id="v-key" type="text" spellcheck="false" placeholder="prl1p… or 64-hex">
+      </label>
+    </div>
+    <div class="row">
+      <button id="v-check-sig" class="primary">Verify signature</button>
+    </div>
+    <div id="v-sig-result" class="verdict-box" hidden></div>
+
+    <div class="row nav-row">
+      <button id="v-back" class="ghost">← Sign</button>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>Pearl Mesh — MuSig2 collaborative keypath desk for PRL · fully client-side; keys never leave your device.</p>
+  <p>Built by <a href="https://x.com/kshot9000" rel="noopener">@kshot9000</a> ·
+  PRL <button class="copy-btn linklike" data-for="tip-addr" title="Copy PRL address">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</button>
+  <span id="tip-addr" hidden>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</span></p>
+  <p class="fine">n-of-n signing · no custody · no broadcasting · simulation is demo-grade</p>
+</footer>
+
+<script src="qrcode.min.js?v=1"></script>
+<script src="pearl-mesh.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
