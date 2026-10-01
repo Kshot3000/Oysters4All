@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Monetary — the PRL issuance &amp; halving desk</title>
+<meta name="description" content="The central-bank desk for Pearl (PRL): exact block-subsidy math from upstream validate.go, issuance curve, era schedule, height/date tools. Client-side only.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="hero">
+  <div class="seal" aria-hidden="true">❖</div>
+  <div class="hero-inner">
+    <p class="kicker">Pearl · Monetary Desk</p>
+    <h1>Pearl Monetary</h1>
+    <p class="sub">The central-bank desk for <strong>PRL</strong>. Every block subsidy on
+      Pearl is minted by one formula — no halvings, no governance votes, just a
+      smooth exponential decay written into
+      <code>node/blockchain/validate.go</code>. This desk recomputes it
+      <em>exactly</em> (BigInt, grain-for-grain) in your browser: the live era,
+      the full issuance curve, the era schedule, and explorer tools. No backend,
+      no wallet, no keys.</p>
+    <nav id="tabs" class="tabs" aria-label="Desk sections">
+      <button data-tab="overview" class="active">1 · Overview</button>
+      <button data-tab="chart">2 · Issuance Chart</button>
+      <button data-tab="schedule">3 · Schedule</button>
+      <button data-tab="tools">4 · Tools</button>
+      <button data-tab="method">5 · Methodology</button>
+    </nav>
+  </div>
+</header>
+
+<aside class="limits" aria-label="Honest limits">
+  <div>
+    <strong>Honest limits — always true:</strong>
+    <ul>
+      <li>All figures come from the exact upstream subsidy formula
+        (<code>CalcBlockSubsidy</code>); dates are <em>estimates</em> at 194&nbsp;s/block —
+        real block times vary, so treat every date as approximate.</li>
+      <li>Live height comes from the public Blockbook API
+        (<code>blockbook.pearlresearch.ai/api/v2</code>). If it is unreachable, the desk
+        falls back to a dated, labeled <em>stale snapshot</em> — never a silent guess.</li>
+      <li>Cumulative supply uses the closed-form <code>S·h/(h+C)</code>; it equals the true
+        sum of per-block subsidies to within one grain per block of truncation.</li>
+      <li>This page never moves PRL, never holds keys, and predicts nothing about price.</li>
+    </ul>
+  </div>
+</aside>
+
+<main>
+  <!-- ============ 1 · OVERVIEW ============ -->
+  <section id="tab-overview" class="panel active">
+    <h2>The state of the mint</h2>
+    <div class="bar">
+      <span id="height-badge" class="badge">…</span>
+      <span id="height-note" class="hint"></span>
+      <span class="spacer"></span>
+      <label class="inline">Height
+        <input id="height-input" class="mono" type="number" min="1" step="1" placeholder="—">
+      </label>
+      <button id="height-set">Set height</button>
+      <button id="height-live" class="ghost">↻ Live</button>
+    </div>
+    <div class="stats" id="overview-stats"></div>
+    <h3>Era progress</h3>
+    <div id="era-progress"></div>
+  </section>
+
+  <!-- ============ 2 · CHART ============ -->
+  <section id="tab-chart" class="panel">
+    <h2>Issuance curve, genesis → full emission</h2>
+    <p class="hint">Log-scale block height, eras 0–99. Gold = cumulative supply
+      (% of 2.1B PRL, left axis). Teal = block subsidy (PRL, log axis, right).
+      The marker shows the current height. Drawn from the exact formula — no
+      sampled data.</p>
+    <div id="chart-wrap" class="chart-wrap"></div>
+    <div class="legend">
+      <span><i class="sw gold"></i>cumulative supply</span>
+      <span><i class="sw teal"></i>block subsidy</span>
+      <span><i class="sw marker"></i>you are here</span>
+    </div>
+  </section>
+
+  <!-- ============ 3 · SCHEDULE ============ -->
+  <section id="tab-schedule" class="panel">
+    <h2>Subsidy schedule by era</h2>
+    <p class="hint">Era <em>n</em> is heights <code>(n·650,226, (n+1)·650,226]</code>.
+      Pearl has no hard halving — each era issues exactly
+      <code>100/((n+1)(n+2))%</code> of the 2.1B supply. "Subsidy at era start"
+      is the exact per-block reward at the era's first block.</p>
+    <div class="table-wrap"><table id="era-table" class="data">
+      <thead><tr>
+        <th>Era</th><th>Height range</th><th>Subsidy at era start</th>
+        <th>Issued during era</th><th>Cumulative at era end</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </section>
+
+  <!-- ============ 4 · TOOLS ============ -->
+  <section id="tab-tools" class="panel">
+    <h2>Explorer tools</h2>
+    <div class="tool-grid">
+      <article class="tool">
+        <h3>Height → reward lookup</h3>
+        <label>Block height
+          <input id="t-height" class="mono" type="number" min="0" step="1" value="650226">
+        </label>
+        <button id="t-height-go">Look up</button>
+        <div id="t-height-out" class="out"></div>
+      </article>
+      <article class="tool">
+        <h3>Date → estimated height &amp; reward</h3>
+        <label>Target date (CT)
+          <input id="t-date" class="mono" type="datetime-local">
+        </label>
+        <button id="t-date-go">Estimate</button>
+        <div id="t-date-out" class="out"></div>
+        <p class="hint">Estimated from the <em>snapshot anchor</em> at
+          <span id="t-anchor"></span>, 194&nbsp;s/block. Real block times vary —
+          ±days of drift per year of projection.</p>
+      </article>
+      <article class="tool">
+        <h3>PRL ↔ grains converter</h3>
+        <label>PRL <input id="t-prl" class="mono" type="text" inputmode="decimal" placeholder="e.g. 3229.64134"></label>
+        <label>Grains <input id="t-grains" class="mono" type="text" inputmode="numeric" placeholder="e.g. 322964134063"></label>
+        <div id="t-conv-out" class="out"></div>
+        <p class="hint">1 PRL = 100,000,000 grains. Integers only below the grain.</p>
+      </article>
+      <article class="tool">
+        <h3>Coinbase maturity explainer</h3>
+        <label>Coinbase funding height
+          <input id="t-mat" class="mono" type="number" min="1" step="1" value="650226">
+        </label>
+        <button id="t-mat-go">Check maturity</button>
+        <div id="t-mat-out" class="out"></div>
+        <p class="hint">Pearl requires <strong>100 confirmations</strong> before a
+          coinbase output is spendable (<code>chaincfg</code>:
+          <code>CoinbaseMaturity = 100</code>). At the 194 s target that is about
+          5 h 23 min after the funding block — an estimate, not a promise.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ============ 5 · METHODOLOGY ============ -->
+  <section id="tab-method" class="panel">
+    <h2>Methodology &amp; sources</h2>
+    <h3>The formula</h3>
+    <p>Pearl's block subsidy is the exact discrete difference of the issuance
+      curve <code>S·h/(h+C)</code>:</p>
+    <pre class="formula">subsidy(h) = ⌊ S · C / ((h + C) · (h − 1 + C)) ⌋   grains,  h ≥ 1
+subsidy(0) = 0                                            (genesis pays nothing)
+
+S = 2,100,000,000 PRL × 10⁸ grains/PRL   (max supply)
+C = (4 × 365 × 86,400 s) / 194 s = 650,226 blocks   (emission constant, ~4 years)</pre>
+    <h3>Sources</h3>
+    <ul class="sources">
+      <li><code>node/blockchain/validate.go</code> — <code>CalcBlockSubsidy</code>
+        (big.Int division, truncated; genesis special-cased to 0).</li>
+      <li><code>node/blockchain/emission_test.go</code> — upstream test vectors
+        (e.g. h=650226 → ~807.412 PRL, h=1300452 → ~358.850 PRL); this desk's
+        unit tests pin the same vectors grain-for-grain.</li>
+      <li><code>node/chaincfg/params.go</code> — <code>TargetTimePerBlock</code> =
+        3&nbsp;min&nbsp;14&nbsp;s (194&nbsp;s), <code>CoinbaseMaturity</code> = 100.</li>
+      <li><code>node/btcutil/const.go</code> — <code>GrainPerPearl = 1e8</code>.</li>
+      <li>Live height: <code>GET https://blockbook.pearlresearch.ai/api/v2</code>
+        → <code>blockbook.bestHeight</code> (fallback: <code>backend.blocks</code>).</li>
+    </ul>
+    <h3>Honesty notes</h3>
+    <ul class="sources">
+      <li>Dates are estimates at exactly 194 s/block from a labeled anchor —
+        difficulty retargets and real block times drift, so ±days of error per
+        projected year is normal.</li>
+      <li>Cumulative supply is the closed form <code>⌊S·h/(h+C)⌋</code>; the true
+        sum of per-block subsidies is never larger and differs by at most one
+        grain per block.</li>
+      <li>Subsidy never reaches zero on this curve — it decays forever toward
+        zero (at height 32,511,300 it is still ~1.24 PRL/block).</li>
+    </ul>
+  </section>
+</main>
+
+<footer>
+  <p class="foot-brand">Pearl Monetary — the PRL issuance &amp; halving desk · the central bank of Pearl</p>
+  <p>Built by <a href="https://x.com/kshot9000" target="_blank" rel="noopener">@kshot9000</a></p>
+  <p class="donate">Donate PRL: <code id="donate-addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+    <button id="donate-copy" class="ghost">copy</button></p>
+</footer>
+
+<script src="pearl-monetary.bundle.js?v=1"></script>
+</body>
+</html>
