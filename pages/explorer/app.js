@@ -94,7 +94,6 @@
       demoHint.innerHTML = '<strong>Connected:</strong> live data from <span class="mono">' +
         escapeHtml(settings.url) + '</span>';
     }).catch(function (e) {
-      // Fall back: try getblockcount alone (some configs restrict info methods)
       if (/No RPC endpoint/.test(e.message)) {
         setConn('', 'not connected');
         showErr(statusErr, e.message);
@@ -102,6 +101,10 @@
       }
       setConn('err', 'connection failed');
       showErr(statusErr, e.message);
+      // a failed refresh must not leave a stale "Connected:" hint behind
+      demoHint.classList.remove('ok');
+      demoHint.innerHTML = '<strong>Not connected:</strong> the last refresh failed — ' +
+        'fix the endpoint under Settings and try again.';
     });
   }
 

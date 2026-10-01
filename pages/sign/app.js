@@ -165,7 +165,7 @@ function loadWatch() {
     S.watchProgram = d.program;
     renderAddrList(); markStepDone(1);
     $("utxoAddr").value = S.watchAddress;
-  } catch (e) { alert("Invalid address: " + e.message); }
+  } catch (e) { renderAddrList(); alert("Invalid address: " + e.message); }
 }
 $("btnWatch").addEventListener("click", loadWatch);
 

@@ -47,6 +47,7 @@ var PearlSign = (() => {
     fetchFeeRate: () => fetchFeeRate,
     fetchFeeRateGrainsPerVByte: () => fetchFeeRateGrainsPerVByte,
     fetchTxStatus: () => fetchTxStatus,
+    fetchUtxos: () => fetchUtxos,
     fmtPRL: () => fmtPRL,
     hexToBytes: () => hexToBytes,
     keypathSigDigestEx: () => keypathSigDigestEx,
@@ -6449,6 +6450,19 @@ zoo`.split("\n");
     const txid = j.result ?? j.txid;
     if (!/^[0-9a-f]{64}$/i.test(txid || "")) throw new Error("unexpected broadcast response: " + text.slice(0, 160));
     return txid.toLowerCase();
+  }
+  async function fetchUtxos(blockbookBase, address) {
+    const base = blockbookBase.replace(/\/$/, "");
+    let res;
+    try {
+      res = await fetch(base + `/api/v2/utxo/${address}`);
+    } catch (e) {
+      throw new Error(`blockbook unreachable at ${base} \u2014 check the URL and your network connection (${e.message})`);
+    }
+    if (!res.ok) throw new Error(`blockbook ${res.status} on /api/v2/utxo`);
+    const list = await res.json();
+    if (!Array.isArray(list)) throw new Error("unexpected utxo response");
+    return list.map((u) => ({ txid: u.txid, vout: u.vout, value: Number(u.value), confirmations: u.confirmations ?? 0 })).filter((u) => u.value > 0 && /^[0-9a-f]{64}$/i.test(u.txid || ""));
   }
   async function fetchFeeRate(blockbookBase, blocks = 2) {
     const base = blockbookBase.replace(/\/$/, "");
