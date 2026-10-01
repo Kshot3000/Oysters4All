@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Pact — Discreet Log Contract desk for PRL</title>
+<meta name="description" content="Pearl Pact: draft oracle-conditional contracts on Pearl — two parties lock PRL in a 2-of-2 Taproot funding output, pre-sign every outcome's CET with Schnorr adaptor signatures, and execute trustlessly when the oracle attests. Timelocked refund insurance included. Fully client-side.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 64 64" width="52" height="52" aria-hidden="true">
+      <circle cx="32" cy="32" r="27" class="ring"/>
+      <path d="M32 14 C24 24 18 30 18 40 a14 14 0 0 0 28 0 C46 30 40 24 32 14 Z" fill="#8e2f32" class="waxdrop"/>
+      <path d="M24 34 L32 26 L40 34 M32 26 L32 44 M26 40 L38 40" class="sigil"/>
+    </svg>
+    <div>
+      <h1>Pearl Pact</h1>
+      <p class="tagline">Discreet Log Contract desk for PRL · oracle-conditional payouts, sealed by adaptor math</p>
+    </div>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-step="draft" class="active">1 · Draft</button>
+    <button data-step="fund" class="">2 · Fund</button>
+    <button data-step="seal" class="">3 · Seal</button>
+    <button data-step="execute" class="">4 · Execute</button>
+    <button data-step="refund" class="">5 · Refund</button>
+  </nav>
+</header>
+
+<div class="margin-strip" aria-hidden="true"><span>PACT REGISTER · FOLIO 01 · ADAPTOR SEALED · ORACLE ATTESTED · NO SMART CONTRACTS — PURE TAPROOT</span></div>
+
+<aside class="limits" id="honest-limits">
+  <h3>Honest limits — read before you pact</h3>
+  <ul>
+    <li><strong>Trust the oracle, not the math, for the outcome:</strong> the oracle cannot steal (it holds no key that moves funds), but it alone picks the winner. Only pact with oracles whose attestations you would bet on.</li>
+    <li><strong>Adaptor cryptography is real but newly composed here:</strong> Schnorr/BIP-340, Taproot and the 2-of-2 script come from audited lineage; the adaptor encrypt/verify/decrypt glue is new code in this page, pinned by tests. Review <code>src/pact-core.js</code> before mainnet money.</li>
+    <li><strong>This page never broadcasts:</strong> every transaction leaves as hex for you to copy and broadcast yourself. The Blockbook broadcast buttons double-confirm first.</li>
+    <li><strong>CETs are worthless until the funding output confirms:</strong> seal everything before funding, fund, wait for confirmation, then the winning CET becomes spendable after the oracle attests.</li>
+    <li><strong>The refund is insurance, not a promise:</strong> it only becomes valid after its nLockTime. If the oracle attests first, the winner's CET beats any refund.</li>
+    <li><strong>Keys live in this page's memory only.</strong> Anyone watching your screen or with access to this browser session sees them. Clear them when done.</li>
+  </ul>
+  <div class="row"><button class="danger" id="wipe-keys">Wipe all pasted keys from this page</button></div>
+</aside>
+
+<main>
+  <!-- ============ STEP 1: DRAFT ============ -->
+  <section class="panel active" id="step-draft">
+    <h2>Draft the pact</h2>
+    <p class="lede">Two parties, one oracle, 2–8 outcomes with exact payout splits. The desk derives the
+    2-of-2 Taproot funding address (NUMS internal key — no keypath backdoor) and seals a tamper-evident
+    descriptor. Payout rows must sum to exactly <code>collateral − CET fee</code>; the desk tells you the exact figure.</p>
+    <div class="row">
+      <button class="secondary" id="d-demo">Mint demo pact (fresh local keys)</button>
+      <span class="hint">Fastest way to see the full ceremony: demo parties + demo oracle, everything real crypto.</span>
+    </div>
+    <div class="form-grid">
+      <label>Network
+        <select id="d-network">
+          <option value="mainnet" selected>mainnet (prl)</option>
+          <option value="testnet">testnet (tprl)</option>
+          <option value="regtest">regtest (rprl)</option>
+        </select>
+      </label>
+      <label class="wide">Pact title <input id="d-title" value="Oracle coin flip" maxlength="80"></label>
+      <label>Alice — name <input id="d-aname" value="Alice" maxlength="40"></label>
+      <label>Alice — key kind
+        <select id="d-akind">
+          <option value="xonly">x-only pubkey (watch-only)</option>
+          <option value="priv">private key hex (local signing)</option>
+          <option value="wif">WIF (local signing)</option>
+          <option value="mnemonic" selected>mnemonic (local signing)</option>
+        </select>
+      </label>
+      <label class="wide">Alice — key <input id="d-akey" placeholder="12/24-word mnemonic, WIF, 64-hex priv or x-only pubkey"></label>
+      <label>Bob — name <input id="d-bname" value="Bob" maxlength="40"></label>
+      <label>Bob — key kind
+        <select id="d-bkind">
+          <option value="xonly">x-only pubkey (watch-only)</option>
+          <option value="priv">private key hex (local signing)</option>
+          <option value="wif">WIF (local signing)</option>
+          <option value="mnemonic" selected>mnemonic (local signing)</option>
+        </select>
+      </label>
+      <label class="wide">Bob — key <input id="d-bkey" placeholder="12/24-word mnemonic, WIF, 64-hex priv or x-only pubkey"></label>
+      <label>Alice collateral (PRL) <input id="d-colla" value="1"></label>
+      <label>Bob collateral (PRL) <input id="d-collb" value="1"></label>
+      <label>Oracle name <input id="d-oname" value="Demo Oracle" maxlength="40"></label>
+      <label>Oracle x-only pubkey (64 hex) <input id="d-opub" placeholder="64-hex x-only pubkey"></label>
+      <label class="wide">Event id <input id="d-event" value="coin-flip/2026-10-01" maxlength="120"></label>
+      <label class="wide">Oracle announcement points — one 64-hex x-only point per outcome, in order
+        <textarea id="d-commits" rows="3" placeholder="one per line, in outcome order"></textarea>
+      </label>
+      <label>Outcomes (label | alice PRL | bob PRL — one per line)
+        <textarea id="d-outcomes" rows="4">heads — Alice wins | 1.99998559 | 0.00000546
+tails — Bob wins | 0.00000546 | 1.99998559</textarea>
+      </label>
+      <label>Funding fee rate (grains/vB) <input id="d-feef" value="5"></label>
+      <label>CET fee rate (grains/vB) <input id="d-feec" value="5"></label>
+      <label>Refund fee rate (grains/vB) <input id="d-feer" value="5"></label>
+      <label>Refund lock height (absolute block) <input id="d-lock" value="950000"></label>
+    </div>
+    <div class="row">
+      <button class="primary" id="d-draft">Draft &amp; seal pact</button>
+      <button class="secondary" id="d-mint-oracle">Mint fresh oracle key</button>
+    </div>
+    <div class="error-box" id="d-error" hidden></div>
+    <div class="result-box" id="d-result" hidden>
+      <div class="kv"><span>Descriptor</span><code id="d-descriptor"></code><button class="copy" data-copy="#d-descriptor">copy</button></div>
+      <div class="kv"><span>Funding address</span><code class="addr" id="d-address"></code><button class="copy" data-copy="#d-address">copy</button></div>
+      <div class="kv"><span>Funding script</span><code id="d-script"></code><button class="copy" data-copy="#d-script">copy</button></div>
+      <div class="kv"><span>Internal key (NUMS)</span><code id="d-internal"></code><button class="copy" data-copy="#d-internal">copy</button></div>
+      <div class="kv"><span>CET fee / distributable</span><code id="d-cetfee"></code><span></span></div>
+      <div class="qr-wrap"><div class="qr" id="d-qr"></div><span class="hint">Funding address QR — send exactly the total collateral here.</span></div>
+      <h3>Sealed terms (carry to the next steps)</h3>
+      <textarea id="d-terms" rows="8" readonly></textarea>
+      <div class="row"><button class="copy" data-copy="#d-terms">copy terms</button></div>
+    </div>
+    <div class="note-box">The descriptor <code>pearl-pact:v1:…</code> is a SHA-256 seal over the canonical terms.
+    Paste the sealed terms into any later step (or the Verify box below) — any alteration breaks the seal.</div>
+    <h3>Verify a pact descriptor</h3>
+    <div class="form-grid"><label class="wide">Paste exported pact terms JSON <textarea id="d-verify-in" rows="4"></textarea></label></div>
+    <div class="row"><button class="secondary" id="d-verify">Verify seal</button></div>
+    <div class="verdict-box" id="d-verify-result" hidden></div>
+  </section>
+
+  <!-- ============ STEP 2: FUND ============ -->
+  <section class="panel" id="step-fund">
+    <h2>Fund the pact</h2>
+    <p class="lede">Both parties send their collateral to the funding address. Plan the joint funding transaction
+    from each party's UTXOs — or fund with separate sends from your own wallets and just record the funding txid below.</p>
+    <div class="form-grid">
+      <label class="wide">Pact terms JSON (from Draft) <textarea id="f-terms" rows="3"></textarea></label>
+      <label class="wide">Alice UTXOs — <code>txid:vout:value-grains</code>, one per line <textarea id="f-autxo" rows="3"></textarea></label>
+      <label class="wide">Bob UTXOs — <code>txid:vout:value-grains</code>, one per line <textarea id="f-butxo" rows="3"></textarea></label>
+      <label>Funding fee rate (grains/vB) <input id="f-fee" value="5"></label>
+      <label>Blockbook endpoint (optional, GET-only) <input id="f-blockbook" value="https://blockbook.pearlresearch.ai"></label>
+    </div>
+    <div class="row">
+      <button class="primary" id="f-plan">Plan funding tx</button>
+      <button class="secondary" id="f-balance">Check funding address balance</button>
+    </div>
+    <div class="error-box" id="f-error" hidden></div>
+    <div class="result-box" id="f-result" hidden>
+      <div class="kv"><span>Funding txid</span><code id="f-txid"></code><button class="copy" data-copy="#f-txid">copy</button></div>
+      <div class="kv"><span>vBytes / fee</span><code id="f-feeinfo"></code><span></span></div>
+      <div class="kv"><span>Outputs</span><code id="f-outputs"></code><span></span></div>
+      <h3>Unsigned funding hex</h3>
+      <textarea id="f-hex" rows="4" readonly></textarea>
+      <div class="row"><button class="copy" data-copy="#f-hex">copy hex</button></div>
+      <h3>Sign locally (both parties' keys must be in the page)</h3>
+      <div class="form-grid">
+        <label>Alice private key (64 hex) <input id="f-apriv" placeholder="optional — leave blank to stay unsigned"></input></label>
+        <label>Bob private key (64 hex) <input id="f-bpriv" placeholder="optional — leave blank to stay unsigned"></input></label>
+      </div>
+      <div class="row"><button class="secondary" id="f-sign">Sign funding tx</button></div>
+      <div class="error-box" id="f-sign-error" hidden></div>
+      <div id="f-signed-wrap" hidden>
+        <h3>Signed funding hex — broadcast it, then record the txid</h3>
+        <textarea id="f-signed" rows="4" readonly></textarea>
+        <div class="row">
+          <button class="copy" data-copy="#f-signed">copy hex</button>
+          <button class="secondary" id="f-broadcast">Broadcast via Blockbook</button>
+        </div>
+      </div>
+      <div class="note-box">After the funding transaction confirms, carry its txid to the Seal step (vout is
+      <code id="f-vout-note">0</code> for the planner above; adjust if you funded manually).</div>
+    </div>
+    <div class="verdict-box" id="f-balance-result" hidden></div>
+  </section>
+
+  <!-- ============ STEP 3: SEAL ============ -->
+  <section class="panel" id="step-seal">
+    <h2>Seal the CETs</h2>
+    <p class="lede">For each outcome the desk builds the Contract Execution Transaction, then each party
+    adaptor-encrypts their signature to that outcome's oracle announcement point. Every encrypted signature is
+    verified on the spot. Do this <em>before</em> funding — once sealed, neither party can hold the other hostage.</p>
+    <div class="form-grid">
+      <label class="wide">Pact terms JSON <textarea id="s-terms" rows="3"></textarea></label>
+      <label>Funding txid (64 hex) <input id="s-ftxid" placeholder="from the Fund step"></label>
+      <label>Funding vout <input id="s-fvout" value="0"></label>
+      <label>Alice private key (64 hex) <input id="s-apriv"></label>
+      <label>Bob private key (64 hex) <input id="s-bpriv"></label>
+    </div>
+    <div class="row"><button class="primary" id="s-build">Build CETs</button></div>
+    <div class="error-box" id="s-error" hidden></div>
+    <div class="result-box" id="s-result" hidden>
+      <h3>Contract Execution Transactions</h3>
+      <div id="s-cets"></div>
+      <div class="row"><button class="primary" id="s-seal">Run sealing ceremony</button></div>
+      <div class="error-box" id="s-seal-error" hidden></div>
+      <div id="s-sealed-wrap" hidden>
+        <h3>Sealed pact bundle <span class="pill ok" id="s-seal-pill">SEALED</span></h3>
+        <div id="s-seal-table"></div>
+        <h3>Bundle JSON (exchange with your counterparty)</h3>
+        <textarea id="s-bundle" rows="8" readonly></textarea>
+        <div class="row"><button class="copy" data-copy="#s-bundle">copy bundle</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ STEP 4: EXECUTE ============ -->
+  <section class="panel" id="step-execute">
+    <h2>Execute the winning outcome</h2>
+    <p class="lede">The oracle attests: it reveals the outcome secret <code>t</code> and signs the attestation.
+    The desk checks <code>t·G</code> against the committed announcement point, verifies the oracle's signature,
+    decrypts both adaptor signatures, re-verifies them as plain BIP-340 signatures, and emits the final CET.</p>
+    <div class="form-grid">
+      <label class="wide">Pact terms JSON <textarea id="x-terms" rows="3"></textarea></label>
+      <label class="wide">Sealed bundle JSON <textarea id="x-bundle" rows="4"></textarea></label>
+      <label>Winning outcome index <input id="x-index" value="0"></label>
+      <label>Revealed outcome secret t (64 hex) <input id="x-t"></label>
+      <label class="wide">Oracle attestation signature (128 hex) <input id="x-sig"></label>
+    </div>
+    <div class="row">
+      <button class="primary" id="x-execute">Verify attestation &amp; execute</button>
+      <button class="secondary" id="x-sim-oracle">Simulate oracle attestation (demo oracle key)</button>
+    </div>
+    <div class="form-grid" id="x-sim-wrap" hidden>
+      <label class="wide">Demo oracle private key (64 hex) — only for pacts drafted with the demo minter
+        <input id="x-oraclepriv" placeholder="paste the demo oracle key to attest"></label>
+    </div>
+    <div class="error-box" id="x-error" hidden></div>
+    <div class="verdict-box" id="x-result" hidden></div>
+    <div class="result-box" id="x-hex-wrap" hidden>
+      <h3>Final CET hex — broadcast to claim</h3>
+      <div class="kv"><span>Outcome</span><code id="x-label"></code><span></span></div>
+      <div class="kv"><span>CET txid</span><code id="x-txid"></code><button class="copy" data-copy="#x-txid">copy</button></div>
+      <textarea id="x-hex" rows="5" readonly></textarea>
+      <div class="row">
+        <button class="copy" data-copy="#x-hex">copy hex</button>
+        <button class="secondary" id="x-broadcast">Broadcast via Blockbook</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ STEP 5: REFUND ============ -->
+  <section class="panel" id="step-refund">
+    <h2>Refund — the insurance leg</h2>
+    <p class="lede">If the oracle never attests, the timelocked refund returns each party's collateral.
+    Both parties sign it now, while everyone is cooperative. It becomes valid only after
+    <code>nLockTime</code> — before that, miners will reject it.</p>
+    <div class="form-grid">
+      <label class="wide">Pact terms JSON <textarea id="r-terms" rows="3"></textarea></label>
+      <label>Funding txid (64 hex) <input id="r-ftxid"></label>
+      <label>Funding vout <input id="r-fvout" value="0"></label>
+      <label>Alice private key (64 hex) <input id="r-apriv"></label>
+      <label>Bob private key (64 hex) <input id="r-bpriv"></label>
+    </div>
+    <div class="row"><button class="primary" id="r-build">Build refund tx</button></div>
+    <div class="error-box" id="r-error" hidden></div>
+    <div class="result-box" id="r-result" hidden>
+      <div class="kv"><span>Refund txid</span><code id="r-txid"></code><button class="copy" data-copy="#r-txid">copy</button></div>
+      <div class="kv"><span>Valid after block</span><code id="r-lock"></code><span></span></div>
+      <div class="kv"><span>Alice gets / Bob gets / fee</span><code id="r-splits"></code><span></span></div>
+      <div class="kv"><span>Digest</span><code id="r-digest"></code><button class="copy" data-copy="#r-digest">copy</button></div>
+      <div class="row"><button class="secondary" id="r-sign">Both parties sign refund</button></div>
+      <div class="error-box" id="r-sign-error" hidden></div>
+      <div id="r-signed-wrap" hidden>
+        <h3>Signed refund hex — keep it safe until the lock height</h3>
+        <textarea id="r-signed" rows="4" readonly></textarea>
+        <div class="row"><button class="copy" data-copy="#r-signed">copy hex</button></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>Built by <a href="https://x.com/kshot9000">@kshot9000</a> for the Pearl ecosystem ·
+  PRL donations: <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code></p>
+  <p class="fine">No smart contracts on Pearl — pure Taproot script trees. Keys never leave this page. This page never broadcasts on its own.</p>
+</footer>
+
+<script src="qrcode.min.js?v=1"></script>
+<script src="pearl-pact.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>

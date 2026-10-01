@@ -60,6 +60,7 @@
         <a href="pages/mesh/">Mesh</a>
         <a href="pages/will/">Will</a>
         <a href="pages/burn/">Burn</a>
+        <a href="pages/pact/">Pact</a>
         <a href="pages/id/">ID</a>
         <a href="pages/raffle/">Raffle</a>
         <a href="pages/swap/">Swap</a>
@@ -595,9 +596,14 @@ cd miner && uv run pearl-miner \
             <div class="card-links"><a href="pages/will/">Open Pearl Will →</a></div>
           </article>
           <article class="card reveal">
-            <h3>Pearl Burn — Provable-Burn Desk <span class="badge">new</span></h3>
+            <h3>Pearl Burn — Provable-Burn Desk</h3>
             <p>The furnace for PRL — derive provably-unspendable Taproot burn addresses from a public tag (NUMS-style: no private key exists, by construction). Four steps: Generate → Plan → Certify → Verify: exact unsigned burn txs with real vByte fee math (154 vB / 111 vB), a 546-grain dust floor with loud refusals, tamper-evident <code>pearl-burn:v1</code> certificates with a standalone PROVEN / NOT PROVEN verifier, and GET-only Blockbook confirmation of on-chain burns. This page never holds keys, never signs, never broadcasts — burns are irreversible.</p>
             <div class="card-links"><a href="pages/burn/">Open Pearl Burn →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Pact — Discreet Log Contract Desk <span class="badge">new</span></h3>
+            <p>The wax-seal desk for oracle-conditional PRL contracts — two parties lock collateral in a 2-of-2 Taproot funding output under a NUMS internal key, pre-sign one CET per outcome with Schnorr adaptor signatures encrypted to the oracle's announcement points, and execute trustlessly when the oracle attests. Five steps: Draft → Fund → Seal → Execute → Refund, with a timelocked refund leg as insurance, sealed tamper-evident descriptors, and standalone PROVEN / NOT PROVEN verification. The oracle can't steal — it can only pick the winner.</p>
+            <div class="card-links"><a href="pages/pact/">Open Pearl Pact →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Foundry — Mining Pool <span class="badge">new</span></h3>
