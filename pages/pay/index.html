@@ -4,8 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Pearl Pay — Accept PRL Payments</title><meta name="description" content="Payment buttons, invoices, and a WooCommerce plugin for Pearl (PRL). Fresh BIP-86 Taproot address per invoice, live Blockbook verification, no custody, no server." />
-<link rel="stylesheet" href="styles.css" />
-<link rel="stylesheet" href="pay.css" />
+<link rel="stylesheet" href="styles.css?v=1" />
+<link rel="stylesheet" href="pay.css?v=1" />
 </head>
 <body>
 <header class="nav">
@@ -239,7 +239,7 @@ PearlPay.createButton("#pay", {
         <p class="muted">Full <code>WC_Payment_Gateway</code>: xpub settings, per-order Taproot addresses derived in PHP, order-page QR + polling, server-side confirmation checks, address-pool management.</p>
         <div class="row">
           <a class="btn btn-ghost btn-small" href="woocommerce/pearl-gateway-for-woocommerce.zip" download>⬇ Plugin .zip</a>
-          <a class="btn btn-ghost btn-small" href="woocommerce/pearl-gateway-for-woocommerce/README.txt">📖 Plugin readme</a>
+          <a class="btn btn-ghost btn-small" href="woocommerce/pearl-gateway-for-woocommerce/readme.txt">📖 Plugin readme</a>
         </div>
         <p class="muted small">PHP 7.4+ with GMP. No private keys anywhere — the plugin derives public addresses from your account xpub.</p>
       </div>
@@ -289,8 +289,8 @@ PearlPay.createButton("#pay", {
   </div>
 </footer>
 
-<script src="pearl-pay.js"></script>
-<script src="pearl-pay-core.bundle.js"></script>
-<script src="app.js"></script>
+<script src="pearl-pay.js?v=1"></script>
+<script src="pearl-pay-core.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
 </body>
 </html>
