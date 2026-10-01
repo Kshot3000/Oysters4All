@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Atlas — BIP-380 Output-Descriptor Desk for PRL</title>
+<meta name="description" content="Chart, checksum, derive and verify Bitcoin-style output descriptors for Pearl (PRL). Offline, open, honest.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="masthead">
+  <svg class="rose" viewBox="0 0 100 100" aria-hidden="true">
+    <circle cx="50" cy="50" r="46" fill="none" stroke="#c9a227" stroke-width="1.5"/>
+    <circle cx="50" cy="50" r="38" fill="none" stroke="#c9a227" stroke-width="0.75" opacity="0.6"/>
+    <path d="M50 6 L56 44 L94 50 L56 56 L50 94 L44 56 L6 50 L44 44 Z" fill="none" stroke="#c9a227" stroke-width="1.25"/>
+    <path d="M50 6 L50 94 M6 50 L94 50" stroke="#c9a227" stroke-width="0.75" opacity="0.6"/>
+    <circle cx="50" cy="50" r="4" fill="#c9a227"/>
+    <text x="50" y="24" text-anchor="middle" fill="#c9a227" font-size="9" font-family="Georgia,serif">N</text>
+  </svg>
+  <div class="masthead-text">
+    <h1>Pearl Atlas</h1>
+    <p class="tagline">A cartographer's desk for <span class="mono">BIP-380</span> output descriptors on Pearl (PRL)</p>
+  </div>
+  <div class="attrib-chip">@kshot9000</div>
+</header>
+
+<nav class="tabs" role="tablist" aria-label="Desk sections">
+  <button role="tab" data-tab="analyze" class="tab active" aria-selected="true">Analyze</button>
+  <button role="tab" data-tab="checksum" class="tab" aria-selected="false">Checksum</button>
+  <button role="tab" data-tab="derive" class="tab" aria-selected="false">Derive</button>
+  <button role="tab" data-tab="templates" class="tab" aria-selected="false">Templates</button>
+  <button role="tab" data-tab="verify" class="tab" aria-selected="false">Verify</button>
+</nav>
+
+<main>
+  <!-- ANALYZE -->
+  <section id="tab-analyze" class="panel" role="tabpanel">
+    <h2>Chart a descriptor</h2>
+    <p class="hint">Paste any output descriptor. The desk parses it like Bitcoin Core would — grammar, checksum, keys, and the full Taproot tree — and charts what it finds. Nothing leaves your browser; there are no network calls at all.</p>
+    <textarea id="an-input" rows="4" spellcheck="false" placeholder="tr([deadbeef/86h/808276h/0h]xpub…/0/*,and_v(pk(xpub…),older(144)))"></textarea>
+    <div class="row">
+      <button id="an-run" class="btn">Chart it</button>
+      <button id="an-clear" class="btn ghost">Clear</button>
+    </div>
+    <div id="an-out" class="out" aria-live="polite"></div>
+  </section>
+
+  <!-- CHECKSUM -->
+  <section id="tab-checksum" class="panel hidden" role="tabpanel">
+    <h2>Seal &amp; verify checksums</h2>
+    <p class="hint">BIP-380 checksums are the wax seal on a descriptor: 8 characters that catch any transcription error. Add one to a bare descriptor, or verify a sealed one.</p>
+    <textarea id="cs-input" rows="3" spellcheck="false" placeholder="wpkh(xpub…/0/*)   or   wpkh(xpub…/0/*)#ab12cd34"></textarea>
+    <div class="row">
+      <button id="cs-add" class="btn">Add checksum</button>
+      <button id="cs-verify" class="btn">Verify checksum</button>
+      <button id="cs-clear" class="btn ghost">Clear</button>
+    </div>
+    <div id="cs-out" class="out" aria-live="polite"></div>
+  </section>
+
+  <!-- DERIVE -->
+  <section id="tab-derive" class="panel hidden" role="tabpanel">
+    <h2>Derive addresses</h2>
+    <p class="hint">Give a ranged descriptor and an index range; the desk derives each address exactly as BIP-386 specifies. Only <span class="mono">tr()</span> and <span class="mono">addr()</span> produce Pearl-spendable addresses — anything else yields its exact scriptPubKey with an honest note.</p>
+    <textarea id="dv-input" rows="3" spellcheck="false" placeholder="tr([deadbeef/86h/808276h/0h]xpub…/0/*)"></textarea>
+    <div class="row wrap">
+      <label>Start index <input id="dv-start" type="number" min="0" max="1000000" value="0"></label>
+      <label>Count <input id="dv-count" type="number" min="1" max="50" value="5"></label>
+      <label>Network
+        <select id="dv-net">
+          <option value="prl1">Pearl mainnet (prl1…)</option>
+          <option value="tprl1">Pearl testnet (tprl1…)</option>
+        </select>
+      </label>
+      <button id="dv-run" class="btn">Derive</button>
+      <button id="dv-wipe" class="btn danger">Wipe inputs</button>
+    </div>
+    <div id="dv-warn" class="warn hidden" role="alert"></div>
+    <div id="dv-out" class="out" aria-live="polite"></div>
+  </section>
+
+  <!-- TEMPLATES -->
+  <section id="tab-templates" class="panel hidden" role="tabpanel">
+    <h2>Charted templates</h2>
+    <p class="hint">Sound, well-trodden descriptor shapes. Placeholders like <span class="mono">xpubA</span> must be replaced with your own keys before use — the desk refuses to derive from placeholders.</p>
+    <div id="tmpl-grid" class="tmpl-grid"></div>
+  </section>
+
+  <!-- VERIFY -->
+  <section id="tab-verify" class="panel hidden" role="tabpanel">
+    <h2>Prove the desk</h2>
+    <p class="hint">Don't take the brass plate's word for it. This runs the desk's pinned test battery in your browser: official BIP-380 checksum vectors, a known-answer BIP-86 address, control-block recomputation, and multipath expansion.</p>
+    <div class="row">
+      <button id="vf-run" class="btn">Run self-test</button>
+    </div>
+    <div id="vf-out" class="out" aria-live="polite"></div>
+  </section>
+
+  <!-- HONEST LIMITS : always visible -->
+  <aside class="limits" aria-label="Honest limits">
+    <h2>Honest limits of this desk</h2>
+    <ul>
+      <li><strong>Fully offline.</strong> No network calls, no servers, no tracking. Your descriptors never leave this page.</li>
+      <li><strong>Only <span class="mono">tr()</span> and <span class="mono">addr()</span> are Pearl-spendable.</strong> Legacy types (<span class="mono">pkh</span>, <span class="mono">wpkh</span>, <span class="mono">sh</span>, <span class="mono">wsh</span>, <span class="mono">multi</span>…) resolve to their exact scriptPubKey, labeled as not Taproot — Pearl is a Taproot-only chain.</li>
+      <li><strong>Private keys stay in memory and are wiped.</strong> If you paste WIF or xprv material, a warning appears and the Wipe button clears every input. The desk never stores or transmits keys.</li>
+      <li><strong>Descriptors are not wallets.</strong> This desk charts and derives; it does not sign, broadcast, or hold funds.</li>
+      <li><strong>Verify before trusting.</strong> Checksums catch typos, not malice. The Verify tab replays the pinned vectors — run it.</li>
+    </ul>
+  </aside>
+</main>
+
+<footer>
+  <p>Charted by <span class="mono">@kshot9000</span> · tips: <span class="mono copy" id="tip-addr" title="click to copy">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</span></p>
+  <p class="fine">Pearl Atlas · BIP-380 / BIP-386 / BIP-389 · crypto: @noble/* + @scure/* via the audited Pearl signing core</p>
+</footer>
+
+<script src="pearl-descriptor.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
