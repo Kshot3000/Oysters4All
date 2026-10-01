@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl Sighash Studio — BIP-342 Taproot digest explorer for PRL</title>
+<meta name="description" content="Pearl Sighash Studio: build a Taproot spending scenario, watch the BIP-342 sighash digest being assembled byte by byte, compare sighash flags side by side, sign with BIP-340 Schnorr, and verify sealed descriptors. Fully client-side.">
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg class="seal" viewBox="0 0 64 64" width="52" height="52" aria-hidden="true">
+      <rect x="6" y="6" width="52" height="52" class="frame"/>
+      <circle cx="32" cy="32" r="13" class="ring"/>
+      <path d="M32 19 L32 45 M19 32 L45 32" class="cross"/>
+      <circle cx="32" cy="32" r="2.5" class="dot"/>
+      <path d="M46 46 L58 58 M46 58 L58 46" class="cross"/>
+    </svg>
+    <div>
+      <h1>Pearl Sighash Studio</h1>
+      <p class="tagline">BIP-342 Taproot sighash digest explorer for PRL · every byte of the signature message, on the drafting table</p>
+    </div>
+  </div>
+  <nav class="steps" id="steps">
+    <button data-step="build" class="active">1 · Build</button>
+    <button data-step="anatomy" class="">2 · Anatomy</button>
+    <button data-step="compare" class="">3 · Compare</button>
+    <button data-step="sign" class="">4 · Sign</button>
+    <button data-step="verify" class="">5 · Verify</button>
+  </nav>
+</header>
+
+<div class="margin-strip" aria-hidden="true"><span>SIGHASH BLUEPRINT · SHEET 01 · BIP-341 COMMON MESSAGE + BIP-342 EXTENSION · EPOCH 0x00 · NO SMART CONTRACTS — PURE TAPROOT</span></div>
+
+<aside class="limits" id="honest-limits">
+  <h3>Honest limits — read before you draft</h3>
+  <ul>
+    <li><strong>Educational reference implementation, not consensus code:</strong> the digest math is real and pinned byte-for-byte against the official BIP-341 wallet test vectors (all 7 sighash flags) plus the full BIP-340 vector set, but this page is not pearld and makes no claim of interop with it. Review <code>src/sighash-core.js</code> before trusting it with real money.</li>
+    <li><strong>Demo values are labeled demo:</strong> the built-in scenario uses invented txids and keys. Nothing here touches a chain, a wallet, or a node — every digest is computed locally from what you type.</li>
+    <li><strong>SIGHASH_SINGLE is refused loudly</strong> when the input index has no corresponding output — consensus would fail that signature too.</li>
+    <li><strong>Keys live in this page's memory only.</strong> Anyone watching your screen or with access to this browser session sees them. Wipe them when done.</li>
+    <li><strong>Annexes are exotic:</strong> the annex path (spend_type low bit, sha_annex) is implemented per BIP-341, but no mainstream wallet produces annexes yet — treat it as a drafting exercise.</li>
+  </ul>
+  <div class="row"><button class="danger" id="wipe-keys">Wipe all pasted keys from this page</button></div>
+</aside>
+
+<main>
+  <!-- ============ STEP 1: BUILD ============ -->
+  <section class="panel active" id="step-build">
+    <h2><span class="fig">FIG. 1</span> Build the spending scenario</h2>
+    <p class="lede">Draft a small transaction: N inputs, M outputs, the input being signed, the spend type and the sighash flag.
+    The desk assembles the exact BIP-341/BIP-342 signature message and hashes it with the <code>TapSighash</code> tag.</p>
+    <div class="row">
+      <button class="secondary" id="b-demo">Load demo scenario (2-in / 2-out, labeled demo)</button>
+      <span class="hint">The demo uses invented txids — clearly marked, never presented as a real transaction.</span>
+    </div>
+    <h3>Transaction</h3>
+    <div class="form-grid">
+      <label>nVersion <input id="b-version" type="number" value="2" min="0" max="4294967295"></label>
+      <label>nLockTime <input id="b-locktime" type="number" value="0" min="0" max="4294967295"></label>
+      <label>Input being signed (index) <input id="b-input-index" type="number" value="0" min="0"></label>
+    </div>
+    <h3>Inputs <button class="mini" id="b-add-input">+ add input</button></h3>
+    <div class="table-wrap"><table class="draft" id="b-inputs">
+      <thead><tr><th>#</th><th>txid (64 hex)</th><th>vout</th><th>amount (grains)</th><th>scriptPubKey (hex)</th><th>nSequence</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <h3>Outputs <button class="mini" id="b-add-output">+ add output</button></h3>
+    <div class="table-wrap"><table class="draft" id="b-outputs">
+      <thead><tr><th>#</th><th>amount (grains)</th><th>scriptPubKey (hex)</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <h3>Spend type</h3>
+    <div class="form-grid">
+      <label>Path
+        <select id="b-spend-type">
+          <option value="keypath">Key path (ext_flag = 0)</option>
+          <option value="scriptpath">Script path (ext_flag = 1, BIP-342 ext)</option>
+        </select>
+      </label>
+      <label class="scriptonly">Tapleaf script (hex)
+        <input id="b-leaf-script" type="text" spellcheck="false" placeholder="e.g. 20&lt;32-byte key&gt;ac">
+      </label>
+      <label class="scriptonly">Key version
+        <input id="b-key-version" type="text" value="00" spellcheck="false">
+      </label>
+      <label class="scriptonly">Codesep position
+        <input id="b-codeseed" type="text" value="ffffffff" spellcheck="false">
+      </label>
+      <label>Annex (hex, 0x50-prefixed; empty = none)
+        <input id="b-annex" type="text" spellcheck="false" placeholder="optional">
+      </label>
+    </div>
+    <h3>Sighash flag</h3>
+    <div class="flag-grid" id="b-flags"></div>
+    <div class="row">
+      <button class="primary" id="b-compute">Compute digest</button>
+      <button class="secondary" id="b-seal">Seal scenario descriptor</button>
+    </div>
+    <div class="error" id="b-error" hidden></div>
+    <div class="result-block" id="b-result" hidden>
+      <h3>Digest <span class="stamp">COMPUTED LOCALLY</span></h3>
+      <div class="hex" id="b-digest"></div>
+      <p class="meta" id="b-meta"></p>
+      <h4>Sealed descriptor</h4>
+      <textarea id="b-sealed" rows="8" readonly spellcheck="false"></textarea>
+      <p class="hint">Paste this into the Verify tab — any alteration flips the verdict to NOT PROVEN.</p>
+    </div>
+  </section>
+
+  <!-- ============ STEP 2: ANATOMY ============ -->
+  <section class="panel" id="step-anatomy">
+    <h2><span class="fig">FIG. 2</span> Digest anatomy</h2>
+    <p class="lede">The full walkthrough: every intermediate hash in preimage order, each with its exact preimage bytes and the hash step applied.
+    Omitted components are shown as struck-through — ANYONECANPAY and NONE <em>drop</em> fields, they don't zero them.</p>
+    <div class="row">
+      <button class="primary" id="a-render">Render anatomy for the current scenario</button>
+      <span class="hint">Always computed fresh from the Build tab inputs.</span>
+    </div>
+    <div class="error" id="a-error" hidden></div>
+    <div id="a-list"></div>
+    <h3>Full preimage <span class="meta" id="a-preimage-len"></span></h3>
+    <div class="hex" id="a-preimage"></div>
+    <h3>Final digest — taggedHash("TapSighash", preimage)</h3>
+    <div class="hex big" id="a-digest"></div>
+    <p class="meta">BIP-340 tagged hash: SHA256(SHA256("TapSighash") ‖ SHA256("TapSighash") ‖ preimage).</p>
+  </section>
+
+  <!-- ============ STEP 3: COMPARE ============ -->
+  <section class="panel" id="step-compare">
+    <h2><span class="fig">FIG. 3</span> Compare two sighash flags</h2>
+    <p class="lede">Two flags, one scenario, side by side. The desk shows which intermediates differ, which are dropped, and <em>why</em> —
+    e.g. NONE zeroes nothing but <em>omits</em> sha_outputs; ANYONECANPAY replaces the four all-input hashes with this input's own data.</p>
+    <div class="form-grid">
+      <label>Flag A <select id="c-flag-a"></select></label>
+      <label>Flag B <select id="c-flag-b"></select></label>
+    </div>
+    <div class="row">
+      <button class="primary" id="c-run">Compare on the current scenario</button>
+    </div>
+    <div class="error" id="c-error" hidden></div>
+    <div id="c-verdict"></div>
+    <div class="table-wrap"><table class="draft" id="c-table">
+      <thead><tr><th>Component</th><th id="c-head-a">A</th><th id="c-head-b">B</th><th>Same?</th><th>Why</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <h3>All seven digests on this scenario</h3>
+    <div class="table-wrap"><table class="draft" id="c-matrix">
+      <thead><tr><th>Flag</th><th>Digest</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </section>
+
+  <!-- ============ STEP 4: SIGN ============ -->
+  <section class="panel" id="step-sign">
+    <h2><span class="fig">FIG. 4</span> Sign &amp; verify (BIP-340)</h2>
+    <p class="lede">Sign the digest with a fresh or pasted key using BIP-340 Schnorr, then verify the signature. Keys never leave the page.</p>
+    <div class="row">
+      <button class="secondary" id="s-gen">Generate fresh key (demo)</button>
+      <button class="danger" id="s-wipe">Wipe key</button>
+    </div>
+    <div class="form-grid">
+      <label>Private key (64 hex) <input id="s-priv" type="text" spellcheck="false" autocomplete="off"></label>
+      <label>Public key (x-only, derived) <input id="s-pub" type="text" readonly spellcheck="false"></label>
+    </div>
+    <div class="form-grid">
+      <label>Message: use the current scenario's digest
+        <select id="s-msg-src">
+          <option value="scenario">Current scenario digest (recomputed)</option>
+          <option value="paste">Paste a 32-byte digest / message</option>
+        </select>
+      </label>
+      <label>Digest / message (hex) <input id="s-digest" type="text" spellcheck="false"></label>
+    </div>
+    <div class="row">
+      <button class="primary" id="s-sign">Sign (BIP-340, zero aux)</button>
+    </div>
+    <div class="error" id="s-error" hidden></div>
+    <div class="result-block" id="s-result" hidden>
+      <h3>Signature <span class="stamp">BIP-340</span></h3>
+      <div class="hex" id="s-sig"></div>
+      <p class="meta" id="s-meta"></p>
+    </div>
+    <h3>Verify a signature</h3>
+    <div class="form-grid">
+      <label>Digest / message (hex) <input id="v-digest" type="text" spellcheck="false"></label>
+      <label>Signature (128 hex) <input id="v-sig" type="text" spellcheck="false"></label>
+      <label>Public key (64 hex) <input id="v-pub" type="text" spellcheck="false"></label>
+    </div>
+    <div class="row"><button class="primary" id="v-verify">Verify</button></div>
+    <div id="v-result"></div>
+  </section>
+
+  <!-- ============ STEP 5: VERIFY ============ -->
+  <section class="panel" id="step-verify">
+    <h2><span class="fig">FIG. 5</span> Verify</h2>
+    <p class="lede">Two independent checks. First, the desk replays the <strong>official BIP-341 wallet test vectors</strong> (all 7 sighash flags,
+    byte-exact preimages and digests) live in your browser. Second, paste any sealed descriptor — the digest is recomputed and the verdict is
+    <strong>PROVEN</strong> or <strong>NOT PROVEN</strong>, loud on tamper.</p>
+    <h3>Official BIP-341 vectors — live replay</h3>
+    <div class="row">
+      <button class="primary" id="vf-run-vectors">Replay the 7 official vectors</button>
+      <span class="hint">Source: bitcoin/bips <code>bip-0341/wallet-test-vectors.json</code>, keyPathSpending[0].</span>
+    </div>
+    <div id="vf-vector-results"></div>
+    <h3>Sealed descriptor verifier</h3>
+    <label class="block">Paste a sealed <code>pearl-sighash:v1</code> descriptor (or any raw parameter set)
+      <textarea id="vf-input" rows="8" spellcheck="false" placeholder='{"domain":"pearl-sighash:v1", ...}'></textarea>
+    </label>
+    <div class="row"><button class="primary" id="vf-verify">Verify descriptor</button></div>
+    <div id="vf-verdict"></div>
+  </section>
+</main>
+
+<footer>
+  <div class="foot-grid">
+    <div>
+      <strong>Pearl Sighash Studio</strong> — an interactive BIP-342 Taproot sighash digest explorer for the Pearl blockchain (PRL).
+      Educational reference implementation; digest math pinned against official BIP vectors. Built by the Pearl 24/7 builder.
+    </div>
+    <div class="attr">
+      <a href="https://x.com/kshot9000">@kshot9000</a><br>
+      <span class="addr">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</span>
+    </div>
+  </div>
+</footer>
+
+<script src="pearl-sighash.bundle.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>

@@ -61,6 +61,7 @@
         <a href="pages/will/">Will</a>
         <a href="pages/burn/">Burn</a>
         <a href="pages/pact/">Pact</a>
+        <a href="pages/sighash/">Sighash</a>
         <a href="pages/id/">ID</a>
         <a href="pages/raffle/">Raffle</a>
         <a href="pages/swap/">Swap</a>
@@ -601,9 +602,14 @@ cd miner && uv run pearl-miner \
             <div class="card-links"><a href="pages/burn/">Open Pearl Burn →</a></div>
           </article>
           <article class="card reveal">
-            <h3>Pearl Pact — Discreet Log Contract Desk <span class="badge">new</span></h3>
+            <h3>Pearl Pact — Discreet Log Contract Desk</h3>
             <p>The wax-seal desk for oracle-conditional PRL contracts — two parties lock collateral in a 2-of-2 Taproot funding output under a NUMS internal key, pre-sign one CET per outcome with Schnorr adaptor signatures encrypted to the oracle's announcement points, and execute trustlessly when the oracle attests. Five steps: Draft → Fund → Seal → Execute → Refund, with a timelocked refund leg as insurance, sealed tamper-evident descriptors, and standalone PROVEN / NOT PROVEN verification. The oracle can't steal — it can only pick the winner.</p>
             <div class="card-links"><a href="pages/pact/">Open Pearl Pact →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Sighash Studio <span class="badge">new</span></h3>
+            <p>The drafting table for Taproot signatures — build a spending scenario and watch the exact BIP-342 sighash digest being assembled byte by byte. Five steps: Build → Anatomy → Compare → Sign → Verify, with a full intermediate-hash walkthrough, a side-by-side diff of all seven sighash flags (why NONE omits sha_outputs, what ANYONECANPAY drops), BIP-340 Schnorr signing, tamper-evident <code>pearl-sighash:v1</code> descriptors with a standalone PROVEN / NOT PROVEN verifier, and a live replay of the official BIP-341 wallet test vectors, byte-exact. Educational reference implementation — review the source before trusting it with real money.</p>
+            <div class="card-links"><a href="pages/sighash/">Open Sighash Studio →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Foundry — Mining Pool <span class="badge">new</span></h3>
