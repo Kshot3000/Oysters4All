@@ -239,6 +239,26 @@ test("buildFillTx: atomic fill, fee covers vBytes, buyer sig verifies", () => {
   assert.ok(fill.hex.length > 500);
 });
 
+test("buildFillTx rejects duplicate leg outpoints", () => {
+  const seller = fixtureBond();
+  const buyer = buyerBond();
+  const t = seller.tranches[0];
+  const bt = buyer.tranches[0];
+  const mk = (vout) => presignTransferLeg(MAINNET, t,
+    { txid: "dd".repeat(32), vout, value: t.amountGrains }, SELLER_PRIV,
+    hexToBytes(bytesToHex(bt.tweakedX)), 10);
+  const buyerUtxo = {
+    txid: "ee".repeat(32), vout: 0, value: 60_000_000_000,
+    spk: p2trScriptPubKey(tweak(BUYER_PRIV)), priv: BUYER_PRIV,
+  };
+  // same outpoint twice -> would double-spend one UTXO: refused
+  assert.throws(() => buildFillTx(MAINNET, [mk(0), mk(0)], 50_000_000_000, buyerUtxo, sellerXOnly, buyerXOnly, 10),
+    /duplicate leg outpoint/);
+  // distinct outpoints still fine
+  const fill = buildFillTx(MAINNET, [mk(0), mk(1)], 50_000_000_000, buyerUtxo, sellerXOnly, buyerXOnly, 10);
+  assert.equal(fill.nLegs, 2);
+});
+
 test("buildFillTx rejects underfunded buyer", () => {
   const seller = fixtureBond();
   const buyer = buyerBond();

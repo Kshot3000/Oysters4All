@@ -205,7 +205,7 @@
       const d = E.parseDescriptor(currentDescriptor("cm-descriptor"));
       const addr = E.validBidderAddress($("cm-address").value, d.network);
       const bid = E.parsePRL($("cm-bid").value.trim());
-      if (bid < d.minBidGrains) throw new Error(`bid of ${fmtPRL(bid)} PRL is below the auction minimum of ${fmtPRL(d.minBidGrains)} PRL`);
+      if (bid < d.minBidGrains) throw new Error(`bid of ${fmtPRL(bid)} is below the auction minimum of ${fmtPRL(d.minBidGrains)}`);
       const salt = $("cm-salt").value.trim().toLowerCase();
       const c = E.makeCommitment({ descriptorHash: d.descriptorHash, bidderAddr: addr, bidGrains: bid, saltHex: salt });
       $("cm-hash").textContent = c.commitment;

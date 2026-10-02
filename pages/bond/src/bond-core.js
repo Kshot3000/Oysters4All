@@ -558,6 +558,14 @@ export function buildFillTx(network, legs, priceGrains, buyerUtxo, sellerPayProg
   if (!Array.isArray(legs) || legs.length === 0 || legs.length > MAX_PERIODS) {
     throw new Error("need 1..N verified legs");
   }
+  // Each tranche input may appear only once: repeating an outpoint would
+  // build a tx that double-spends the same UTXO (consensus-invalid).
+  const seenOutpoints = new Set();
+  for (const leg of legs) {
+    const k = String(leg.input.txid).toLowerCase() + ":" + leg.input.vout;
+    if (seenOutpoints.has(k)) throw new Error(`duplicate leg outpoint ${k} — each tranche input once`);
+    seenOutpoints.add(k);
+  }
   if (!Number.isSafeInteger(priceGrains) || priceGrains < 0) throw new Error("bad price");
   for (const p of [sellerPayProgram, buyerChangeProgram]) {
     if (!(p instanceof Uint8Array) || p.length !== 32) throw new Error("payment programs must be 32 bytes");

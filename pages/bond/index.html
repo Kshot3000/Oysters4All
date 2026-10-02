@@ -190,7 +190,7 @@
         <div class="field"><label for="s-desc">Bond descriptor</label><input id="s-desc" type="text" placeholder="bond:v1:…" autocomplete="off" spellcheck="false"></div>
         <div class="field"><label for="s-key">Seller signing key <span class="hint">(mnemonic or 64-hex privkey)</span></label><input id="s-key" type="password" autocomplete="off" spellcheck="false"></div>
         <div class="field"><label for="s-buyer">Buyer tranche key <span class="hint">(x-only pubkey hex or PRL address)</span></label><input id="s-buyer" type="text" autocomplete="off" spellcheck="false"></div>
-        <div class="field"><label for="s-legs">Legs <span class="hint">(tranche indexes, comma-separated; funding txid:vout:value per leg below)</span></label><input id="s-legs" type="text" value="0" autocomplete="off"></div>
+        <div class="field"><label for="s-legs">Legs <span class="hint">(tranche indexes, comma-separated; funding txid:vout:value per leg below)</span></label><input id="s-legs" type="text" value="1" autocomplete="off"></div>
         <div class="field"><label for="s-outpoints">Funding outpoints <span class="hint">(one per leg: txid:vout:valueGrains)</span></label><textarea id="s-outpoints" rows="3" class="mono" placeholder="ab…:0:2500000000"></textarea></div>
         <div class="field"><label for="s-feerate">Fee rate (grains/vbyte)</label><input id="s-feerate" type="text" inputmode="decimal" value="2" autocomplete="off"></div>
         <div class="row"><button id="s-presign" class="btn primary">Presign legs</button><span id="s-err" class="err"></span></div>
@@ -259,7 +259,7 @@
   <p>Donations: <code id="donate">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code> <button class="copy-btn" data-for="donate">Copy</button></p>
 </footer>
 
-<script src="pearl-bond.bundle.js?v=1"></script>
-<script src="app.js?v=1"></script>
+<script src="pearl-bond.bundle.js?v=2"></script>
+<script src="app.js?v=2"></script>
 </body>
 </html>

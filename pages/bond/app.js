@@ -329,6 +329,7 @@
       const buyerProgram = buyerProgramFromInput($("s-buyer").value, network);
       const idxs = $("s-legs").value.split(",").map((s) => Number(s.trim())).filter((n) => Number.isInteger(n) && n > 0);
       if (!idxs.length) throw new Error("list at least one tranche index");
+      if (new Set(idxs).size !== idxs.length) throw new Error("duplicate tranche index in legs — each tranche once");
       const lines = $("s-outpoints").value.split("\n").map((l) => l.trim()).filter(Boolean);
       if (lines.length !== idxs.length) throw new Error(`need ${idxs.length} outpoint line(s), got ${lines.length}`);
       const feeRate = parseFee($("s-feerate").value);

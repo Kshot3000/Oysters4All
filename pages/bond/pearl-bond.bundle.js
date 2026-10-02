@@ -6953,6 +6953,12 @@ zoo`.split("\n");
     if (!Array.isArray(legs) || legs.length === 0 || legs.length > MAX_PERIODS) {
       throw new Error("need 1..N verified legs");
     }
+    const seenOutpoints = /* @__PURE__ */ new Set();
+    for (const leg of legs) {
+      const k = String(leg.input.txid).toLowerCase() + ":" + leg.input.vout;
+      if (seenOutpoints.has(k)) throw new Error(`duplicate leg outpoint ${k} \u2014 each tranche input once`);
+      seenOutpoints.add(k);
+    }
     if (!Number.isSafeInteger(priceGrains) || priceGrains < 0) throw new Error("bad price");
     for (const p of [sellerPayProgram, buyerChangeProgram]) {
       if (!(p instanceof Uint8Array) || p.length !== 32) throw new Error("payment programs must be 32 bytes");

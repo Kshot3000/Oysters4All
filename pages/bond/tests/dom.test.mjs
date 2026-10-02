@@ -299,7 +299,7 @@ test("index.html carries attribution, honest limits, and cache keys", () => {
   assert.match(html, /@kshot9000/, "X attribution");
   assert.match(html, /prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d/, "donation address, character-for-character");
   assert.match(html, /honest-limits|Honest limits/i, "honest limits panel");
-  assert.match(html, /pearl-bond\.bundle\.js\?v=1/, "bundle cache key");
-  assert.match(html, /app\.js\?v=1/, "app cache key");
+  assert.match(html, /pearl-bond\.bundle\.js\?v=2/, "bundle cache key");
+  assert.match(html, /app\.js\?v=2/, "app cache key");
   assert.match(html, /styles\.css\?v=1/, "css cache key");
 });
