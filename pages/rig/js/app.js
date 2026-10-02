@@ -82,15 +82,27 @@ async function refreshPrice() {
     state.lastPrice = { last: p.last, changePct: p.changePct, source: p.source, at: new Date().toISOString() };
     save();
     renderPrice();
+    recalc();
   } catch (e) {
+    // Render first (shows the last known price, if any), THEN stamp the
+    // failure state — renderPrice() would otherwise overwrite the failed
+    // badge back to "live" whenever a cached price exists.
+    renderPrice();
     badge.textContent = '● price: failed';
+    badge.classList.remove('live');
     note.textContent = 'Price fetch failed: ' + e.message +
       (state.priceSource === 'coinex' ? ' CoinEx sends no CORS headers — the proxy is required.' : '');
-    renderPrice();
   }
 }
 
 function effectivePrice() {
+  // In manual mode the typed price is the price — a previously fetched
+  // price must not shadow it (the manual input promises the figures follow
+  // what the user types).
+  if (state.priceSource === 'manual') {
+    const m = Number(state.priceManual);
+    if (Number.isFinite(m) && m > 0) return m;
+  }
   if (state.lastPrice && Number.isFinite(state.lastPrice.last)) return state.lastPrice.last;
   const m = Number(state.priceManual);
   return Number.isFinite(m) && m > 0 ? m : null;
@@ -99,6 +111,17 @@ function effectivePrice() {
 function renderPrice() {
   const badge = $('priceBadge');
   const lp = state.lastPrice;
+  if (state.priceSource === 'manual') {
+    const m = Number(state.priceManual);
+    if (Number.isFinite(m) && m > 0) {
+      $('priceBig').textContent = fmtUSD(m, 4);
+      $('priceChg').textContent = '—';
+      $('priceSrc').textContent = 'manual entry';
+      badge.textContent = '● price: manual';
+      badge.classList.remove('live');
+      return;
+    }
+  }
   if (lp) {
     $('priceBig').textContent = fmtUSD(lp.last, 4);
     const chg = $('priceChg');
