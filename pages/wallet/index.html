@@ -13,14 +13,14 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="styles.css?v=4">
+<link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to main content</a>
 <div id="app">
 
   <!-- ================= ONBOARDING ================= -->
-  <section id="view-onboarding" class="view">
+  <section id="view-onboarding" class="view" tabindex="-1">
     <div class="wrap onb">
       <!-- step: welcome -->
       <div class="obstep" id="ob-welcome">
@@ -109,7 +109,7 @@
   </section>
 
   <!-- ================= LOCK ================= -->
-  <section id="view-lock" class="view">
+  <section id="view-lock" class="view" tabindex="-1">
     <div class="lockwrap">
       <div class="lockgem">◈</div>
       <h2 style="margin:0 0 6px;letter-spacing:-.5px;font-size:2em">Vault locked</h2>
@@ -305,6 +305,6 @@
 
 <script src="qrcode.min.js?v=1"></script>
 <script src="pearl-wallet.bundle.js?v=1"></script>
-<script src="app.js?v=1"></script>
+<script src="app.js?v=2"></script>
 </body>
 </html>

@@ -46,11 +46,14 @@
     return r;
   }
   const STEPS = ["manifest", "freight", "review", "sign", "broadcast"];
-  function goto(step) {
+  function goto(step, skipScroll) {
     STEPS.forEach((s) => { const b = $("st-" + s); if (b) b.classList.toggle("active", s === step); });
     STEPS.forEach((s) => { const p = $("step-" + s); if (p) p.hidden = s !== step; });
     const el = $("step-" + step);
-    if (el && el.scrollIntoView) el.scrollIntoView({ block: "start" });
+    // scrollIntoView also moves the keyboard focus-navigation starting point;
+    // the boot call passes skipScroll so the page loads at the top and the
+    // first Tab reaches the skip link, not the manifest textarea.
+    if (el && el.scrollIntoView && !skipScroll) el.scrollIntoView({ block: "start" });
   }
   async function copyText(text, msg) {
     try {
@@ -536,7 +539,7 @@
     if (b) b.addEventListener("click", () => goto(s));
   });
   loadConfig();
-  goto("manifest");
+  goto("manifest", true);
 
   /* test hook (drives the DOM test suite; exposes no secrets) */
   window.__batchTest = {

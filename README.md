@@ -73,7 +73,11 @@ keyboard users no longer tab through the full header and step-nav on all
 live dashboard) received the same skip link plus the focus ring they had
 missed. Verified in a real browser on all 81 pages here and both Hermes
 pages: the first Tab reveals the link at AA contrast, Enter lands focus
-on `<main>`, zero console errors.
+on `<main>`, zero console errors. (Pearl Wallet's `<main>` sits inside its
+app view, so while its onboarding or lock view is showing, the link lands
+focus on that visible view instead; Batch and Payroll no longer scroll to
+their first panel on load, which had moved the first Tab stop past the
+link.)
 
 ## Support this work
 

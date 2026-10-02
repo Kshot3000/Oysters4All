@@ -52,13 +52,16 @@
     return r;
   }
   const STEPS = ["roster", "schedule", "fund", "review", "sign", "broadcast"];
-  function goto(step) {
+  function goto(step, skipScroll) {
     STEPS.forEach((s) => { const b = $("st-" + s); if (b) b.classList.toggle("active", s === step); });
     STEPS.forEach((s) => { const p = $("step-" + s); if (p) p.hidden = s !== step; });
     $("st-history").classList.remove("active");
     $("step-history").hidden = true;
     const el = $("step-" + step);
-    if (el && el.scrollIntoView) el.scrollIntoView({ block: "start" });
+    // scrollIntoView also moves the keyboard focus-navigation starting point;
+    // the boot call passes skipScroll so the page loads at the top and the
+    // first Tab reaches the skip link, not the roster textarea.
+    if (el && el.scrollIntoView && !skipScroll) el.scrollIntoView({ block: "start" });
   }
   function gotoHistory() {
     STEPS.forEach((s) => { const b = $("st-" + s); if (b) b.classList.remove("active"); });
@@ -721,7 +724,7 @@
   });
   loadConfig();
   renderHistory();
-  goto("roster");
+  goto("roster", true);
 
   /* test hook (drives the DOM test suite; exposes no secrets) */
   window.__payrollTest = {

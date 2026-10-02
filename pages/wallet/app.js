@@ -117,6 +117,21 @@ function showView(name) {
   });
   window.scrollTo(0, 0);
 }
+/* Skip link: <main> lives inside #view-app, so while onboarding or lock is
+   the visible view the anchor target is display:none and the jump would land
+   nowhere. In that state, land focus on the visible view instead. */
+var skipLink = document.querySelector(".skip-link");
+if (skipLink) {
+  skipLink.addEventListener("click", function (e) {
+    if ($("view-app").classList.contains("active")) return; /* normal jump to <main> */
+    var current = document.querySelector(".view.active");
+    if (current) {
+      e.preventDefault();
+      current.focus();
+      try { history.replaceState(null, "", "#" + current.id); } catch (err) {}
+    }
+  });
+}
 function showTab(name) {
   document.querySelectorAll(".tab").forEach(function (t) {
     t.classList.toggle("active", t.dataset.tab === name);
