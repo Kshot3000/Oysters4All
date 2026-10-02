@@ -76,3 +76,10 @@ node build.mjs   # rebuild pearl-predict.bundle.js after touching src/
 - `pearl-predict.bundle.js` — committed esbuild bundle (`?v=1`)
 - `build.mjs` — esbuild with the sign importmap plugin
 - `tests/` — core + DOM suites
+- real-browser QA (headless Chromium, file:// + CDP) — 32/32 checks green,
+  zero console/page errors, plus a 375px mobile tab-sweep
+  (`hidden_files/qa-predict-browser.mjs`). The sweep caught a real mobile
+  overflow (create tab 449px, fund tab 787px): an unbroken `.mono` NUMS
+  string and the positions table stretched their `.grid2` tracks past the
+  viewport — fixed with `overflow-wrap: anywhere` on `.mono` and
+  `min-width: 0` on grid children (`styles.css?v=2`).

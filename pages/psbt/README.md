@@ -75,6 +75,13 @@ esbuild `globalName` — see the repo AGENTS.md lesson). Bare `@`-specifiers
 resolve through `../sign/importmap.json` via the importmap plugin, same as the
 Quorum desk.
 
+Real-browser QA (headless Chromium, file:// + CDP) — 35/35 checks green,
+zero console/page errors, plus a 375px mobile tab-sweep
+(`hidden_files/qa-psbt-browser.mjs`). The sweep caught a real mobile
+overflow: the footer donation `<code>` (62-char address, no wrap rule)
+forced every tab to 566px at a 375px viewport — fixed with
+`word-break: break-all` on `footer .donate code` (`styles.css?v=2`).
+
 ## Honest limits
 
 - The desk **never broadcasts** — finalize hands you raw tx hex.

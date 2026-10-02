@@ -67,4 +67,5 @@ addresses, unspendable NUMS keypaths, tamper evidence) vs. what they don't
 - `node --no-warnings --loader ./tests/loader.mjs --test tests/dom.test.mjs` — 11/11 DOM tests green
   (real app.js + committed bundle against a strict shim; hostile localStorage).
 - Real-browser QA: headless Chromium 152 via file:// + CDP, design → address →
-  verify → export, zero console/page errors.
+  verify → export, zero console/page errors — 28/28 checks green, plus a
+  375px mobile tab-sweep (`hidden_files/qa-policy-browser.mjs`).

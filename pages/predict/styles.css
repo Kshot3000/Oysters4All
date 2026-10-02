@@ -107,6 +107,7 @@ main { max-width: 1080px; margin: 0 auto; padding: 24px 20px 60px; }
 .card h2::before { content: "▸ "; color: var(--amber); }
 .card h3 { margin: 18px 0 8px; font-size: 15px; color: var(--amber); font-family: var(--mono); letter-spacing: 0.05em; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+.grid2 > *, .row2 > * { min-width: 0; }
 @media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 560px) { .row2 { grid-template-columns: 1fr; } }
@@ -140,7 +141,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .err { color: var(--down); font-size: 14px; white-space: pre-wrap; }
 .muted { color: var(--paper-dim); }
 .small { font-size: 13px; }
-.mono { font-family: var(--mono); }
+.mono { font-family: var(--mono); overflow-wrap: anywhere; }
 .checklist li { margin: 6px 0; }
 
 /* ---- outcome cards / tables ---- */

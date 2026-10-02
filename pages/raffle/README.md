@@ -71,6 +71,9 @@ the organizer's own wallet.
 - `qrcode.min.js` — vendored QR renderer (same copy as Pearl Stream)
 - `tests/` — 12/12 unit tests + 7/7 DOM tests
   (`node --no-warnings --loader ./tests/loader.mjs tests/raffle.test.mjs`)
+- real-browser QA (headless Chromium, file:// + CDP) — 22/22 checks green,
+  zero console/page errors, plus a 375px mobile tab-sweep
+  (`hidden_files/qa-raffle-browser.mjs`)
 
 Reuses the audited Pearl Sign crypto (`../sign/src/crypto.js`, bech32m +
 SHA-256, pearlpurse lineage) — no new cryptography is introduced.

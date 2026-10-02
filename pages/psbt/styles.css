@@ -203,5 +203,5 @@ footer {
   text-align: center; color: var(--ink-faint); font-size: 0.9rem;
 }
 footer a { color: var(--brass); }
-footer .donate code { color: var(--amber-hot); }
+footer .donate code { color: var(--amber-hot); word-break: break-all; }
 footer .hint { margin-top: 8px; }

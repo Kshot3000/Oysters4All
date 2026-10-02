@@ -86,3 +86,6 @@ node build.mjs   # rebuild pearl-paywall.bundle.js after touching src/
 - `qrcode.min.js` — vendored QR library (`?v=1`)
 - `build.mjs` — esbuild with the sign importmap plugin
 - `tests/` — core (17) + DOM (10) suites
+- real-browser QA (headless Chromium, file:// + CDP) — 27/27 checks green,
+  zero console/page errors, plus a 375px mobile tab-sweep
+  (`hidden_files/qa-paywall-browser.mjs`)
