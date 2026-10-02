@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pearl Treasury — DAO / Team Treasury Command Center for PRL</title>
 <meta name="description" content="Treasury console for teams and DAOs holding PRL in m-of-n Taproot vaults: register vaults, propose spends, collect cosigner signatures to quorum, build and broadcast real Taproot disbursements, and keep a hash-chained audit log. Keys never leave this page.">
-<link rel="stylesheet" href="styles.css?v=1">
+<link rel="stylesheet" href="styles.css?v=2">
 </head>
 <body>
 <header class="hero">
@@ -86,10 +86,10 @@
       </div>
     </div>
     <h3>Registered vaults</h3>
-    <table class="ledger">
+    <div class="table-wrap"><table class="ledger">
       <thead><tr><th>Vault</th><th>Address</th><th>Quorum</th><th>Confirmed</th><th>Unconfirmed</th><th>UTXOs</th><th>Refreshed</th><th></th></tr></thead>
       <tbody id="v-rows"></tbody>
-    </table>
+    </table></div>
     <p id="v-totals" class="summary"></p>
   </section>
 
@@ -122,10 +122,10 @@
       <span id="p-err" class="err" role="alert"></span>
     </div>
     <h3>Proposals</h3>
-    <table class="ledger">
+    <div class="table-wrap"><table class="ledger">
       <thead><tr><th>Fingerprint</th><th>Vault</th><th>Payee</th><th>Amount</th><th>Status</th><th>Due</th><th></th></tr></thead>
       <tbody id="p-rows"></tbody>
-    </table>
+    </table></div>
     <div id="p-detail-wrap" class="hidden">
       <h3>Proposal detail</h3>
       <pre id="p-detail" class="mono-block"></pre>
@@ -268,10 +268,10 @@
     <div class="row">
       <button id="d-sched-add">Add schedule</button>
     </div>
-    <table class="ledger">
+    <div class="table-wrap"><table class="ledger">
       <thead><tr><th>Proposal</th><th>Every</th><th>Next due</th><th>Last paid</th><th>Status</th><th></th></tr></thead>
       <tbody id="d-sched-rows"></tbody>
-    </table>
+    </table></div>
   </section>
 
   <!-- ============ 5 · AUDIT ============ -->
@@ -287,10 +287,10 @@
       <button id="a-clear" class="danger">Clear log</button>
       <span id="a-verdict" class="ok" role="status"></span>
     </div>
-    <table class="ledger">
+    <div class="table-wrap"><table class="ledger">
       <thead><tr><th>#</th><th>Time</th><th>Event</th><th>Actor</th><th>Detail</th><th>Hash</th></tr></thead>
       <tbody id="a-rows"></tbody>
-    </table>
+    </table></div>
     <textarea id="a-export" rows="6" class="hidden mono-block" readonly spellcheck="false"></textarea>
   </section>
 </main>

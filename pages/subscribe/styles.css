@@ -74,7 +74,9 @@ textarea { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .85
 .kv { margin: 1rem 0; }
 .kv > div { display: flex; gap: 1rem; padding: .4rem 0; border-bottom: 1px dotted var(--line); align-items: baseline; flex-wrap: wrap; }
 .kv dt { color: var(--muted); min-width: 200px; }
-.kv dd { margin: 0; }
+.kv dd { margin: 0; min-width: 0; }
+.kv code { overflow-wrap: anywhere; }
+.table-wrap { overflow-x: auto; }
 code { font-family: ui-monospace, Menlo, Consolas, monospace; }
 .nonce-row { display: flex; gap: .5rem; }
 .nonce-row input { flex: 1; }

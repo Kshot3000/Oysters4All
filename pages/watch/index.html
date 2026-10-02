@@ -6,7 +6,7 @@
 <title>Pearl Watch — PRL Watchtower &amp; Alert Desk</title>
 <meta name="description" content="Pearl Watch: the lighthouse watchtower for PRL. Watch Taproot addresses over GET-only Blockbook reads, fire alert rules on incoming payments, balance crossings and confirmation milestones, and track any txid's confirmations. Read-only — no keys, ever.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 44'%3E%3Crect x='15' y='10' width='10' height='5' rx='1' fill='none' stroke='%23ffd166' stroke-width='2'/%3E%3Cpath d='M16 40 V14 L20 6 L24 14 V40' fill='none' stroke='%23e8eef7' stroke-width='3'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="styles.css?v=1">
+<link rel="stylesheet" href="styles.css?v=2">
 </head>
 <body>
 <div class="nightsky" aria-hidden="true"><i class="beam"></i><i class="stars"></i></div>
@@ -80,10 +80,10 @@
         <span class="spacer"></span>
         <span id="w-count" class="dim"></span>
       </div>
-      <table class="tbl" id="w-table">
+      <div class="table-wrap"><table class="tbl" id="w-table">
         <thead><tr><th>Label</th><th>Address</th><th class="num">Balance</th><th class="num">Received</th><th class="num">Sent</th><th class="num">Txs</th><th>Last seen</th><th></th></tr></thead>
         <tbody id="w-tbody"><tr class="empty"><td colspan="8">No addresses yet. Add one above — the lamp only watches what you point it at.</td></tr></tbody>
-      </table>
+      </table></div>
       <p class="dim" id="w-note">Balances fill in after the next beacon sweep (tab 2) or a manual refresh.</p>
       <div class="row"><button id="w-refresh" type="button">Refresh balances now</button><span id="w-ref-status" class="dim"></span></div>
     </div>
@@ -114,10 +114,10 @@
       </div>
       <p class="err" id="b-err" hidden></p>
       <div class="lamp" id="lamp" aria-hidden="true"><i></i></div>
-      <table class="tbl" id="b-table">
+      <div class="table-wrap"><table class="tbl" id="b-table">
         <thead><tr><th>Address</th><th class="num">Balance</th><th>New txs this sweep</th><th>Scanned at</th><th>Status</th></tr></thead>
         <tbody id="b-tbody"><tr class="empty"><td colspan="5">Beacon idle. Start it to sweep the watchlist.</td></tr></tbody>
-      </table>
+      </table></div>
     </div>
   </section>
 
@@ -153,10 +153,10 @@
         <button id="r-add" type="button" class="primary">Add rule</button>
       </div>
       <p class="err" id="r-err" hidden></p>
-      <table class="tbl" id="r-table">
+      <div class="table-wrap"><table class="tbl" id="r-table">
         <thead><tr><th></th><th>Rule</th><th>Target</th><th>Condition</th><th>Last fired</th><th></th></tr></thead>
         <tbody id="r-tbody"><tr class="empty"><td colspan="6">No rules. A watchtower with no rules is just a nice view.</td></tr></tbody>
-      </table>
+      </table></div>
       <p class="dim">Balance-crossing rules re-arm after the balance moves back across. Confirmation rules re-arm if a reorg drops the count back under target. Rules fire only while the beacon sweeps (or a manual refresh runs).</p>
     </div>
   </section>
@@ -179,10 +179,10 @@
         <span class="spacer"></span>
         <button id="e-clear" type="button" class="danger">Clear log</button>
       </div>
-      <table class="tbl" id="e-table">
+      <div class="table-wrap"><table class="tbl" id="e-table">
         <thead><tr><th>Time (UTC)</th><th>Kind</th><th>Detail</th><th class="num">Amount</th><th class="num">Conf</th><th>Txid</th></tr></thead>
         <tbody id="e-tbody"><tr class="empty"><td colspan="6">Quiet seas. Events appear here when rules fire.</td></tr></tbody>
-      </table>
+      </table></div>
     </div>
   </section>
 

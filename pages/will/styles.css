@@ -137,13 +137,13 @@ dl.kv { display: grid; grid-template-columns: 150px 1fr; gap: 0.4rem 0.9rem; mar
 dl.kv dt { color: var(--parchment-dim); font-size: 0.9rem; }
 dl.kv dd { margin: 0; overflow-wrap: anywhere; }
 dl.kv code { color: var(--amber-hot); }
-dl.kv code.long { display: block; word-break: break-all; font-size: 0.82rem; }
+code.long { display: block; word-break: break-all; font-size: 0.82rem; }
 
 .checks { list-style: none; padding: 0; }
 .checks li { padding: 0.35rem 0; border-bottom: 1px dotted var(--line); }
 .checks li .ok { color: var(--ok); font-weight: bold; }
 .checks li .no { color: var(--bad); font-weight: bold; }
-.checks li .detail { display: block; color: var(--parchment-dim); font-size: 0.85rem; }
+.checks li .detail { display: block; color: var(--parchment-dim); font-size: 0.85rem; overflow-wrap: anywhere; }
 
 .claim-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1rem; margin-top: 1rem; }
 .claim-col { background: var(--ink-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem 1.2rem; }
@@ -160,7 +160,7 @@ footer {
   border-top: 2px solid var(--wax-deep); color: var(--parchment-dim);
   font-size: 0.9rem; text-align: center;
 }
-footer code { color: var(--amber-hot); font-size: 0.82rem; }
+footer code { color: var(--amber-hot); font-size: 0.82rem; word-break: break-all; }
 footer .fine { font-size: 0.8rem; color: #6d7590; }
 @media (max-width: 640px) {
   dl.kv { grid-template-columns: 1fr; }

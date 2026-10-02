@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pearl Subscribe — Standing Orders for PRL</title>
 <meta name="description" content="Pearl Subscribe: recurring PRL payments as pre-signed nLockTime Taproot transactions. Subscriber funds one tx with a per-period output; each period's payment is signed locally with a consensus-enforced locktime; cancel any not-yet-due period by double-spending it. Keys never leave your browser.">
-<link rel="stylesheet" href="styles.css?v=1">
+<link rel="stylesheet" href="styles.css?v=2">
 </head>
 <body>
 <header class="topbar">
@@ -105,8 +105,8 @@
       <div><dt>Funding total (incl. fee reserves)</dt><dd id="terms-funding-total"></dd></div>
       <div><dt>Schedule</dt><dd id="terms-schedule-note"></dd></div>
     </dl>
-    <table class="reserves"><thead><tr><th>Period</th><th>Locktime (height)</th><th>≈ date</th><th>Merchant gets</th></tr></thead>
-    <tbody id="terms-body"></tbody></table>
+    <div class="table-wrap"><table class="reserves"><thead><tr><th>Period</th><th>Locktime (height)</th><th>≈ date</th><th>Merchant gets</th></tr></thead>
+    <tbody id="terms-body"></tbody></table></div>
     <div class="row">
       <button id="terms-copy" class="btn ghost">Copy descriptor JSON</button>
       <button id="terms-download" class="btn ghost">Download .json</button>
@@ -131,8 +131,8 @@
       <div><dt>Per output</dt><dd id="fund-perout"></dd></div>
       <div><dt>Total to fund</dt><dd id="fund-total"></dd></div>
     </dl>
-    <table class="reserves"><thead><tr><th>vout</th><th>Address</th><th>Value</th><th>Unlocks period</th></tr></thead>
-    <tbody id="fund-body"></tbody></table>
+    <div class="table-wrap"><table class="reserves"><thead><tr><th>vout</th><th>Address</th><th>Value</th><th>Unlocks period</th></tr></thead>
+    <tbody id="fund-body"></tbody></table></div>
     <h3>Your coins</h3>
     <div class="row">
       <button id="fund-scan" class="btn ghost">Scan anchor via Blockbook</button>
@@ -168,8 +168,8 @@
       <input id="ps-funding-txid" spellcheck="false" placeholder="64-hex funding txid">
     </label>
     <div class="row"><button id="ps-plans" class="btn ghost">Show payment plans</button></div>
-    <table class="reserves"><thead><tr><th>Period</th><th>Locktime</th><th>Payment txid (precomputed)</th><th>Fee</th></tr></thead>
-    <tbody id="ps-body"></tbody></table>
+    <div class="table-wrap"><table class="reserves"><thead><tr><th>Period</th><th>Locktime</th><th>Payment txid (precomputed)</th><th>Fee</th></tr></thead>
+    <tbody id="ps-body"></tbody></table></div>
     <label class="wide">Your key <span class="hint-inline">(must control the anchor — wiped after signing)</span>
       <input id="ps-key" type="password" autocomplete="off" spellcheck="false">
     </label>
@@ -208,8 +208,8 @@
       <span id="tr-tip" class="hint"></span>
     </div>
     <div id="tr-err" class="err" hidden></div>
-    <table class="reserves"><thead><tr><th>Period</th><th>Locktime</th><th>≈ date</th><th>Status</th><th>Detail</th></tr></thead>
-    <tbody id="tr-body"></tbody></table>
+    <div class="table-wrap"><table class="reserves"><thead><tr><th>Period</th><th>Locktime</th><th>≈ date</th><th>Status</th><th>Detail</th></tr></thead>
+    <tbody id="tr-body"></tbody></table></div>
   </section>
 
   <!-- STEP 6: CANCEL -->
