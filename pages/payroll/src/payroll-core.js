@@ -313,7 +313,11 @@ function dayNumberToYmd(n) {
  *  The anchor is a reference payday; dates strictly before `from` are
  *  skipped, so the table always shows upcoming paydays. Monthly preserves
  *  the anchor's day-of-month (clamped: Jan 31 -> Feb 28).
- *  Returns [{ index, iso, dow }] — index is the run number from the anchor. */
+ *  Returns [{ index, iso, dow }] — index is the run number from the anchor.
+ *  The returned array also carries `skippedPaydays` = the number of run
+ *  indices skipped because they fell before `from` (0 when the anchor is
+ *  today or in the future). Callers MUST surface this: a skipped payday is
+ *  a pay run the operator may owe. */
 export function nextPayDates({ anchor, period, customDays = 0, count = 12, from = null }) {
   if (!PAY_PERIODS.includes(period)) throw new Error(`unknown pay period "${period}" — pick weekly, biweekly, monthly, or custom`);
   if (!Number.isInteger(count) || count < 1 || count > 60) throw new Error("count must be 1–60");
@@ -355,6 +359,7 @@ export function nextPayDates({ anchor, period, customDays = 0, count = 12, from 
     }
     dates.push({ index: k, iso: ymd.iso, dow: ymd.dow });
   }
+  dates.skippedPaydays = n; // runs 0..n-1 fell before `from` — surfaced by the UI
   return dates;
 }
 

@@ -148,11 +148,12 @@
         <div><dt>Per-run total</dt><dd id="p-total-out"></dd></div>
         <div><dt>Next payday</dt><dd id="p-countdown"></dd></div>
       </dl>
+      <p class="note" id="p-skip-warn" hidden></p>
       <div class="tablewrap"><table class="ledger">
         <thead><tr><th>Run</th><th>Pay date (UTC)</th><th>Day</th><th>Per-run total</th></tr></thead>
         <tbody id="p-tbody"></tbody>
       </table></div>
-      <p class="note">No auto-pay: each of these dates needs a fresh signed dispatch from steps 3–6. The calendar plans; you press the button.</p>
+      <p class="note" id="p-noautopay">No auto-pay: each of these dates needs a fresh signed dispatch from steps 3–6. The calendar plans; you press the button.</p>
       <div class="rowbtns">
         <button class="btn primary" id="p-next" type="button">Fund this run →</button>
       </div>
@@ -352,7 +353,7 @@
   </div>
 </footer>
 
-<script src="pearl-payroll.bundle.js?v=1"></script>
-<script src="app.js?v=1"></script>
+<script src="pearl-payroll.bundle.js?v=2"></script>
+<script src="app.js?v=2"></script>
 </body>
 </html>

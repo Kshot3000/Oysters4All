@@ -6360,6 +6360,7 @@ zoo`.split("\n");
       }
       dates.push({ index: k, iso: ymd.iso, dow: ymd.dow });
     }
+    dates.skippedPaydays = n;
     return dates;
   }
   function msUntilPayday(dates, nowMs = Date.now()) {

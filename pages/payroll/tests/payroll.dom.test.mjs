@@ -159,6 +159,9 @@ async function waitFor(fn, label) {
   for (let i = 0; i < 150; i++) { if (fn()) return; await tick(40); }
   throw new Error("timeout waiting for: " + label);
 }
+// date fixtures stay fresh: the app skips paydays before "today" (UTC)
+const todayIso = () => new Date().toISOString().slice(0, 10);
+const yesterdayIso = () => new Date(Date.now() - 86400000).toISOString().slice(0, 10);
 
 // fixture identities derived through the real bundle
 const N = R.NETWORKS.mainnet;
@@ -274,19 +277,33 @@ test("roster: add / edit / remove rows, duplicates refused loudly", async () => 
 });
 
 test("schedule: 12 biweekly paydays planned, countdown, per-run total", async () => {
+  const anchor = todayIso(); // fresh anchor: no paydays skipped
   get("p-period").value = "biweekly";
-  get("p-anchor").value = "2026-10-01";
+  get("p-anchor").value = anchor;
   get("p-label").value = "October payroll";
   get("p-plan").click();
   await tick();
   const sch = T.state().schedule;
   assert.ok(sch, "schedule planned");
   assert.equal(sch.period, "biweekly");
-  assert.equal(sch.payDate, "2026-10-01");
+  assert.equal(sch.payDate, anchor);
   assert.equal(sch.runLabel, "October payroll");
   assert.equal(get("p-tbody").children.length, 12);
-  assert.match(get("p-countdown").textContent, /2026-10-01/);
+  assert.match(get("p-countdown").textContent, new RegExp(anchor));
   assert.match(get("p-total-out").textContent, /11\.25000546 PRL/);
+  assert.ok(get("p-skip-warn").hidden, "no skip warning for a current anchor");
+  // past anchor: the desk must say so, naming the skipped payday
+  get("p-anchor").value = yesterdayIso();
+  get("p-plan").click();
+  await tick();
+  assert.ok(!get("p-skip-warn").hidden, "skip warning shown for a past anchor");
+  assert.match(get("p-skip-warn").textContent, /1 payday was skipped/);
+  assert.match(get("p-skip-warn").textContent, /never paid, settle it manually/);
+  // restore a current labeled schedule for the rest of the flow
+  get("p-anchor").value = anchor;
+  get("p-plan").click();
+  await tick();
+  assert.equal(T.state().schedule.payDate, anchor);
   get("p-next").click();
   await tick();
   assert.ok(!get("step-fund").hidden, "moved to fund");
@@ -306,7 +323,7 @@ test("schedule: custom days + monthly, no-auto-pay note always shown", async () 
   assert.ok(html.includes("No auto-pay: each of these dates needs a fresh signed dispatch"), "no-auto-pay note in markup");
   // restore a labeled schedule for the rest of the flow
   get("p-period").value = "weekly";
-  get("p-anchor").value = "2026-10-01";
+  get("p-anchor").value = todayIso();
   get("p-label").value = "October payroll";
   get("p-plan").click();
   await tick();
@@ -382,7 +399,7 @@ test("review: breakdown, exact fee math, double-confirm gate, bundle", async () 
   const b = JSON.parse(get("s-bundle").value);
   assert.equal(b.bundle, "pearl-payroll-unsigned:v1:");
   assert.equal(b.descriptor.runLabel, "October payroll");
-  assert.equal(b.descriptor.payDate, "2026-10-01");
+  assert.equal(b.descriptor.payDate, todayIso());
   assert.equal(b.descriptor.period, "weekly");
 });
 

@@ -301,6 +301,14 @@
       const dates = R.nextPayDates({ anchor, period, customDays, count: 12 });
       const runLabel = $("p-label").value.trim() || `${PERIOD_LABELS[period] || period} run — ${dates[0].iso}`;
       state.schedule = { dates, period, customDays, anchor, runLabel, payDate: dates[0].iso };
+      const skipped = dates.skippedPaydays || 0;
+      const warn = $("p-skip-warn");
+      if (skipped > 0) {
+        warn.hidden = false;
+        warn.innerHTML = `<strong>Heads up:</strong> the anchor ${escapeHtml(anchor)} is in the past — ${skipped} payday${skipped > 1 ? "s were" : " was"} skipped, so the calendar starts from the next upcoming payday, ${escapeHtml(dates[0].iso)}. If ${skipped === 1 ? "that run was" : "any of those runs were"} never paid, settle ${skipped === 1 ? "it" : "them"} manually before continuing.`;
+      } else {
+        warn.hidden = true; warn.textContent = "";
+      }
       $("p-period-out").textContent = period === "custom" ? `Custom — every ${customDays} days (anchor ${anchor})` : `${PERIOD_LABELS[period]} (anchor ${anchor})`;
       $("p-total-out").textContent = `${R.fmtPRL(state.roster.total)} PRL per run × ${state.roster.payees.length} payee(s)`;
       const ms = R.msUntilPayday(dates);

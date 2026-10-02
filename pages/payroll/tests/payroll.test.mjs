@@ -212,6 +212,19 @@ test("nextPayDates: past anchor advances to the next upcoming payday", () => {
   const ds = nextPayDates({ anchor: "2026-10-01", period: "biweekly", count: 2, from: "2026-10-20" });
   assert.deepEqual(ds.map((d) => d.iso), ["2026-10-29", "2026-11-12"]);
   assert.deepEqual(ds.map((d) => d.index), [2, 3]);
+  assert.equal(ds.skippedPaydays, 2);
+});
+
+test("nextPayDates: skippedPaydays counts skipped runs (0 when anchor is current)", () => {
+  const fresh = nextPayDates({ anchor: "2026-10-01", period: "weekly", count: 3, from: "2026-10-01" });
+  assert.equal(fresh.skippedPaydays, 0);
+  const stale = nextPayDates({ anchor: "2026-10-01", period: "weekly", count: 3, from: "2026-10-02" });
+  assert.equal(stale.skippedPaydays, 1);
+  assert.equal(stale[0].iso, "2026-10-08");
+  // Jan 31 anchor, Mar 1 "today": Jan 31 + Feb 28 skipped (Feb 28 < Mar 1), Mar 31 first
+  const monthly = nextPayDates({ anchor: "2026-01-31", period: "monthly", count: 3, from: "2026-03-01" });
+  assert.deepEqual(monthly.map((d) => d.iso), ["2026-03-31", "2026-04-30", "2026-05-31"]);
+  assert.equal(monthly.skippedPaydays, 2);
 });
 
 test("nextPayDates: monthly preserves day-of-month with clamping", () => {

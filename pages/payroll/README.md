@@ -19,8 +19,11 @@ Built by [@kshot9000](https://x.com/kshot9000) · tips: `prl1p62v09vuzyd8kdz9l23
    Rows can be added, edited, and removed after validation.
 2. **Schedule** — pick weekly, biweekly, monthly, or a custom day count, set an
    anchor payday and an optional run label. The planner shows the next **12 pay
-   dates** plus a countdown to the next payday. Schedules are planners only —
-   each date still needs a fresh signed dispatch through steps 3–6.
+   dates** plus a countdown to the next payday. The anchor is a reference: dates
+   before today are skipped so the table always shows upcoming paydays, and when
+   any are skipped the desk says so up front ("1 payday was skipped — settle it
+   manually") instead of silently dropping a run you may owe. Schedules are
+   planners only — each date still needs a fresh signed dispatch through steps 3–6.
 3. **Fund** — paste the sender `prl1…` address and fetch its UTXOs from Blockbook
    (GET-only), or paste `txid:vout grains` lines for an air-gapped run. Auto mode
    selects the fewest largest-first UTXOs that cover the run; manual mode lets
