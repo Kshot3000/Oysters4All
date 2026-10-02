@@ -63,8 +63,8 @@
     </label>
     <button class="btn ghost" id="fee-estimate" type="button">Estimate fee</button>
     <button class="btn danger-ghost" id="wipe" type="button">Wipe keys</button>
-    <span class="cfg-msg" id="cfg-msg"></span>
-    <span class="cfg-msg" id="wipe-msg"></span>
+    <span class="cfg-msg" id="cfg-msg" aria-live="polite"></span>
+    <span class="cfg-msg" id="wipe-msg" aria-live="polite"></span>
   </section>
 
   <!-- STEP 1: MANIFEST -->
@@ -112,7 +112,7 @@
       </label>
       <div class="rowbtns wide">
         <button class="btn ghost" id="f-fetch" type="button">Fetch UTXOs (Blockbook)</button>
-        <span class="cfg-msg" id="f-fetch-msg"></span>
+        <span class="cfg-msg" id="f-fetch-msg" aria-live="polite"></span>
       </div>
       <label class="wide">…or paste UTXOs <span class="hintline">one per line: <code>txid:vout value [prl|grains] [address]</code> — air-gapped</span>
         <textarea id="f-paste" rows="4" spellcheck="false" placeholder="ab12…:0 150000000"></textarea>
@@ -264,7 +264,7 @@
       <div class="rowbtns">
         <button class="btn ghost" id="b-track-start" type="button">Start tracking</button>
         <button class="btn ghost" id="b-track-stop" type="button">Stop</button>
-        <span class="cfg-msg" id="b-track-msg"></span>
+        <span class="cfg-msg" id="b-track-msg" aria-live="polite"></span>
       </div>
       <div class="card inset" id="b-verify-out" hidden>
         <h4 id="b-verdict"></h4>

@@ -71,7 +71,7 @@
           <button id="make-gift" class="primary">Generate gift wallet</button>
           <button id="new-gift" class="ghost">↻ new random</button>
         </div>
-        <p id="gift-error" class="error" hidden></p>
+        <p id="gift-error" class="error" hidden role="alert"></p>
       </div>
 
       <div class="panel" id="gift-key-card" hidden>
@@ -118,7 +118,7 @@
       <div class="load-right">
         <div class="kv big"><span>Gift address</span><code id="load-address">—</code></div>
         <div class="kv big"><span>Confirmed balance</span><strong id="load-balance">not checked</strong></div>
-        <p id="funding-error" class="error" hidden></p>
+        <p id="funding-error" class="error" hidden role="alert"></p>
         <p class="hint">Funding needs at least one confirmation before a redeem sweep will succeed.
           The sweep fee is deducted automatically at redeem time — no separate fee wallet needed.</p>
       </div>
@@ -172,7 +172,7 @@
         <div class="row">
           <button id="redeem-derive" class="primary">Read card</button>
         </div>
-        <p id="redeem-error" class="error" hidden></p>
+        <p id="redeem-error" class="error" hidden role="alert"></p>
         <div id="redeem-card" hidden>
           <div class="kv"><span>Gift address</span><code id="redeem-address"></code></div>
           <label>UTXO source
@@ -199,8 +199,8 @@
         <div class="row"><button id="redeem-plan" class="primary">Plan sweep</button></div>
         <div id="plan-summary" class="plan" hidden></div>
         <div class="row"><button id="build-sweep" class="primary" disabled>Build &amp; sign sweep</button></div>
-        <p id="sweep-error" class="error" hidden></p>
-        <div id="sweep-result" hidden>
+        <p id="sweep-error" class="error" hidden role="alert"></p>
+        <div id="sweep-result" hidden aria-live="polite">
           <div class="kv"><span>TXID</span><code id="sweep-txid"></code></div>
           <label>Signed transaction (hex)
             <textarea id="sweep-hex" rows="4" readonly spellcheck="false"></textarea>
@@ -209,7 +209,7 @@
           <div class="row">
             <button id="broadcast-sweep" class="primary">Broadcast via Blockbook</button>
           </div>
-          <p id="broadcast-error" class="error" hidden></p>
+          <p id="broadcast-error" class="error" hidden role="alert"></p>
           <p id="broadcast-ok" class="ok" hidden></p>
         </div>
       </div>

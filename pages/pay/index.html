@@ -96,7 +96,7 @@
       <textarea id="set-xpub" class="input mono wide" rows="2" spellcheck="false"
                 placeholder="xpub6… (mainnet) or tpub6… (testnet)"></textarea>
     </label>
-    <div id="xpub-status" class="xpub-status muted">No xpub configured — paste one to enable fresh addresses.</div>
+    <div id="xpub-status" class="xpub-status muted" aria-live="polite">No xpub configured — paste one to enable fresh addresses.</div>
     <div class="grid3">
       <label>Next invoice index
         <input id="set-index" class="input mono" type="number" min="0" step="1" value="0" />
@@ -110,7 +110,7 @@
     </div>
     <div class="row">
       <button class="btn btn-ghost" id="btn-scan" type="button">🔍 Scan chain for next unused index</button>
-      <span class="muted" id="scan-status"></span>
+      <span class="muted" id="scan-status" aria-live="polite"></span>
     </div>
     <div class="grid2" style="margin-top:.75rem">
       <label>Rate source

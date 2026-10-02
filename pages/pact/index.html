@@ -106,8 +106,8 @@ tails — Bob wins | 0.00000546 | 1.99998559</textarea>
       <button class="primary" id="d-draft">Draft &amp; seal pact</button>
       <button class="secondary" id="d-mint-oracle">Mint fresh oracle key</button>
     </div>
-    <div class="error-box" id="d-error" hidden></div>
-    <div class="result-box" id="d-result" hidden>
+    <div class="error-box" id="d-error" hidden role="alert"></div>
+    <div class="result-box" id="d-result" hidden aria-live="polite">
       <div class="kv"><span>Descriptor</span><code id="d-descriptor"></code><button class="copy" data-copy="#d-descriptor">copy</button></div>
       <div class="kv"><span>Funding address</span><code class="addr" id="d-address"></code><button class="copy" data-copy="#d-address">copy</button></div>
       <div class="kv"><span>Funding script</span><code id="d-script"></code><button class="copy" data-copy="#d-script">copy</button></div>
@@ -123,7 +123,7 @@ tails — Bob wins | 0.00000546 | 1.99998559</textarea>
     <h3>Verify a pact descriptor</h3>
     <div class="form-grid"><label class="wide">Paste exported pact terms JSON <textarea id="d-verify-in" rows="4"></textarea></label></div>
     <div class="row"><button class="secondary" id="d-verify">Verify seal</button></div>
-    <div class="verdict-box" id="d-verify-result" hidden></div>
+    <div class="verdict-box" id="d-verify-result" hidden aria-live="polite"></div>
   </section>
 
   <!-- ============ STEP 2: FUND ============ -->
@@ -142,8 +142,8 @@ tails — Bob wins | 0.00000546 | 1.99998559</textarea>
       <button class="primary" id="f-plan">Plan funding tx</button>
       <button class="secondary" id="f-balance">Check funding address balance</button>
     </div>
-    <div class="error-box" id="f-error" hidden></div>
-    <div class="result-box" id="f-result" hidden>
+    <div class="error-box" id="f-error" hidden role="alert"></div>
+    <div class="result-box" id="f-result" hidden aria-live="polite">
       <div class="kv"><span>Funding txid</span><code id="f-txid"></code><button class="copy" data-copy="#f-txid">copy</button></div>
       <div class="kv"><span>vBytes / fee</span><code id="f-feeinfo"></code><span></span></div>
       <div class="kv"><span>Outputs</span><code id="f-outputs"></code><span></span></div>
@@ -156,7 +156,7 @@ tails — Bob wins | 0.00000546 | 1.99998559</textarea>
         <label>Bob private key (64 hex) <input id="f-bpriv" placeholder="optional — leave blank to stay unsigned"></input></label>
       </div>
       <div class="row"><button class="secondary" id="f-sign">Sign funding tx</button></div>
-      <div class="error-box" id="f-sign-error" hidden></div>
+      <div class="error-box" id="f-sign-error" hidden role="alert"></div>
       <div id="f-signed-wrap" hidden>
         <h3>Signed funding hex — broadcast it, then record the txid</h3>
         <textarea aria-label="Signed funding transaction hex" id="f-signed" rows="4" readonly></textarea>
@@ -168,7 +168,7 @@ tails — Bob wins | 0.00000546 | 1.99998559</textarea>
       <div class="note-box">After the funding transaction confirms, carry its txid to the Seal step (vout is
       <code id="f-vout-note">0</code> for the planner above; adjust if you funded manually).</div>
     </div>
-    <div class="verdict-box" id="f-balance-result" hidden></div>
+    <div class="verdict-box" id="f-balance-result" hidden aria-live="polite"></div>
   </section>
 
   <!-- ============ STEP 3: SEAL ============ -->
@@ -185,12 +185,12 @@ tails — Bob wins | 0.00000546 | 1.99998559</textarea>
       <label>Bob private key (64 hex) <input id="s-bpriv"></label>
     </div>
     <div class="row"><button class="primary" id="s-build">Build CETs</button></div>
-    <div class="error-box" id="s-error" hidden></div>
-    <div class="result-box" id="s-result" hidden>
+    <div class="error-box" id="s-error" hidden role="alert"></div>
+    <div class="result-box" id="s-result" hidden aria-live="polite">
       <h3>Contract Execution Transactions</h3>
       <div id="s-cets"></div>
       <div class="row"><button class="primary" id="s-seal">Run sealing ceremony</button></div>
-      <div class="error-box" id="s-seal-error" hidden></div>
+      <div class="error-box" id="s-seal-error" hidden role="alert"></div>
       <div id="s-sealed-wrap" hidden>
         <h3>Sealed pact bundle <span class="pill ok" id="s-seal-pill">SEALED</span></h3>
         <div id="s-seal-table"></div>
@@ -222,8 +222,8 @@ tails — Bob wins | 0.00000546 | 1.99998559</textarea>
       <label class="wide">Demo oracle private key (64 hex) — only for pacts drafted with the demo minter
         <input id="x-oraclepriv" placeholder="paste the demo oracle key to attest"></label>
     </div>
-    <div class="error-box" id="x-error" hidden></div>
-    <div class="verdict-box" id="x-result" hidden></div>
+    <div class="error-box" id="x-error" hidden role="alert"></div>
+    <div class="verdict-box" id="x-result" hidden aria-live="polite"></div>
     <div class="result-box" id="x-hex-wrap" hidden>
       <h3>Final CET hex — broadcast to claim</h3>
       <div class="kv"><span>Outcome</span><code id="x-label"></code><span></span></div>
@@ -250,14 +250,14 @@ tails — Bob wins | 0.00000546 | 1.99998559</textarea>
       <label>Bob private key (64 hex) <input id="r-bpriv"></label>
     </div>
     <div class="row"><button class="primary" id="r-build">Build refund tx</button></div>
-    <div class="error-box" id="r-error" hidden></div>
-    <div class="result-box" id="r-result" hidden>
+    <div class="error-box" id="r-error" hidden role="alert"></div>
+    <div class="result-box" id="r-result" hidden aria-live="polite">
       <div class="kv"><span>Refund txid</span><code id="r-txid"></code><button class="copy" data-copy="#r-txid">copy</button></div>
       <div class="kv"><span>Valid after block</span><code id="r-lock"></code><span></span></div>
       <div class="kv"><span>Alice gets / Bob gets / fee</span><code id="r-splits"></code><span></span></div>
       <div class="kv"><span>Digest</span><code id="r-digest"></code><button class="copy" data-copy="#r-digest">copy</button></div>
       <div class="row"><button class="secondary" id="r-sign">Both parties sign refund</button></div>
-      <div class="error-box" id="r-sign-error" hidden></div>
+      <div class="error-box" id="r-sign-error" hidden role="alert"></div>
       <div id="r-signed-wrap" hidden>
         <h3>Signed refund hex — keep it safe until the lock height</h3>
         <textarea aria-label="Signed refund transaction hex" id="r-signed" rows="4" readonly></textarea>

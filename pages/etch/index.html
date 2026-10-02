@@ -42,7 +42,7 @@
       <button id="add-op" class="btn primary">Engrave into batch ↓</button>
       <button id="preset-prls" class="btn ghost" title="Fill the official PRLS launch parameters">PRLS preset</button>
     </div>
-    <div id="op-error" class="error" hidden></div>
+    <div id="op-error" class="error" hidden role="alert"></div>
     <h3>Batch <span id="batch-count" class="count">0</span></h3>
     <p class="hint">Multiple envelopes can share one reveal: pure mint batches consolidate to a single owner output; mixed batches map each envelope to its own owner output (per the PRL-20 v0 spec).</p>
     <ul id="batch-list" class="batch-list"></ul>
@@ -79,7 +79,7 @@
       <button id="make-key" class="btn primary">Create key</button>
       <button id="new-key" class="btn ghost">New random key</button>
     </div>
-    <div id="key-error" class="error" hidden></div>
+    <div id="key-error" class="error" hidden role="alert"></div>
     <div id="key-card" class="key-card" hidden>
       <div><span class="k">Address</span><code id="key-address"></code></div>
       <div><span class="k">Mnemonic</span><code id="key-mnemonic" class="secret"></code>
@@ -118,11 +118,11 @@
       <input aria-label="Fee rate" id="fee-slider" type="range" min="1" max="100" value="5">
       <button id="fee-auto" class="btn ghost">auto</button>
     </div>
-    <div id="commit-error" class="error" hidden></div>
+    <div id="commit-error" class="error" hidden role="alert"></div>
     <div class="row">
       <button id="build-commit" class="btn primary" disabled>Build &amp; sign commit</button>
     </div>
-    <div id="commit-result" class="result" hidden>
+    <div id="commit-result" class="result" hidden aria-live="polite">
       <div><span class="k">Commit txid</span><code id="commit-txid"></code></div>
       <div><span class="k">Fee paid</span><code id="commit-fee"></code></div>
       <label>Signed commit hex <textarea id="commit-hex" rows="4" readonly></textarea></label>
@@ -153,11 +153,11 @@
       <button id="detect-commit" class="btn ghost">Detect from commit address</button>
     </div>
     <div id="reveal-plan" class="plan" hidden></div>
-    <div id="reveal-error" class="error" hidden></div>
+    <div id="reveal-error" class="error" hidden role="alert"></div>
     <div class="row">
       <button id="build-reveal" class="btn primary">Build &amp; sign reveal</button>
     </div>
-    <div id="reveal-result" class="result" hidden>
+    <div id="reveal-result" class="result" hidden aria-live="polite">
       <div><span class="k">Reveal txid</span><code id="reveal-txid"></code></div>
       <div><span class="k">Fee paid</span><code id="reveal-fee"></code></div>
       <label>Signed reveal hex <textarea id="reveal-hex" rows="4" readonly></textarea></label>

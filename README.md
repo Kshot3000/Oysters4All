@@ -114,7 +114,20 @@ the Hermes landing page's card links, and every native checkbox and radio
 in the fleet (previously 13–18px, now 24px). Links inside a sentence keep
 their inline size, which 2.5.8 explicitly allows. Re-probed after the fix:
 0 standalone targets under 24px remain, and every changed stylesheet
-carries a bumped `?v=` cache key.
+carries a bumped `?v=` cache key. A ninth pass the same day fixed status
+messages (WCAG 4.1.3): the fleet's apps report outcomes by filling in
+error, result, and status elements, but almost none of those elements
+were live regions, so screen readers stayed silent when a derivation
+failed or a result landed. 264 message elements across 49 pages were
+classified and marked up — every `*-error` element (140) now carries
+`role="alert"` so failures announce assertively, and every `*-msg`,
+`*-result`, and `*-status` element (124) carries `aria-live="polite"`,
+including the Pay invoice page's error card and the Wallet toast.
+Verified in a real browser on all 82 pages: every message element sits
+in a live region, zero console errors, and triggering a real error in
+Hush surfaces the message through its alert region. No styles or
+scripts changed, so no cache keys moved; all 77 test suites match their
+pre-pass results exactly.
 
 ## Support this work
 

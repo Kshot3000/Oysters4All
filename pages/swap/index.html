@@ -113,7 +113,7 @@
     <p class="danger" id="p-pre-warn" hidden>⚠ This preimage controls the locked PRL. Back it up once, share only the hash, and clear it after the swap settles.</p>
     <div class="row">
       <button class="btn primary" id="propose-btn">Forge swap contract</button>
-      <span class="error" id="propose-error" hidden></span>
+      <span class="error" id="propose-error" hidden role="alert"></span>
     </div>
     <div id="propose-out" hidden>
       <h3>Swap address <span class="hint">— both parties must re-derive this independently</span></h3>
@@ -156,7 +156,7 @@
     <textarea aria-label="Swap spec JSON" id="lock-spec" rows="3" spellcheck="false" placeholder="Swap spec JSON (carried over from Propose, or paste it)"></textarea>
     <div class="row">
       <button class="btn ghost" id="lock-load-btn">Load spec</button>
-      <span class="error" id="lock-error" hidden></span>
+      <span class="error" id="lock-error" hidden role="alert"></span>
     </div>
     <div id="lock-summary" class="summary" hidden></div>
     <div id="lock-work" hidden>
@@ -201,7 +201,7 @@
         <label class="confirm"><input type="checkbox" id="lock-confirm"> I understand this broadcasts a real PRL transaction that only the swap contract can release.</label>
         <div class="row"><button class="btn primary" id="lock-broadcast-btn">Broadcast via Blockbook</button></div>
         <div id="lock-ok" class="ok" hidden></div>
-        <div id="lock-bcast-error" class="error" hidden></div>
+        <div id="lock-bcast-error" class="error" hidden role="alert"></div>
       </div>
       <h3>Bitcoin mirror template <span class="hint">— for Bob's side; Pearl Swap never builds BTC transactions</span></h3>
       <p class="lede">Hand this to Bob. He reproduces the BTC HTLC below with his own Bitcoin tooling — the
@@ -247,7 +247,7 @@
     <textarea aria-label="Swap spec JSON to track" id="track-spec" rows="3" spellcheck="false" placeholder="Swap spec JSON"></textarea>
     <div class="row">
       <button class="btn ghost" id="track-load-btn">Load spec</button>
-      <span class="error" id="track-error" hidden></span>
+      <span class="error" id="track-error" hidden role="alert"></span>
     </div>
     <div id="track-work" hidden>
       <div class="row">
@@ -290,7 +290,7 @@
           </div>
           <div class="row">
             <button class="btn primary" id="claim-build-btn">Build + sign claim tx</button>
-            <span class="error" id="claim-error" hidden></span>
+            <span class="error" id="claim-error" hidden role="alert"></span>
           </div>
           <div id="claim-out" hidden>
             <p>txid: <code id="claim-txid" class="addr small"></code></p>
@@ -299,7 +299,7 @@
             <label class="confirm"><input type="checkbox" id="claim-confirm"> I understand this reveals the preimage on-chain and releases the PRL to the destination.</label>
             <div class="row"><button class="btn primary" id="claim-broadcast-btn">Broadcast via Blockbook</button></div>
             <div id="claim-ok" class="ok" hidden></div>
-            <div id="claim-bcast-error" class="error" hidden></div>
+            <div id="claim-bcast-error" class="error" hidden role="alert"></div>
           </div>
         </div>
       </div>
@@ -310,7 +310,7 @@
         <textarea aria-label="Bob's claim transaction hex" id="alice-claim-hex" rows="4" spellcheck="false" placeholder="Bob's claim transaction hex"></textarea>
         <div class="row">
           <button class="btn primary" id="alice-extract-btn">Extract preimage</button>
-          <span class="error" id="alice-error" hidden></span>
+          <span class="error" id="alice-error" hidden role="alert"></span>
         </div>
         <div id="alice-out" hidden>
           <h4>Preimage</h4>
@@ -352,7 +352,7 @@
       <div class="row">
         <button class="btn ghost" id="refund-tip-btn">Fetch current height</button>
         <button class="btn primary" id="refund-build-btn">Build + sign refund tx</button>
-        <span class="error" id="refund-error" hidden></span>
+        <span class="error" id="refund-error" hidden role="alert"></span>
       </div>
       <div id="refund-out" hidden>
         <p>txid: <code id="refund-txid" class="addr small"></code></p>
@@ -361,7 +361,7 @@
         <label class="confirm"><input type="checkbox" id="refund-confirm"> I understand this reclaims the locked PRL to the destination after T1.</label>
         <div class="row"><button class="btn primary" id="refund-broadcast-btn">Broadcast via Blockbook</button></div>
         <div id="refund-ok" class="ok" hidden></div>
-        <div id="refund-bcast-error" class="error" hidden></div>
+        <div id="refund-bcast-error" class="error" hidden role="alert"></div>
       </div>
     </div>
   </section>

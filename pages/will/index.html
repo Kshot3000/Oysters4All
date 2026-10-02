@@ -118,7 +118,7 @@
     </div>
     <p class="err" id="d-err" hidden></p>
 
-    <div id="d-result" class="result-card" hidden>
+    <div id="d-result" class="result-card" hidden aria-live="polite">
       <h3>Sealed vault</h3>
       <dl class="kv">
         <dt>Vault address</dt><dd><code id="d-addr"></code> <button class="copy" data-copy="d-addr">copy</button></dd>
@@ -191,7 +191,7 @@
       <dt>Chain tip</dt><dd><span id="w-tip"></span></dd>
       <dt>Unlock block</dt><dd><span id="w-unlock"></span></dd>
       <dt>Countdown</dt><dd><span id="w-countdown"></span></dd>
-      <dt>Status</dt><dd><span id="w-status"></span></dd>
+      <dt>Status</dt><dd><span id="w-status" aria-live="polite"></span></dd>
       <dt>Confirmed balance</dt><dd><span id="w-balance"></span></dd>
       <dt>Recent txs</dt><dd><span id="w-txs"></span></dd>
     </dl>
@@ -328,7 +328,7 @@
     </div>
     <div class="row"><button id="v-check" class="primary">Verify descriptor</button></div>
     <p class="err" id="v-err" hidden></p>
-    <div id="v-result" class="result-card" hidden>
+    <div id="v-result" class="result-card" hidden aria-live="polite">
       <h3 id="v-verdict"></h3>
       <ul id="v-checks" class="checks"></ul>
     </div>

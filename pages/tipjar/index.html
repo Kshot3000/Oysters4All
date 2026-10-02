@@ -24,7 +24,7 @@
 <main id="main" tabindex="-1">
   <section class="panel" id="wizard-panel">
     <h2>1 · Configure your jar</h2>
-    <p id="tj-error" class="error" hidden></p>
+    <p id="tj-error" class="error" hidden role="alert"></p>
 
     <label class="field">
       <span>Recipient address <small>(prl1… mainnet or tprl1… testnet — validated bech32m, witness v1)</small></span>
@@ -128,7 +128,7 @@
     <div class="actions">
       <button id="tj-verify" class="btn primary" type="button">Verify</button>
     </div>
-    <div id="tj-verify-result" class="verify" hidden></div>
+    <div id="tj-verify-result" class="verify" hidden aria-live="polite"></div>
   </section>
 
   <section class="panel" id="listen-panel">

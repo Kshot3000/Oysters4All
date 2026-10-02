@@ -33,7 +33,7 @@
     <button type="button" class="step" id="sw-step-5" data-step="5"><span class="n">5</span> Verify</button>
   </nav>
 
-  <p id="sw-error" class="error" hidden></p>
+  <p id="sw-error" class="error" hidden role="alert"></p>
 
   <!-- STEP 1: ANALYZE -->
   <section class="panel" id="sw-panel-1">
@@ -56,7 +56,7 @@
     <div class="actions">
       <button id="sw-analyze" class="btn primary" type="button">Analyze UTXOs</button>
     </div>
-    <p class="status" id="sw-analyze-status"></p>
+    <p class="status" id="sw-analyze-status" aria-live="polite"></p>
 
     <div id="sw-dash" hidden>
       <div class="dash-grid">
@@ -158,7 +158,7 @@
       <button id="sw-sign" class="btn primary" type="button">Sign consolidation</button>
       <button id="sw-wipe" class="btn ghost" type="button" title="Wipe the key from page memory">🧹 Wipe key</button>
     </div>
-    <p class="status" id="sw-sign-status"></p>
+    <p class="status" id="sw-sign-status" aria-live="polite"></p>
     <div id="sw-signed" hidden>
       <p class="ok-line" id="sw-sign-ok"></p>
       <p class="note" id="sw-key-note"></p>
@@ -181,7 +181,7 @@
       <div class="actions">
         <button id="sw-broadcast" class="btn danger" type="button">Broadcast via Blockbook</button>
       </div>
-      <p class="status" id="sw-broadcast-status"></p>
+      <p class="status" id="sw-broadcast-status" aria-live="polite"></p>
     </div>
   </section>
 
@@ -196,7 +196,7 @@
       <button id="sw-track-start" class="btn primary" type="button">Watch</button>
       <button id="sw-track-stop" class="btn" type="button" disabled>Stop</button>
     </div>
-    <p class="status" id="sw-track-status"></p>
+    <p class="status" id="sw-track-status" aria-live="polite"></p>
     <div id="sw-track-out" hidden>
       <div class="dash-grid">
         <div class="stat"><span class="k">Confirmations</span><span class="v" id="sw-tr-conf">—</span></div>
@@ -216,7 +216,7 @@
     <div class="actions">
       <button id="sw-verify-rescan" class="btn primary" type="button">Re-scan address</button>
     </div>
-    <p class="status" id="sw-verify-status"></p>
+    <p class="status" id="sw-verify-status" aria-live="polite"></p>
     <div id="sw-verify-out" hidden>
       <p id="sw-verdict" class="verdict"></p>
       <div class="table-wrap">
@@ -245,7 +245,7 @@
     <div class="actions">
       <button id="sw-sa-run" class="btn" type="button">Verify txid</button>
     </div>
-    <p class="status" id="sw-sa-status"></p>
+    <p class="status" id="sw-sa-status" aria-live="polite"></p>
     <div id="sw-sa-out" class="math mono" hidden></div>
   </section>
 

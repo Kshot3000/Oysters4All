@@ -145,7 +145,7 @@
       <div class="row">
         <button id="a-check" class="ghost">Recompute &amp; compare</button>
       </div>
-      <div id="a-check-result" class="verdict-box" hidden></div>
+      <div id="a-check-result" class="verdict-box" hidden aria-live="polite"></div>
     </div>
     <div class="row nav-row">
       <button id="a-back" class="ghost">← Setup</button>
@@ -188,7 +188,7 @@
         <div class="row">
           <button id="f-tally" class="ghost">Tally pasted UTXOs</button>
         </div>
-        <div id="f-tally-result" class="kv" hidden></div>
+        <div id="f-tally-result" class="kv" hidden aria-live="polite"></div>
       </div>
     </div>
     <div class="row nav-row">
@@ -210,7 +210,7 @@
     <h3>Message to sign</h3>
     <div class="form-grid">
       <label class="wide">Message (plain text is hashed to 32 bytes; or paste a 64-hex digest)
-        <textarea id="g-msg" rows="2" spellcheck="false" placeholder="e.g. mesh spends 2.5 PRL to prl1p… (or 64-hex digest)"></textarea>
+        <textarea id="g-msg" rows="2" spellcheck="false" placeholder="e.g. mesh spends 2.5 PRL to prl1p… (or 64-hex digest)" aria-live="polite"></textarea>
       </label>
       <label>Session salt (fresh per ceremony)
         <input id="g-salt" type="text" readonly spellcheck="false">
@@ -251,7 +251,7 @@
       <div class="row">
         <button id="g-simulate" class="ghost">Run local simulation</button>
       </div>
-      <div id="g-sim-result" class="kv" hidden></div>
+      <div id="g-sim-result" class="kv" hidden aria-live="polite"></div>
     </div>
 
     <div class="row nav-row">
@@ -283,7 +283,7 @@
     <div class="row">
       <button id="v-check-desc" class="primary">Verify descriptor</button>
     </div>
-    <div id="v-desc-result" class="verdict-box" hidden></div>
+    <div id="v-desc-result" class="verdict-box" hidden aria-live="polite"></div>
 
     <h3>Signature verifier</h3>
     <div class="form-grid">
@@ -291,7 +291,7 @@
         <input id="v-sig" type="text" spellcheck="false" placeholder="128-hex Schnorr signature">
       </label>
       <label class="wide">Message (text or 64-hex digest)
-        <input id="v-msg" type="text" spellcheck="false" placeholder="message that was signed">
+        <input id="v-msg" type="text" spellcheck="false" placeholder="message that was signed" aria-live="polite">
       </label>
       <label class="wide">Aggregate key (address or 64-hex x-only)
         <input id="v-key" type="text" spellcheck="false" placeholder="prl1p… or 64-hex">
@@ -300,7 +300,7 @@
     <div class="row">
       <button id="v-check-sig" class="primary">Verify signature</button>
     </div>
-    <div id="v-sig-result" class="verdict-box" hidden></div>
+    <div id="v-sig-result" class="verdict-box" hidden aria-live="polite"></div>
 
     <div class="row nav-row">
       <button id="v-back" class="ghost">← Sign</button>

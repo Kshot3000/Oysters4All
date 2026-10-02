@@ -59,7 +59,7 @@
       <input id="feerate" type="number" min="1" step="1" value="20">
     </label>
     <button class="btn ghost" id="fee-estimate" type="button">Estimate fee</button>
-    <span class="cfg-msg" id="cfg-msg"></span>
+    <span class="cfg-msg" id="cfg-msg" aria-live="polite"></span>
   </section>
 
   <!-- STEP 1: LAUNCH -->
@@ -172,7 +172,7 @@
     </label>
     <div class="rowbtns">
       <button class="btn primary" id="tr-scan" type="button">Scan chain</button>
-      <span class="cfg-msg" id="tr-scan-msg"></span>
+      <span class="cfg-msg" id="tr-scan-msg" aria-live="polite"></span>
     </div>
     <p class="err" id="tr-err" hidden></p>
     <div id="tr-out" hidden>
@@ -180,7 +180,7 @@
         <div class="gauge"><span class="g-label">Pledged</span><strong id="tr-total">–</strong><span class="g-sub" id="tr-total-grains"></span></div>
         <div class="gauge"><span class="g-label">Backers</span><strong id="tr-count">–</strong><span class="g-sub" id="tr-funded"></span></div>
         <div class="gauge"><span class="g-label">Tide turns in</span><strong id="tr-blocks">–</strong><span class="g-sub" id="tr-deadline"></span></div>
-        <div class="gauge"><span class="g-label">Status</span><strong id="tr-status">–</strong><span class="g-sub" id="tr-goal-note"></span></div>
+        <div class="gauge"><span class="g-label">Status</span><strong id="tr-status" aria-live="polite">–</strong><span class="g-sub" id="tr-goal-note"></span></div>
       </div>
       <div class="progress"><div class="bar" id="tr-bar"></div></div>
       <table class="ledger"><thead><tr><th>Pledge address</th><th>Backer key</th><th>Funded</th></tr></thead>
@@ -203,7 +203,7 @@
     </label>
     <div class="rowbtns">
       <button class="btn primary" id="rl-load-scan" type="button">Load + scan funding</button>
-      <span class="cfg-msg" id="rl-scan-msg"></span>
+      <span class="cfg-msg" id="rl-scan-msg" aria-live="polite"></span>
     </div>
     <p class="err" id="rl-err" hidden></p>
     <div id="rl-out" hidden>
@@ -235,7 +235,7 @@
             <button class="btn" id="rl-sign-recip" type="button">Sign as recipient</button>
             <button class="btn" id="rl-sign-creator" type="button">Sign as creator</button>
           </div>
-          <div class="rowbtns"><span class="cfg-msg" id="rl-status"></span></div>
+          <div class="rowbtns"><span class="cfg-msg" id="rl-status" aria-live="polite"></span></div>
         </div>
         <div class="rowbtns"><button class="btn primary" id="rl-finalize" type="button">Finalize + review transaction</button></div>
         <div id="rl-review-wrap" hidden>
@@ -302,7 +302,7 @@
 
   <section class="lockbar">
     <button class="btn ghost" id="wipe" type="button">🔒 Lock — wipe all keys from page memory</button>
-    <span class="cfg-msg" id="wipe-msg"></span>
+    <span class="cfg-msg" id="wipe-msg" aria-live="polite"></span>
   </section>
 </main>
 

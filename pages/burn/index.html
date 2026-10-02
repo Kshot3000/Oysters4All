@@ -72,7 +72,7 @@
     <div class="row">
       <button id="g-generate" class="primary">Derive burn address</button>
     </div>
-    <div id="g-result" class="result-box" hidden>
+    <div id="g-result" class="result-box" hidden aria-live="polite">
       <div class="kv"><span>Burn address</span><code id="g-address" class="addr"></code><button class="copy secondary" data-copy="#g-address">copy</button></div>
       <div class="kv"><span>NUMS internal key</span><code id="g-internal"></code><button class="copy secondary" data-copy="#g-internal">copy</button></div>
       <div class="kv"><span>Tweaked output key (P2TR)</span><code id="g-output"></code><button class="copy secondary" data-copy="#g-output">copy</button></div>
@@ -124,7 +124,7 @@
     <div class="row">
       <button id="p-plan" class="primary">Build unsigned burn tx</button>
     </div>
-    <div id="p-result" class="result-box" hidden>
+    <div id="p-result" class="result-box" hidden aria-live="polite">
       <div class="kv"><span>Burn address</span><code id="p-burnaddr" class="addr"></code></div>
       <div class="kv"><span>Burn output</span><code id="p-burnout"></code></div>
       <div class="kv"><span>Change output</span><code id="p-changeout"></code></div>
@@ -134,7 +134,7 @@
       <p class="note-box">This hex is <strong>unsigned</strong>. Sign it in your own wallet (any PRL signer that accepts raw hex),
       then broadcast the signed tx. The desk re-verified the hex by decoding it before showing it to you — outputs, values and fee all match the plan.</p>
     </div>
-    <div id="p-error" class="error-box" hidden></div>
+    <div id="p-error" class="error-box" hidden role="alert"></div>
   </section>
 
   <!-- STEP 3: CERTIFY -->
@@ -165,11 +165,11 @@
     <div class="row">
       <button id="c-build" class="primary">Seal certificate</button>
     </div>
-    <div id="c-result" class="result-box" hidden>
+    <div id="c-result" class="result-box" hidden aria-live="polite">
       <textarea aria-label="Burn certificate" id="c-cert" rows="8" readonly></textarea>
       <div class="row"><button class="copy secondary" data-copy="#c-cert">copy certificate</button></div>
     </div>
-    <div id="c-error" class="error-box" hidden></div>
+    <div id="c-error" class="error-box" hidden role="alert"></div>
   </section>
 
   <!-- STEP 4: VERIFY -->
@@ -185,7 +185,7 @@
       <textarea id="v-cert" rows="8" spellcheck="false" placeholder="pearl-burn:v1 certificate&#10;tag: …"></textarea>
     </label>
     <div class="row"><button id="v-check" class="primary">Verify certificate</button></div>
-    <div id="v-result" class="verdict-box" hidden></div>
+    <div id="v-result" class="verdict-box" hidden aria-live="polite"></div>
 
     <h3>On-chain check (Blockbook, GET-only)</h3>
     <div class="form-grid">
@@ -203,7 +203,7 @@
       </label>
     </div>
     <div class="row"><button id="o-check" class="primary">Look up burn on-chain</button></div>
-    <div id="o-result" class="verdict-box" hidden></div>
+    <div id="o-result" class="verdict-box" hidden aria-live="polite"></div>
   </section>
 </main>
 

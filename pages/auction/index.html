@@ -96,7 +96,7 @@
     <div class="row">
       <button id="li-button" class="primary">List the auction</button>
     </div>
-    <p class="err" id="li-error" hidden></p>
+    <p class="err" id="li-error" hidden role="alert"></p>
     <div id="li-out" hidden>
       <h3>Auction listed</h3>
       <div class="kv"><span>Descriptor</span></div>
@@ -150,7 +150,7 @@
       <button id="cm-new-salt" class="ghost">New salt</button>
       <button id="cm-button" class="primary">Generate commitment</button>
     </div>
-    <p class="err" id="cm-error" hidden></p>
+    <p class="err" id="cm-error" hidden role="alert"></p>
     <div id="cm-out" hidden>
       <div class="loud">
         <h4>⛔ PUBLISH ONLY THE HASH — BEFORE THE COMMIT DEADLINE</h4>
@@ -193,7 +193,7 @@
       <button id="cm-rec-fetch-tip" class="ghost">Read tip from Blockbook</button>
       <button id="cm-record" class="primary">Record commitment</button>
     </div>
-    <p class="err" id="cm-rec-error" hidden></p>
+    <p class="err" id="cm-rec-error" hidden role="alert"></p>
     <h4>Commitment ledger (<span id="cm-count">0</span>)</h4>
     <div id="cm-ledger-wrap" class="table-wrap" hidden>
       <table class="rtable">
@@ -235,7 +235,7 @@
       <button id="rv-fetch-tip" class="ghost">Read tip from Blockbook</button>
       <button id="rv-button" class="primary">Reveal bid</button>
     </div>
-    <p class="err" id="rv-error" hidden></p>
+    <p class="err" id="rv-error" hidden role="alert"></p>
     <h3 class="keep-h4">Reveals — in reveal order (<span id="rv-count">0</span>)</h3>
     <p class="hint" id="rv-empty">No reveals yet. The order below is the reveal order — it breaks bid ties.</p>
     <div id="rv-table-wrap" class="table-wrap" hidden>
@@ -269,7 +269,7 @@
       <button id="st-csv" class="ghost" disabled>Download CSV</button>
       <button id="st-json" class="ghost" disabled>Download result JSON</button>
     </div>
-    <p class="err" id="st-error" hidden></p>
+    <p class="err" id="st-error" hidden role="alert"></p>
     <div id="st-out" hidden>
       <div id="st-verdict" class="verdict"></div>
       <h3>Full derivation</h3>
@@ -310,7 +310,7 @@
     <div class="row">
       <button id="vf-run" class="primary">Verify auction</button>
     </div>
-    <p class="err" id="vf-error" hidden></p>
+    <p class="err" id="vf-error" hidden role="alert"></p>
     <div id="vf-out" hidden>
       <div id="vf-verdict" class="verdict"></div>
       <h3>Recomputed derivation</h3>
@@ -345,7 +345,7 @@
       <button id="tk-load" class="primary">Load auction</button>
       <button id="tk-scan" class="ghost">Scan tip + deadlines</button>
     </div>
-    <p class="err" id="tk-error" hidden></p>
+    <p class="err" id="tk-error" hidden role="alert"></p>
     <div id="tk-out" hidden>
       <dl class="review" id="tk-fields"></dl>
       <div class="dashboard">

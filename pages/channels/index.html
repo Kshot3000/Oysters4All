@@ -55,8 +55,8 @@
       <button id="open-build" class="primary">Open channel</button>
       <button id="open-restore" class="ghost">Restore from descriptor</button>
     </div>
-    <div id="open-error" class="error" hidden></div>
-    <div id="open-result" hidden>
+    <div id="open-error" class="error" hidden role="alert"></div>
+    <div id="open-result" hidden aria-live="polite">
       <h3>Channel open</h3>
       <dl class="kv">
         <div><dt>Channel address</dt><dd><code id="open-address" class="addr"></code></dd></div>
@@ -105,8 +105,8 @@
       <button id="fund-build" class="primary">Build &amp; sign funding tx</button>
       <button id="fund-wipe" class="ghost">Wipe key</button>
     </div>
-    <div id="fund-error" class="error" hidden></div>
-    <div id="fund-result" hidden>
+    <div id="fund-error" class="error" hidden role="alert"></div>
+    <div id="fund-result" hidden aria-live="polite">
       <h3>Funding transaction</h3>
       <dl class="kv">
         <div><dt>txid</dt><dd><code id="fund-txid" class="addr"></code></dd></div>
@@ -155,8 +155,8 @@
     <div class="row">
       <button id="pay-propose" class="primary">Propose state</button>
     </div>
-    <div id="pay-error" class="error" hidden></div>
-    <div id="pay-result" hidden>
+    <div id="pay-error" class="error" hidden role="alert"></div>
+    <div id="pay-result" hidden aria-live="polite">
       <h3>Proposed state <span id="pay-version"></span></h3>
       <dl class="kv">
         <div><dt>Your balance</dt><dd id="pay-mine"></dd></div>
@@ -209,7 +209,7 @@
         <label class="inline">Peer's revealed secret <input id="revoke-theirs" size="64" autocomplete="off" spellcheck="false" placeholder="64 hex chars"></label>
         <button id="revoke-record" class="primary">Record</button>
       </div>
-      <div id="revoke-status" class="note"></div>
+      <div id="revoke-status" class="note" aria-live="polite"></div>
     </div>
     <div id="state-history"><h3>History</h3><div id="state-historylist" class="history"></div></div>
   </section>
@@ -225,8 +225,8 @@
         <h3>Cooperative close</h3>
         <p class="lede">Immediate outputs to both payout addresses. Fee split equally.</p>
         <div class="row"><button id="close-coop-build" class="primary">Build cooperative close</button></div>
-        <div id="close-coop-error" class="error" hidden></div>
-        <div id="close-coop-result" hidden>
+        <div id="close-coop-error" class="error" hidden role="alert"></div>
+        <div id="close-coop-result" hidden aria-live="polite">
           <dl class="kv">
             <div><dt>txid</dt><dd><code id="close-coop-txid" class="addr"></code></dd></div>
             <div><dt>Fee</dt><dd id="close-coop-fee"></dd></div>
@@ -249,8 +249,8 @@
         <h3>Unilateral close</h3>
         <p class="lede">Broadcast your latest commitment, then claim after the CSV delay.</p>
         <div class="row"><button id="close-uni-build" class="primary">Build claim tx</button></div>
-        <div id="close-uni-error" class="error" hidden></div>
-        <div id="close-uni-result" hidden>
+        <div id="close-uni-error" class="error" hidden role="alert"></div>
+        <div id="close-uni-result" hidden aria-live="polite">
           <dl class="kv">
             <div><dt>Commitment txid</dt><dd><code id="close-uni-ctid" class="addr"></code></dd></div>
             <div><dt>Claim txid</dt><dd><code id="close-uni-txid" class="addr"></code></dd></div>
@@ -279,8 +279,8 @@
       <label>Blockbook base URL <input id="track-blockbook" autocomplete="off" spellcheck="false"></label>
     </div>
     <div class="row"><button id="track-refresh" class="primary">Refresh</button></div>
-    <div id="track-error" class="error" hidden></div>
-    <div id="track-result" hidden>
+    <div id="track-error" class="error" hidden role="alert"></div>
+    <div id="track-result" hidden aria-live="polite">
       <dl class="kv">
         <div><dt>Chain tip</dt><dd id="track-tip"></dd></div>
         <div><dt>Funding tx</dt><dd id="track-funding"></dd></div>
@@ -317,8 +317,8 @@
     <label>Signed transaction hex <textarea id="verify-hex" rows="4" spellcheck="false" placeholder="0200000001…"></textarea></label>
     <div class="row"><button id="verify-go" class="primary">Verify transaction</button>
     <button id="verify-desc" class="ghost">Verify descriptor only</button></div>
-    <div id="verify-error" class="error" hidden></div>
-    <div id="verify-result" hidden>
+    <div id="verify-error" class="error" hidden role="alert"></div>
+    <div id="verify-result" hidden aria-live="polite">
       <h3 id="verify-verdict"></h3>
       <div id="verify-kind" class="note"></div>
       <h4>Checks</h4><ul id="verify-checks" class="checklist"></ul>

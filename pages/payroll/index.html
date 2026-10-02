@@ -64,8 +64,8 @@
     </label>
     <button class="btn ghost" id="fee-estimate" type="button">Estimate fee</button>
     <button class="btn danger-ghost" id="wipe" type="button">Wipe keys</button>
-    <span class="cfg-msg" id="cfg-msg"></span>
-    <span class="cfg-msg" id="wipe-msg"></span>
+    <span class="cfg-msg" id="cfg-msg" aria-live="polite"></span>
+    <span class="cfg-msg" id="wipe-msg" aria-live="polite"></span>
   </section>
 
   <!-- STEP 1: ROSTER -->
@@ -104,7 +104,7 @@
         <div class="rowbtns wide">
           <button class="btn ghost" id="a-add" type="button">Add payee</button>
           <button class="btn ghost" id="a-cancel" type="button" hidden>Cancel edit</button>
-          <span class="cfg-msg" id="a-msg"></span>
+          <span class="cfg-msg" id="a-msg" aria-live="polite"></span>
         </div>
       </div>
       <p class="err" id="a-err" hidden></p>
@@ -171,7 +171,7 @@
       </label>
       <div class="rowbtns wide">
         <button class="btn ghost" id="f-fetch" type="button">Fetch UTXOs (Blockbook)</button>
-        <span class="cfg-msg" id="f-fetch-msg"></span>
+        <span class="cfg-msg" id="f-fetch-msg" aria-live="polite"></span>
       </div>
       <label class="wide">…or paste UTXOs <span class="hintline">one per line: <code>txid:vout value [prl|grains] [address]</code> — air-gapped</span>
         <textarea id="f-paste" rows="4" spellcheck="false" placeholder="ab12…:0 150000000"></textarea>
@@ -329,7 +329,7 @@
     <div class="rowbtns">
       <button class="btn ghost" id="h-export" type="button">Export history CSV</button>
       <button class="btn danger-ghost" id="h-clear" type="button">Clear history</button>
-      <span class="cfg-msg" id="h-msg"></span>
+      <span class="cfg-msg" id="h-msg" aria-live="polite"></span>
     </div>
     <div class="card" id="h-card">
       <h3>Past runs <span class="count" id="h-count"></span></h3>

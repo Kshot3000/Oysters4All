@@ -69,7 +69,7 @@
       </div>
 
       <button class="btn" id="pl-forge">Forge vault plan</button>
-      <div class="alert error" id="pl-error" hidden></div>
+      <div class="alert error" id="pl-error" hidden role="alert"></div>
 
       <div id="pl-out" hidden>
         <h3>Vault address</h3>
@@ -105,7 +105,7 @@
       <button class="btn" id="v-load">Load spec</button>
       <button class="btn ghost" id="v-loadsaved">Load saved spec</button>
       <button class="btn ghost" id="v-clear-saved">Clear saved</button>
-      <div class="alert error" id="v-error" hidden></div>
+      <div class="alert error" id="v-error" hidden role="alert"></div>
       <div class="alert info" id="v-storage-note">This page can keep the <b>spec</b> (never private keys) in this browser's localStorage for convenience. It survives even if localStorage is hostile or disabled — it just won't persist.</div>
 
       <div id="v-out" hidden>
@@ -149,11 +149,11 @@
       </div>
       <button class="btn" id="w-scan">Scan vault</button>
       <label style="margin-left:.8rem;font-size:.85rem"><input type="checkbox" id="w-auto"> auto-refresh every <input type="number" id="w-every" value="10" min="1" style="width:4em"> min</label>
-      <div class="alert error" id="w-error" hidden></div>
+      <div class="alert error" id="w-error" hidden role="alert"></div>
 
       <div id="w-out" hidden>
         <h3>Status</h3>
-        <div id="w-status"></div>
+        <div id="w-status" aria-live="polite"></div>
         <div class="kv">
           <dt>Chain tip</dt><dd id="w-tip"></dd>
           <dt>Vault balance</dt><dd id="w-balance"></dd>
@@ -184,7 +184,7 @@
         <textarea id="c-spec" placeholder="Paste the vault spec JSON (or carry it from another tab)…"></textarea>
       </div>
       <button class="btn small ghost" id="c-load">Load spec</button>
-      <div class="alert error" id="c-error" hidden></div>
+      <div class="alert error" id="c-error" hidden role="alert"></div>
       <div id="c-summary" class="alert info" hidden></div>
 
       <div id="c-claim-box">
@@ -251,7 +251,7 @@
         </div>
       </div>
 
-      <div id="c-result" hidden>
+      <div id="c-result" hidden aria-live="polite">
         <h3>Signed transaction</h3>
         <div class="kv">
           <dt>txid</dt><dd><code id="c-txid-out"></code></dd>
@@ -266,7 +266,7 @@
           <button class="btn danger" id="c-broadcast-go" disabled>Broadcast now</button>
         </div>
         <button class="btn" id="c-broadcast">Review &amp; broadcast…</button>
-        <div class="alert" id="c-broadcast-result" hidden></div>
+        <div class="alert" id="c-broadcast-result" hidden aria-live="polite"></div>
       </div>
     </div>
   </section>
@@ -285,7 +285,7 @@
         <input type="text" id="vf-address" autocomplete="off" spellcheck="false">
       </div>
       <button class="btn" id="vf-run">Verify</button>
-      <div class="alert error" id="vf-error" hidden></div>
+      <div class="alert error" id="vf-error" hidden role="alert"></div>
       <div id="vf-verdict"></div>
     </div>
   </section>

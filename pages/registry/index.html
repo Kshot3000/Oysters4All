@@ -46,7 +46,7 @@
       </label>
       <div class="row">
         <button id="idx-scan" class="btn primary">Scan the register</button>
-        <span id="idx-status" class="muted"></span>
+        <span id="idx-status" class="muted" aria-live="polite"></span>
       </div>
       <div id="idx-progress" class="progress" hidden><div id="idx-progress-fill"></div></div>
       <p class="honest">The scan walks the indexer's asc-ordered <code class="mono">/inscriptions</code> list
@@ -89,7 +89,7 @@
         <input aria-label="Handle" id="cw-handle" class="grow mono big" placeholder="satoshi" autocomplete="off" spellcheck="false" maxlength="40">
         <button id="cw-check" class="btn">Check</button>
       </div>
-      <div id="cw-handle-status"></div>
+      <div id="cw-handle-status" aria-live="polite"></div>
       <div id="cw-squat" class="squat" hidden></div>
       <div class="row end"><button id="cw-to2" class="btn primary" disabled>Continue →</button></div>
     </div>
@@ -111,7 +111,7 @@
           <input id="cw-blockbook" class="mono" placeholder="https://blockbook.pearlresearch.ai" autocomplete="off" spellcheck="false">
         </label>
       </div>
-      <div id="cw-owner-status"></div>
+      <div id="cw-owner-status" aria-live="polite"></div>
       <div class="row">
         <button id="cw-back1" class="btn ghost">← Back</button>
         <button id="cw-to3" class="btn primary" disabled>Continue →</button>
@@ -149,7 +149,7 @@
           <button id="cw-commit-broadcast" class="btn" disabled>1 · Broadcast commit</button>
           <button id="cw-reveal-broadcast" class="btn" disabled>2 · Broadcast reveal</button>
         </div>
-        <div id="cw-result"></div>
+        <div id="cw-result" aria-live="polite"></div>
       </div>
       <div class="card">
         <h4>Standalone reveal-pair verifier</h4>

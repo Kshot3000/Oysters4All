@@ -46,8 +46,8 @@
     <div class="row">
       <button id="seal-compose" class="btn primary">Compute fingerprint &amp; compose ↓</button>
     </div>
-    <div id="doc-error" class="error" hidden></div>
-    <div id="doc-result" class="record-card" hidden>
+    <div id="doc-error" class="error" hidden role="alert"></div>
+    <div id="doc-result" class="record-card" hidden aria-live="polite">
       <div class="prow"><span class="k">SHA-256</span><code id="doc-hash"></code></div>
       <div class="prow"><span class="k">Size</span><span id="doc-size"></span></div>
       <div class="prow"><span class="k">Envelope</span><pre id="doc-envelope" class="json"></pre></div>
@@ -83,7 +83,7 @@
       <button id="make-key" class="btn primary">Create key</button>
       <button id="new-key" class="btn ghost">New random key</button>
     </div>
-    <div id="key-error" class="error" hidden></div>
+    <div id="key-error" class="error" hidden role="alert"></div>
     <div id="key-card" class="record-card" hidden>
       <div class="prow"><span class="k">Address</span><code id="key-address"></code></div>
       <div class="prow"><span class="k">Mnemonic</span>
@@ -119,8 +119,8 @@
       <button id="fee-auto" class="btn ghost">Auto fee from blockbook</button>
       <button id="build-commit" class="btn primary" disabled>Build &amp; sign commit</button>
     </div>
-    <div id="commit-error" class="error" hidden></div>
-    <div id="commit-result" class="record-card" hidden>
+    <div id="commit-error" class="error" hidden role="alert"></div>
+    <div id="commit-result" class="record-card" hidden aria-live="polite">
       <div class="prow"><span class="k">Commit txid</span><code id="commit-txid"></code></div>
       <div class="prow"><span class="k">Fee</span><span id="commit-fee"></span></div>
       <label>Signed commit hex<textarea id="commit-hex" rows="4" readonly spellcheck="false"></textarea></label>
@@ -147,9 +147,9 @@
       <button id="detect-commit" class="btn ghost">Detect commit UTXO</button>
       <button id="build-reveal" class="btn primary">Build &amp; sign reveal</button>
     </div>
-    <div id="reveal-error" class="error" hidden></div>
+    <div id="reveal-error" class="error" hidden role="alert"></div>
     <div id="reveal-plan" class="record-card" hidden></div>
-    <div id="reveal-result" class="record-card" hidden>
+    <div id="reveal-result" class="record-card" hidden aria-live="polite">
       <div class="prow"><span class="k">Reveal txid</span><code id="reveal-txid"></code></div>
       <div class="prow"><span class="k">Fee</span><span id="reveal-fee"></span></div>
       <label>Signed reveal hex<textarea id="reveal-hex" rows="4" readonly spellcheck="false"></textarea></label>
@@ -181,7 +181,7 @@
       <button id="download-cert" class="btn ghost">Download .json</button>
       <button id="print-cert" class="btn ghost">Print</button>
     </div>
-    <div id="seal-error" class="error" hidden></div>
+    <div id="seal-error" class="error" hidden role="alert"></div>
     <div class="row end">
       <button id="restart" class="btn ghost">Notarize another document</button>
     </div>
@@ -203,8 +203,8 @@
     <div class="row">
       <button id="v-run" class="btn primary">Verify</button>
     </div>
-    <div id="v-error" class="error" hidden></div>
-    <div id="v-result" class="record-card" hidden></div>
+    <div id="v-error" class="error" hidden role="alert"></div>
+    <div id="v-result" class="record-card" hidden aria-live="polite"></div>
   </section>
 
   <!-- HONEST LIMITS -->

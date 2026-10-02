@@ -81,7 +81,7 @@
         </div>
       </label>
     </div>
-    <div id="parties-error" class="error" hidden></div>
+    <div id="parties-error" class="error" hidden role="alert"></div>
     <div class="row end"><button id="to-contract" class="btn primary">Draft the contract →</button></div>
   </section>
 
@@ -103,7 +103,7 @@
         </div>
         <canvas id="escrow-qr" width="132" height="132" title="Escrow address QR"></canvas>
       </div>
-      <div class="row"><button id="copy-address" class="btn ghost">Copy address</button><span id="funding-status" class="funding"></span></div>
+      <div class="row"><button id="copy-address" class="btn ghost">Copy address</button><span id="funding-status" class="funding" aria-live="polite"></span></div>
       <h3>Spending paths</h3>
       <div class="leaf">
         <h4>Leaf 0 · Release <span class="tag">2-of-3</span></h4>
@@ -132,7 +132,7 @@
       <button id="manual-utxo" class="btn ghost">Enter UTXO manually</button>
     </div>
     <div id="utxo-list" class="utxo-list"></div>
-    <div id="contract-error" class="error" hidden></div>
+    <div id="contract-error" class="error" hidden role="alert"></div>
     <div class="row end"><button id="to-spend" class="btn primary" disabled>Continue to spend →</button></div>
   </section>
 
@@ -164,10 +164,10 @@
       <label class="wide">Refund destination (P2TR)
         <input id="refund-dest" spellcheck="false" placeholder="defaults to the refund key">
       </label>
-      <div class="wide"><span id="refund-lock-status" class="lock-status"></span></div>
+      <div class="wide"><span id="refund-lock-status" class="lock-status" aria-live="polite"></span></div>
     </div>
     <div class="row"><button id="build-plan" class="btn primary">Build spending plan</button></div>
-    <div id="spend-error" class="error" hidden></div>
+    <div id="spend-error" class="error" hidden role="alert"></div>
     <div id="plan-card" class="contract-card" hidden>
       <h3>Spending plan</h3>
       <dl class="kv">
@@ -179,7 +179,7 @@
       and sends back the 64-byte signature. Signatures are useless without this exact transaction.</p>
       <div id="sig-slots"></div>
       <div class="row"><button id="assemble" class="btn primary" disabled>Verify &amp; assemble transaction</button></div>
-      <div id="assemble-error" class="error" hidden></div>
+      <div id="assemble-error" class="error" hidden role="alert"></div>
     </div>
   </section>
 
@@ -199,7 +199,7 @@
       <button id="copy-hex" class="btn ghost">Copy hex</button>
       <button id="broadcast" class="btn primary">Broadcast via blockbook</button>
     </div>
-    <div id="broadcast-error" class="error" hidden></div>
+    <div id="broadcast-error" class="error" hidden role="alert"></div>
     <div id="broadcast-ok" class="ok" hidden></div>
   </section>
 </main>

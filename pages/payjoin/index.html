@@ -52,7 +52,7 @@
         <button id="r-build" class="pj-btn primary">Build offer</button>
         <button id="r-fill-lab" class="pj-btn ghost" title="Fill with a lab-only address for experimenting">Fill lab address</button>
       </div>
-      <div id="r-error" class="pj-error" hidden></div>
+      <div id="r-error" class="pj-error" hidden role="alert"></div>
       <div id="r-out" hidden>
         <h3>Endpoint query string</h3>
         <p class="pj-lede">A real payjoin server would serve this template at <code>https://your-endpoint/payjoin</code> with this query:</p>
@@ -84,7 +84,7 @@
       <div class="pj-actions">
         <button id="s-validate" class="pj-btn primary">Validate offer</button>
       </div>
-      <div id="s-error" class="pj-error" hidden></div>
+      <div id="s-error" class="pj-error" hidden role="alert"></div>
       <div id="s-offerinfo" class="pj-kv" hidden></div>
     </div>
 
@@ -118,7 +118,7 @@
         <button id="s-estimate" class="pj-btn ghost">Fetch network fee estimate (live)</button>
         <button id="s-build" class="pj-btn primary">Build &amp; sign original</button>
       </div>
-      <div id="s-build-error" class="pj-error" hidden></div>
+      <div id="s-build-error" class="pj-error" hidden role="alert"></div>
       <div id="s-out" hidden>
         <h3>Signed original <small>(send this envelope to the receiver)</small></h3>
         <div class="pj-copyrow"><textarea aria-label="Signed original envelope" id="s-envelope" class="pj-mono" rows="6" readonly></textarea><button class="pj-btn small" data-copy="s-envelope">Copy</button></div>
@@ -141,7 +141,7 @@
         <textarea id="p-original" class="pj-mono" rows="5" spellcheck="false" placeholder='{"kind":"pearl-payjoin-original",…}'></textarea>
       </label>
       <div class="pj-actions"><button id="p-load" class="pj-btn primary">Load &amp; check original</button></div>
-      <div id="p-error" class="pj-error" hidden></div>
+      <div id="p-error" class="pj-error" hidden role="alert"></div>
       <div id="p-originfo" class="pj-kv" hidden></div>
     </div>
     <div class="pj-card" id="p-build-card" hidden>
@@ -158,7 +158,7 @@
         <button id="p-build" class="pj-btn primary">Build proposal</button>
         <button id="p-wipe" class="pj-btn danger-ghost">Wipe keys</button>
       </div>
-      <div id="p-build-error" class="pj-error" hidden></div>
+      <div id="p-build-error" class="pj-error" hidden role="alert"></div>
       <div id="p-out" hidden>
         <h3>Proposal envelope <small>(send this back to the sender)</small></h3>
         <div class="pj-copyrow"><textarea aria-label="Proposal envelope" id="p-envelope" class="pj-mono" rows="6" readonly></textarea><button class="pj-btn small" data-copy="p-envelope">Copy</button></div>
@@ -180,7 +180,7 @@
         <textarea id="v-proposal" class="pj-mono" rows="5" spellcheck="false" placeholder='{"kind":"pearl-payjoin-proposal",…}'></textarea>
       </label>
       <div class="pj-actions"><button id="v-run" class="pj-btn primary">Run verification</button></div>
-      <div id="v-error" class="pj-error" hidden></div>
+      <div id="v-error" class="pj-error" hidden role="alert"></div>
       <div id="v-verdict" hidden></div>
       <table id="v-table" class="pj-table" hidden>
         <thead><tr><th>Check</th><th>Result</th><th>Detail</th></tr></thead>
@@ -207,7 +207,7 @@
         <button id="g-sign" class="pj-btn primary">Verify + sign + finalize</button>
         <button id="g-wipe" class="pj-btn danger-ghost">Wipe keys</button>
       </div>
-      <div id="g-error" class="pj-error" hidden></div>
+      <div id="g-error" class="pj-error" hidden role="alert"></div>
       <div id="g-out" hidden>
         <div id="g-summary" class="pj-kv"></div>
         <h3>Final transaction (hex)</h3>

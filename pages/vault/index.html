@@ -75,7 +75,7 @@
       <button id="f-forge" type="button" class="btn-brass">Forge vault →</button>
       <button id="f-clear" type="button" class="btn-ghost">Clear</button>
     </div>
-    <div id="f-result" hidden>
+    <div id="f-result" hidden aria-live="polite">
       <div class="card vaultcard">
         <h3>Vault descriptor</h3>
         <div class="addrrow"><code id="f-address" class="addr"></code>
@@ -161,7 +161,7 @@
       <div class="actions">
         <button id="plan-build" type="button" class="btn-brass">Build unsigned bundle →</button>
       </div>
-      <div id="plan-result" class="card" hidden>
+      <div id="plan-result" class="card" hidden aria-live="polite">
         <h3>Unsigned bundle</h3>
         <dl class="kv">
           <div><dt>Inputs</dt><dd id="plan-in-n"></dd></div>
@@ -225,7 +225,7 @@
           <div class="actions"><button id="c-add" type="button" class="btn-small">+ Add partial</button></div>
           <div id="c-list" class="check"></div>
           <div class="actions"><button id="c-finalize" type="button" class="btn-brass">Verify &amp; finalize spend</button></div>
-          <div id="c-result" hidden>
+          <div id="c-result" hidden aria-live="polite">
             <dl class="kv">
               <div><dt>txid</dt><dd><code id="c-txid" class="wrap"></code>
                 <button id="c-copy-txid" type="button" class="btn-small">Copy</button></dd></div>
@@ -264,7 +264,7 @@
         <button id="t-check" type="button" class="btn-brass">Check confirmations</button>
         <button id="t-auto" type="button" class="btn-ghost">Auto-refresh 30s</button>
       </div>
-      <div id="t-result" class="check" hidden></div>
+      <div id="t-result" class="check" hidden aria-live="polite"></div>
     </div>
   </section>
 
@@ -278,7 +278,7 @@
         <textarea id="v-json" rows="8" placeholder='Paste the pearl vault descriptor JSON…'></textarea>
       </label>
       <div class="actions"><button id="v-run" type="button" class="btn-brass">Verify descriptor</button></div>
-      <div id="v-result" class="check" hidden></div>
+      <div id="v-result" class="check" hidden aria-live="polite"></div>
     </div>
   </section>
 

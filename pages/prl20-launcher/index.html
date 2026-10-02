@@ -284,7 +284,7 @@
             <button class="btn ghost" id="l-commit-download" type="button">Download hex</button>
             <button class="btn" id="l-broadcast-commit" type="button">Broadcast commit</button>
           </div>
-          <div id="l-commit-status" class="hint hidden"></div>
+          <div id="l-commit-status" class="hint hidden" aria-live="polite"></div>
           <h3>Reveal transaction <span class="muted">— publishes the inscription</span></h3>
           <div class="row"><span class="muted">txid</span><code id="l-reveal-txid" class="mono addr"></code>
             <button class="btn ghost" data-copy="l-reveal-txid" type="button">Copy</button></div>
@@ -296,7 +296,7 @@
           </div>
           <label class="check"><input type="checkbox" id="l-zero-conf" /> Allow 0-conf reveal
             <span class="muted">— broadcast before the commit confirms. Faster, but the reveal is invalid if the commit drops from the mempool.</span></label>
-          <div id="l-reveal-status" class="hint hidden"></div>
+          <div id="l-reveal-status" class="hint hidden" aria-live="polite"></div>
         </div>
       </div>
     </div>
@@ -309,7 +309,7 @@
         <div class="row">
           <button class="btn" id="dir-refresh" type="button">Refresh</button>
           <input id="dir-search" class="input mono" placeholder="Filter ticker…" aria-label="Filter tokens" />
-          <span id="dir-status" class="muted"></span>
+          <span id="dir-status" class="muted" aria-live="polite"></span>
         </div>
         <div id="dir-tokens" class="grid"></div>
         <div id="dir-detail" class="hidden"></div>

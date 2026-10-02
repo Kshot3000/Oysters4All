@@ -99,8 +99,8 @@
       <button class="primary" id="b-compute">Compute digest</button>
       <button class="secondary" id="b-seal">Seal scenario descriptor</button>
     </div>
-    <div class="error" id="b-error" hidden></div>
-    <div class="result-block" id="b-result" hidden>
+    <div class="error" id="b-error" hidden role="alert"></div>
+    <div class="result-block" id="b-result" hidden aria-live="polite">
       <h3>Digest <span class="stamp">COMPUTED LOCALLY</span></h3>
       <div class="hex" id="b-digest"></div>
       <p class="meta" id="b-meta"></p>
@@ -119,7 +119,7 @@
       <button class="primary" id="a-render">Render anatomy for the current scenario</button>
       <span class="hint">Always computed fresh from the Build tab inputs.</span>
     </div>
-    <div class="error" id="a-error" hidden></div>
+    <div class="error" id="a-error" hidden role="alert"></div>
     <div id="a-list"></div>
     <h3>Full preimage <span class="meta" id="a-preimage-len"></span></h3>
     <div class="hex" id="a-preimage"></div>
@@ -140,7 +140,7 @@
     <div class="row">
       <button class="primary" id="c-run">Compare on the current scenario</button>
     </div>
-    <div class="error" id="c-error" hidden></div>
+    <div class="error" id="c-error" hidden role="alert"></div>
     <div id="c-verdict"></div>
     <div class="table-wrap"><table class="draft" id="c-table">
       <thead><tr><th>Component</th><th id="c-head-a">A</th><th id="c-head-b">B</th><th>Same?</th><th>Why</th></tr></thead>
@@ -177,8 +177,8 @@
     <div class="row">
       <button class="primary" id="s-sign">Sign (BIP-340, zero aux)</button>
     </div>
-    <div class="error" id="s-error" hidden></div>
-    <div class="result-block" id="s-result" hidden>
+    <div class="error" id="s-error" hidden role="alert"></div>
+    <div class="result-block" id="s-result" hidden aria-live="polite">
       <h3>Signature <span class="stamp">BIP-340</span></h3>
       <div class="hex" id="s-sig"></div>
       <p class="meta" id="s-meta"></p>
@@ -190,7 +190,7 @@
       <label>Public key (64 hex) <input id="v-pub" type="text" spellcheck="false"></label>
     </div>
     <div class="row"><button class="primary" id="v-verify">Verify</button></div>
-    <div id="v-result"></div>
+    <div id="v-result" aria-live="polite"></div>
   </section>
 
   <!-- ============ STEP 5: VERIFY ============ -->

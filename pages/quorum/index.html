@@ -63,11 +63,11 @@
     <div class="row">
       <button id="v-sample" class="ghost">Load sample council (testnet, BIP-340 test keys)</button>
     </div>
-    <div id="vault-error" class="error" hidden></div>
+    <div id="vault-error" class="error" hidden role="alert"></div>
     <div class="row">
       <button id="v-forge" class="primary">Forge vault →</button>
     </div>
-    <div id="vault-result" hidden>
+    <div id="vault-result" hidden aria-live="polite">
       <h3>The seal is set</h3>
       <dl class="kv">
         <div><dt>Vault address</dt><dd><code id="v-r-addr" class="addr"></code> <button id="v-copy-addr" class="ghost small">Copy</button></dd></div>
@@ -89,7 +89,7 @@
       <div class="row">
         <button id="v-import" class="ghost">Verify &amp; load descriptor</button>
       </div>
-      <div id="vault-import-error" class="error" hidden></div>
+      <div id="vault-import-error" class="error" hidden role="alert"></div>
     </div>
   </section>
 
@@ -118,8 +118,8 @@
         </div>
       </div>
     </div>
-    <div id="fund-error" class="error" hidden></div>
-    <div id="fund-result" hidden>
+    <div id="fund-error" class="error" hidden role="alert"></div>
+    <div id="fund-result" hidden aria-live="polite">
       <dl class="kv">
         <div><dt>Confirmed balance</dt><dd id="f-r-bal"></dd></div>
         <div><dt>UTXOs</dt><dd id="f-r-count"></dd></div>
@@ -152,12 +152,12 @@
     <h3>Recipients</h3>
     <div id="s-outputs"></div>
     <div class="row"><button id="s-add-out" class="ghost">+ Add recipient</button></div>
-    <div id="spend-error" class="error" hidden></div>
+    <div id="spend-error" class="error" hidden role="alert"></div>
     <div class="row">
       <button id="s-estimate" class="ghost">Fetch fee estimate</button>
       <button id="s-build" class="primary">Build unsigned bundle →</button>
     </div>
-    <div id="spend-result" hidden>
+    <div id="spend-result" hidden aria-live="polite">
       <h3>The motion on the table</h3>
       <dl class="kv">
         <div><dt>Bundle fingerprint</dt><dd><code id="s-r-fp"></code></dd></div>
@@ -206,7 +206,7 @@
           <button id="c-sign" class="primary">Sign as this slot</button>
           <button id="c-wipe" class="ghost">Wipe key</button>
         </div>
-        <div id="cosign-error" class="error" hidden></div>
+        <div id="cosign-error" class="error" hidden role="alert"></div>
         <label>Your signature bundle <span class="hint">send this back to the coordinator.</span>
           <textarea id="c-sigs-out" rows="4" readonly spellcheck="false"></textarea></label>
       </div>
@@ -217,7 +217,7 @@
         <textarea id="c-sigs-in" rows="3" spellcheck="false" placeholder='{"bundle":"pearl-quorum-sigs:v1:",…}'></textarea></label>
     </div>
     <div class="row"><button id="c-add" class="primary">Verify &amp; add signatures</button></div>
-    <div id="c-collect-error" class="error" hidden></div>
+    <div id="c-collect-error" class="error" hidden role="alert"></div>
     <div id="c-slots"></div>
     <div class="row">
       <button id="c-finalize" class="primary" disabled>Assemble at quorum →</button>
@@ -243,14 +243,14 @@
       <label>Blockbook base URL
         <input id="b-blockbook" autocomplete="off" spellcheck="false" placeholder="https://blockbook.pearlresearch.ai"></label>
     </div>
-    <div id="bcast-error" class="error" hidden></div>
+    <div id="bcast-error" class="error" hidden role="alert"></div>
     <div class="row">
       <button id="b-arm" class="primary">Arm broadcast</button>
       <button id="b-confirm" class="ghost" hidden>Confirm broadcast</button>
     </div>
-    <div id="bcast-result" hidden>
+    <div id="bcast-result" hidden aria-live="polite">
       <dl class="kv">
-        <div><dt>Status</dt><dd id="b-r-status"></dd></div>
+        <div><dt>Status</dt><dd id="b-r-status" aria-live="polite"></dd></div>
         <div><dt>Txid</dt><dd><code id="b-r-txid" class="addr"></code></dd></div>
         <div><dt>Confirmations</dt><dd id="b-r-confs"></dd></div>
       </dl>
@@ -271,7 +271,7 @@
       <button id="l-csv-spends" class="ghost">Export spends CSV</button>
       <button id="l-clear" class="ghost">Clear ledger</button>
     </div>
-    <div id="ledger-error" class="error" hidden></div>
+    <div id="ledger-error" class="error" hidden role="alert"></div>
     <h3>Vaults</h3>
     <div id="l-vaults"></div>
     <h3>Spends</h3>

@@ -24,7 +24,7 @@
 <main id="main" tabindex="-1">
   <section class="panel" id="setup-panel">
     <h2>Recovery settings</h2>
-    <p id="rc-error" class="error" hidden></p>
+    <p id="rc-error" class="error" hidden role="alert"></p>
 
     <label class="field">
       <span>BIP-39 seed phrase <small>(12 or 24 words — stays in page memory only)</small></span>
@@ -74,7 +74,7 @@
   <section class="panel" id="progress-panel" hidden>
     <h2>Scan progress</h2>
     <div class="progress"><div id="rc-bar" class="bar"></div></div>
-    <p class="status" id="rc-status">Preparing…</p>
+    <p class="status" id="rc-status" aria-live="polite">Preparing…</p>
   </section>
 
   <section class="panel" id="results-panel" hidden>

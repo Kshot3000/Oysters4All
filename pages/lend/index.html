@@ -69,8 +69,8 @@
       <button id="offer-build" class="primary">Draft offer</button>
       <button id="offer-restore" class="ghost">Restore from descriptor</button>
     </div>
-    <div id="offer-error" class="error" hidden></div>
-    <div id="offer-result" hidden>
+    <div id="offer-error" class="error" hidden role="alert"></div>
+    <div id="offer-result" hidden aria-live="polite">
       <h3>Offer drafted</h3>
       <dl class="kv">
         <div><dt>Collateral vault</dt><dd><code id="offer-address" class="addr"></code></dd></div>
@@ -117,8 +117,8 @@
       <button id="lock-scan" class="primary">Verify lock on-chain</button>
       <button id="lock-manualgo" class="ghost">Record without checking</button>
     </div>
-    <div id="lock-error" class="error" hidden></div>
-    <div id="lock-result" hidden>
+    <div id="lock-error" class="error" hidden role="alert"></div>
+    <div id="lock-result" hidden aria-live="polite">
       <h3>Collateral locked</h3>
       <dl class="kv">
         <div><dt>Vault</dt><dd><code id="lock-address" class="addr"></code></dd></div>
@@ -152,7 +152,7 @@
     <div class="row">
       <button id="fund-build" class="primary">Build unsigned payment</button>
     </div>
-    <div id="fund-error" class="error" hidden></div>
+    <div id="fund-error" class="error" hidden role="alert"></div>
     <div id="fund-hexbox" hidden>
       <h3>Unsigned payment</h3>
       <p class="lede">Sign this hex in your wallet (or with the key below), then broadcast it yourself. This desk
@@ -165,7 +165,7 @@
       <label>Funding txid <input id="fund-txid" autocomplete="off" spellcheck="false" placeholder="64-hex txid of the principal payment"></label>
     </div>
     <div class="row"><button id="fund-record" class="primary">Record funding</button></div>
-    <div id="fund-result" hidden><p class="lede">Funding recorded. The loan is live — track it in step&nbsp;4.</p></div>
+    <div id="fund-result" hidden aria-live="polite"><p class="lede">Funding recorded. The loan is live — track it in step&nbsp;4.</p></div>
   </section>
 
   <!-- STEP 4: TRACK -->
@@ -177,8 +177,8 @@
       <label>Blockbook base URL <input id="track-blockbook" autocomplete="off" spellcheck="false" placeholder="https://blockbook.pearlresearch.ai"></label>
     </div>
     <div class="row"><button id="track-refresh" class="primary">Refresh</button></div>
-    <div id="track-error" class="error" hidden></div>
-    <div id="track-result" hidden>
+    <div id="track-error" class="error" hidden role="alert"></div>
+    <div id="track-result" hidden aria-live="polite">
       <dl class="kv">
         <div><dt>Chain height</dt><dd id="track-height"></dd></div>
         <div><dt>Vault status</dt><dd id="track-vault"></dd></div>
@@ -204,7 +204,7 @@
       <label>Fee rate (grains/vB) <input id="repay-feerate" type="number" min="0.1" step="any" value="2"></label>
     </div>
     <div class="row"><button id="repay-build" class="primary">Build repayment proposal</button></div>
-    <div id="repay-error" class="error" hidden></div>
+    <div id="repay-error" class="error" hidden role="alert"></div>
     <div id="repay-proposalbox" hidden>
       <h3>Repayment proposal</h3>
       <dl class="kv">
@@ -274,7 +274,7 @@
         </div>
         <label class="check"><input id="close-override" type="checkbox"> I know the loan is not mature — build the claim anyway (it will not confirm until the CSV delay passes)</label>
         <div class="row"><button id="close-buildclaim" class="primary">Build default claim</button></div>
-        <div id="close-error" class="error" hidden></div>
+        <div id="close-error" class="error" hidden role="alert"></div>
         <div id="close-claimbox" hidden>
           <dl class="kv">
             <div><dt>Lender receives</dt><dd id="close-claimgets"></dd></div>

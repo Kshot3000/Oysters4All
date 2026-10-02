@@ -120,7 +120,7 @@
       <label>Deal label <input id="deal-label" spellcheck="false" placeholder="e.g. PRL→ERG with Bob"></label>
     </div>
 
-    <div id="deal-error" class="error" hidden></div>
+    <div id="deal-error" class="error" hidden role="alert"></div>
     <div id="deal-warnings" class="warnings" hidden></div>
     <div class="row end"><button id="to-contract" class="btn primary">Forge the HTLC →</button></div>
 
@@ -141,7 +141,7 @@
         </div>
         <canvas id="htlc-qr" width="132" height="132" title="HTLC address QR"></canvas>
       </div>
-      <div class="row"><button id="copy-address" class="btn ghost">Copy address</button><span id="funding-status" class="funding"></span></div>
+      <div class="row"><button id="copy-address" class="btn ghost">Copy address</button><span id="funding-status" class="funding" aria-live="polite"></span></div>
       <h3>Spending paths</h3>
       <div class="leaf">
         <h4>Leaf 0 · Claim <span class="tag">hash-locked</span></h4>
@@ -187,7 +187,7 @@
       </label>
       <div class="row"><button id="desc-import-btn" class="btn ghost">Verify &amp; load descriptor</button></div>
       <div id="desc-import-out" class="ok" hidden></div>
-      <div id="contract-error" class="error" hidden></div>
+      <div id="contract-error" class="error" hidden role="alert"></div>
     </div>
     <div class="row end"><button id="to-fund" class="btn primary">Continue to funding →</button></div>
   </section>
@@ -205,7 +205,7 @@
       <button id="fund-refresh" class="btn ghost">Refresh UTXOs</button>
     </div>
     <div id="fund-utxos" class="utxo-list"></div>
-    <div id="fund-error" class="error" hidden></div>
+    <div id="fund-error" class="error" hidden role="alert"></div>
     <h3>Air-gapped funding <span class="hint-inline">(paste the funding outpoint manually)</span></h3>
     <div class="form-grid">
       <label class="wide">Funding txid <input id="fund-txid" spellcheck="false" placeholder="64-hex txid"></label>
@@ -223,7 +223,7 @@
     <p class="lede">Watch the HTLC: funding confirmations, any spend (claim or refund), and the countdown
     to the refund timeout.</p>
     <div class="row"><button id="track-refresh" class="btn ghost">Refresh state</button><span id="track-updated" class="hint-inline"></span></div>
-    <div id="track-error" class="error" hidden></div>
+    <div id="track-error" class="error" hidden role="alert"></div>
     <dl class="kv">
       <div><dt>Funding</dt><dd id="tr-funding">—</dd></div>
       <div><dt>Spend</dt><dd id="tr-spend">—</dd></div>
@@ -243,7 +243,7 @@
         <button id="store-preimage" class="btn ghost">Verify &amp; store with deal</button></div>
       </label>
       <div id="revealed-out" class="ok" hidden></div>
-      <div id="revealed-error" class="error" hidden></div>
+      <div id="revealed-error" class="error" hidden role="alert"></div>
     </div>
     <div class="row end"><button id="to-settle" class="btn primary">Continue to settlement →</button></div>
   </section>
@@ -280,11 +280,11 @@
           <input id="refund-feerate" type="number" min="1" step="1" value="20">
         </label>
       </div>
-      <div class="wide"><span id="refund-lock-status" class="lock-status"></span></div>
+      <div class="wide"><span id="refund-lock-status" class="lock-status" aria-live="polite"></span></div>
     </div>
 
     <div class="row"><button id="build-plan" class="btn primary">Build settlement plan</button></div>
-    <div id="settle-error" class="error" hidden></div>
+    <div id="settle-error" class="error" hidden role="alert"></div>
 
     <div id="plan-card" class="contract-card" hidden>
       <h3>Settlement plan</h3>
@@ -308,7 +308,7 @@
         <button id="assemble" class="btn primary">Verify &amp; assemble transaction</button>
       </div>
       <div id="sign-out" class="ok" hidden></div>
-      <div id="assemble-error" class="error" hidden></div>
+      <div id="assemble-error" class="error" hidden role="alert"></div>
       <h3>Unsigned bundle <span class="hint-inline">(air-gap: sign on a cold device)</span></h3>
       <div class="row">
         <button id="bundle-export" class="btn ghost">Export unsigned bundle</button>
@@ -321,7 +321,7 @@
       </label>
       <div class="row"><button id="bundle-import-btn" class="btn ghost">Verify bundle</button></div>
       <div id="bundle-import-out" class="ok" hidden></div>
-      <div id="bundle-import-error" class="error" hidden></div>
+      <div id="bundle-import-error" class="error" hidden role="alert"></div>
     </div>
     <div class="row end"><button id="to-verify" class="btn primary" disabled>Continue →</button></div>
   </section>
@@ -343,8 +343,8 @@
       <button id="copy-hex" class="btn ghost">Copy hex</button>
       <button id="broadcast" class="btn primary">Broadcast via blockbook</button>
     </div>
-    <div class="row"><button id="wipe" class="btn danger">Wipe key material from this page</button> <span id="wipe-msg" class="hint-inline"></span></div>
-    <div id="broadcast-error" class="error" hidden></div>
+    <div class="row"><button id="wipe" class="btn danger">Wipe key material from this page</button> <span id="wipe-msg" class="hint-inline" aria-live="polite"></span></div>
+    <div id="broadcast-error" class="error" hidden role="alert"></div>
     <div id="broadcast-ok" class="ok" hidden></div>
 
     <h3>Standalone verifier</h3>
@@ -354,13 +354,13 @@
     </label>
     <div class="row"><button id="verify-desc-btn" class="btn ghost">Verify descriptor</button></div>
     <div id="verify-desc-out" class="ok" hidden></div>
-    <div id="verify-desc-error" class="error" hidden></div>
+    <div id="verify-desc-error" class="error" hidden role="alert"></div>
     <div class="form-grid">
       <label class="wide">HTLC address to inspect <input id="verify-addr" spellcheck="false" placeholder="prl1…"></label>
     </div>
     <div class="row"><button id="verify-addr-btn" class="btn ghost">Classify on-chain state</button></div>
     <div id="verify-addr-out" class="ok" hidden></div>
-    <div id="verify-addr-error" class="error" hidden></div>
+    <div id="verify-addr-error" class="error" hidden role="alert"></div>
   </section>
 
   <section class="panel limits">

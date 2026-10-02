@@ -53,7 +53,7 @@
     <div id="cosigner-fields" class="party-grid"></div>
     <div class="row">
       <button class="btn primary" id="forge-btn">Forge covenant</button>
-      <span class="error" id="forge-error" hidden></span>
+      <span class="error" id="forge-error" hidden role="alert"></span>
     </div>
     <div id="covenant-preview" hidden>
       <h3>Vault address</h3>
@@ -93,7 +93,7 @@
     <div class="row">
       <button class="btn primary" id="refresh-utxos">Refresh UTXOs</button>
       <span id="vault-balance" class="balance"></span>
-      <span class="error" id="vault-error" hidden></span>
+      <span class="error" id="vault-error" hidden role="alert"></span>
     </div>
     <table class="keys"><thead><tr><th></th><th>txid</th><th>vout</th><th>Value (PRL)</th><th>Confs</th></tr></thead>
     <tbody id="utxo-rows"><tr><td colspan="5" class="hint">No UTXOs loaded yet.</td></tr></tbody></table>
@@ -128,7 +128,7 @@
     <div class="row">
       <button class="btn ghost" id="fee-estimate-btn">Fetch fee estimate</button>
       <button class="btn primary" id="build-round">Build signing round</button>
-      <span class="error" id="round-error" hidden></span>
+      <span class="error" id="round-error" hidden role="alert"></span>
     </div>
     <div id="round-out" hidden>
       <h3>Round</h3>
@@ -151,11 +151,11 @@
     <textarea aria-label="Signing round JSON to import" id="sign-round-input" rows="6" spellcheck="false" placeholder='Paste the signing-round JSON here'></textarea>
     <div class="row">
       <button class="btn primary" id="verify-round">Verify round</button>
-      <span class="error" id="sign-error" hidden></span>
+      <span class="error" id="sign-error" hidden role="alert"></span>
     </div>
     <div id="sign-work" hidden>
       <h3>Round summary</h3>
-      <div id="round-status" class="summary"></div>
+      <div id="round-status" class="summary" aria-live="polite"></div>
       <div class="quorum"><div id="quorum-bar"></div></div>
       <p id="quorum-label" class="hint"></p>
       <h3>Sign with a local key</h3>
@@ -194,7 +194,7 @@
           <button class="btn primary" id="broadcast-btn">Broadcast via Blockbook</button>
         </div>
         <div id="broadcast-ok" class="ok" hidden></div>
-        <div id="broadcast-error" class="error" hidden></div>
+        <div id="broadcast-error" class="error" hidden role="alert"></div>
       </div>
     </div>
   </section>

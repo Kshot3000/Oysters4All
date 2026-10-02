@@ -63,7 +63,7 @@
         <input id="su-bspend" type="text" spellcheck="false" placeholder="leave empty and generate, or paste">
       </label>
     </div>
-    <div id="su-result" hidden>
+    <div id="su-result" hidden aria-live="polite">
       <h3>Your silent-payment address</h3>
       <div class="addr-row">
         <code id="su-address" class="big-addr"></code>
@@ -77,7 +77,7 @@
         <div><span class="k">Spend public key B<sub>spend</sub></span><code id="su-bspend-pub"></code></div>
       </div>
     </div>
-    <p class="err" id="su-error" hidden></p>
+    <p class="err" id="su-error" hidden role="alert"></p>
   </section>
 
   <!-- ============ STEP 2: SEND ============ -->
@@ -98,8 +98,8 @@
       <button class="primary" id="se-derive">Derive outputs</button>
       <span class="hint">Outputs are deterministic for these inputs — the receiver finds them by scanning.</span>
     </div>
-    <p class="err" id="se-error" hidden></p>
-    <div id="se-result" hidden>
+    <p class="err" id="se-error" hidden role="alert"></p>
+    <div id="se-result" hidden aria-live="polite">
       <h3>Derived outputs</h3>
       <div class="table-wrap"><table class="draft" id="se-outputs">
         <thead><tr><th>k</th><th>taproot output key (x-only)</th><th>Pearl address (prl1…)</th></tr></thead>
@@ -130,8 +130,8 @@
     <h3>Taproot outputs to check <span class="sub">one x-only key (64 hex) per line</span></h3>
     <textarea aria-label="Taproot outputs to check — one x-only key per line" id="sc-outputs" rows="4" spellcheck="false" placeholder="3e9fce73d4e77a4809908e3c3a2e54ee147b9312dc5044a193d1fc85de46e3c1"></textarea>
     <div class="row"><button class="primary" id="sc-scan">Scan for my payments</button></div>
-    <p class="err" id="sc-error" hidden></p>
-    <div id="sc-result" hidden>
+    <p class="err" id="sc-error" hidden role="alert"></p>
+    <div id="sc-result" hidden aria-live="polite">
       <h3>Found payments</h3>
       <div class="table-wrap"><table class="draft" id="sc-matches">
         <thead><tr><th>k</th><th>label</th><th>output key</th><th>Pearl address</th><th>spend secret (keep cold)</th></tr></thead>
@@ -155,8 +155,8 @@
       </label>
     </div>
     <div class="row"><button class="primary" id="la-derive">Derive labeled address</button></div>
-    <p class="err" id="la-error" hidden></p>
-    <div id="la-result" hidden>
+    <p class="err" id="la-error" hidden role="alert"></p>
+    <div id="la-result" hidden aria-live="polite">
       <h3>Labeled address <span class="sub" id="la-m-echo"></span></h3>
       <div class="addr-row">
         <code id="la-address" class="big-addr"></code>
@@ -180,8 +180,8 @@
       <label>Address <input id="ve-address" type="text" spellcheck="false" placeholder="sp1qq…" size="60"></label>
     </div>
     <div class="row"><button class="secondary" id="ve-decode">Decode</button></div>
-    <p class="err" id="ve-error" hidden></p>
-    <div id="ve-decode-result" hidden>
+    <p class="err" id="ve-error" hidden role="alert"></p>
+    <div id="ve-decode-result" hidden aria-live="polite">
       <div class="key-grid">
         <div><span class="k">HRP / version</span><code id="ve-hrpver"></code></div>
         <div><span class="k">B<sub>scan</sub></span><code id="ve-bscan"></code></div>
@@ -191,7 +191,7 @@
     <h3>Official BIP-352 vectors, in this page</h3>
     <p class="hint">Runs pinned send + receive vectors (including label and change cases) through the bundled crypto and compares byte-for-byte.</p>
     <div class="row"><button class="primary" id="ve-selftest">Run vector self-test</button></div>
-    <div id="ve-selftest-result" hidden>
+    <div id="ve-selftest-result" hidden aria-live="polite">
       <p class="proof" id="ve-proof"></p>
       <p class="hint" id="ve-proof-detail"></p>
     </div>

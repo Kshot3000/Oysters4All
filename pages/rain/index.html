@@ -51,7 +51,7 @@
         <div class="row">
           <button id="fund-derive" class="primary">Read funder</button>
         </div>
-        <p id="fund-error" class="error" hidden></p>
+        <p id="fund-error" class="error" hidden role="alert"></p>
         <div id="fund-card" hidden>
           <div class="kv"><span>Funder address</span><code id="fund-address"></code></div>
           <div class="kv"><span>Derivation</span><code id="fund-path"></code></div>
@@ -83,7 +83,7 @@
           <button id="fund-fetch" class="primary">Find funder coins</button>
         </div>
         <p id="fund-utxos" class="hint"></p>
-        <p id="fetch-error" class="error" hidden></p>
+        <p id="fetch-error" class="error" hidden role="alert"></p>
       </div>
     </div>
     <p class="fineprint">Mnemonics derive at <code>m/86'/coin'/0'/0/0</code> — your ordinary
@@ -109,7 +109,7 @@
         <label>Or import a CSV file
           <input id="recip-file" type="file" accept=".csv,.txt,text/csv,text/plain">
         </label>
-        <p id="recip-error" class="error" hidden></p>
+        <p id="recip-error" class="error" hidden role="alert"></p>
       </div>
       <div class="panel">
         <h2>Validated</h2>
@@ -135,7 +135,7 @@
       <div class="row">
         <button id="plan-button" class="primary">Compute plan</button>
       </div>
-      <p id="plan-error" class="error" hidden></p>
+      <p id="plan-error" class="error" hidden role="alert"></p>
       <div id="plan-summary" class="plan" hidden></div>
     </div>
     <p class="fineprint">Fee = exact keypath vBytes × your fee rate. If the change would be dust,
@@ -151,8 +151,8 @@
       <div class="row">
         <button id="sign-button" class="primary" disabled>Build &amp; sign rain</button>
       </div>
-      <p id="sign-error" class="error" hidden></p>
-      <div id="rain-result" hidden>
+      <p id="sign-error" class="error" hidden role="alert"></p>
+      <div id="rain-result" hidden aria-live="polite">
         <div class="kv"><span>TXID</span><code id="rain-txid"></code></div>
         <label>Signed transaction (hex)
           <textarea id="rain-hex" rows="4" readonly spellcheck="false"></textarea>
@@ -162,7 +162,7 @@
           <button id="broadcast-button" class="primary">⛈ Broadcast via Blockbook</button>
           <button id="clear-secrets" class="ghost">Clear secrets from memory</button>
         </div>
-        <p id="broadcast-error" class="error" hidden></p>
+        <p id="broadcast-error" class="error" hidden role="alert"></p>
         <p id="broadcast-ok" class="ok" hidden></p>
       </div>
     </div>

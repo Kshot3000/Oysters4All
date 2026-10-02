@@ -74,7 +74,7 @@
         <label>Or import a CSV file
           <input id="forge-file" type="file" accept=".csv,.txt,text/csv,text/plain">
         </label>
-        <p id="forge-entries-error" class="err" hidden></p>
+        <p id="forge-entries-error" class="err" hidden role="alert"></p>
       </div>
       <div>
         <h4>Validated</h4>
@@ -90,7 +90,7 @@
     <div class="row">
       <button id="forge-button" class="primary">Forge raffle</button>
     </div>
-    <p class="err" id="forge-error" hidden></p>
+    <p class="err" id="forge-error" hidden role="alert"></p>
     <div id="forge-out" hidden>
       <h3>Raffle forged</h3>
       <div class="kv"><span>Descriptor</span></div>
@@ -135,7 +135,7 @@
       <button id="track-load" class="primary">Load raffle</button>
       <button id="track-scan" class="ghost">Scan tip + settlement block</button>
     </div>
-    <p class="err" id="track-error" hidden></p>
+    <p class="err" id="track-error" hidden role="alert"></p>
     <div id="track-out" hidden>
       <dl class="review" id="track-fields"></dl>
       <p class="hint" id="track-commit" hidden></p>
@@ -186,7 +186,7 @@
     <div class="row">
       <button id="draw-run" class="primary">Run the draw</button>
     </div>
-    <p class="err" id="draw-error" hidden></p>
+    <p class="err" id="draw-error" hidden role="alert"></p>
     <div id="draw-out" hidden>
       <h3>Winners</h3>
       <div id="draw-winners" class="winner-cards"></div>
@@ -226,7 +226,7 @@
     <div class="row">
       <button id="verify-run" class="primary">Verify draw</button>
     </div>
-    <p class="err" id="verify-error" hidden></p>
+    <p class="err" id="verify-error" hidden role="alert"></p>
     <div id="verify-out" hidden>
       <div id="verify-verdict" class="verdict"></div>
       <h3>Recomputed derivation</h3>
@@ -253,7 +253,7 @@
       <button id="payout-build" class="primary">Build payout plan</button>
       <button id="payout-csv" class="ghost" disabled>Download CSV</button>
     </div>
-    <p class="err" id="payout-error" hidden></p>
+    <p class="err" id="payout-error" hidden role="alert"></p>
     <div id="payout-out" hidden>
       <h3>Payout plan — total <span id="payout-total"></span></h3>
       <div id="payout-rows" class="payout-cards"></div>

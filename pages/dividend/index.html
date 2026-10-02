@@ -50,8 +50,8 @@
     <div class="row">
       <button id="tok-fetch" class="primary">Read token metadata</button>
     </div>
-    <div id="tok-error" class="error" hidden></div>
-    <div id="tok-result" hidden>
+    <div id="tok-error" class="error" hidden role="alert"></div>
+    <div id="tok-result" hidden aria-live="polite">
       <h3>Token card</h3>
       <dl class="kv">
         <div><dt>Ticker</dt><dd><code id="tok-r-tick"></code></dd></div>
@@ -84,7 +84,7 @@
       <button id="snap-parse" class="primary">Validate &amp; seal snapshot</button>
       <button id="snap-sample" class="ghost">Load labeled sample</button>
     </div>
-    <div id="snap-error" class="error" hidden></div>
+    <div id="snap-error" class="error" hidden role="alert"></div>
     <div id="snap-dups" hidden>
       <h3>Duplicate addresses</h3>
       <p class="note">The same address appears more than once. Merge (balances summed) or refuse (snapshot rejected).</p>
@@ -94,7 +94,7 @@
         <button id="snap-refuse" class="ghost">Refuse snapshot</button>
       </div>
     </div>
-    <div id="snap-result" hidden>
+    <div id="snap-result" hidden aria-live="polite">
       <h3>Snapshot sealed</h3>
       <dl class="kv">
         <div><dt>Holders</dt><dd id="snap-r-count"></dd></div>
@@ -145,8 +145,8 @@
     <div class="row">
       <button id="plan-build" class="primary">Compute shares &amp; seal plan</button>
     </div>
-    <div id="plan-error" class="error" hidden></div>
-    <div id="plan-result" hidden>
+    <div id="plan-error" class="error" hidden role="alert"></div>
+    <div id="plan-result" hidden aria-live="polite">
       <h3>Dividend plan</h3>
       <dl class="kv">
         <div><dt>Eligible / paid</dt><dd id="plan-r-counts"></dd></div>
@@ -184,8 +184,8 @@
       <button id="fund-fetch" class="primary">Fetch UTXOs</button>
       <button id="fund-apply" class="ghost">Use pasted UTXOs</button>
     </div>
-    <div id="fund-error" class="error" hidden></div>
-    <div id="fund-result" hidden>
+    <div id="fund-error" class="error" hidden role="alert"></div>
+    <div id="fund-result" hidden aria-live="polite">
       <h3>Funding plan</h3>
       <div id="fund-chunks"></div>
     </div>
@@ -215,8 +215,8 @@
       <button id="sign-sign" class="primary">Sign transaction</button>
       <button id="sign-wipe" class="ghost">Wipe key</button>
     </div>
-    <div id="sign-error" class="error" hidden></div>
-    <div id="sign-result" hidden>
+    <div id="sign-error" class="error" hidden role="alert"></div>
+    <div id="sign-result" hidden aria-live="polite">
       <h3>Signed</h3>
       <dl class="kv">
         <div><dt>Txid</dt><dd><code id="sign-r-txid" class="addr"></code></dd></div>
@@ -237,7 +237,7 @@
         <input id="bcast-blockbook" autocomplete="off" spellcheck="false" placeholder="https://…"></label>
     </div>
     <div id="bcast-list"></div>
-    <div id="bcast-error" class="error" hidden></div>
+    <div id="bcast-error" class="error" hidden role="alert"></div>
   </section>
 
   <!-- STEP 7: VERIFY -->
@@ -260,7 +260,7 @@
         <textarea id="ver-txjson" rows="4" spellcheck="false" placeholder='[{"txid":"…","vin":[…],"vout":[…]}]'></textarea></label>
     </div>
     <div class="row"><button id="ver-run" class="primary">Verify dividend</button></div>
-    <div id="ver-error" class="error" hidden></div>
+    <div id="ver-error" class="error" hidden role="alert"></div>
     <div id="ver-verdict" class="verdict" hidden></div>
     <div id="ver-details" class="checks" hidden></div>
   </section>

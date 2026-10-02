@@ -92,7 +92,7 @@
     <div class="row">
       <button id="bt-draft" class="primary">Draft the proposal</button>
     </div>
-    <p class="err" id="bt-error" hidden></p>
+    <p class="err" id="bt-error" hidden role="alert"></p>
     <div id="bt-out" hidden>
       <h3>Proposal drafted</h3>
       <p class="hint">Carry this descriptor to <strong>Publish</strong> (or copy it now) and publish it publicly <strong>before block <span id="bt-out-start"></span></strong>.</p>
@@ -109,7 +109,7 @@
     <p class="lede">This is the tamper-evident commitment. Post the descriptor <strong>and</strong> the proposal JSON
       publicly (X, Discord, the DAO forum) <strong>before the voting window opens</strong>. Anyone can later
       re-hash the proposal and prove it was never altered.</p>
-    <p class="err" id="bt-pub-error" hidden></p>
+    <p class="err" id="bt-pub-error" hidden role="alert"></p>
     <div id="bt-pub-empty" class="hint-box">
       <p>No drafted proposal in this session yet — draft one on step 1, or paste a published descriptor below to review its commitment.</p>
       <label class="wide">Descriptor
@@ -175,7 +175,7 @@
       <button id="bt-vote-wipe" class="danger">Wipe key</button>
     </div>
     <p class="hint" id="bt-vote-tip-out" hidden></p>
-    <p class="err" id="bt-vote-error" hidden></p>
+    <p class="err" id="bt-vote-error" hidden role="alert"></p>
     <div id="bt-vote-proposal-out" hidden>
       <h3>Proposal verified</h3>
       <p class="desc-code"><code id="bt-vote-desc"></code></p>
@@ -227,7 +227,7 @@
       <label class="inline">or enter tip manually <input id="bt-tally-tip-manual" type="number" min="0" step="1" placeholder="current height"></label>
     </div>
     <p class="hint" id="bt-tally-tip-out" hidden></p>
-    <p class="err" id="bt-tally-error" hidden></p>
+    <p class="err" id="bt-tally-error" hidden role="alert"></p>
     <p class="hint" id="bt-tally-count">0 ballots imported.</p>
     <div class="row"><button id="bt-tally-run" class="primary">Run the tally</button></div>
     <div id="bt-tally-out" hidden>
@@ -272,7 +272,7 @@
       </label>
     </div>
     <div class="row"><button id="bt-ver-run" class="primary">Verify the poll</button></div>
-    <p class="err" id="bt-ver-error" hidden></p>
+    <p class="err" id="bt-ver-error" hidden role="alert"></p>
     <div id="bt-ver-out" hidden>
       <h3 id="bt-ver-head">Proven</h3>
       <dl class="kv">

@@ -51,7 +51,7 @@
       <button id="m-add" class="primary">Seat member</button>
       <button id="m-sample" class="ghost">Load sample party (testnet)</button>
     </div>
-    <div id="tab-error" class="error" hidden></div>
+    <div id="tab-error" class="error" hidden role="alert"></div>
     <div class="row">
       <button id="tab-start" class="primary">Open tab &amp; add expenses →</button>
     </div>
@@ -84,7 +84,7 @@
     <div class="row">
       <button id="e-add" class="primary">Add expense</button>
     </div>
-    <div id="exp-error" class="error" hidden></div>
+    <div id="exp-error" class="error" hidden role="alert"></div>
     <div id="exp-list"></div>
   </section>
 
@@ -99,8 +99,8 @@
     <div class="row">
       <button id="st-compute" class="primary">Compute settlement</button>
     </div>
-    <div id="st-error" class="error" hidden></div>
-    <div id="st-result" hidden>
+    <div id="st-error" class="error" hidden role="alert"></div>
+    <div id="st-result" hidden aria-live="polite">
       <h3>Balances</h3>
       <div class="table-wrap"><table id="st-table">
         <thead><tr><th>Member</th><th>Balance (PRL)</th><th>Side</th></tr></thead>
@@ -142,8 +142,8 @@
       <button id="pay-fetch" class="primary">Fetch UTXOs &amp; fund payment</button>
       <button id="pay-apply" class="ghost">Use pasted UTXOs</button>
     </div>
-    <div id="pay-error" class="error" hidden></div>
-    <div id="pay-result" hidden>
+    <div id="pay-error" class="error" hidden role="alert"></div>
+    <div id="pay-result" hidden aria-live="polite">
       <h3>Funding plan</h3>
       <dl class="kv">
         <div><dt>Inputs</dt><dd id="pay-r-ins"></dd></div>
@@ -198,7 +198,7 @@
       <button id="led-csv" class="ghost">Export ledger CSV</button>
       <button id="led-clear" class="ghost">Clear ledger</button>
     </div>
-    <div id="led-error" class="error" hidden></div>
+    <div id="led-error" class="error" hidden role="alert"></div>
     <div id="led-list"></div>
   </section>
 
