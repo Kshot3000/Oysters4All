@@ -13,7 +13,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="styles.css?v=1">
+<link rel="stylesheet" href="styles.css?v=2">
 </head>
 <body>
 <div id="app">
@@ -36,7 +36,7 @@
       <!-- step: choose length -->
       <div class="obstep hidden" id="ob-length">
         <div class="stepdot"><i class="on"></i><i></i><i></i><i></i></div>
-        <h1>Recovery phrase<br>length</h1>
+        <h2 class="step-title">Recovery phrase<br>length</h2>
         <p class="lead">12 words is standard. 24 words adds brute-force margin for large vaults.</p>
         <div class="btnrow" style="flex-direction:column">
           <button class="btn" data-words="12">12 words <span class="tiny">— recommended</span></button>
@@ -48,7 +48,7 @@
       <!-- step: show seed -->
       <div class="obstep hidden" id="ob-seed">
         <div class="stepdot"><i class="on"></i><i class="on"></i><i></i><i></i></div>
-        <h1>Write these down</h1>
+        <h2 class="step-title">Write these down</h2>
         <p class="lead">Pen and paper. Offline. Never screenshot, never share — anyone with these words owns your PRL.</p>
         <div class="card iris"><div class="seedgrid" id="seed-grid"></div></div>
         <div class="btnrow">
@@ -61,7 +61,7 @@
       <!-- step: quiz -->
       <div class="obstep hidden" id="ob-quiz">
         <div class="stepdot"><i class="on"></i><i class="on"></i><i class="on"></i><i></i></div>
-        <h1>Prove it</h1>
+        <h2 class="step-title">Prove it</h2>
         <p class="lead" id="quiz-prompt">Tap the words in order.</p>
         <div class="card"><div class="seedgrid" id="quiz-slots"></div></div>
         <div class="quizbank" id="quiz-bank"></div>
@@ -72,7 +72,7 @@
       <!-- step: import -->
       <div class="obstep hidden" id="ob-import">
         <div class="stepdot"><i class="on"></i><i></i><i></i><i></i></div>
-        <h1>Bring your vault</h1>
+        <h2 class="step-title">Bring your vault</h2>
         <p class="lead">Paste a 12/24-word recovery phrase <b>or</b> a WIF private key.</p>
         <div class="field">
           <label for="import-secret">Recovery phrase or WIF</label>
@@ -90,7 +90,7 @@
       <!-- step: password -->
       <div class="obstep hidden" id="ob-password">
         <div class="stepdot"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div>
-        <h1>Lock the vault</h1>
+        <h2 class="step-title">Lock the vault</h2>
         <p class="lead">This password encrypts your backup on this device. It can't be recovered — don't forget it.</p>
         <div class="field">
           <label for="pw1">Password (min 8 characters)</label>
@@ -111,7 +111,7 @@
   <section id="view-lock" class="view">
     <div class="lockwrap">
       <div class="lockgem">◈</div>
-      <h1 style="margin:0 0 6px;letter-spacing:-.5px">Vault locked</h1>
+      <h2 style="margin:0 0 6px;letter-spacing:-.5px;font-size:2em">Vault locked</h2>
       <p class="lead" style="color:var(--ink-2);margin:0 0 20px">Your keys are encrypted. Enter your password.</p>
       <div class="wrap">
         <div class="field"><input aria-label="Password" class="input" id="lock-pw" type="password" placeholder="Password" autocomplete="current-password"></div>

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pearl Rain — Batch-Send PRL Airdrops</title>
 <meta name="description" content="Pearl Rain: rain PRL on many addresses in one locally-signed Taproot batch transaction. Paste recipients, plan exact fees, sign locally, broadcast via Blockbook. Keys never leave your browser.">
-<link rel="stylesheet" href="styles.css?v=1">
+<link rel="stylesheet" href="styles.css?v=2">
 </head>
 <body>
 <header class="topbar">
@@ -92,7 +92,7 @@
 
   <!-- ================= RECIPIENTS ================= -->
   <section id="step-recipients" class="step">
-    <h1>Who gets rained on</h1>
+    <h2 class="step-title">Who gets rained on</h2>
     <p class="lede">Paste one recipient per line — <code>&lt;address&gt; &lt;amount&gt;</code>
       (PRL; decimals allowed). CSV works too. Duplicate addresses merge into a single output.</p>
     <div class="grid2">
@@ -127,7 +127,7 @@
 
   <!-- ================= PLAN ================= -->
   <section id="step-plan" class="step">
-    <h1>Plan the storm</h1>
+    <h2 class="step-title">Plan the storm</h2>
     <p class="lede">Exact fee math up front: one transaction, N outputs, change back to the funder.
       Nothing is signed until you approve the plan.</p>
     <div class="panel">
@@ -143,7 +143,7 @@
 
   <!-- ================= SIGN & SEND ================= -->
   <section id="step-send" class="step">
-    <h1>Sign &amp; send</h1>
+    <h2 class="step-title">Sign &amp; send</h2>
     <p class="danger">☔ Review carefully — broadcasting sends real PRL to every address above,
       and it cannot be undone.</p>
     <div class="panel">

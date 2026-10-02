@@ -49,7 +49,7 @@ main { max-width: 1080px; margin: 0 auto; padding: 2rem 1.4rem 4rem; }
 .step { display: none; }
 .step.active { display: block; animation: fade .25s ease; }
 @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }
-h1 { font-size: 2rem; margin: .2rem 0 .6rem; letter-spacing: .01em; }
+h1, .step-title { font-size: 2rem; margin: .2rem 0 .6rem; letter-spacing: .01em; }
 .lede { color: var(--dim); max-width: 62ch; margin-top: 0; }
 .panel {
   background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
@@ -169,7 +169,7 @@ footer code { font-size: .8rem; }
 /* ---------- print: only the card ---------- */
 @media print {
   body { background: #fff; }
-  .topbar, main > section:not(#step-card), footer, #step-card > h1, #step-card > .lede,
+  .topbar, main > section:not(#step-card), footer, #step-card > .step-title, #step-card > .lede,
   #step-card > .row, #step-card > .fineprint { display: none !important; }
   main { padding: 0; max-width: none; }
   .card-stage { margin: 0; }

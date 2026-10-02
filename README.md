@@ -47,7 +47,11 @@ and Plonky2 zk-SNARK block certificates.
 Every form control in every app carries a programmatic label (a `<label for>`
 association or an `aria-label`), so the fleet works with screen readers and
 voice control. Audited fleet-wide on 2026-10-02: 152 previously unlabeled
-controls across 43 apps were fixed; 0 unlabeled controls remain.
+controls across 43 apps were fixed; 0 unlabeled controls remain. The same
+audit's second pass fixed document structure: every page now has exactly one
+`<h1>` (the multi-step wizards in Gift, Rain, and Wallet demoted their later
+step headings to styled `<h2>`s) and a `<main>` landmark (added to Legacy,
+Names, Pool, and Vanity).
 
 ## Support this work
 
