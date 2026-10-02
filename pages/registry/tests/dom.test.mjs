@@ -173,7 +173,7 @@ test("boot: bundle + app wired, footer carries @kshot9000 and the exact donation
   assert.ok(html.includes("sample of indexed data"), "honest scan wording present");
   assert.ok(html.includes('src="pearl-registry.bundle.js?v=3"'), "cache-busted bundle script");
   assert.ok(html.includes('src="app.js?v=1"'), "cache-busted app script");
-  assert.ok(html.includes('href="styles.css?v=3"'), "cache-busted stylesheet");
+  assert.ok(html.includes('href="styles.css?v=4"'), "cache-busted stylesheet");
 });
 
 test("directory scan builds the register with first-seen resolution", async () => {

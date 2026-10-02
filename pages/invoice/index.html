@@ -5,9 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pearl Invoice — PRL Invoicing Studio</title>
 <meta name="description" content="Compose tamper-evident PRL invoices, share a payment QR, watch for payment on-chain, and issue hash-bound receipts. Receive-only: the page never spends.">
-<link rel="stylesheet" href="styles.css?v=2">
+<link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
+<a class="skip-link" href="#inv-wizard">Skip to main content</a>
 <header class="ledger-head">
   <div class="ledger-rule"></div>
   <h1><span class="seal">◈</span> Pearl Invoice</h1>
@@ -21,7 +22,7 @@
 <div id="inv-error" class="banner error" hidden></div>
 <div id="inv-toast" class="toast" hidden></div>
 
-<main id="inv-wizard">
+<main id="inv-wizard" tabindex="-1">
   <ol class="stepper">
     <li><button id="inv-step-1" class="step active" type="button"><span class="n">1</span> Compose</button></li>
     <li><button id="inv-step-2" class="step" type="button"><span class="n">2</span> Descriptor</button></li>

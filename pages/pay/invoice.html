@@ -5,10 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Pay invoice — Pearl Pay</title>
 <meta name="description" content="Pay a Pearl (PRL) invoice. Scan the QR, send the exact amount, watch confirmations live." />
-<link rel="stylesheet" href="styles.css?v=2" />
+<link rel="stylesheet" href="styles.css?v=3" />
 <link rel="stylesheet" href="pay.css?v=2" />
 </head>
 <body>
+<a class="skip-link" href="#main">Skip to main content</a>
 <header class="nav">
   <div class="nav-inner">
     <a class="brand" href="./" aria-label="Pearl Pay home"><span class="brand-mark">🐚</span> Pearl <span class="badge">Pay</span></a>
@@ -21,7 +22,7 @@
   </div>
 </header>
 
-<main class="container inv-wrap">
+<main id="main" tabindex="-1" class="container inv-wrap">
   <div id="demo-banner" class="demo-banner" hidden>DEMO MODE — simulated payment, no real PRL moves.</div>
   <section class="card inv-card" id="inv-card" hidden>
     <div class="eyebrow">Pearl invoice</div>

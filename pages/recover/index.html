@@ -5,9 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pearl Recover — PRL Seed Recovery Scanner</title>
 <meta name="description" content="Scan your BIP-39 seed across BIP-86 Taproot derivation paths and find every used Pearl address. Discovery only — the page never signs or broadcasts.">
-<link rel="stylesheet" href="styles.css?v=3">
+<link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
+<a class="skip-link" href="#main">Skip to main content</a>
 <div class="beacon-sky" aria-hidden="true">
   <div class="ring r1"></div>
   <div class="ring r2"></div>
@@ -20,7 +21,7 @@
   <p class="sub">The rescue beacon — point your BIP-39 seed at the Pearl chain and find every address that ever held PRL. Discovery only: this page never signs, never broadcasts, and never stores your seed.</p>
 </header>
 
-<main>
+<main id="main" tabindex="-1">
   <section class="panel" id="setup-panel">
     <h2>Recovery settings</h2>
     <p id="rc-error" class="error" hidden></p>

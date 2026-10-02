@@ -83,7 +83,7 @@ test("index.html: every id touched by app.js exists", () => {
 
 test("index.html: all asset scripts cache-busted, QR lib present", () => {
   const html = readFileSync(P(appDir, "index.html"), "utf8");
-  for (const asset of ["styles.css?v=3", "qrcode.min.js?v=1", "pearl-burn.bundle.js?v=1", "app.js?v=2"]) {
+  for (const asset of ["styles.css?v=4", "qrcode.min.js?v=1", "pearl-burn.bundle.js?v=1", "app.js?v=2"]) {
     assert.ok(html.includes(asset), "cache-busted asset missing: " + asset);
   }
   assert.ok(existsSync(P(appDir, "qrcode.min.js")), "qrcode.min.js must be vendored");

@@ -91,7 +91,7 @@ test("index.html: five steps, five panels, honest limits, attribution", () => {
     const src = m[1];
     if (!src.startsWith("http")) assert.ok(src.includes("?v="), "cache-busted: " + src);
   }
-  assert.ok(html.includes('href="styles.css?v=4"'), "styles cache-busted");
+  assert.ok(html.includes('href="styles.css?v=5"'), "styles cache-busted");
 });
 
 test("styles.css exists and is non-trivial", () => {

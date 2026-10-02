@@ -63,7 +63,17 @@ tabs, and cards — previously only 3 of 77 pages defined one, so keyboard
 users relied on the browser default, which is easy to lose against the
 fleet's dark, glowing surfaces. Verified in a real browser on all 77 pages:
 the first focusable element on every page matches `:focus-visible` and
-renders the ring, with zero console errors.
+renders the ring, with zero console errors. A fifth pass the same day added
+a skip-to-main-content link as the first Tab stop on every page: parked
+off-screen until keyboard focus reveals it as a dark chip in the app's own
+accent, it jumps straight to the `<main>` landmark — which now carries
+`tabindex="-1"` so focus, not just scroll position, moves with it — and
+keyboard users no longer tab through the full header and step-nav on all
+81 pages. The two pages in the companion Hermes repo (landing page and
+live dashboard) received the same skip link plus the focus ring they had
+missed. Verified in a real browser on all 81 pages here and both Hermes
+pages: the first Tab reveals the link at AA contrast, Enter lands focus
+on `<main>`, zero console errors.
 
 ## Support this work
 

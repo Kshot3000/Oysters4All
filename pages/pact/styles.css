@@ -176,3 +176,8 @@ footer .fine { font-size: 0.75rem; margin-top: 0.4rem; }
 
 /* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
 :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+/* Skip link: the first Tab stop on the page — parked off-screen until keyboard focus reveals it (fleet skip-link pass). */
+.skip-link { position: absolute; left: 12px; top: -64px; z-index: 1000; padding: 10px 16px; border: 2px solid var(--gold); border-radius: 8px; background: #0b0e14; color: var(--gold); font-weight: 700; text-decoration: none; transition: top .15s ease; }
+.skip-link:focus-visible { top: 12px; }
+main:focus { outline: none; }
