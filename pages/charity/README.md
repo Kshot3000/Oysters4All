@@ -67,7 +67,7 @@ Live: https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/charity/
 - `node build.mjs` → committed `pearl-charity.bundle.js` (`window.PearlCharity`). Never hand-edit the bundle.
 - `node --no-warnings --loader ./tests/loader.mjs --test tests/charity.test.mjs` — descriptor round-trip, pinned fixture descriptor, tamper refusal on every committed field, fingerprint format, receipt hash round-trip + tamper refusal, classification (unfunded/funding/goal-met/past-deadline), deadline countdown math, dust/zero-goal/bad-address refusals, organizer sign→verify, stubbed-fetch Blockbook parsing, receipt cross-check proven/not-proven.
 - `node --test tests/dom.test.mjs` — drives the real `app.js` against the committed bundle in a vm with a strict DOM shim.
-- `node ~/workspace/goals/pearl-blockchain-24-7-builder/hidden_files/qa-charity-browser.mjs` — real headless-Chromium QA (file:// + CDP, stubbed Blockbook), all five steps, zero console/page errors.
+- `node ~/workspace/goals/pearl-blockchain-24-7-builder/hidden_files/qa-charity-browser.mjs` — real headless-Chromium QA (file:// + CDP, stubbed Blockbook), all five steps, 54/54 checks green, zero console/page errors.
 
 ## Files
 

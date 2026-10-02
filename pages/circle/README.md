@@ -68,7 +68,7 @@ leaves are byte-identical to the audited originals.
 
 - `tests/circle.test.mjs` — 13/13: terms/member validation, pinned setup hash / fingerprint / payout order / round addresses / claim txid / refund txid, lottery tamper paths, leaf byte-equality with the audited lineage, descriptor round-trip + tamper detection, funding plan, claim/refund signing round-trips, classification.
 - `tests/dom.test.mjs` — 8/8: drives the real `app.js` against a strict DOM shim through found → lottery → fund → claim (double-confirm + wipe) → refund → track.
-- Real-browser QA (`hidden_files/qa-circle-browser.mjs`): headless Chromium 152 via file:// + CDP, stubbed Blockbook, zero console/page errors.
+- Real-browser QA (`hidden_files/qa-circle-browser.mjs`): headless Chromium 152 via file:// + CDP, stubbed Blockbook, zero console/page errors — 37/37 green.
 
 Run: `node --no-warnings --loader ./tests/loader.mjs --test tests/circle.test.mjs`
 Build the bundle: `node build.mjs` (committed as `pearl-circle.bundle.js`).

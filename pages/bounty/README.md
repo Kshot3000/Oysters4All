@@ -45,7 +45,7 @@ Six steps, one page, zero build step:
 ## Tests
 
 - `node build.mjs` → `pearl-bounty.bundle.js` (`window.PearlBounty`).
-- `node --test tests/bounty.test.mjs` — 16/16 core tests green
+- `node --no-warnings --loader ./tests/loader.mjs tests/bounty.test.mjs` — 16/16 core tests green
   (descriptor round-trip, reclaim-leaf byte-identity with the audited escrow,
   award/reclaim sign + verify, commit-reveal, deadline rules, fixture address pin).
 - `node --test tests/dom.test.mjs` — 7/7 DOM tests green (real `app.js` driven

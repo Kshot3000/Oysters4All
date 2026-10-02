@@ -52,6 +52,8 @@ plus an always-visible Honest Limits panel.
   real Schnorr sign + re-verify round-trip with tamper check).
 - `node --no-warnings tests/dom.test.mjs` — 12/12 DOM tests driving the real bundle.
 - Real-browser QA: `hidden_files/qa-boost-browser.mjs` (headless Chromium 152, file:// + CDP,
-  Blockbook stubbed at fetch, zero console/page errors) — not committed.
+  Blockbook stubbed at fetch, zero console/page errors) — 21/21 green, not committed.
 
 Theme: launchpad ignition — deep navy + ignition orange.
+
+Built by [@kshot9000](https://x.com/kshot9000) · tips: `prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`
