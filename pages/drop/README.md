@@ -52,13 +52,16 @@ encode/decode are copied verbatim from the audited `sign/src/crypto.js`
 
 ## Files
 
-- `index.html` — the desk (references `styles.css?v=1`, `pearl-drop.bundle.js?v=1`)
+- `index.html` — the desk (references `styles.css?v=2`, `pearl-drop.bundle.js?v=1`)
 - `styles.css` — raindrop-storm theme (deep navy + luminous cyan/teal)
 - `src/logic.js` — pure core: crypto, grains, campaign, CSV, merkle, seal, claim
 - `src/index.js` — DOM wiring (sets `window.PearlDrop` at the end)
 - `build.mjs` — esbuild IIFE bundle, no `globalName` (see AGENTS.md esbuild lesson)
 - `pearl-drop.bundle.js` — committed bundle (rebuild with `node build.mjs`)
 - `tests/logic.test.mjs` — `node tests/logic.test.mjs` (93/93 green)
+- real-browser QA (headless Chromium, file:// + CDP) — 26/26 checks green,
+  zero console/page errors, plus a 375px mobile tab-sweep
+  (`hidden_files/qa-drop-browser.mjs`)
 
 Pure client-side — no network calls, no keys, never moves PRL.
 

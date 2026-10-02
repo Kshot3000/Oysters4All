@@ -52,7 +52,7 @@ sent anywhere, and signing never touches the network.
 
 ## Verification
 
-- `tests/escrow.test.mjs` — 16/16: exact script bytes, script-number
+- `tests/escrow.test.mjs` — 18/18: exact script bytes, script-number
   vectors, Taproot address/control-block derivation, leaf-order
   independence, sighash byte-equality with the audited Pearl Sign
   `buildRevealTx` digest, odd-Y BIP-340 signing, full 2-of-3 release flow,
