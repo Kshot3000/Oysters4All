@@ -363,7 +363,9 @@
       });
       var t = document.createElement("table"); t.className = "draft";
       t.innerHTML = "<thead><tr><th>hash_type</th><th>Flag</th><th class='num'>Input</th><th>Preimage</th><th>Digest</th></tr></thead>";
-      t.appendChild(tb); box.appendChild(t);
+      t.appendChild(tb);
+      var wrap = document.createElement("div"); wrap.className = "table-wrap";
+      wrap.appendChild(t); box.appendChild(wrap);
       var d = document.createElement("div");
       d.className = "verdict " + (fails === 0 ? "proven" : "notproven");
       d.textContent = fails === 0 ? "7 / 7 vectors reproduced" : fails + " vector(s) FAILED";

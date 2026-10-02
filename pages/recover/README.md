@@ -50,6 +50,13 @@ node --no-warnings --loader ./tests/loader.mjs tests/recover.test.mjs  # 14/14
 node build.mjs  # rebuild the bundle
 ```
 
+- Real-browser QA (headless Chromium, file:// + CDP) — 17/17 checks green,
+  zero console/page errors, plus a 375px mobile sweep
+  (`hidden_files/qa-recover-browser.mjs`). The sweep caught a real mobile
+  overflow (382px): the unbroken `.mono` derivation-path string in the
+  BIP-39 note stretched the page — fixed with `overflow-wrap: anywhere`
+  on `.mono` (`styles.css?v=2`).
+
 Crypto is vendored — every key operation reuses `../sign/src/crypto.js`
 (`NETWORKS`, `walletFromPriv`, `encodeBech32m`, `GRAIN_PER_PRL`) and the
 vendored `@scure/bip39` / `@scure/bip32` HD derivation. No new cryptographic

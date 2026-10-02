@@ -55,16 +55,21 @@ engineering-drafting theme (cyan drafting ink on deep-blue grid paper).
 - `pearl-sighash.bundle.js` — committed esbuild IIFE bundle (`?v=1`; built by `node build.mjs`, no `globalName` — see AGENTS.md)
 - `src/sighash-core.js` — the digest engine + BIP-340 + sealed descriptors
 - `src/vectors-bip341.js`, `src/vectors-bip340.js` — transcribed official test vectors
-- `tests/sighash.test.mjs` — 83 core tests (`node --no-warnings --loader ./tests/loader.mjs tests/sighash.test.mjs`)
+- `tests/sighash.test.mjs` — 84 core tests (`node --no-warnings --loader ./tests/loader.mjs tests/sighash.test.mjs`)
 - `tests/dom.test.mjs` — 56 wiring tests (bundle surface, id coverage, `?v=` keys, footer attribution)
 
 ## Verification
 
-- 83/83 core tests, 56/56 DOM tests.
-- 30/30 real-browser QA checks in headless Chromium 152 (file:// + CDP),
+- 84/84 core tests, 56/56 DOM tests.
+- 31/31 real-browser QA checks in headless Chromium 152 (file:// + CDP),
   zero console/page errors — harness at
   `~/workspace/goals/pearl-blockchain-24-7-builder/hidden_files/qa-sighash-browser.mjs`
-  (not committed).
+  (not committed). The 375px mobile tab-sweep caught two real overflows:
+  the Compare verdict line (two unbroken 64-char digests in `.meta`,
+  549px) — fixed with `overflow-wrap: anywhere` on `.meta`
+  (`styles.css?v=2`) — and the Verify tab's JS-built vectors table
+  (514px), which was appended without the `.table-wrap` scroll wrapper
+  every static table uses — now wrapped in `app.js` (`app.js?v=2`).
 - Rebuild the bundle after touching `src/`: `node build.mjs`.
 
 ## Attribution

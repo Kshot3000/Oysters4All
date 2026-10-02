@@ -61,7 +61,17 @@ audited bech32m decoder from Sign core.
   pair (18 tests).
 - `node --no-warnings --loader ./tests/loader.mjs tests/dom.test.mjs` —
   DOM suite booting the committed bundle + `app.js` against a DOM shim with a
-  stubbed indexer/Blockbook.
+  stubbed indexer/Blockbook (8/8).
+- Real-browser QA (headless Chromium, file:// + CDP) — 27/27 checks green,
+  zero console/page errors, plus a 375px mobile tab-sweep
+  (`hidden_files/qa-registry-browser.mjs`). The sweep caught real mobile
+  overflows on every tab (532px; claim tab 657px): unbroken `.mono` code
+  strings — the footer donation address and claim-wizard txids — had no
+  wrap rule; fixed with `overflow-wrap: anywhere` on `.mono`
+  (`styles.css?v=2`). The same pass fixed the DOM suite's stale cache-key
+  expectation (bundle is legitimately at `?v=3` since the fleet-wide
+  BIP-341 bundle rebuild; the test still expected `?v=1` and had been
+  failing unnoticed).
 
 ## Honest limits
 

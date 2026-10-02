@@ -73,7 +73,7 @@ h3 { color: var(--brass); font-size: 1.15rem; margin: 1.4rem 0 .5rem; }
 h4 { color: var(--ink); font-size: 1rem; margin: .6rem 0 .4rem; }
 .lede { color: var(--muted); max-width: 70ch; }
 .muted { color: var(--muted); font-size: .9rem; }
-.mono { font-family: var(--mono); font-size: .92em; }
+.mono { font-family: var(--mono); font-size: .92em; overflow-wrap: anywhere; }
 code.mono { background: #241e10; padding: .1em .4em; border-radius: 4px; color: var(--brass-hi); }
 .count { color: var(--brass-hi); font-size: .85em; }
 

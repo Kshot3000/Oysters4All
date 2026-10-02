@@ -116,7 +116,7 @@ main { max-width: 1180px; margin: 0 auto; padding: 26px 22px 60px; }
 }
 .lede { color: var(--ink-dim); max-width: 72ch; }
 .hint { color: var(--ink-faint); font-size: 13.5px; }
-.meta { color: var(--ink-dim); font-size: 13.5px; font-family: var(--mono); }
+.meta { color: var(--ink-dim); font-size: 13.5px; font-family: var(--mono); overflow-wrap: anywhere; }
 .stamp {
   font-family: var(--mono); font-size: 11px; letter-spacing: .14em; color: var(--good);
   border: 1px solid var(--good); padding: 2px 8px; margin-left: 8px; vertical-align: middle;

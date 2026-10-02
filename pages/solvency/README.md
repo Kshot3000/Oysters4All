@@ -57,9 +57,11 @@ signature and re-add the on-chain balances.
   stubbed-fetch reserve summation.
 - 3/3 DOM tests (`node --test tests/dom.test.mjs`): id cross-check, attribution
   check, full custodian→bundle UI flow in a stub DOM with real signing.
-- 17/17 real-browser QA (headless Chromium 152, file:// + CDP, stubbed
+- 18/18 real-browser QA (headless Chromium 152, file:// + CDP, stubbed
   Blockbook, zero console/page errors): full wizard incl. wrong-key refusal,
-  key wipe, end-to-end PROVEN verdict at 133.33%, tampered-bundle refusal.
+  key wipe, end-to-end PROVEN verdict at 133.33%, tampered-bundle refusal,
+  plus a 375px mobile tab-sweep — all five steps measure exactly 375px, no
+  fixes needed (`hidden_files/qa-solvency-browser.mjs`).
 
 Footer carries [@kshot9000](https://x.com/kshot9000) and the donation address
 `prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`.

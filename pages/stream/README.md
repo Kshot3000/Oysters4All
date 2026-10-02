@@ -58,6 +58,13 @@ unmatured ticks in one transaction.
 - `node --no-warnings --loader ./tests/loader.mjs tests/stream.test.mjs` — 13 core tests
 - `node --no-warnings --loader ./tests/loader.mjs tests/dom.test.mjs` — 8 DOM tests
   (real `index.html` + committed bundle + `app.js` against a minimal DOM shim, hostile localStorage)
+- Real-browser QA (headless Chromium, file:// + CDP) — 18/18 checks green,
+  zero console/page errors, plus a 375px mobile tab-sweep
+  (`hidden_files/qa-stream-browser.mjs`). The sweep caught a real mobile
+  overflow on the Cancel tab (528px): the broadcast-txid `<code>` inside
+  `.hint` (a 64-char unbroken string) had no wrap rule — the same markup
+  on the Claim tab would overflow after a broadcast too; fixed with
+  `word-break: break-all` on `.lede/.hint/label code` (`styles.css?v=2`).
 
 Built by [@kshot9000](https://x.com/kshot9000) for the Pearl ecosystem.
 Donations: `prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`
