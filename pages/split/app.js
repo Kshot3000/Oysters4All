@@ -271,12 +271,12 @@
     finally { $("pay-fetch").disabled = false; }
   });
 
-  $("pay-apply").addEventListener("click", () => {
+  $("pay-apply").addEventListener("click", async () => {
     err("pay-error");
     try {
       const utxos = P.parseUtxoList($("pay-paste").value, S.network);
       if (!utxos.length) throw new Error("no UTXOs pasted");
-      fundFrom(utxos);
+      await fundFrom(utxos);
     } catch (e) { err("pay-error", e.message); }
   });
 

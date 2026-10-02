@@ -6027,7 +6027,7 @@ zoo`.split("\n");
     const changeProgram = addressToProgram(changeAddress, plan.network);
     const outputs = [...plan.ownerOutputs, ...plan.feeOutputs];
     const outSum = outputs.reduce((n, o) => n + o.value, 0);
-    const fee = revealTxVBytes(plan.script.length, outputs.length + 1) * plan.feeRate;
+    const fee = revealTxVBytes(plan.script.length, outputs.length) * plan.feeRate;
     const change = plan.commitValue - outSum - fee;
     if (change < 0) throw new Error("commit value too small for reveal outputs + fee");
     if (change >= DUST_GRAIN) outputs.push({ program: changeProgram, value: change });

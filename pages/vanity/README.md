@@ -79,7 +79,7 @@ live rate, elapsed time, expected attempts, your luck so far
 | `src/worker-driver.js` | Classic-worker driver (cooperative, `setTimeout(0)` yields) |
 | `src/worker-src.js` | Generated: worker source embedded as a string |
 | `build.mjs` | `node build.mjs` rebuilds all bundles (esbuild via `~/workspace/.build-tools`) |
-| `tests/vanity.test.mjs` | 12 core tests (node) |
+| `tests/vanity.test.mjs` | 11 core tests (node) |
 | `tests/dom.test.mjs` | 5 DOM integration tests (fake Blob-URL worker, real crypto) |
 | `tests/loader.mjs` | ESM loader mapping bare `@…` imports to `../sign/lib/` |
 
@@ -92,14 +92,17 @@ key-generation loops and prefix matching.
 
 ```bash
 node build.mjs   # rebuild bundles
-node --no-warnings --loader ./tests/loader.mjs tests/vanity.test.mjs   # 12/12
+node --no-warnings --loader ./tests/loader.mjs tests/vanity.test.mjs   # 11/11
 node --no-warnings --loader ./tests/loader.mjs tests/dom.test.mjs       # 5/5
 ```
 
-Real-browser QA (headless Chromium, `file://` + CDP): 20/20 green —
-invalid-prefix rejection, difficulty panel, real Blob-URL workers finding a
-1-char prefix, claim integrity, QR, WIF round-trip, Schnorr key-control
-proof, zero console/page errors.
+Real-browser QA (headless Chromium, `file://` + CDP): 24/24 green —
+invalid-prefix rejection (`b`, `1`, empty), difficulty panel, real Blob-URL
+workers finding a 1-char prefix, claim integrity re-check, QR, attempts
+counter, Schnorr key-control proof + address re-derivation, secret reveal,
+export button, BIP-86 seed-box validation, fresh-seed generation, stop
+halting an active grind, footer attribution, honest limits, zero
+console/page errors.
 
 ## Honest limits
 

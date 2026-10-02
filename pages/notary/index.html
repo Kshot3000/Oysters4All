@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pearl Notary — Proof-of-Existence Timestamping on Pearl</title>
 <meta name="description" content="Pearl Notary: hash any document and seal its SHA-256 digest into Pearl with a Taproot inscription. Verify later — the chain is the witness. All crypto runs locally in your browser.">
-<link rel="stylesheet" href="styles.css?v=1">
+<link rel="stylesheet" href="styles.css?v=2">
 </head>
 <body>
 <header class="topbar">
@@ -205,6 +205,27 @@
     <div id="v-error" class="error" hidden></div>
     <div id="v-result" class="record-card" hidden></div>
   </section>
+
+  <!-- HONEST LIMITS -->
+  <section class="limits" aria-label="Honest limits">
+    <h2>Honest limits</h2>
+    <ul>
+      <li><strong>Sealing costs real PRL on a live chain.</strong> A notarization is two
+      on-chain transactions (commit, then reveal) — it needs a funded address and a
+      reachable Blockbook endpoint. Nothing here broadcasts without your click, and
+      nothing here can seal without funds.</li>
+      <li><strong>The chain is the witness, not a lawyer.</strong> This is
+      proof-of-existence timestamping — it proves a document existed at a time, not
+      who wrote it or whether it is true. Nothing here is legal advice.</li>
+      <li><strong>Your document never leaves this machine.</strong> Only its SHA-256
+      fingerprint is engraved on-chain; the file or text you drop here is hashed locally.</li>
+      <li><strong>Confirmations matter.</strong> The reveal is only valid once the commit
+      transaction confirms — revealing early burns the fee and seals nothing.</li>
+      <li><strong>Keys live in this page's memory only.</strong> Generated or imported
+      secrets are never sent anywhere; reloading the page forgets them. Back up any key
+      that guards real funds.</li>
+    </ul>
+  </section>
 </main>
 
 <footer>
@@ -214,7 +235,7 @@
   <p class="hint">Notary seals SHA-256 fingerprints into Pearl via Taproot commit/reveal. Documents never leave your machine. Nothing here is legal advice.</p>
 </footer>
 
-<script src="pearl-notary.bundle.js?v=2"></script>
+<script src="pearl-notary.bundle.js?v=3"></script>
 <script src="app.js?v=1"></script>
 </body>
 </html>

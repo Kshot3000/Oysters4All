@@ -97,6 +97,12 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; }
 .utxo-list { display: flex; flex-direction: column; gap: .4rem; margin: .6rem 0; }
 .utxo-list .u { display: flex; justify-content: space-between; background: var(--ink-2); border: 1px solid #2a3a5c; border-radius: 6px; padding: .5rem .7rem; }
 .count { color: var(--brass-hi); }
+.limits { margin: 2.5rem 0 0; border: 1px solid #2a3a5c; border-left: 4px solid var(--brass);
+  border-radius: 0 10px 10px 0; padding: 1.1rem 1.3rem; background: rgba(201,162,39,.05); }
+.limits h2 { margin: 0 0 .6rem; font-size: 1.05rem; color: var(--brass-hi); }
+.limits ul { margin: 0; padding-left: 1.2rem; color: var(--muted); line-height: 1.65; font-size: .92rem; }
+.limits li { margin: .45rem 0; }
+.limits strong { color: var(--text); }
 footer { text-align: center; padding: 2rem 1rem; color: var(--muted); font-size: .85rem; border-top: 1px solid #2a3a5c; }
 footer a { color: var(--brass-hi); }
 #donate-addr { font-size: .75rem; }
