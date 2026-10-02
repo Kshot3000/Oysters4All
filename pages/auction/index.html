@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pearl Auction — Sealed-Bid PRL Auction Hall</title>
 <meta name="description" content="Pearl Auction: sealed-bid PRL auctions with commit-reveal fairness. List an item in a tamper-evident auction:v1: descriptor, take sealed SHA-256 bid commitments before the commit deadline, reveal bids before the reveal deadline, settle to the highest verified bid with a full derivation table, and verify anyone's auction standalone. No PRL ever moves through this page.">
-<link rel="stylesheet" href="styles.css?v=1">
+<link rel="stylesheet" href="styles.css?v=2">
 </head>
 <body>
 <div class="hall-glow" aria-hidden="true"><span class="orb o1"></span><span class="orb o2"></span><span class="orb o3"></span><span class="velvet" aria-hidden="true"></span></div>
@@ -83,7 +83,7 @@
     </div>
     <p class="hint" id="li-tip-out" hidden></p>
     <div class="rules">
-      <h4>The auction rules (published with the descriptor)</h4>
+      <h3>The auction rules (published with the descriptor)</h3>
       <ul>
         <li>One bidder, one commitment. A second commitment from the same address is flagged and <strong>both are excluded</strong>.</li>
         <li>Commitment hashes must be published <strong>before</strong> the commit deadline block — late hashes are refused.</li>
@@ -235,7 +235,7 @@
       <button id="rv-button" class="primary">Reveal bid</button>
     </div>
     <p class="err" id="rv-error" hidden></p>
-    <h4>Reveals — in reveal order (<span id="rv-count">0</span>)</h4>
+    <h3 class="keep-h4">Reveals — in reveal order (<span id="rv-count">0</span>)</h3>
     <p class="hint" id="rv-empty">No reveals yet. The order below is the reveal order — it breaks bid ties.</p>
     <div id="rv-table-wrap" class="table-wrap" hidden>
       <table class="rtable">

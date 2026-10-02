@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pearl Mesh — MuSig2 collaborative keypath signing desk for PRL</title>
 <meta name="description" content="Pearl Mesh: weave 2–7 PRL keyholders into one MuSig2 aggregate key that spends like a single Taproot key. Guided nonce ceremony, sealed descriptor, standalone verifiers. Fully offline except an optional balance lookup.">
-<link rel="stylesheet" href="styles.css?v=2">
+<link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
 <header class="topbar">
@@ -36,7 +36,7 @@
 <div class="margin-strip" aria-hidden="true"><span>FIG. 01 — COLLABORATIVE KEYPATH LOOM · SHEET PRL-327 · SCALE 1:1 · ALL KEYS IN X-ONLY FORM</span></div>
 
 <aside class="limits" id="limits">
-  <h3>Honest limits — read before weaving</h3>
+  <h2>Honest limits — read before weaving</h2>
   <ul>
     <li><strong>MuSig2 is n-of-n:</strong> every member must take part in every signing ceremony. If one key is lost, the funds are locked. This is not a threshold scheme.</li>
     <li><strong>The ceremony is interactive:</strong> members exchange nonce bundles and partial signatures with the coordinator. Anyone who sees a member's <em>secret</em> nonce (not the bundle — the secret) alongside their partial can recover that member's private key. Keep secrets on-device; share only bundles and partials.</li>

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pearl Hush — BIP-352 Silent Payments desk for PRL</title>
 <meta name="description" content="Pearl Hush: a BIP-352 silent payments desk for the Pearl blockchain. Generate a silent-payment address, derive unlinkable taproot outputs, scan for payments, manage labels, and verify everything against the official BIP-352 test vectors. Fully client-side.">
-<link rel="stylesheet" href="styles.css?v=2">
+<link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
 <header class="topbar">
@@ -32,7 +32,7 @@
 </header>
 
 <aside class="limits" id="honest-limits">
-  <h3>Honest limits — read before you hush</h3>
+  <h2>Honest limits — read before you hush</h2>
   <ul>
     <li><strong>Forward-looking standards desk, not a wallet:</strong> BIP-352 is not yet supported by Pearl wallet software (Oyster). This page implements the published BIP-352 math byte-exact — pinned against the official test vectors — so the ecosystem has a correct reference when support lands.</li>
     <li><strong>Derived <code>prl1…</code> outputs are valid Pearl Taproot addresses</strong> for manual sweeping: each is a well-formed bech32m v1 32-byte address. This page never signs and never broadcasts — moving funds is on you, with a real wallet.</li>

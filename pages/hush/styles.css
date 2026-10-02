@@ -72,7 +72,7 @@ h1 {
   border: 1px solid var(--line); border-left: 3px solid var(--peri-dim);
   border-radius: var(--radius);
 }
-.limits h3 { margin: 0 0 8px; font-size: 0.95rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--peri-soft); font-weight: 500; }
+.limits h2 { margin: 0 0 8px; font-size: 0.95rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--peri-soft); font-weight: 500; }
 .limits ul { margin: 0; padding-left: 20px; color: var(--ink-dim); font-size: 0.9rem; }
 .limits li { margin: 5px 0; }
 .limits strong { color: var(--ink); font-weight: 600; }

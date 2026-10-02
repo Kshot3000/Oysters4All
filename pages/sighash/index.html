@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pearl Sighash Studio — BIP-342 Taproot digest explorer for PRL</title>
 <meta name="description" content="Pearl Sighash Studio: build a Taproot spending scenario, watch the BIP-342 sighash digest being assembled byte by byte, compare sighash flags side by side, sign with BIP-340 Schnorr, and verify sealed descriptors. Fully client-side.">
-<link rel="stylesheet" href="styles.css?v=2">
+<link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
 <header class="topbar">
@@ -34,7 +34,7 @@
 <div class="margin-strip" aria-hidden="true"><span>SIGHASH BLUEPRINT · SHEET 01 · BIP-341 COMMON MESSAGE + BIP-342 EXTENSION · EPOCH 0x00 · NO SMART CONTRACTS — PURE TAPROOT</span></div>
 
 <aside class="limits" id="honest-limits">
-  <h3>Honest limits — read before you draft</h3>
+  <h2>Honest limits — read before you draft</h2>
   <ul>
     <li><strong>Educational reference implementation, not consensus code:</strong> the digest math is real and pinned byte-for-byte against the official BIP-341 wallet test vectors (all 7 sighash flags) plus the full BIP-340 vector set, but this page is not pearld and makes no claim of interop with it. Review <code>src/sighash-core.js</code> before trusting it with real money.</li>
     <li><strong>Demo values are labeled demo:</strong> the built-in scenario uses invented txids and keys. Nothing here touches a chain, a wallet, or a node — every digest is computed locally from what you type.</li>

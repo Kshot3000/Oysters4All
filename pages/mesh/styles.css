@@ -82,7 +82,7 @@ code { font-family: var(--mono); }
   border: 1px solid var(--copper-dim); border-radius: 8px;
   background: var(--copper-glow);
 }
-.limits h3 { margin: 0 0 0.4rem; color: var(--copper); font-size: 0.95rem; }
+.limits h2 { margin: 0 0 0.4rem; color: var(--copper); font-size: 0.95rem; letter-spacing: normal; }
 .limits ul { margin: 0; padding-left: 1.2rem; color: var(--chalk-dim); font-size: 0.85rem; }
 .limits li { margin: 0.25rem 0; }
 .limits strong { color: var(--chalk); }

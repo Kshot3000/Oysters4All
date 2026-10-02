@@ -74,7 +74,7 @@ aside.limits {
   background: #171208; border: 1px solid #4d3a16; border-left: 4px solid var(--wax);
   border-radius: var(--radius);
 }
-aside.limits h3 { margin: 0 0 0.4rem; color: var(--amber-hot); font-size: 1rem; }
+aside.limits h2 { margin: 0 0 0.4rem; color: var(--amber-hot); font-size: 1rem; border-bottom: none; padding-bottom: 0; }
 aside.limits ul { margin: 0; padding-left: 1.2rem; }
 aside.limits li { margin: 0.25rem 0; color: var(--parchment-dim); }
 aside.limits strong { color: var(--parchment); }

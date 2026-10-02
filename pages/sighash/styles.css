@@ -81,7 +81,7 @@ h1 {
   margin: 22px auto 0; max-width: 1180px; padding: 16px 22px;
   border: 1px dashed var(--warn); background: rgba(60, 44, 8, .25);
 }
-.limits h3 { margin: 0 0 8px; color: var(--warn); font-size: 15px; letter-spacing: .18em; text-transform: uppercase; }
+.limits h2 { margin: 0 0 8px; color: var(--warn); font-size: 15px; letter-spacing: .18em; text-transform: uppercase; }
 .limits ul { margin: 0 0 10px; padding-left: 20px; color: var(--ink); font-size: 14px; }
 .limits li { margin: 6px 0; }
 .limits code, .hint code, .meta code, td code {

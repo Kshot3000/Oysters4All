@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pearl Burn — Provable-burn desk for PRL</title>
 <meta name="description" content="Pearl Burn: derive provably-unspendable Taproot burn addresses from a public tag (NUMS-style), plan the exact unsigned burn tx with real vByte fee math, seal a tamper-evident burn certificate, and verify past burns against Blockbook. Fully offline except optional Blockbook lookups.">
-<link rel="stylesheet" href="styles.css?v=1">
+<link rel="stylesheet" href="styles.css?v=2">
 </head>
 <body>
 <header class="topbar">
@@ -38,7 +38,7 @@
 <div class="margin-strip" aria-hidden="true"><span>BURN REGISTER · FOLIO 01 · ENTRY PRL-B-001 · NUMS INTERNAL KEYS ONLY — NO PRIVATE KEY EXISTS</span></div>
 
 <aside class="limits" id="honest-limits">
-  <h3>Honest limits — read before burning</h3>
+  <h2>Honest limits — read before burning</h2>
   <ul>
     <li><strong>Burns are irreversible:</strong> coins sent to a burn address can never be spent by anyone — that is the entire point. Double-check the tag and amount before you broadcast.</li>
     <li><strong>Unspendable by construction:</strong> the burn internal key is <code>lift_x(SHA-256("PearlBurnNUMS/v1:" || tag))</code> — a hash of a public tag, so nobody knows the private key. Anyone can recompute tag → address and confirm it.</li>

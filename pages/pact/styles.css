@@ -73,7 +73,7 @@ body {
   background: linear-gradient(180deg, rgba(142, 47, 50, 0.12), rgba(142, 47, 50, 0.03));
   border: 1px solid #4a2320; border-radius: var(--radius);
 }
-.limits h3 { margin: 0 0 0.5rem; color: var(--gold-hot); font-size: 0.95rem; }
+.limits h2 { margin: 0 0 0.5rem; color: var(--gold-hot); font-size: 0.95rem; }
 .limits ul { margin: 0; padding-left: 1.2rem; font-size: 0.88rem; }
 .limits li { margin: 0.25rem 0; }
 .limits code { color: var(--gold-hot); }

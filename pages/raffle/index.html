@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pearl Raffle — Provably-Fair PRL Raffle Manager</title>
 <meta name="description" content="Pearl Raffle: provably-fair PRL raffles. Commit to prize, settlement block and entries in a tamper-evident descriptor, draw winners from the settlement block hash with a hand-verifiable SHA-256 derivation, verify anyone's draw standalone, and export an exact payout plan. No PRL ever moves through this page.">
-<link rel="stylesheet" href="styles.css?v=1">
+<link rel="stylesheet" href="styles.css?v=2">
 </head>
 <body>
 <div class="vault-glow" aria-hidden="true"><span class="orb o1"></span><span class="orb o2"></span><span class="orb o3"></span></div>
@@ -147,7 +147,7 @@
       <div class="row">
         <button id="track-carry" class="primary">Carry to Draw →</button>
       </div>
-      <h4>Air-gapped path — paste the settlement block hash by hand</h4>
+      <h3 class="keep-h4">Air-gapped path — paste the settlement block hash by hand</h3>
       <label class="wide">Settlement block hash (64 hex)
         <input id="track-hash-manual" type="text" autocomplete="off" spellcheck="false" placeholder="aa… (64 hex)">
       </label>

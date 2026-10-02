@@ -38,6 +38,7 @@ body {
 h2 { color: var(--blue); font-size: 1.35rem; margin: 0 0 0.5rem; letter-spacing: 0.02em; }
 h3 { color: var(--chalk); font-size: 1.05rem; margin: 1.4rem 0 0.5rem; }
 h4 { color: var(--chalk-dim); font-size: 0.85rem; margin: 1rem 0 0.4rem; text-transform: uppercase; letter-spacing: 0.12em; }
+#a-out h3.keep-h4 { color: var(--chalk-dim); font-size: 0.85rem; margin: 1rem 0 0.4rem; text-transform: uppercase; letter-spacing: 0.12em; }
 .lede { color: var(--chalk-dim); max-width: 72ch; }
 .lede strong, li strong { color: var(--chalk); }
 a { color: var(--blue); }

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pearl Ballot — Off-Chain DAO Governance with Schnorr-Signed Ballots</title>
 <meta name="description" content="Pearl Ballot: off-chain DAO governance for Pearl (PRL). Draft a proposal in a tamper-evident pearl-ballot:v1: descriptor, vote with locally-signed BIP-340 Schnorr ballots bound to your prl1/tprl1 address, tally with full signature re-verification and a hand-verifiable derivation, and verify anyone's poll standalone. No PRL ever moves through this page.">
-<link rel="stylesheet" href="styles.css?v=2">
+<link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
 <div class="hall-glow" aria-hidden="true"><span class="orb o1"></span><span class="orb o2"></span><span class="orb o3"></span><span class="rotunda" aria-hidden="true"></span></div>
@@ -79,7 +79,7 @@
     </div>
     <p class="hint" id="bt-tip-out" hidden></p>
     <div class="rules">
-      <h4>The voting rules (published with the descriptor)</h4>
+      <h3>The voting rules (published with the descriptor)</h3>
       <ul>
         <li>One address, one ballot. A second ballot from the same address is flagged — <strong>first valid ballot wins</strong>.</li>
         <li>Ballots are signed <strong>inside the voting window only</strong> (chain tip between start and end height).</li>

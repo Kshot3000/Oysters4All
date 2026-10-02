@@ -51,7 +51,12 @@ controls across 43 apps were fixed; 0 unlabeled controls remain. The same
 audit's second pass fixed document structure: every page now has exactly one
 `<h1>` (the multi-step wizards in Gift, Rain, and Wallet demoted their later
 step headings to styled `<h2>`s) and a `<main>` landmark (added to Legacy,
-Names, Pool, and Vanity).
+Names, Pool, and Vanity). A third pass the same day fixed the heading
+outline: no page skips a heading level anymore (the honest-limits panels in
+Burn, Hush, Mesh, Pact, Sighash, and Will are now `<h2>`s, and six panel
+sub-headings in Auction, Ballot, Policy, and Raffle were promoted from
+`<h4>` to `<h3>`), with computed styles verified identical in a real
+browser — the outline changed, the pixels didn't.
 
 ## Support this work
 

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pearl Pact — Discreet Log Contract desk for PRL</title>
 <meta name="description" content="Pearl Pact: draft oracle-conditional contracts on Pearl — two parties lock PRL in a 2-of-2 Taproot funding output, pre-sign every outcome's CET with Schnorr adaptor signatures, and execute trustlessly when the oracle attests. Timelocked refund insurance included. Fully client-side.">
-<link rel="stylesheet" href="styles.css?v=1">
+<link rel="stylesheet" href="styles.css?v=2">
 </head>
 <body>
 <header class="topbar">
@@ -32,7 +32,7 @@
 <div class="margin-strip" aria-hidden="true"><span>PACT REGISTER · FOLIO 01 · ADAPTOR SEALED · ORACLE ATTESTED · NO SMART CONTRACTS — PURE TAPROOT</span></div>
 
 <aside class="limits" id="honest-limits">
-  <h3>Honest limits — read before you pact</h3>
+  <h2>Honest limits — read before you pact</h2>
   <ul>
     <li><strong>Trust the oracle, not the math, for the outcome:</strong> the oracle cannot steal (it holds no key that moves funds), but it alone picks the winner. Only pact with oracles whose attestations you would bet on.</li>
     <li><strong>Adaptor cryptography is real but newly composed here:</strong> Schnorr/BIP-340, Taproot and the 2-of-2 script come from audited lineage; the adaptor encrypt/verify/decrypt glue is new code in this page, pinned by tests. Review <code>src/pact-core.js</code> before mainnet money.</li>
