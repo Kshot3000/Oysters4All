@@ -67,7 +67,8 @@ main { max-width: 1180px; margin: 0 auto; padding: 22px 20px 60px; }
 .limits h2 { margin: 0 0 8px; font-size: 15px; color: var(--lantern); }
 .limits ul { margin: 0; padding-left: 20px; color: var(--dim); font-size: 13.5px; }
 .limits strong { color: var(--ink); }
-.limits code { color: var(--beam); }
+.limits code { color: var(--beam); overflow-wrap: anywhere; }
+.limits li { overflow-wrap: anywhere; }
 
 .netbar { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;
   background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);

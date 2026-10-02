@@ -79,6 +79,11 @@ code { font-family: var(--mono); font-size: 0.88em; color: var(--mint); }
 .panel h3 { margin: 22px 0 8px; font-size: 1.05rem; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
 @media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
+@media (max-width: 720px) {
+  .topbar-in { flex-wrap: wrap; gap: 6px 14px; }
+  .brand-tag { display: none; }
+  .topnav { flex-wrap: wrap; }
+}
 
 label { display: block; margin: 12px 0; font-size: 0.9rem; font-weight: 600; }
 input, select, textarea {

@@ -105,7 +105,7 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; }
 .limits strong { color: var(--text); }
 footer { text-align: center; padding: 2rem 1rem; color: var(--muted); font-size: .85rem; border-top: 1px solid #2a3a5c; }
 footer a { color: var(--brass-hi); }
-#donate-addr { font-size: .75rem; }
+#donate-addr { font-size: .75rem; overflow-wrap: anywhere; }
 @media print {
   .topbar, .row, footer, #steps { display: none; }
   body { background: #fff; color: #000; }

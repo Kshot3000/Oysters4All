@@ -89,7 +89,7 @@ input:focus, select:focus, textarea:focus {
 }
 .prefix-row { display: flex; align-items: center; gap: 8px; }
 .prefix-row .fixed { color: var(--ember-hot); font-size: 18px; }
-.prefix-row input { font-size: 20px; letter-spacing: 2px; max-width: 280px; }
+.prefix-row input { font-size: 20px; letter-spacing: 2px; max-width: 280px; flex: 1; min-width: 0; }
 .hint { color: var(--dim); font-size: 13px; margin: 6px 0 0; }
 .err {
   color: #ffd7d7; background: rgba(255,93,93,.12); border: 1px solid rgba(255,93,93,.4);

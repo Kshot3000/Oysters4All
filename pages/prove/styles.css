@@ -66,7 +66,7 @@ code {
 @media (max-width: 720px) {
   .topbar-in { flex-wrap: wrap; gap: 6px 14px; }
   .brand-tag { display: none; } /* topbar must fit 375px: brand + nav share the row */
-  .topnav { gap: 12px; font-size: .88em; }
+  .topnav { gap: 12px; font-size: .88em; flex-wrap: wrap; }
 }
 .net-badge {
   border: 1px solid var(--brass-soft); color: var(--brass);
@@ -87,7 +87,7 @@ code {
 }
 
 /* tabs */
-.tabs { display: flex; gap: 8px; margin: 28px 0 0; border-bottom: 2px solid var(--line); }
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 28px 0 0; border-bottom: 2px solid var(--line); }
 .tab {
   font: inherit; background: none; border: none; cursor: pointer;
   padding: 10px 20px; color: var(--ink-soft); border-bottom: 3px solid transparent;

@@ -324,7 +324,7 @@ label { display: block; }
   min-width: 240px;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.input.wide { flex: 1; min-width: 280px; width: 100%; }
+.input.wide { flex: 1; min-width: min(280px, 100%); width: 100%; }
 .input::placeholder { color: var(--muted); opacity: 0.7; }
 .input:hover { border-color: rgba(125, 255, 212, 0.3); }
 .input:focus { outline: none; border-color: var(--pay); box-shadow: 0 0 0 3px rgba(125, 255, 212, 0.15); }

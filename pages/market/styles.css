@@ -67,7 +67,7 @@ a { color: var(--gold); }
 }
 .nav-inner {
   max-width: 1180px; margin: 0 auto; padding: 0.8rem 1.5rem;
-  display: flex; align-items: center; gap: 1rem;
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
 }
 .brand { display: flex; align-items: center; gap: 0.55rem; text-decoration: none; color: var(--text); font-weight: 800; font-size: 1.1rem; }
 .brand svg { width: 26px; height: 26px; }

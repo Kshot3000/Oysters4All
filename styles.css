@@ -170,7 +170,7 @@ code { font-family: var(--mono); font-size: 0.88em; background: rgba(111, 211, 2
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 1.25rem;
 }
-.card {
+.card { min-width: 0;
   background: var(--card);
   border: 1px solid var(--card-border);
   border-radius: var(--radius);
@@ -179,7 +179,7 @@ code { font-family: var(--mono); font-size: 0.88em; background: rgba(111, 211, 2
 }
 .card:hover { transform: translateY(-3px); border-color: rgba(111, 211, 255, 0.35); }
 .card-icon { font-size: 1.75rem; margin-bottom: 0.75rem; }
-.card p { color: var(--muted); }
+.card p { color: var(--muted); overflow-wrap: anywhere; }
 .card-links { display: flex; gap: 1rem; margin-top: 0.5rem; }
 .card-links a, .card > a { font-weight: 650; text-decoration: none; }
 .card-links a:hover, .card > a:hover { text-decoration: underline; }
@@ -196,6 +196,7 @@ code { font-family: var(--mono); font-size: 0.88em; background: rgba(111, 211, 2
 .steps strong { color: var(--text); }
 
 .code-card {
+  min-width: 0;
   background: #04070c;
   border: 1px solid var(--card-border);
   border-radius: var(--radius);

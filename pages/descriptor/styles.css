@@ -165,3 +165,6 @@ main:focus { outline: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
+
+/* reflow (WCAG 1.4.10): the 62-char tip address must wrap at 320px, not stretch the page */
+#tip-addr { overflow-wrap: anywhere; }

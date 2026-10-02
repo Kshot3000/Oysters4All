@@ -149,6 +149,19 @@ Verified in a real browser: 17/17 targeted keyboard checks pass
 label associations), the fleet census re-run shows 0 unnamed and 0
 placeholder-only controls, and all test suites match their pre-pass
 results exactly. Every changed script carries a bumped `?v=` cache key.
+An eleventh pass covered WCAG 1.4.10 reflow: every page was probed in a
+real browser at a true 320 CSS px viewport, and 16 pages (14 in this
+repo, both Hermes pages) scrolled horizontally — unbreakable strings
+(the 62-character donation address in Split and Notary, the tip address
+in Descriptor, a Blockbook URL in Watch, a slash-joined key list in
+Policy) now wrap, the hub's code card and ecosystem cards no longer let
+`min-content` sizing stretch the grid, Sign's and Prove's top
+navigation wraps instead of running off-screen, Market's header,
+Pay's settings and invoice rows, and Vanity's prefix field all flex
+within the viewport, and on Hermes a scrollable wrapper carries the
+dashboard's wide pool table while the landing page's cards and hero
+glow are clipped to the screen. Re-probed after the fix: 0 of 82 pages
+scroll horizontally at 320px, with zero console errors.
 
 ## Support this work
 

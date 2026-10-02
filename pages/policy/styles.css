@@ -91,7 +91,7 @@ main { max-width: 1080px; margin: 0 auto; padding: 1.5rem; }
 .panel.active { display: block; }
 .panel.limits { display: block; border-style: dashed; border-color: var(--blue-dim); }
 .limits h2 { color: var(--blue); }
-.limits li { margin-bottom: 0.5rem; color: var(--chalk-dim); }
+.limits li { margin-bottom: 0.5rem; color: var(--chalk-dim); overflow-wrap: anywhere; }
 .limits li strong { color: var(--chalk); }
 
 .form-grid {
