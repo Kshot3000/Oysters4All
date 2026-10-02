@@ -158,7 +158,7 @@
     </div>
     <h3>Air-gapped UTXO tally (offline)</h3>
     <p class="lede">One per line: <code>txid:vout amount-PRL address</code>. Nothing leaves your machine.</p>
-    <textarea id="f-utxos" rows="4" spellcheck="false" placeholder="a3f1…:0 1.50000000 prl1…"></textarea>
+    <textarea aria-label="UTXO tally — one per line" id="f-utxos" rows="4" spellcheck="false" placeholder="a3f1…:0 1.50000000 prl1…"></textarea>
     <div class="row"><button id="f-tally" class="secondary">Tally</button></div>
     <p id="f-tally-out" class="note"></p>
     <h3>Claim fee preview</h3>
@@ -253,7 +253,7 @@
           <dl class="kv">
             <dt>Signed txid</dt><dd><code id="co-txid"></code></dd>
             <dt>Fee</dt><dd><span id="co-fee"></span></dd>
-            <dt>Signed hex</dt><dd><textarea id="co-hex" rows="5" readonly spellcheck="false"></textarea></dd>
+            <dt>Signed hex</dt><dd><textarea aria-label="Owner claim signed transaction hex" id="co-hex" rows="5" readonly spellcheck="false"></textarea></dd>
           </dl>
           <div class="row">
             <button id="co-broadcast" class="danger">Broadcast via Blockbook (double-confirm)</button>
@@ -299,7 +299,7 @@
             <dt>Signed txid</dt><dd><code id="ch-txid"></code></dd>
             <dt>Locktime</dt><dd><span id="ch-locktime"></span></dd>
             <dt>Fee</dt><dd><span id="ch-fee"></span></dd>
-            <dt>Signed hex</dt><dd><textarea id="ch-hex" rows="5" readonly spellcheck="false"></textarea></dd>
+            <dt>Signed hex</dt><dd><textarea aria-label="Heir claim signed transaction hex" id="ch-hex" rows="5" readonly spellcheck="false"></textarea></dd>
           </dl>
           <div class="row">
             <button id="ch-broadcast" class="danger">Broadcast via Blockbook (double-confirm)</button>

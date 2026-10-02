@@ -77,7 +77,7 @@
         <h3>Descriptor <span class="hint">(share with the heir — recomputable; NOT signed — verify against the published address)</span></h3>
         <div class="addr-row"><code id="pl-desc"></code> <button class="copy-btn" data-for="pl-desc">Copy</button></div>
         <h3>Vault spec (JSON — keep this; it re-derives everything)</h3>
-        <textarea id="pl-spec" readonly></textarea>
+        <textarea aria-label="Vault spec (JSON)" id="pl-spec" readonly></textarea>
         <div>
           <button class="btn small" id="pl-dl">Download JSON</button>
           <button class="btn small ghost" id="pl-carry-vault">Open in Vault tab →</button>
@@ -144,7 +144,7 @@
       </div>
       <div class="field">
         <label><input type="checkbox" id="w-manual"> Manual chain height (skip Blockbook tip)</label>
-        <input type="number" id="w-height" placeholder="current height…" min="0" style="margin-top:.4rem">
+        <input aria-label="Manual chain height" type="number" id="w-height" placeholder="current height…" min="0" style="margin-top:.4rem">
       </div>
       <button class="btn" id="w-scan">Scan vault</button>
       <label style="margin-left:.8rem;font-size:.85rem"><input type="checkbox" id="w-auto"> auto-refresh every <input type="number" id="w-every" value="10" min="1" style="width:4em"> min</label>
@@ -257,7 +257,7 @@
           <dt>fee</dt><dd id="c-fee-out"></dd>
           <dt>vsize</dt><dd id="c-vsize-out"></dd>
         </div>
-        <textarea id="c-hex" readonly></textarea>
+        <textarea aria-label="Signed transaction hex" id="c-hex" readonly></textarea>
         <div class="confirm-banner" id="c-confirm" hidden>
           <b>Broadcast confirmation</b> — this moves real PRL.
           <label><input type="checkbox" id="c-ack1"> I checked the destination address and amount above.</label>

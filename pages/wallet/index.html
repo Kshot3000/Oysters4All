@@ -75,12 +75,12 @@
         <h1>Bring your vault</h1>
         <p class="lead">Paste a 12/24-word recovery phrase <b>or</b> a WIF private key.</p>
         <div class="field">
-          <label>Recovery phrase or WIF</label>
+          <label for="import-secret">Recovery phrase or WIF</label>
           <textarea class="input mono" id="import-secret" placeholder="abandon abandon …  or  Kx… / L… / c…"></textarea>
           <div class="ferr" id="import-err"></div>
         </div>
         <div class="field">
-          <label>Passphrase <span class="tiny">(optional BIP-39 passphrase)</span></label>
+          <label for="import-passphrase">Passphrase <span class="tiny">(optional BIP-39 passphrase)</span></label>
           <input class="input" id="import-passphrase" type="password" autocomplete="off" placeholder="Leave empty if none">
         </div>
         <button class="btn" id="btn-import-continue">Continue</button>
@@ -93,11 +93,11 @@
         <h1>Lock the vault</h1>
         <p class="lead">This password encrypts your backup on this device. It can't be recovered — don't forget it.</p>
         <div class="field">
-          <label>Password (min 8 characters)</label>
+          <label for="pw1">Password (min 8 characters)</label>
           <input class="input" id="pw1" type="password" autocomplete="new-password">
         </div>
         <div class="field">
-          <label>Confirm password</label>
+          <label for="pw2">Confirm password</label>
           <input class="input" id="pw2" type="password" autocomplete="new-password">
           <div class="ferr" id="pw-err"></div>
         </div>
@@ -114,7 +114,7 @@
       <h1 style="margin:0 0 6px;letter-spacing:-.5px">Vault locked</h1>
       <p class="lead" style="color:var(--ink-2);margin:0 0 20px">Your keys are encrypted. Enter your password.</p>
       <div class="wrap">
-        <div class="field"><input class="input" id="lock-pw" type="password" placeholder="Password" autocomplete="current-password"></div>
+        <div class="field"><input aria-label="Password" class="input" id="lock-pw" type="password" placeholder="Password" autocomplete="current-password"></div>
         <div class="ferr" id="lock-err"></div>
         <button class="btn" id="btn-unlock">Unlock</button>
         <button class="btn ghost sm mt" id="btn-lock-wipe" style="width:auto">Forgot password? Wipe &amp; restore…</button>
@@ -171,12 +171,12 @@
         <div class="hero"><p class="eyebrow">Send</p><h2 class="bal-big" style="font-size:34px">Move <small>PRL</small></h2></div>
         <div class="card iris">
           <div class="field">
-            <label>To address</label>
+            <label for="send-to">To address</label>
             <input class="input mono" id="send-to" placeholder="prl1p…" autocomplete="off" spellcheck="false">
             <div class="ferr" id="send-to-err"></div>
           </div>
           <div class="field">
-            <label>Amount (PRL)</label>
+            <label for="send-amt">Amount (PRL)</label>
             <input class="input" id="send-amt" inputmode="decimal" placeholder="0.00" autocomplete="off">
             <div class="row" style="margin-top:8px">
               <button class="btn ghost sm" id="send-max">Max</button>
@@ -239,10 +239,10 @@
 
         <div class="card">
           <h3>Endpoints</h3>
-          <div class="field"><label>Blockbook URL</label><input class="input mono" id="set-blockbook" placeholder="https://blockbook.pearlresearch.ai"></div>
-          <div class="field"><label>Testnet Blockbook URL</label><input class="input mono" id="set-testbook" placeholder="https://…"></div>
-          <div class="field"><label>Pearlscriptions indexer URL</label><input class="input mono" id="set-pearlsc" placeholder="https://…"></div>
-          <div class="field"><label>Fiat currency</label>
+          <div class="field"><label for="set-blockbook">Blockbook URL</label><input class="input mono" id="set-blockbook" placeholder="https://blockbook.pearlresearch.ai"></div>
+          <div class="field"><label for="set-testbook">Testnet Blockbook URL</label><input class="input mono" id="set-testbook" placeholder="https://…"></div>
+          <div class="field"><label for="set-pearlsc">Pearlscriptions indexer URL</label><input class="input mono" id="set-pearlsc" placeholder="https://…"></div>
+          <div class="field"><label for="set-fiat">Fiat currency</label>
             <select class="input" id="set-fiat"><option>USD</option><option>EUR</option><option>GBP</option><option>JPY</option></select>
           </div>
           <button class="btn" id="btn-save-settings">Save settings</button>

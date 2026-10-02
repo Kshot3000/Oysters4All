@@ -110,7 +110,7 @@
       <button id="unsigned-export" class="btn ghost">Export unsigned bundle</button>
       <button id="unsigned-copy" class="btn ghost">Copy</button>
     </div>
-    <textarea id="unsigned-text" rows="4" readonly spellcheck="false" placeholder="export first"></textarea>
+    <textarea aria-label="Unsigned challenge bundle" id="unsigned-text" rows="4" readonly spellcheck="false" placeholder="export first"></textarea>
     <label class="wide">Import signed challenges <span class="hint-inline">JSON: {"signatures":[{"address":"…","sig":"…"}]}</span>
       <textarea id="signed-import" rows="4" spellcheck="false" placeholder='paste {"signatures":[…]}'></textarea>
     </label>
@@ -134,7 +134,7 @@
       <button id="bundle-copy" class="btn ghost">Copy bundle JSON</button>
       <button id="bundle-download" class="btn ghost">Download .json</button>
     </div>
-    <textarea id="bundle-text" rows="12" readonly spellcheck="false"></textarea>
+    <textarea aria-label="Signed bundle JSON" id="bundle-text" rows="12" readonly spellcheck="false"></textarea>
     <div class="row"><button id="bundle-next" class="btn primary">Continue to verify →</button></div>
   </section>
 

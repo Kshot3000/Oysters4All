@@ -26,7 +26,7 @@
     The API must allow CORS from this page's origin. Reference:
     <a href="https://github.com/Pearlscriptions/indexer">Pearlscriptions/indexer</a> (MIT).</p>
     <div class="row">
-      <input id="api-url" class="grow mono" type="url" placeholder="https://your-indexer.example" autocomplete="off" spellcheck="false">
+      <input aria-label="Indexer API base URL" id="api-url" class="grow mono" type="url" placeholder="https://your-indexer.example" autocomplete="off" spellcheck="false">
       <button id="api-save" class="btn">Connect</button>
       <button id="api-clear" class="btn ghost">Clear</button>
     </div>
@@ -69,7 +69,7 @@
       or an inscription id. Numbers are looked up by paging the ordered list; ids
       are fetched directly.</p>
       <div class="row">
-        <input id="lookup-q" class="grow mono" placeholder="42 or inscription id…" autocomplete="off" spellcheck="false">
+        <input aria-label="Inscription number or id" id="lookup-q" class="grow mono" placeholder="42 or inscription id…" autocomplete="off" spellcheck="false">
         <button id="lookup-go" class="btn">Open</button>
       </div>
       <div id="lookup-out" class="mt"></div>
@@ -82,7 +82,7 @@
       <p class="muted">Show every inscription currently owned by a Pearl address
       (<code class="mono">/addresses/:address/inscriptions</code>).</p>
       <div class="row">
-        <input id="coll-addr" class="grow mono" placeholder="prl1p…" autocomplete="off" spellcheck="false">
+        <input aria-label="Pearl address" id="coll-addr" class="grow mono" placeholder="prl1p…" autocomplete="off" spellcheck="false">
         <button id="coll-go" class="btn">View collection</button>
       </div>
       <div id="coll-out" class="mt"></div>

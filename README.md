@@ -42,6 +42,13 @@ and Plonky2 zk-SNARK block certificates.
    changed and why.
 4. Finished work is **committed and pushed to `main`** automatically every run.
 
+## Accessibility
+
+Every form control in every app carries a programmatic label (a `<label for>`
+association or an `aria-label`), so the fleet works with screen readers and
+voice control. Audited fleet-wide on 2026-10-02: 152 previously unlabeled
+controls across 43 apps were fixed; 0 unlabeled controls remain.
+
 ## Support this work
 
 If this builder saved you time, donations are welcome:

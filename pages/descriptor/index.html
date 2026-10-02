@@ -37,7 +37,7 @@
   <section id="tab-analyze" class="panel" role="tabpanel">
     <h2>Chart a descriptor</h2>
     <p class="hint">Paste any output descriptor. The desk parses it like Bitcoin Core would — grammar, checksum, keys, and the full Taproot tree — and charts what it finds. Nothing leaves your browser; there are no network calls at all.</p>
-    <textarea id="an-input" rows="4" spellcheck="false" placeholder="tr([deadbeef/86h/808276h/0h]xpub…/0/*,and_v(pk(xpub…),older(144)))"></textarea>
+    <textarea aria-label="Descriptor to analyze" id="an-input" rows="4" spellcheck="false" placeholder="tr([deadbeef/86h/808276h/0h]xpub…/0/*,and_v(pk(xpub…),older(144)))"></textarea>
     <div class="row">
       <button id="an-run" class="btn">Chart it</button>
       <button id="an-clear" class="btn ghost">Clear</button>
@@ -49,7 +49,7 @@
   <section id="tab-checksum" class="panel hidden" role="tabpanel">
     <h2>Seal &amp; verify checksums</h2>
     <p class="hint">BIP-380 checksums are the wax seal on a descriptor: 8 characters that catch any transcription error. Add one to a bare descriptor, or verify a sealed one.</p>
-    <textarea id="cs-input" rows="3" spellcheck="false" placeholder="wpkh(xpub…/0/*)   or   wpkh(xpub…/0/*)#ab12cd34"></textarea>
+    <textarea aria-label="Descriptor to seal or verify" id="cs-input" rows="3" spellcheck="false" placeholder="wpkh(xpub…/0/*)   or   wpkh(xpub…/0/*)#ab12cd34"></textarea>
     <div class="row">
       <button id="cs-add" class="btn">Add checksum</button>
       <button id="cs-verify" class="btn">Verify checksum</button>
@@ -62,7 +62,7 @@
   <section id="tab-derive" class="panel hidden" role="tabpanel">
     <h2>Derive addresses</h2>
     <p class="hint">Give a ranged descriptor and an index range; the desk derives each address exactly as BIP-386 specifies. Only <span class="mono">tr()</span> and <span class="mono">addr()</span> produce Pearl-spendable addresses — anything else yields its exact scriptPubKey with an honest note.</p>
-    <textarea id="dv-input" rows="3" spellcheck="false" placeholder="tr([deadbeef/86h/808276h/0h]xpub…/0/*)"></textarea>
+    <textarea aria-label="Descriptor to derive addresses from" id="dv-input" rows="3" spellcheck="false" placeholder="tr([deadbeef/86h/808276h/0h]xpub…/0/*)"></textarea>
     <div class="row wrap">
       <label>Start index <input id="dv-start" type="number" min="0" max="1000000" value="0"></label>
       <label>Count <input id="dv-count" type="number" min="1" max="50" value="5"></label>

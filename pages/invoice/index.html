@@ -137,7 +137,7 @@
     <h3>Air-gapped check</h3>
     <p class="note">Paste a txid you obtained elsewhere — the page fetches only that one transaction and analyzes it against the invoice. No address scan.</p>
     <div class="row">
-      <input id="inv-txid-paste" class="mono grow" placeholder="64-hex txid" autocomplete="off" spellcheck="false">
+      <input aria-label="Transaction id to check" id="inv-txid-paste" class="mono grow" placeholder="64-hex txid" autocomplete="off" spellcheck="false">
       <button id="inv-check-txid" class="btn" type="button">Analyze txid</button>
     </div>
     <p id="inv-receipt-hint" class="hint"></p>

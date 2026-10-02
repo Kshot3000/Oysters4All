@@ -129,7 +129,7 @@
         <button class="btn ghost copy-btn" data-for="sw-descriptor">Copy</button>
       </div>
       <h3>Shareable spec <span class="hint">— tamper-evident JSON; carries no preimage, no private keys</span></h3>
-      <textarea id="sw-json" rows="6" spellcheck="false" readonly></textarea>
+      <textarea aria-label="Shareable swap spec (JSON)" id="sw-json" rows="6" spellcheck="false" readonly></textarea>
       <div class="row">
         <button class="btn ghost copy-btn" data-for="sw-json">Copy JSON</button>
         <button class="btn ghost" id="sw-download">Download .json</button>
@@ -141,7 +141,7 @@
       </details>
     </div>
     <h3>Load a swap</h3>
-    <textarea id="load-spec" rows="3" spellcheck="false" placeholder='Paste the swap spec JSON here'></textarea>
+    <textarea aria-label="Swap spec JSON to load" id="load-spec" rows="3" spellcheck="false" placeholder='Paste the swap spec JSON here'></textarea>
     <div class="row"><button class="btn ghost" id="load-spec-btn">Load + re-derive</button></div>
   </section>
 
@@ -152,7 +152,7 @@
     signed <strong>locally</strong>; every signature is re-verified before the hex is shown. Broadcast is
     explicit and confirmed — nothing leaves until you say so.</p>
     <p class="danger">⚠ This step moves real PRL. Review the transaction before broadcasting.</p>
-    <textarea id="lock-spec" rows="3" spellcheck="false" placeholder="Swap spec JSON (carried over from Propose, or paste it)"></textarea>
+    <textarea aria-label="Swap spec JSON" id="lock-spec" rows="3" spellcheck="false" placeholder="Swap spec JSON (carried over from Propose, or paste it)"></textarea>
     <div class="row">
       <button class="btn ghost" id="lock-load-btn">Load spec</button>
       <span class="error" id="lock-error" hidden></span>
@@ -160,7 +160,7 @@
     <div id="lock-summary" class="summary" hidden></div>
     <div id="lock-work" hidden>
       <h3>Funder key <span class="hint">— mnemonic (BIP-86), WIF, or 32-byte hex private key</span></h3>
-      <textarea id="lock-key" rows="2" spellcheck="false" placeholder="private key — never leaves this page"></textarea>
+      <textarea aria-label="Funder key — mnemonic, WIF, or hex private key" id="lock-key" rows="2" spellcheck="false" placeholder="private key — never leaves this page"></textarea>
       <div class="row"><button class="btn ghost" id="lock-derive-btn">Derive funder address</button></div>
       <div class="addr-row"><code id="lock-address" class="addr"></code></div>
       <h3>Funder UTXOs</h3>
@@ -193,7 +193,7 @@
         <div id="lock-tx-summary" class="summary"></div>
         <div id="lock-warnings"></div>
         <p>txid: <code id="lock-txid" class="addr small"></code></p>
-        <textarea id="lock-hex" rows="6" spellcheck="false" readonly></textarea>
+        <textarea aria-label="Signed lock transaction hex" id="lock-hex" rows="6" spellcheck="false" readonly></textarea>
         <div class="row">
           <button class="btn ghost copy-btn" data-for="lock-hex">Copy hex</button>
         </div>
@@ -233,7 +233,7 @@
           <p class="hint" id="mirror-note"></p>
         </details>
         <div class="row"><button class="btn ghost copy-btn" data-for="mirror-text">Copy template text</button></div>
-        <textarea id="mirror-text" rows="8" spellcheck="false" readonly hidden></textarea>
+        <textarea aria-label="Mirror template text" id="mirror-text" rows="8" spellcheck="false" readonly hidden></textarea>
       </div>
     </div>
   </section>
@@ -243,7 +243,7 @@
     <h2>Track the swap</h2>
     <p class="lede">Watch the swap address: funding, Bob's claim (preimage revealed on-chain), or Alice's
     refund after T1 — plus live countdowns to both timelocks.</p>
-    <textarea id="track-spec" rows="3" spellcheck="false" placeholder="Swap spec JSON"></textarea>
+    <textarea aria-label="Swap spec JSON to track" id="track-spec" rows="3" spellcheck="false" placeholder="Swap spec JSON"></textarea>
     <div class="row">
       <button class="btn ghost" id="track-load-btn">Load spec</button>
       <span class="error" id="track-error" hidden></span>
@@ -256,7 +256,7 @@
       <div id="track-state" class="summary"></div>
       <div id="track-countdown" class="summary"></div>
       <h3>Classify a spend <span class="hint">— paste any transaction spending the swap UTXO (works offline)</span></h3>
-      <textarea id="track-tx-hex" rows="4" spellcheck="false" placeholder="raw transaction hex"></textarea>
+      <textarea aria-label="Transaction hex to classify" id="track-tx-hex" rows="4" spellcheck="false" placeholder="raw transaction hex"></textarea>
       <div class="row">
         <button class="btn ghost" id="track-classify-btn">Classify</button>
         <button class="btn primary" id="track-to-claim-btn" hidden>Preimage found — go to Claim →</button>
@@ -274,7 +274,7 @@
         <p class="lede">Bob spends the claim leaf, revealing the preimage on Pearl. Alice watches this
         transaction to learn the preimage for the BTC side.</p>
         <p class="danger">⚠ This step moves real PRL and reveals the secret.</p>
-        <textarea id="claim-spec" rows="3" spellcheck="false" placeholder="Swap spec JSON"></textarea>
+        <textarea aria-label="Swap spec JSON" id="claim-spec" rows="3" spellcheck="false" placeholder="Swap spec JSON"></textarea>
         <div class="row"><button class="btn ghost" id="claim-load-btn">Load spec</button></div>
         <div id="claim-work" hidden>
           <div class="form-grid">
@@ -293,7 +293,7 @@
           </div>
           <div id="claim-out" hidden>
             <p>txid: <code id="claim-txid" class="addr small"></code></p>
-            <textarea id="claim-hex" rows="6" spellcheck="false" readonly></textarea>
+            <textarea aria-label="Signed claim transaction hex" id="claim-hex" rows="6" spellcheck="false" readonly></textarea>
             <div class="row"><button class="btn ghost copy-btn" data-for="claim-hex">Copy hex</button></div>
             <label class="confirm"><input type="checkbox" id="claim-confirm"> I understand this reveals the preimage on-chain and releases the PRL to the destination.</label>
             <div class="row"><button class="btn primary" id="claim-broadcast-btn">Broadcast via Blockbook</button></div>
@@ -306,7 +306,7 @@
         <h3>Alice's path — extract the preimage</h3>
         <p class="lede">Paste Bob's confirmed claim transaction. The page pulls the preimage out of the
         witness so you can claim the BTC with your own Bitcoin tooling.</p>
-        <textarea id="alice-claim-hex" rows="4" spellcheck="false" placeholder="Bob's claim transaction hex"></textarea>
+        <textarea aria-label="Bob's claim transaction hex" id="alice-claim-hex" rows="4" spellcheck="false" placeholder="Bob's claim transaction hex"></textarea>
         <div class="row">
           <button class="btn primary" id="alice-extract-btn">Extract preimage</button>
           <span class="error" id="alice-error" hidden></span>
@@ -333,7 +333,7 @@
     refuses to build the transaction before maturity — and the wire format hard-codes nLockTime = T1 with
     input sequence 0xfffffffe.</p>
     <p class="danger">⚠ This step moves real PRL.</p>
-    <textarea id="refund-spec" rows="3" spellcheck="false" placeholder="Swap spec JSON"></textarea>
+    <textarea aria-label="Swap spec JSON" id="refund-spec" rows="3" spellcheck="false" placeholder="Swap spec JSON"></textarea>
     <div class="row"><button class="btn ghost" id="refund-load-btn">Load spec</button></div>
     <div id="refund-work" hidden>
       <div class="form-grid">
@@ -355,7 +355,7 @@
       </div>
       <div id="refund-out" hidden>
         <p>txid: <code id="refund-txid" class="addr small"></code></p>
-        <textarea id="refund-hex" rows="6" spellcheck="false" readonly></textarea>
+        <textarea aria-label="Signed refund transaction hex" id="refund-hex" rows="6" spellcheck="false" readonly></textarea>
         <div class="row"><button class="btn ghost copy-btn" data-for="refund-hex">Copy hex</button></div>
         <label class="confirm"><input type="checkbox" id="refund-confirm"> I understand this reclaims the locked PRL to the destination after T1.</label>
         <div class="row"><button class="btn primary" id="refund-broadcast-btn">Broadcast via Blockbook</button></div>

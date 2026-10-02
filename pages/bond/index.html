@@ -99,7 +99,7 @@
           <input id="f-feerate" type="text" inputmode="decimal" value="2" autocomplete="off">
         </div>
         <div class="field">
-          <label>YTM at price</label>
+          <label for="f-price">YTM at price</label>
           <div class="row">
             <input id="f-price" type="text" inputmode="decimal" placeholder="price in PRL (default: par)" autocomplete="off">
             <button id="f-ytm" class="btn ghost">Solve YTM</button>
@@ -116,7 +116,7 @@
       <div id="f-plan" class="callout"></div>
       <h3>Bond descriptor</h3>
       <p class="lede small">Anyone holding this re-derives every tranche address. Share it with the holder, the buyer, or your records.</p>
-      <textarea id="f-desc" class="mono" rows="3" readonly></textarea>
+      <textarea aria-label="Bond descriptor" id="f-desc" class="mono" rows="3" readonly></textarea>
       <div class="row">
         <button id="f-copydesc" class="btn ghost">Copy descriptor</button>
         <button id="f-dl" class="btn ghost">Download term sheet (.json)</button>
@@ -171,7 +171,7 @@
     <div id="r-out" class="hidden">
       <h3>Signed claim transaction</h3>
       <div id="r-meta" class="callout"></div>
-      <label>Raw transaction hex <span class="hint">(broadcast with your node / wallet)</span></label>
+      <label for="r-hex">Raw transaction hex <span class="hint">(broadcast with your node / wallet)</span></label>
       <textarea id="r-hex" class="mono" rows="5" readonly></textarea>
       <div class="row">
         <button id="r-copy" class="btn ghost">Copy raw tx</button>
@@ -210,13 +210,13 @@
     <div id="t-pkg-out" class="hidden">
       <h3>Transfer package</h3>
       <p class="lede small">Send this JSON to the buyer. It contains the seller's 0x83 presignatures — safe to transmit.</p>
-      <textarea id="t-pkg" class="mono" rows="6" readonly></textarea>
+      <textarea aria-label="Transfer package" id="t-pkg" class="mono" rows="6" readonly></textarea>
       <div class="row"><button id="t-pkgcopy" class="btn ghost">Copy package</button></div>
     </div>
     <div id="t-fill-out" class="hidden">
       <h3>Fill transaction</h3>
       <div id="t-fill-meta" class="callout"></div>
-      <textarea id="t-fill-hex" class="mono" rows="5" readonly></textarea>
+      <textarea aria-label="Fill transaction hex" id="t-fill-hex" class="mono" rows="5" readonly></textarea>
       <div class="row"><button id="t-fill-copy" class="btn ghost">Copy raw tx</button></div>
     </div>
   </section>

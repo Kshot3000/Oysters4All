@@ -111,7 +111,7 @@
       <button id="terms-copy" class="btn ghost">Copy descriptor JSON</button>
       <button id="terms-download" class="btn ghost">Download .json</button>
     </div>
-    <textarea id="terms-desc" rows="10" readonly spellcheck="false"></textarea>
+    <textarea aria-label="Subscription descriptor JSON" id="terms-desc" rows="10" readonly spellcheck="false"></textarea>
     <div class="row">
       <button id="terms-back" class="btn ghost">← Back</button>
       <button id="terms-next" class="btn primary">Continue to funding →</button>
@@ -138,7 +138,7 @@
       <button id="fund-scan" class="btn ghost">Scan anchor via Blockbook</button>
       <span class="hint">or paste UTXOs (<code>txid:vout:value-grains</code> per line)</span>
     </div>
-    <textarea id="fund-utxos" rows="5" spellcheck="false" placeholder="aabb…:0:150000000"></textarea>
+    <textarea aria-label="UTXOs — one per line (txid:vout:value in grains)" id="fund-utxos" rows="5" spellcheck="false" placeholder="aabb…:0:150000000"></textarea>
     <label class="wide">Your key <span class="hint-inline">(mnemonic, WIF, or 64-hex — wiped after signing)</span>
       <input id="fund-key" type="password" autocomplete="off" spellcheck="false">
     </label>
@@ -149,7 +149,7 @@
     </div>
     <div id="fund-out" hidden>
       <dl class="kv"><div><dt>Funding txid</dt><dd><code id="fund-txid"></code></dd></div></dl>
-      <textarea id="fund-hex" rows="4" readonly spellcheck="false"></textarea>
+      <textarea aria-label="Funding transaction hex" id="fund-hex" rows="4" readonly spellcheck="false"></textarea>
     </div>
     <div class="row">
       <button id="fund-back" class="btn ghost">← Back</button>
@@ -181,7 +181,7 @@
         <button id="ps-copy" class="btn ghost">Copy bundle JSON</button>
         <button id="ps-download" class="btn ghost">Download .json</button>
       </div>
-      <textarea id="ps-bundle" rows="10" readonly spellcheck="false"></textarea>
+      <textarea aria-label="Signed payment bundle" id="ps-bundle" rows="10" readonly spellcheck="false"></textarea>
     </div>
     <div class="row">
       <button id="ps-back" class="btn ghost">← Back</button>
@@ -240,7 +240,7 @@
         <div><dt>Cancel txid</dt><dd><code id="cx-txid"></code></dd></div>
         <div><dt>Reclaimed</dt><dd id="cx-reclaimed"></dd></div>
       </dl>
-      <textarea id="cx-hex" rows="4" readonly spellcheck="false"></textarea>
+      <textarea aria-label="Cancel transaction hex" id="cx-hex" rows="4" readonly spellcheck="false"></textarea>
     </div>
   </section>
 

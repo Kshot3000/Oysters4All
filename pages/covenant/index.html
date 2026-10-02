@@ -74,7 +74,7 @@
         <button class="btn ghost" id="save-covenant">Save covenant on this device</button>
       </div>
       <h3>Load a covenant</h3>
-      <textarea id="descriptor-input" rows="2" spellcheck="false" placeholder="covenant:v1:prl:2-of-3:…"></textarea>
+      <textarea aria-label="Covenant descriptor to load" id="descriptor-input" rows="2" spellcheck="false" placeholder="covenant:v1:prl:2-of-3:…"></textarea>
       <div class="row"><button class="btn ghost" id="load-btn">Load from descriptor</button></div>
     </div>
   </section>
@@ -132,7 +132,7 @@
     <div id="round-out" hidden>
       <h3>Round</h3>
       <div id="round-summary" class="summary"></div>
-      <textarea id="round-json" rows="8" spellcheck="false" readonly></textarea>
+      <textarea aria-label="Signing round JSON" id="round-json" rows="8" spellcheck="false" readonly></textarea>
       <div class="row">
         <button class="btn ghost copy-btn" data-for="round-json">Copy JSON</button>
         <button class="btn ghost" id="download-round">Download .json</button>
@@ -147,7 +147,7 @@
     <h2>Sign &amp; finalize</h2>
     <p class="lede">Import a round, verify it independently, add signatures. Every signature is checked against
     the round digest before it is accepted. Finalizing needs <strong>m of n</strong>.</p>
-    <textarea id="sign-round-input" rows="6" spellcheck="false" placeholder='Paste the signing-round JSON here'></textarea>
+    <textarea aria-label="Signing round JSON to import" id="sign-round-input" rows="6" spellcheck="false" placeholder='Paste the signing-round JSON here'></textarea>
     <div class="row">
       <button class="btn primary" id="verify-round">Verify round</button>
       <span class="error" id="sign-error" hidden></span>
@@ -165,7 +165,7 @@
       </div>
       <p class="hint">Keys entered as mnemonics in the Covenant step are available here. Otherwise paste a
       32-byte hex private key or a 12/24-word mnemonic:</p>
-      <textarea id="sign-key-input" rows="2" spellcheck="false" placeholder="private key (hex) or mnemonic — never leaves this page"></textarea>
+      <textarea aria-label="Private key or mnemonic to sign with" id="sign-key-input" rows="2" spellcheck="false" placeholder="private key (hex) or mnemonic — never leaves this page"></textarea>
       <div class="row"><button class="btn primary" id="sign-with-local">Add my signature</button></div>
       <h3>Add a cosigner's signature</h3>
       <div class="form-grid">
@@ -176,7 +176,7 @@
       <h3>Export round with signatures</h3>
       <p class="hint">Hand this to the next cosigner — or back to the coordinator. It carries every
       signature collected so far and stays tamper-evident: any edit invalidates the digest.</p>
-      <textarea id="sign-round-export" rows="6" spellcheck="false" readonly></textarea>
+      <textarea aria-label="Round JSON with signatures" id="sign-round-export" rows="6" spellcheck="false" readonly></textarea>
       <div class="row">
         <button class="btn ghost copy-btn" data-for="sign-round-export">Copy JSON</button>
         <button class="btn ghost" id="download-signed-round">Download .json</button>
@@ -187,7 +187,7 @@
       </div>
       <div id="final-out" hidden>
         <p>txid: <code id="final-txid" class="addr small"></code></p>
-        <textarea id="final-hex" rows="6" spellcheck="false" readonly></textarea>
+        <textarea aria-label="Finalized transaction hex" id="final-hex" rows="6" spellcheck="false" readonly></textarea>
         <div class="row">
           <button class="btn ghost copy-btn" data-for="final-hex">Copy hex</button>
           <button class="btn primary" id="broadcast-btn">Broadcast via Blockbook</button>

@@ -56,7 +56,7 @@
     <div class="config card">
       <h3>Handle lookup</h3>
       <div class="row">
-        <input id="dir-search" class="grow" placeholder="satoshi" autocomplete="off" spellcheck="false">
+        <input aria-label="Handle to look up" id="dir-search" class="grow" placeholder="satoshi" autocomplete="off" spellcheck="false">
         <button id="dir-lookup" class="btn">Look up</button>
       </div>
       <div id="dir-lookup-out"></div>
@@ -85,7 +85,7 @@
       <p class="muted">1–32 chars, <code class="mono">a–z 0–9 -</code>; no leading/trailing/double hyphens.
       Normalization is lowercase-trim — <code class="mono">Satoshi</code> and <code class="mono">satoshi</code> are the same handle.</p>
       <div class="row">
-        <input id="cw-handle" class="grow mono big" placeholder="satoshi" autocomplete="off" spellcheck="false" maxlength="40">
+        <input aria-label="Handle" id="cw-handle" class="grow mono big" placeholder="satoshi" autocomplete="off" spellcheck="false" maxlength="40">
         <button id="cw-check" class="btn">Check</button>
       </div>
       <div id="cw-handle-status"></div>
@@ -124,7 +124,7 @@
         <h4>Signing key (page memory only)</h4>
         <div class="row">
           <button id="cw-newkey" class="btn">Generate fresh key</button>
-          <input id="cw-wif" class="grow mono" type="password" placeholder="or paste WIF…" autocomplete="off" spellcheck="false">
+          <input aria-label="Signing key — paste WIF" id="cw-wif" class="grow mono" type="password" placeholder="or paste WIF…" autocomplete="off" spellcheck="false">
           <button id="cw-unlock" class="btn">Use key</button>
           <button id="cw-lock" class="btn danger" disabled>Lock &amp; wipe</button>
         </div>
@@ -176,7 +176,7 @@
     and confirms first-seen ownership against a live directory re-scan of that handle. Tampered or
     losing records are refused loudly, with exact field-level reasons.</p>
     <div class="row">
-      <input id="v-id" class="grow mono" placeholder="inscription id (txid + i0)" autocomplete="off" spellcheck="false">
+      <input aria-label="Inscription id to verify" id="v-id" class="grow mono" placeholder="inscription id (txid + i0)" autocomplete="off" spellcheck="false">
       <button id="v-run" class="btn primary">Verify</button>
     </div>
     <div id="v-out"></div>

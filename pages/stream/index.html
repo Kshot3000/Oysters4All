@@ -86,7 +86,7 @@
       <p class="hint">Hand this to the beneficiary (or save it). Anyone can re-derive every tick address from it and
       verify the funder funded the right ones — it is tamper-evident.</p>
       <div class="row">
-        <textarea id="descriptor" rows="3" readonly spellcheck="false"></textarea>
+        <textarea aria-label="Stream descriptor" id="descriptor" rows="3" readonly spellcheck="false"></textarea>
       </div>
       <div class="row">
         <button class="copy-btn" data-for="descriptor">Copy</button>
@@ -164,7 +164,7 @@
       <div id="claim-signed" hidden>
         <h4>Signed transaction</h4>
         <dl class="review" id="claim-signed-dl"></dl>
-        <textarea id="claim-hex" rows="4" readonly spellcheck="false"></textarea>
+        <textarea aria-label="Signed claim transaction hex" id="claim-hex" rows="4" readonly spellcheck="false"></textarea>
         <div class="row">
           <button class="copy-btn" data-for="claim-hex">Copy</button>
           <button id="claim-broadcast" class="primary">Broadcast via Blockbook</button>
@@ -215,7 +215,7 @@
       <div id="cancel-signed" hidden>
         <h4>Signed transaction</h4>
         <dl class="review" id="cancel-signed-dl"></dl>
-        <textarea id="cancel-hex" rows="4" readonly spellcheck="false"></textarea>
+        <textarea aria-label="Signed cancel transaction hex" id="cancel-hex" rows="4" readonly spellcheck="false"></textarea>
         <div class="row">
           <button class="copy-btn" data-for="cancel-hex">Copy</button>
           <button id="cancel-broadcast" class="primary">Broadcast via Blockbook</button>

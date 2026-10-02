@@ -92,7 +92,7 @@
     </table></div>
     <p class="hint">For taproot inputs the secret is the private key of the taproot <em>output</em> key (parity is handled for you). scriptSig / witness may be empty for key-path spends. Secrets are wiped from these fields after deriving.</p>
     <h3>Recipients <span class="sub">one <code>sp1…</code>/<code>tsp1…</code> address per line</span></h3>
-    <textarea id="se-recipients" rows="3" spellcheck="false" placeholder="sp1qq…"></textarea>
+    <textarea aria-label="Recipients — one silent-payment address per line" id="se-recipients" rows="3" spellcheck="false" placeholder="sp1qq…"></textarea>
     <div class="row">
       <button class="primary" id="se-derive">Derive outputs</button>
       <span class="hint">Outputs are deterministic for these inputs — the receiver finds them by scanning.</span>
@@ -125,9 +125,9 @@
       </label>
     </div>
     <h3>Transaction inputs <span class="sub">JSON array: [{txid, vout, prevoutSpk, scriptSig, txinwitness}]</span></h3>
-    <textarea id="sc-vins" rows="4" spellcheck="false" placeholder='[{"txid":"…","vout":0,"prevoutSpk":"5120…","scriptSig":"","txinwitness":""}]'></textarea>
+    <textarea aria-label="Transaction inputs (JSON array)" id="sc-vins" rows="4" spellcheck="false" placeholder='[{"txid":"…","vout":0,"prevoutSpk":"5120…","scriptSig":"","txinwitness":""}]'></textarea>
     <h3>Taproot outputs to check <span class="sub">one x-only key (64 hex) per line</span></h3>
-    <textarea id="sc-outputs" rows="4" spellcheck="false" placeholder="3e9fce73d4e77a4809908e3c3a2e54ee147b9312dc5044a193d1fc85de46e3c1"></textarea>
+    <textarea aria-label="Taproot outputs to check — one x-only key per line" id="sc-outputs" rows="4" spellcheck="false" placeholder="3e9fce73d4e77a4809908e3c3a2e54ee147b9312dc5044a193d1fc85de46e3c1"></textarea>
     <div class="row"><button class="primary" id="sc-scan">Scan for my payments</button></div>
     <p class="err" id="sc-error" hidden></p>
     <div id="sc-result" hidden>

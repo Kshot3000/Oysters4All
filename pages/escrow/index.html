@@ -46,17 +46,17 @@
     <div class="party-grid">
       <div class="party-card" data-role="buyer">
         <h3>Buyer <span class="role-note">funds the escrow · default refund key</span></h3>
-        <textarea id="key-buyer" rows="2" spellcheck="false" placeholder="64-hex x-only pubkey or 12/24-word mnemonic"></textarea>
+        <textarea aria-label="Buyer key — 64-hex x-only pubkey or mnemonic" id="key-buyer" rows="2" spellcheck="false" placeholder="64-hex x-only pubkey or 12/24-word mnemonic"></textarea>
         <div class="row"><button class="btn ghost gen-key" data-for="key-buyer">Generate fresh key</button><span class="key-ok" id="ok-buyer"></span></div>
       </div>
       <div class="party-card" data-role="seller">
         <h3>Seller <span class="role-note">receives on release</span></h3>
-        <textarea id="key-seller" rows="2" spellcheck="false" placeholder="64-hex x-only pubkey or 12/24-word mnemonic"></textarea>
+        <textarea aria-label="Seller key — 64-hex x-only pubkey or mnemonic" id="key-seller" rows="2" spellcheck="false" placeholder="64-hex x-only pubkey or 12/24-word mnemonic"></textarea>
         <div class="row"><button class="btn ghost gen-key" data-for="key-seller">Generate fresh key</button><span class="key-ok" id="ok-seller"></span></div>
       </div>
       <div class="party-card" data-role="arbiter">
         <h3>Arbiter <span class="role-note">breaks ties, never unilateral</span></h3>
-        <textarea id="key-arbiter" rows="2" spellcheck="false" placeholder="64-hex x-only pubkey or 12/24-word mnemonic"></textarea>
+        <textarea aria-label="Arbiter key — 64-hex x-only pubkey or mnemonic" id="key-arbiter" rows="2" spellcheck="false" placeholder="64-hex x-only pubkey or 12/24-word mnemonic"></textarea>
         <div class="row"><button class="btn ghost gen-key" data-for="key-arbiter">Generate fresh key</button><span class="key-ok" id="ok-arbiter"></span></div>
       </div>
     </div>

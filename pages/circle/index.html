@@ -71,7 +71,7 @@
       <h3>Setup descriptor</h3>
       <p class="hint">Share this with every member <em>before</em> the lottery. It pins the
         members, the money, and the rules — anyone can re-derive it and check the fingerprint.</p>
-      <textarea id="f-desc" rows="3" readonly spellcheck="false"></textarea>
+      <textarea aria-label="Setup descriptor" id="f-desc" rows="3" readonly spellcheck="false"></textarea>
       <p class="mono">fingerprint <code id="f-fp"></code> · setup hash <code id="f-setuphash"></code></p>
       <div class="row">
         <button id="f-copydesc">Copy descriptor</button>
@@ -101,11 +101,11 @@
     <h3>Publish commitments</h3>
     <p class="hint">Send every member's commitment to the group <em>before</em> anyone reveals.
       Paste the published set here to lock the draw:</p>
-    <textarea id="l-commitments" rows="4" spellcheck="false" placeholder='[{"memberIndex":0,"commitment":"…"}, …]'></textarea>
+    <textarea aria-label="Published commitments" id="l-commitments" rows="4" spellcheck="false" placeholder='[{"memberIndex":0,"commitment":"…"}, …]'></textarea>
     <h3>Reveal</h3>
     <p class="hint">After all commitments are public, each member reveals their secret.
       Paste the reveals here:</p>
-    <textarea id="l-reveals" rows="4" spellcheck="false" placeholder='[{"memberIndex":0,"secretHex":"…"}, …]'></textarea>
+    <textarea aria-label="Reveals" id="l-reveals" rows="4" spellcheck="false" placeholder='[{"memberIndex":0,"secretHex":"…"}, …]'></textarea>
     <div class="row">
       <button id="l-draw" class="primary">Verify reveals &amp; draw the order</button>
     </div>
@@ -191,7 +191,7 @@
         </div>
         <div id="c-out" class="hidden">
           <p id="c-meta" class="mono"></p>
-          <textarea id="c-hex" rows="4" readonly spellcheck="false"></textarea>
+          <textarea aria-label="Winner claim transaction hex" id="c-hex" rows="4" readonly spellcheck="false"></textarea>
           <div class="row">
             <button id="c-copy">Copy hex</button>
             <button id="c-broadcast">Broadcast via Blockbook</button>
@@ -231,7 +231,7 @@
           </div>
           <div id="d-out" class="hidden">
             <p id="d-fmeta" class="mono"></p>
-            <textarea id="d-hex" rows="4" readonly spellcheck="false"></textarea>
+            <textarea aria-label="Timeout refund transaction hex" id="d-hex" rows="4" readonly spellcheck="false"></textarea>
             <div class="row">
               <button id="d-copy">Copy hex</button>
               <button id="d-broadcast">Broadcast via Blockbook</button>

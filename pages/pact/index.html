@@ -114,7 +114,7 @@ tails — Bob wins | 0.00000546 | 1.99998559</textarea>
       <div class="kv"><span>CET fee / distributable</span><code id="d-cetfee"></code><span></span></div>
       <div class="qr-wrap"><div class="qr" id="d-qr"></div><span class="hint">Funding address QR — send exactly the total collateral here.</span></div>
       <h3>Sealed terms (carry to the next steps)</h3>
-      <textarea id="d-terms" rows="8" readonly></textarea>
+      <textarea aria-label="Sealed terms" id="d-terms" rows="8" readonly></textarea>
       <div class="row"><button class="copy" data-copy="#d-terms">copy terms</button></div>
     </div>
     <div class="note-box">The descriptor <code>pearl-pact:v1:…</code> is a SHA-256 seal over the canonical terms.
@@ -147,7 +147,7 @@ tails — Bob wins | 0.00000546 | 1.99998559</textarea>
       <div class="kv"><span>vBytes / fee</span><code id="f-feeinfo"></code><span></span></div>
       <div class="kv"><span>Outputs</span><code id="f-outputs"></code><span></span></div>
       <h3>Unsigned funding hex</h3>
-      <textarea id="f-hex" rows="4" readonly></textarea>
+      <textarea aria-label="Unsigned funding transaction hex" id="f-hex" rows="4" readonly></textarea>
       <div class="row"><button class="copy" data-copy="#f-hex">copy hex</button></div>
       <h3>Sign locally (both parties' keys must be in the page)</h3>
       <div class="form-grid">
@@ -158,7 +158,7 @@ tails — Bob wins | 0.00000546 | 1.99998559</textarea>
       <div class="error-box" id="f-sign-error" hidden></div>
       <div id="f-signed-wrap" hidden>
         <h3>Signed funding hex — broadcast it, then record the txid</h3>
-        <textarea id="f-signed" rows="4" readonly></textarea>
+        <textarea aria-label="Signed funding transaction hex" id="f-signed" rows="4" readonly></textarea>
         <div class="row">
           <button class="copy" data-copy="#f-signed">copy hex</button>
           <button class="secondary" id="f-broadcast">Broadcast via Blockbook</button>
@@ -194,7 +194,7 @@ tails — Bob wins | 0.00000546 | 1.99998559</textarea>
         <h3>Sealed pact bundle <span class="pill ok" id="s-seal-pill">SEALED</span></h3>
         <div id="s-seal-table"></div>
         <h3>Bundle JSON (exchange with your counterparty)</h3>
-        <textarea id="s-bundle" rows="8" readonly></textarea>
+        <textarea aria-label="Sealed pact bundle JSON" id="s-bundle" rows="8" readonly></textarea>
         <div class="row"><button class="copy" data-copy="#s-bundle">copy bundle</button></div>
       </div>
     </div>
@@ -227,7 +227,7 @@ tails — Bob wins | 0.00000546 | 1.99998559</textarea>
       <h3>Final CET hex — broadcast to claim</h3>
       <div class="kv"><span>Outcome</span><code id="x-label"></code><span></span></div>
       <div class="kv"><span>CET txid</span><code id="x-txid"></code><button class="copy" data-copy="#x-txid">copy</button></div>
-      <textarea id="x-hex" rows="5" readonly></textarea>
+      <textarea aria-label="Final CET transaction hex" id="x-hex" rows="5" readonly></textarea>
       <div class="row">
         <button class="copy" data-copy="#x-hex">copy hex</button>
         <button class="secondary" id="x-broadcast">Broadcast via Blockbook</button>
@@ -259,7 +259,7 @@ tails — Bob wins | 0.00000546 | 1.99998559</textarea>
       <div class="error-box" id="r-sign-error" hidden></div>
       <div id="r-signed-wrap" hidden>
         <h3>Signed refund hex — keep it safe until the lock height</h3>
-        <textarea id="r-signed" rows="4" readonly></textarea>
+        <textarea aria-label="Signed refund transaction hex" id="r-signed" rows="4" readonly></textarea>
         <div class="row"><button class="copy" data-copy="#r-signed">copy hex</button></div>
       </div>
     </div>

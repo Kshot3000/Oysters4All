@@ -126,7 +126,7 @@
           </div>
 
           <h3>Canonical preview</h3>
-          <textarea id="or-canonical" readonly spellcheck="false"></textarea>
+          <textarea aria-label="Canonical attestation preview" id="or-canonical" readonly spellcheck="false"></textarea>
           <div class="kv"><dt>Attestation id</dt><dd><code id="or-attid">—</code></dd></div>
           <div class="btnrow">
             <button class="btn" id="or-publish">Sign &amp; publish to local feed</button>
@@ -135,7 +135,7 @@
 
           <div id="or-pub-out" hidden>
             <h3>Signed attestation <span class="badge-ok">SIGNED</span></h3>
-            <textarea id="or-signed-json" readonly spellcheck="false"></textarea>
+            <textarea aria-label="Signed attestation (JSON)" id="or-signed-json" readonly spellcheck="false"></textarea>
             <div class="btnrow">
               <button class="btn small" id="or-copy-signed">Copy JSON</button>
               <button class="btn small ghost" id="or-dl-signed">Download JSON</button>

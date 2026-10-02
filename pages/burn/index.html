@@ -129,7 +129,7 @@
       <div class="kv"><span>Change output</span><code id="p-changeout"></code></div>
       <div class="kv"><span>Tx size</span><code id="p-vbytes"></code></div>
       <div class="kv"><span>Fee</span><code id="p-fee"></code></div>
-      <div class="kv"><span>Unsigned tx hex</span><textarea id="p-hex" rows="4" readonly></textarea><button class="copy secondary" data-copy="#p-hex">copy</button></div>
+      <div class="kv"><span>Unsigned tx hex</span><textarea aria-label="Unsigned transaction hex" id="p-hex" rows="4" readonly></textarea><button class="copy secondary" data-copy="#p-hex">copy</button></div>
       <p class="note-box">This hex is <strong>unsigned</strong>. Sign it in your own wallet (any PRL signer that accepts raw hex),
       then broadcast the signed tx. The desk re-verified the hex by decoding it before showing it to you — outputs, values and fee all match the plan.</p>
     </div>
@@ -165,7 +165,7 @@
       <button id="c-build" class="primary">Seal certificate</button>
     </div>
     <div id="c-result" class="result-box" hidden>
-      <textarea id="c-cert" rows="8" readonly></textarea>
+      <textarea aria-label="Burn certificate" id="c-cert" rows="8" readonly></textarea>
       <div class="row"><button class="copy secondary" data-copy="#c-cert">copy certificate</button></div>
     </div>
     <div id="c-error" class="error-box" hidden></div>

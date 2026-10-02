@@ -54,7 +54,7 @@
     </div>
     <details class="offline">
       <summary>Offline: paste a Blockbook <code>/api/v2/tx</code> JSON instead (air-gapped path)</summary>
-      <textarea id="dg-json" rows="4" spellcheck="false" placeholder='{"txid":"…","confirmations":0,"fees":"1000",…}'></textarea>
+      <textarea aria-label="Transaction JSON from Blockbook" id="dg-json" rows="4" spellcheck="false" placeholder='{"txid":"…","confirmations":0,"fees":"1000",…}'></textarea>
       <div class="btnrow"><button id="dg-go-offline">Diagnose pasted JSON</button></div>
     </details>
     <div id="dg-result" class="result" aria-live="polite"></div>

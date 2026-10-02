@@ -53,10 +53,10 @@
     <div class="field">
       <span class="flabel">Amount presets <small>(1–4, exact PRL — below the 0.00001 PRL dust floor is refused)</small></span>
       <div class="presets">
-        <input id="tj-p0" class="num" inputmode="decimal" value="0.5" spellcheck="false">
-        <input id="tj-p1" class="num" inputmode="decimal" value="1" spellcheck="false">
-        <input id="tj-p2" class="num" inputmode="decimal" value="2.5" spellcheck="false">
-        <input id="tj-p3" class="num" inputmode="decimal" value="5" spellcheck="false">
+        <input aria-label="Amount preset 1 (PRL)" id="tj-p0" class="num" inputmode="decimal" value="0.5" spellcheck="false">
+        <input aria-label="Amount preset 2 (PRL)" id="tj-p1" class="num" inputmode="decimal" value="1" spellcheck="false">
+        <input aria-label="Amount preset 3 (PRL)" id="tj-p2" class="num" inputmode="decimal" value="2.5" spellcheck="false">
+        <input aria-label="Amount preset 4 (PRL)" id="tj-p3" class="num" inputmode="decimal" value="5" spellcheck="false">
       </div>
     </div>
 
@@ -98,7 +98,7 @@
   <section class="panel" id="snippet-panel" hidden>
     <h2>3 · Copy the snippet</h2>
     <p class="note">One block: a mount <span class="mono">&lt;div&gt;</span>, the jar config as JSON, and the self-contained widget script. No external JS or CSS — only your Blockbook URL is fetched at runtime. Paste it into any HTML page and it works.</p>
-    <textarea id="tj-snippet" rows="10" readonly spellcheck="false"></textarea>
+    <textarea aria-label="Generated tip jar snippet" id="tj-snippet" rows="10" readonly spellcheck="false"></textarea>
     <div class="actions">
       <button id="tj-copy-snippet" class="btn primary" type="button">Copy snippet</button>
       <span class="copied" id="tj-snippet-copied" hidden>copied ✓</span>

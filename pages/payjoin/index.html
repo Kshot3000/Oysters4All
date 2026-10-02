@@ -57,9 +57,9 @@
         <p class="pj-lede">A real payjoin server would serve this template at <code>https://your-endpoint/payjoin</code> with this query:</p>
         <div class="pj-copyrow"><code id="r-query" class="pj-mono"></code><button class="pj-btn small" data-copy="r-query">Copy</button></div>
         <h3>Offer envelope <small>(send this to the sender)</small></h3>
-        <div class="pj-copyrow"><textarea id="r-envelope" class="pj-mono" rows="6" readonly></textarea><button class="pj-btn small" data-copy="r-envelope">Copy</button></div>
+        <div class="pj-copyrow"><textarea aria-label="Offer envelope" id="r-envelope" class="pj-mono" rows="6" readonly></textarea><button class="pj-btn small" data-copy="r-envelope">Copy</button></div>
         <h3>Template PSBT (base64)</h3>
-        <div class="pj-copyrow"><textarea id="r-psbt" class="pj-mono" rows="4" readonly></textarea><button class="pj-btn small" data-copy="r-psbt">Copy</button></div>
+        <div class="pj-copyrow"><textarea aria-label="Template PSBT (base64)" id="r-psbt" class="pj-mono" rows="4" readonly></textarea><button class="pj-btn small" data-copy="r-psbt">Copy</button></div>
         <div id="r-summary" class="pj-kv"></div>
       </div>
     </div>
@@ -120,9 +120,9 @@
       <div id="s-build-error" class="pj-error" hidden></div>
       <div id="s-out" hidden>
         <h3>Signed original <small>(send this envelope to the receiver)</small></h3>
-        <div class="pj-copyrow"><textarea id="s-envelope" class="pj-mono" rows="6" readonly></textarea><button class="pj-btn small" data-copy="s-envelope">Copy</button></div>
+        <div class="pj-copyrow"><textarea aria-label="Signed original envelope" id="s-envelope" class="pj-mono" rows="6" readonly></textarea><button class="pj-btn small" data-copy="s-envelope">Copy</button></div>
         <h3>Original PSBT (base64)</h3>
-        <div class="pj-copyrow"><textarea id="s-psbt" class="pj-mono" rows="4" readonly></textarea><button class="pj-btn small" data-copy="s-psbt">Copy</button></div>
+        <div class="pj-copyrow"><textarea aria-label="Original PSBT (base64)" id="s-psbt" class="pj-mono" rows="4" readonly></textarea><button class="pj-btn small" data-copy="s-psbt">Copy</button></div>
         <div id="s-summary" class="pj-kv"></div>
         <div class="pj-actions">
           <button id="s-to-proposal" class="pj-btn">Continue to Proposal →</button>
@@ -160,9 +160,9 @@
       <div id="p-build-error" class="pj-error" hidden></div>
       <div id="p-out" hidden>
         <h3>Proposal envelope <small>(send this back to the sender)</small></h3>
-        <div class="pj-copyrow"><textarea id="p-envelope" class="pj-mono" rows="6" readonly></textarea><button class="pj-btn small" data-copy="p-envelope">Copy</button></div>
+        <div class="pj-copyrow"><textarea aria-label="Proposal envelope" id="p-envelope" class="pj-mono" rows="6" readonly></textarea><button class="pj-btn small" data-copy="p-envelope">Copy</button></div>
         <h3>Proposal PSBT (base64)</h3>
-        <div class="pj-copyrow"><textarea id="p-psbt" class="pj-mono" rows="4" readonly></textarea><button class="pj-btn small" data-copy="p-psbt">Copy</button></div>
+        <div class="pj-copyrow"><textarea aria-label="Proposal PSBT (base64)" id="p-psbt" class="pj-mono" rows="4" readonly></textarea><button class="pj-btn small" data-copy="p-psbt">Copy</button></div>
         <h3>Fee math (exact grains)</h3>
         <div id="p-fee" class="pj-kv"></div>
         <div class="pj-actions"><button id="p-to-verify" class="pj-btn">Continue to Verify →</button></div>
@@ -210,9 +210,9 @@
       <div id="g-out" hidden>
         <div id="g-summary" class="pj-kv"></div>
         <h3>Final transaction (hex)</h3>
-        <div class="pj-copyrow"><textarea id="g-hex" class="pj-mono" rows="5" readonly></textarea><button class="pj-btn small" data-copy="g-hex">Copy</button></div>
+        <div class="pj-copyrow"><textarea aria-label="Final transaction hex" id="g-hex" class="pj-mono" rows="5" readonly></textarea><button class="pj-btn small" data-copy="g-hex">Copy</button></div>
         <h3>Final PSBT (base64)</h3>
-        <div class="pj-copyrow"><textarea id="g-psbt" class="pj-mono" rows="3" readonly></textarea><button class="pj-btn small" data-copy="g-psbt">Copy</button></div>
+        <div class="pj-copyrow"><textarea aria-label="Final PSBT (base64)" id="g-psbt" class="pj-mono" rows="3" readonly></textarea><button class="pj-btn small" data-copy="g-psbt">Copy</button></div>
         <div class="pj-broadcast">
           <h3>Broadcast <small>(live — Pearl mainnet via public blockbook)</small></h3>
           <p class="pj-lede">This sends the real transaction to the real network. There is no undo.</p>

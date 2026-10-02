@@ -75,7 +75,7 @@
       <h3>Restore</h3>
       <p class="lede">Paste a channel descriptor JSON exported earlier. It is re-derived from the keys and
       refused unless every byte matches.</p>
-      <textarea id="open-restorejson" rows="8" spellcheck="false" placeholder='{"kind":"pearl-channel-descriptor:v1",…}'></textarea>
+      <textarea aria-label="Channel descriptor JSON to restore" id="open-restorejson" rows="8" spellcheck="false" placeholder='{"kind":"pearl-channel-descriptor:v1",…}'></textarea>
       <div class="row"><button id="open-dorestore" class="primary">Verify &amp; restore</button></div>
       <div id="open-restoreerror" class="error" hidden></div>
     </div>
@@ -96,7 +96,7 @@
       <button id="fund-pastebtn" class="ghost">Paste UTXOs instead</button>
     </div>
     <div id="fund-pastebox" hidden>
-      <textarea id="fund-paste" rows="6" spellcheck="false" placeholder='[{"txid":"…","vout":0,"value":"…","spk":"…"}, …]'></textarea>
+      <textarea aria-label="UTXOs as JSON" id="fund-paste" rows="6" spellcheck="false" placeholder='[{"txid":"…","vout":0,"value":"…","spk":"…"}, …]'></textarea>
     </div>
     <div id="fund-utxos"></div>
     <div class="row">
@@ -112,7 +112,7 @@
         <div><dt>Fee</dt><dd id="fund-fee"></dd></div>
         <div><dt>Change</dt><dd id="fund-change"></dd></div>
       </dl>
-      <textarea id="fund-hex" rows="4" readonly spellcheck="false"></textarea>
+      <textarea aria-label="Funding transaction hex" id="fund-hex" rows="4" readonly spellcheck="false"></textarea>
       <div class="row">
         <button id="fund-broadcast" class="primary">Broadcast (double-confirm)</button>
         <button id="fund-confirm" class="ghost">Mark funded — I broadcast elsewhere</button>
@@ -175,7 +175,7 @@
         <button id="pay-export" class="ghost">Export state bundle</button>
         <label class="filebtn ghost">Import peer bundle<input type="file" id="pay-importfile" accept=".json,application/json" hidden></label>
       </div>
-      <textarea id="pay-bundle" rows="8" spellcheck="false" placeholder="State bundle JSON appears here — send it to your peer; paste theirs below."></textarea>
+      <textarea aria-label="Peer state bundle" id="pay-bundle" rows="8" spellcheck="false" placeholder="State bundle JSON appears here — send it to your peer; paste theirs below."></textarea>
       <div class="row"><button id="pay-importtext" class="ghost">Import pasted bundle</button></div>
       <h4>Peer's signatures</h4>
       <p class="lede">Paste your peer's two signatures (one per commitment copy) from their bundle, or import
@@ -191,8 +191,8 @@
           <div><dt>Your commitment txid</dt><dd><code id="pay-txid-mine" class="addr"></code></dd></div>
           <div><dt>Their commitment txid</dt><dd><code id="pay-txid-theirs" class="addr"></code></dd></div>
         </dl>
-        <textarea id="pay-hex-mine" rows="3" readonly spellcheck="false"></textarea>
-        <textarea id="pay-hex-theirs" rows="3" readonly spellcheck="false"></textarea>
+        <textarea aria-label="Your fully-signed commitment transaction hex" id="pay-hex-mine" rows="3" readonly spellcheck="false"></textarea>
+        <textarea aria-label="Their fully-signed commitment transaction hex" id="pay-hex-theirs" rows="3" readonly spellcheck="false"></textarea>
         <div class="row"><button id="pay-activate" class="primary">Activate this state (revoke the old one)</button></div>
       </div>
     </div>
@@ -241,7 +241,7 @@
             <button id="close-coop-assemble" class="primary">Verify &amp; assemble</button>
             <button id="close-coop-broadcast" class="ghost">Broadcast (double-confirm)</button>
           </div>
-          <textarea id="close-coop-hex" rows="3" readonly spellcheck="false" hidden></textarea>
+          <textarea aria-label="Cooperative close transaction hex" id="close-coop-hex" rows="3" readonly spellcheck="false" hidden></textarea>
         </div>
       </div>
       <div class="closecard">
@@ -261,7 +261,7 @@
             <button id="close-uni-sign" class="primary">Sign claim</button>
             <button id="close-uni-broadcast" class="ghost">Broadcast claim (double-confirm)</button>
           </div>
-          <textarea id="close-uni-hex" rows="3" readonly spellcheck="false" hidden></textarea>
+          <textarea aria-label="Unilateral close claim transaction hex" id="close-uni-hex" rows="3" readonly spellcheck="false" hidden></textarea>
           <div class="note">Broadcast the commitment transaction first and wait for it to confirm. Only
           broadcast the claim after <span id="close-uni-csv2"></span> blocks have passed since the
           commitment confirmed — otherwise the network rejects it and you pay a fee for nothing.</div>

@@ -36,7 +36,7 @@
       <p class="dz-main">Drop a file here, or <label class="filelink">choose one<input type="file" id="file-input" hidden></label></p>
       <p class="hint">or paste text below</p>
     </div>
-    <textarea id="doc-text" rows="5" placeholder="…or paste the document text here"></textarea>
+    <textarea aria-label="Document text" id="doc-text" rows="5" placeholder="…or paste the document text here"></textarea>
     <div class="form-grid">
       <label>Title (optional, ≤120 chars)<input id="doc-title" maxlength="120" placeholder="e.g. Loan agreement — final draft"></label>
       <label>Notarized by (optional, ≤80 chars)<input id="doc-by" maxlength="80" placeholder="e.g. Alice"></label>
@@ -198,7 +198,7 @@
     <div id="v-dropzone" class="dropzone" tabindex="0">
       <p class="dz-main">Drop the document here, or <label class="filelink">choose one<input type="file" id="v-file-input" hidden></label></p>
     </div>
-    <textarea id="v-text" rows="4" placeholder="…or paste the document text here"></textarea>
+    <textarea aria-label="Document text to verify" id="v-text" rows="4" placeholder="…or paste the document text here"></textarea>
     <div class="row">
       <button id="v-run" class="btn primary">Verify</button>
     </div>

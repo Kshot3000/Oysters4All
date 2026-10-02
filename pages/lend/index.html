@@ -93,7 +93,7 @@
       <h3>Restore</h3>
       <p class="lede">Paste a loan descriptor JSON exported earlier. It is re-derived from the keys and
       refused unless every byte matches.</p>
-      <textarea id="offer-restorejson" rows="8" spellcheck="false" placeholder='{"kind":"pearllend:v1",…}'></textarea>
+      <textarea aria-label="Loan descriptor JSON to restore" id="offer-restorejson" rows="8" spellcheck="false" placeholder='{"kind":"pearllend:v1",…}'></textarea>
       <div class="row"><button id="offer-dorestore" class="primary">Verify &amp; restore</button></div>
       <div id="offer-restoreerror" class="error" hidden></div>
     </div>
@@ -228,7 +228,7 @@
       <h3>Lender: verify &amp; co-sign</h3>
       <p class="lede">Paste the borrower's signed proposal package. The desk re-derives the digest and checks their
       signature against the borrower key in the descriptor — then, and only then, lets you co-sign.</p>
-      <textarea id="repay-import" rows="6" spellcheck="false" placeholder='{"kind":"repay",…}'></textarea>
+      <textarea aria-label="Borrower's signed proposal package" id="repay-import" rows="6" spellcheck="false" placeholder='{"kind":"repay",…}'></textarea>
       <div class="row"><button id="repay-doimport" class="primary">Verify proposal</button></div>
       <div id="repay-importresult" hidden>
         <dl class="kv">
