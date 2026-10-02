@@ -153,7 +153,7 @@ nav#steps button.done { border-color: var(--ok); color: var(--ok); }
 
 .btn {
   display: inline-block;
-  background: linear-gradient(180deg, var(--amber), #8f5f1c);
+  background: linear-gradient(180deg, #93651e, #8f5f1c);
   border: 1px solid #6b4a15;
   color: #fff8e6;
   padding: 0.65rem 1.4rem;

@@ -8,7 +8,7 @@
   --line: #3a2560;
   --ink: #f2ecff;
   --dim: #b9a8e0;
-  --faint: #8a76b8;
+  --faint: #afa2cf;
   --violet: #8b5cf6;
   --violet-deep: #6d28d9;
   --amber: #fbbf24;
@@ -89,7 +89,7 @@ body {
 .btnrow { display: flex; gap: .6rem; flex-wrap: wrap; margin: .9rem 0; align-items: center; }
 .btn {
   padding: .65rem 1.1rem; border-radius: .65rem; cursor: pointer; font-size: .92rem; font-weight: 700;
-  background: linear-gradient(135deg, var(--violet-deep), var(--violet));
+  background: linear-gradient(135deg, var(--violet-deep), #8155e5);
   color: #fff; border: 1px solid var(--violet);
   box-shadow: 0 0 16px rgba(139,92,246,.35);
 }

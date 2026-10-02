@@ -7,7 +7,7 @@
   --line: #2a5a53;
   --ink: #f0ece1;
   --muted: #9db8b1;
-  --copper: #d08a4a;
+  --copper: #dba776;
   --copper-hi: #f0b878;
   --copper-dim: #7d5226;
   --teal-hi: #5fd4c0;
@@ -65,7 +65,7 @@ textarea { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .85
 }
 .btn:hover:not(:disabled) { border-color: var(--copper); background: #1d5048; }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
-.btn.primary { background: linear-gradient(180deg, #d08a4a, #9c5f28); color: #221204; border-color: #f0b878; font-weight: 600; }
+.btn.primary { background: linear-gradient(180deg, #dba776, #ac794a); color: #221204; border-color: #f0b878; font-weight: 600; }
 .btn.primary:hover:not(:disabled) { background: linear-gradient(180deg, #dd9a58, #ab6a2f); }
 .btn.ghost { background: transparent; color: var(--muted); border-color: var(--line); font-size: .85rem; padding: .4rem .8rem; }
 .btn.ghost:hover:not(:disabled) { color: var(--ink); border-color: var(--copper-dim); }

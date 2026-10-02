@@ -7,7 +7,7 @@
   --navy-3: #131d42;
   --ink: #eef2ff;
   --ink-dim: #a8b4d8;
-  --ink-faint: #6b7699;
+  --ink-faint: #8e97b1;
   --ignite: #ff7a1a;
   --ignite-hot: #ffb347;
   --ignite-deep: #c24e00;
@@ -49,7 +49,7 @@ body {
 }
 .tabs button:hover { border-color: var(--ignite-deep); color: var(--ink); }
 .tabs button.active {
-  background: linear-gradient(180deg, var(--ignite), var(--ignite-deep));
+  background: linear-gradient(180deg, var(--ignite), #c8611b);
   color: #140a02; font-weight: 700; border-color: var(--ignite-hot);
   box-shadow: 0 0 18px rgba(255,122,26,.45);
 }
@@ -85,7 +85,7 @@ button {
 }
 button:hover:not(:disabled) { border-color: var(--ignite-deep); }
 button:disabled { opacity: .38; cursor: not-allowed; }
-button.primary { background: linear-gradient(180deg, var(--ignite), var(--ignite-deep));
+button.primary { background: linear-gradient(180deg, var(--ignite), #c8611b);
   color: #160a01; font-weight: 700; border-color: var(--ignite-hot); }
 button.danger { background: linear-gradient(180deg, #a1250a, #6e1503); border-color: var(--ember); color: #ffe9dd; font-weight: 700; }
 button.danger.armed { animation: pulse 1s infinite; }

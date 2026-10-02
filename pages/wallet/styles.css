@@ -13,9 +13,9 @@
   --stroke-2: rgba(148, 170, 205, 0.28);
   --ink: #eef2f9;
   --ink-2: #9dabC4;
-  --ink-3: #64708a;
+  --ink-3: #959eaf;
   --silver: #d7dee9;
-  --iris: linear-gradient(135deg, #4f7cff 0%, #7d9fd1 52%, #dfe9f6 100%);
+  --iris: linear-gradient(135deg, #3d63d8 0%, #4a6ca3 52%, #54719b 100%);
   --iris-soft: linear-gradient(135deg, rgba(79,124,255,.22), rgba(125,159,209,.22), rgba(223,233,246,.22));
   --ok: #34d399;
   --bad: #fb7185;

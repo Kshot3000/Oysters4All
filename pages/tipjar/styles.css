@@ -9,7 +9,7 @@
   --line: #232b42;
   --text: #eef0f8;
   --dim: #a7b0c9;
-  --faint: #6b7590;
+  --faint: #818aa0;
   --pearl: #f2e7dc;
   --rose: #e0a899;
   --copper: #c97e4e;
@@ -109,7 +109,7 @@ input:focus, textarea:focus { outline: none; border-color: var(--copper); box-sh
   border-radius: 10px; padding: 10px 18px; font-size: 0.92rem; cursor: pointer; font-family: inherit;
 }
 .btn:hover { border-color: var(--copper); }
-.btn.primary { background: linear-gradient(180deg, #d99a5b, #b06a34); border-color: #8a5226; color: #1a0f06; font-weight: 700; }
+.btn.primary { background: linear-gradient(180deg, #d99a5b, #b4713d); border-color: #8a5226; color: #1a0f06; font-weight: 700; }
 .btn.primary:hover { filter: brightness(1.08); }
 .btn.small { padding: 4px 10px; font-size: 0.78rem; }
 .btn:disabled { opacity: 0.45; cursor: default; }

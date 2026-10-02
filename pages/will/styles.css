@@ -66,7 +66,7 @@ nav.steps button.active {
   overflow: hidden; white-space: nowrap;
   border-bottom: 1px solid var(--line);
   padding: 0.3rem 1rem;
-  color: #5d6478; font-size: 0.72rem; letter-spacing: 0.18em;
+  color: #848a99; font-size: 0.72rem; letter-spacing: 0.18em;
 }
 
 aside.limits {
@@ -161,7 +161,7 @@ footer {
   font-size: 0.9rem; text-align: center;
 }
 footer code { color: var(--amber-hot); font-size: 0.82rem; word-break: break-all; }
-footer .fine { font-size: 0.8rem; color: #6d7590; }
+footer .fine { font-size: 0.8rem; color: #8289a0; }
 @media (max-width: 640px) {
   dl.kv { grid-template-columns: 1fr; }
   .heir-row { grid-template-columns: 1fr; }

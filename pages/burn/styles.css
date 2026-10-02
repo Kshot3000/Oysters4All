@@ -6,7 +6,7 @@
   --basalt-2: #161210;
   --basalt-3: #1f1917;
   --ash: #b8b0a8;
-  --ash-dim: #7d746c;
+  --ash-dim: #938c85;
   --ember: #ff6b35;
   --ember-hot: #ffd166;
   --magma: #c1121f;
@@ -109,7 +109,7 @@ button {
   border: 1px solid var(--line); background: var(--basalt-3); color: var(--ash);
 }
 button.primary {
-  background: linear-gradient(100deg, var(--ember-hot), var(--ember) 60%, var(--magma));
+  background: linear-gradient(100deg, var(--ember-hot), var(--ember) 60%, #d35962);
   color: #1a0f08; font-weight: 700; border: none;
   box-shadow: 0 2px 16px rgba(255, 107, 53, 0.35);
 }

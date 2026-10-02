@@ -106,7 +106,7 @@ button {
   border: 1px solid var(--line); background: var(--ink-3); color: var(--parchment);
 }
 button.primary {
-  background: linear-gradient(100deg, var(--gold-hot), var(--gold) 60%, var(--copper));
+  background: linear-gradient(100deg, var(--gold-hot), var(--gold) 60%, #b77145);
   color: #1a1206; font-weight: 700; border: none;
   box-shadow: 0 2px 16px rgba(217, 164, 65, 0.35);
 }

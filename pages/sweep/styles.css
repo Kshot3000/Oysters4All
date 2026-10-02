@@ -124,7 +124,7 @@ textarea { resize: vertical; }
 .btn:hover:not(:disabled) { border-color: var(--teal); box-shadow: 0 0 14px rgba(57, 194, 215, 0.25); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn.primary {
-  background: linear-gradient(120deg, var(--teal-deep), #1593a8);
+  background: linear-gradient(120deg, var(--teal-deep), #127b8d);
   border-color: var(--teal); color: #f2feff; font-weight: 600;
 }
 .btn.ghost { background: transparent; }

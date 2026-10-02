@@ -80,6 +80,7 @@ main { max-width: 1060px; margin: 0 auto; padding: 26px 24px 10px; }
 .panel h3 { color: var(--teal); margin: 26px 0 8px; font-size: 18px; }
 .lede { color: var(--dim); max-width: 820px; }
 .lede a { color: var(--cyan); }
+.hint a { color: var(--cyan); }
 .hint { color: var(--dim); font-size: 13px; }
 .err { color: var(--red); font-size: 14px; min-height: 1.2em; }
 
@@ -100,7 +101,7 @@ button {
   border-radius: 10px; padding: 10px 18px; font-size: 15px; cursor: pointer; border: 1px solid var(--line);
 }
 button.primary {
-  background: linear-gradient(120deg, #0e7d9c, #0f9d8a);
+  background: linear-gradient(120deg, #298ca7, #0f9d8a);
   border-color: var(--cyan); color: #02141a; font-weight: 700;
   box-shadow: 0 0 22px rgba(56,225,255,.35);
 }

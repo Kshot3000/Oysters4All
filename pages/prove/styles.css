@@ -8,12 +8,12 @@
   --paper-2: #efe4cc;
   --card: #fbf7ec;
   --ink: #221a12;
-  --ink-soft: #6b5f4d;
-  --ink-faint: #9a8c74;
+  --ink-soft: #57493a;
+  --ink-faint: #6f6350;
   --line: #dccfae;
   --wax: #9c2b2e;          /* wax-seal red */
   --wax-deep: #7a1f22;
-  --brass: #a97e1f;        /* brass */
+  --brass: #7d5f16;        /* brass */
   --brass-soft: #c9a24a;
   --green: #2f7a3d;
   --radius: 12px;
@@ -204,7 +204,7 @@ textarea { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .85
 :focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
 
 /* Skip link: the first Tab stop on the page — parked off-screen until keyboard focus reveals it (fleet skip-link pass). */
-.skip-link { position: absolute; left: 12px; top: -64px; z-index: 1000; padding: 10px 16px; border: 2px solid var(--brass); border-radius: 8px; background: #0b0e14; color: var(--brass); font-weight: 700; text-decoration: none; transition: top .15s ease; }
+.skip-link { position: absolute; left: 12px; top: -64px; z-index: 1000; padding: 10px 16px; border: 2px solid var(--brass-soft); border-radius: 8px; background: #0b0e14; color: var(--brass-soft); font-weight: 700; text-decoration: none; transition: top .15s ease; }
 .skip-link:focus-visible { top: 12px; }
 main:focus { outline: none; }
 

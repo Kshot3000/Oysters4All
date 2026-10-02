@@ -60,7 +60,7 @@ main, #inv-verify-wrap { max-width: 820px; margin: 0 auto; padding: 0 16px; }
 .paper h2 { margin-top: 0; color: var(--pine-800); border-bottom: 1px solid var(--gold); padding-bottom: 8px; }
 .paper h3 { color: var(--pine-700); margin-bottom: 6px; }
 .lede { font-style: italic; color: #5a4f35; }
-.dim { color: #7a6c4d; font-size: 0.9rem; }
+.dim { color: #6e6040; font-size: 0.9rem; }
 .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.85rem; overflow-wrap: anywhere; }
 .gold-ink { color: #8a6d14; }
 .strong { font-weight: bold; }
@@ -131,6 +131,7 @@ main, #inv-verify-wrap { max-width: 820px; margin: 0 auto; padding: 0 16px; }
 
 .ledger-foot { text-align: center; padding: 26px 16px 40px; color: var(--cream-dim); }
 .ledger-foot a { color: var(--gold-bright); }
+.ledger-foot .dim { color: var(--cream-dim); }
 
 /* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
 :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }

@@ -171,7 +171,7 @@ button {
 }
 button:hover { border-color: var(--gold-dim); }
 button.primary {
-  background: linear-gradient(180deg, #b8912a, var(--gold-dim));
+  background: linear-gradient(180deg, #b8912a, #9a8643);
   border-color: var(--gold);
   color: #0a1f14;
   font-weight: 700;
