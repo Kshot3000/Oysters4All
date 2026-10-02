@@ -132,3 +132,6 @@ pre.code {
   .kv { grid-template-columns: 1fr; }
   .top h1 { font-size: 30px; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }

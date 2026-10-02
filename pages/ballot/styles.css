@@ -166,3 +166,6 @@ footer code { color: var(--bronze-hi); overflow-wrap: anywhere; }
   .total-row { grid-template-columns: 1fr; gap: 0.2rem; }
   .topbar { position: static; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--bronze); outline-offset: 2px; }

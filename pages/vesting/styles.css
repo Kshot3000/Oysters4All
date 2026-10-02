@@ -113,3 +113,6 @@ footer code { font-size: .75rem; word-break: break-all; }
   .panel { padding: 1rem; }
   .form-grid { grid-template-columns: 1fr; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }

@@ -176,3 +176,6 @@ footer code { font-size: .8rem; }
   .gift-card { box-shadow: none; border-radius: 0; width: 100%; }
   .gc-front, .gc-back { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

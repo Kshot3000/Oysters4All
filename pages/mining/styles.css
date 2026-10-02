@@ -176,3 +176,6 @@ pre.code { background: var(--panel-2); border: 1px solid var(--line); border-rad
   padding: 0.5rem 0.8rem; font-size: 0.78rem; overflow-wrap: anywhere; }
 .footer { border-top: 1px solid var(--line); padding: 1.25rem 0 2rem; color: var(--muted);
   font-size: 0.82rem; text-align: center; position: relative; z-index: 1; }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

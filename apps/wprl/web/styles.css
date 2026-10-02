@@ -261,3 +261,6 @@ footer { margin-top: 70px; border-top: 1px solid var(--line); padding: 34px 6px 
   section.panel { padding: 22px 18px; }
   .hero { padding-top: 56px; }
 }
+
+/* Keyboard focus: a visible ring in the bridge glow accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--glow); outline-offset: 2px; }

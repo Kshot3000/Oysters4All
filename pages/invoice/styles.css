@@ -131,3 +131,6 @@ main, #inv-verify-wrap { max-width: 820px; margin: 0 auto; padding: 0 16px; }
 
 .ledger-foot { text-align: center; padding: 26px 16px 40px; color: var(--cream-dim); }
 .ledger-foot a { color: var(--gold-bright); }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }

@@ -155,3 +155,6 @@ footer .hint { font-style: italic; max-width: 720px; margin: 10px auto 0; }
 [hidden] { display: none !important; }
 
 .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--brass-400); outline-offset: 2px; }

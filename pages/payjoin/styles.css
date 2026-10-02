@@ -122,3 +122,6 @@ input:focus, textarea:focus { outline: 2px solid var(--teal); outline-offset: 1p
 .pj-footer a { color: var(--cyan); }
 .pj-tip code { font-family: var(--mono); font-size: .75rem; color: var(--gold); word-break: break-all; }
 [hidden] { display: none !important; }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }

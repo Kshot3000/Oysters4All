@@ -158,3 +158,6 @@ footer code { color: var(--text); font-size: 0.78rem; word-break: break-all; }
   .panel { padding: 1rem; }
   .topbar { padding: 0.8rem; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }

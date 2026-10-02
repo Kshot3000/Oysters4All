@@ -150,3 +150,6 @@ footer a { color: var(--copper-hot); }
 footer .donate { margin: 8px 0; }
 footer .donate .mono { color: var(--dim); font-size: 0.78rem; word-break: break-all; }
 footer .dim { color: var(--faint); font-size: 0.78rem; }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--rose); outline-offset: 2px; }

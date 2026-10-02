@@ -146,3 +146,6 @@ footer .addr { color: var(--beam); font-size: 12px; word-break: break-all; }
   .topbar { padding: 14px; }
   .tbl .num { white-space: nowrap; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }

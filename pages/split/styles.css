@@ -147,3 +147,6 @@ footer {
 }
 footer a { color: var(--brass-hi); }
 footer .fine { font-size: .8rem; color: #8a744e; max-width: 700px; margin: .8rem auto 0; line-height: 1.5; }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }

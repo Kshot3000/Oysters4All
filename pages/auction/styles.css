@@ -159,3 +159,6 @@ details summary { cursor: pointer; color: var(--brass2); font-size: .9rem; }
 footer { text-align: center; color: var(--dim); font-size: .85rem; padding: 2rem 1rem; border-top: 1px solid var(--line); }
 footer a { color: var(--brass); }
 footer code { font-size: .78rem; word-break: break-all; }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }

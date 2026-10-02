@@ -324,3 +324,6 @@ footer.site p { margin: 0.45rem 0; }
   header.top h1 { font-size: 1.5rem; }
   .kv { grid-template-columns: 1fr; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }

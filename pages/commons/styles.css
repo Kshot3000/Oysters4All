@@ -115,3 +115,6 @@ button.danger-btn { background: transparent; color: var(--warn); border: 1px sol
 footer { border-top: 1px solid var(--line); padding: 1.6rem 1rem 2.4rem; text-align: center; color: var(--muted); font-size: .88rem; }
 footer a { color: var(--amber); }
 .donate code { background: var(--panel); padding: .3rem .5rem; border-radius: 5px; }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }

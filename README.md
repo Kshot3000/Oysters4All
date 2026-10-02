@@ -56,7 +56,14 @@ outline: no page skips a heading level anymore (the honest-limits panels in
 Burn, Hush, Mesh, Pact, Sighash, and Will are now `<h2>`s, and six panel
 sub-headings in Auction, Ballot, Policy, and Raffle were promoted from
 `<h4>` to `<h3>`), with computed styles verified identical in a real
-browser — the outline changed, the pixels didn't.
+browser — the outline changed, the pixels didn't. A fourth pass the same day
+gave every page a visible keyboard-focus ring: a global `:focus-visible`
+outline (2px, offset 2px) in each app's own accent color on buttons, links,
+tabs, and cards — previously only 3 of 77 pages defined one, so keyboard
+users relied on the browser default, which is easy to lose against the
+fleet's dark, glowing surfaces. Verified in a real browser on all 77 pages:
+the first focusable element on every page matches `:focus-visible` and
+renders the ring, with zero console errors.
 
 ## Support this work
 

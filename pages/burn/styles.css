@@ -162,3 +162,6 @@ footer .fine { font-size: 0.75rem; margin-top: 0.4rem; }
   .kv { grid-template-columns: 1fr; }
   .kv > span { font-weight: 600; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }

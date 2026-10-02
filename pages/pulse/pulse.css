@@ -135,3 +135,6 @@ input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--teal); }
   .big-num { font-size: 26px; }
   .topnav a { margin-left: 12px; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }

@@ -211,3 +211,6 @@ input:focus { outline: 2px solid var(--brass-dim); border-color: var(--brass); }
   .dlg-body { grid-template-columns: 1fr; }
   .wall { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }

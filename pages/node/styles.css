@@ -220,3 +220,6 @@ pre.relay {
   table.peers { font-size: .74rem; }
   table.peers th:nth-child(n+6), table.peers td:nth-child(n+6) { display: none; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }

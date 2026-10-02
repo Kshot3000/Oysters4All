@@ -120,3 +120,6 @@ footer .donate code { font-size: .75rem; color: var(--brass-hi); word-break: bre
 }
 
 .warnings { background: #3a2a12; border: 1px solid var(--brass-dim); color: #f2cd7e; padding: .7rem 1rem; border-radius: 8px; margin: .8rem 0; }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }

@@ -173,3 +173,6 @@ footer code { color: var(--teal); font-size: 0.78rem; word-break: break-all; }
   .dashboard { grid-template-columns: repeat(2, 1fr); }
   .review { grid-template-columns: 1fr; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }

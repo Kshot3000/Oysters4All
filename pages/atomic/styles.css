@@ -152,3 +152,6 @@ footer .donate code { font-size: .75rem; color: var(--brass-hi); word-break: bre
 .hint { font-size: .82rem; color: var(--muted); }
 .hint-inline { font-size: .78rem; color: var(--muted); font-weight: normal; }
 @media (max-width: 700px) { .role-pick { grid-template-columns: 1fr; } }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }

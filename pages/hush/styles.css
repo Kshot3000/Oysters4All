@@ -183,3 +183,6 @@ footer code { color: var(--peri-soft); word-break: break-all; } /* tip address m
   h1 { font-size: 1.4rem; }
   main { padding: 18px 14px 48px; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--peri); outline-offset: 2px; }

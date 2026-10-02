@@ -126,3 +126,6 @@ footer a { color: var(--gold); }
   .kv > div { grid-template-columns: 1fr; }
   .kv dt { font-size: 0.85rem; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }

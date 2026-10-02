@@ -183,3 +183,6 @@ code.address { font-family: var(--mono); font-size: 0.78rem; background: var(--b
   .footer-grid { grid-template-columns: 1fr; }
   .input-row { grid-template-columns: 1fr; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }

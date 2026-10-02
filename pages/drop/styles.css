@@ -202,3 +202,6 @@ footer .donate code { color: var(--aqua); font-size: 13px; word-break: break-all
   .kv { grid-template-columns: 1fr; }
   .hero h1 { font-size: 32px; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }

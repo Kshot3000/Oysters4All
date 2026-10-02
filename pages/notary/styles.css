@@ -116,3 +116,6 @@ footer a { color: var(--brass-hi); }
   .topbar { padding: .8rem; }
   .steps button { padding: .35rem .6rem; font-size: .78rem; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }

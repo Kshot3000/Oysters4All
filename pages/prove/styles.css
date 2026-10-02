@@ -199,3 +199,6 @@ textarea { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .85
 .err { color: var(--wax); font-weight: bold; margin-top: 12px; }
 .spin { display: inline-block; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }

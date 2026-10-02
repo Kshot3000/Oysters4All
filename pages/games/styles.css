@@ -99,3 +99,6 @@ footer .foot-note{margin-top:10px;font-size:12px}
 .qr-wrap{display:flex;gap:14px;align-items:center;margin-top:10px;flex-wrap:wrap}
 .qr-wrap canvas,.qr-wrap img{border:1px solid var(--line);border-radius:8px;background:#fff;padding:6px}
 .status-line{font-size:13px;margin:8px 0;font-family:var(--mono)}
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }

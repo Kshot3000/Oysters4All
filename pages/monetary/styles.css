@@ -173,3 +173,6 @@ footer a { color: var(--gold); }
   .hero h1 { font-size: 2rem; }
   .stat .v { font-size: 1.25rem; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }

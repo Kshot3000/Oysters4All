@@ -185,3 +185,6 @@ footer { text-align: center; color: var(--dim); font-size: 13px; padding: 10px 1
 footer a { color: var(--ember-hot); }
 footer .donate { margin: 8px 0; }
 footer .donate .mono { font-size: 12px; word-break: break-all; }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }

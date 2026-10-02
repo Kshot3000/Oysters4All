@@ -166,3 +166,6 @@ footer .donate code { font-size: .75rem; color: var(--cyan-hi); word-break: brea
   .claim-grid { grid-template-columns: 1fr; }
   .topbar { position: static; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }

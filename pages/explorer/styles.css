@@ -176,3 +176,6 @@ pre.code {
   .kv div { grid-template-columns: 1fr; gap: 0.15rem; }
   .nav { display: none; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

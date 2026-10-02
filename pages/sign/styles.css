@@ -164,3 +164,6 @@ summary { cursor: pointer; color: var(--mint); font-weight: 600; font-size: 0.9r
 .footer-in { display: flex; flex-direction: column; gap: 8px; }
 .donate code { color: var(--ink); word-break: break-all; }
 .txid { word-break: break-all; color: var(--mint); }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }

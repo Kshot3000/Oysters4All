@@ -164,3 +164,6 @@ footer code { font-size: 12px; word-break: break-all; }
   .printonly h1 { color: #111; }
   .receipt-card { border: 1px solid #999; background: none; break-inside: avoid; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }

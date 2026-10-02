@@ -107,3 +107,6 @@ footer .donate code { font-size: .75rem; color: var(--amber-hi); word-break: bre
   .topbar { position: static; }
   table.keys { display: block; overflow-x: auto; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }

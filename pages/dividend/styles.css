@@ -122,3 +122,6 @@ footer code { color: var(--gold-hi); word-break: break-all; }
   .kv > div { grid-template-columns: 1fr; gap: .1rem; }
   .topbar { position: static; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }

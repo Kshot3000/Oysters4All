@@ -279,3 +279,6 @@ footer code { font-family: var(--mono); color: var(--gold-soft); font-size: 0.8r
   .grid .span2, .grid .span3 { grid-column: span 1; }
   .hero h1 { font-size: 1.8rem; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }

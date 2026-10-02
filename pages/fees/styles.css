@@ -209,3 +209,6 @@ footer .donate { font-family: var(--mono); font-size: 0.78rem; word-break: break
   .hero h1 { font-size: 1.8rem; }
   .grid2 { grid-template-columns: 1fr; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }

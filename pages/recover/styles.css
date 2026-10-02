@@ -158,3 +158,6 @@ footer a:hover { text-decoration: underline; }
   .grid { grid-template-columns: 1fr; }
   h1 { font-size: 1.8rem; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }

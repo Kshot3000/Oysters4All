@@ -235,3 +235,6 @@ footer .dim { opacity: 0.75; }
   h1 { font-size: 1.8rem; }
   .hrow { grid-template-columns: 96px 1fr 90px; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }

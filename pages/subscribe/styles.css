@@ -112,3 +112,6 @@ footer .donate code { font-size: .78rem; word-break: break-all; }
 footer .hint { font-size: .8rem; }
 .copy-btn { margin-left: .5rem; }
 @media (max-width: 640px) { .form-grid { grid-template-columns: 1fr; } }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--copper); outline-offset: 2px; }

@@ -184,3 +184,6 @@ select { width: auto; min-width: 120px; }
   padding: 10px 22px; border-radius: 999px; font-size: .9rem; z-index: 50;
   box-shadow: 0 8px 30px rgba(0,0,0,.5);
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }

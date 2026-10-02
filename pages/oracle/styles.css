@@ -171,3 +171,6 @@ body {
 .foot { text-align: center; padding: 1.6rem 1rem 2.4rem; color: var(--faint); font-size: .85rem; }
 .foot a { color: var(--amber); }
 .donate { margin-top: .4rem; }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }

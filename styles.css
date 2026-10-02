@@ -293,3 +293,6 @@ code { font-family: var(--mono); font-size: 0.88em; background: rgba(111, 211, 2
   border-radius: 999px;
   vertical-align: middle;
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

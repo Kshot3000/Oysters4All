@@ -205,3 +205,6 @@ footer {
 footer a { color: var(--brass); }
 footer .donate code { color: var(--amber-hot); word-break: break-all; }
 footer .hint { margin-top: 8px; }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }

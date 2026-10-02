@@ -204,3 +204,6 @@ footer code { color: var(--chalk-dim); word-break: break-all; }
   .panel { padding: 1rem; }
   .steps { margin-left: 0; }
 }
+
+/* Keyboard focus: a visible ring in this app's accent on every interactive element (fleet focus-visible pass). */
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
