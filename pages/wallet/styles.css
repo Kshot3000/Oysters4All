@@ -376,3 +376,8 @@ a { color: #8fb0ff; }
 main:focus { outline: none; }
 /* Skip-link bridge: while onboarding/lock is the visible view, the skip link lands focus on that view section — suppress the full-screen outline. */
 #view-onboarding:focus, #view-lock:focus { outline: none; }
+
+/* Reduced motion: when the OS asks for reduced motion, animations and transitions finish near-instantly and scrolling is not smoothed (fleet reduced-motion pass). Near-zero durations — not animation: none — so fade-ins still land on their end state and no content can be stranded invisible. Extends this page's targeted reduced-motion rules above. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}

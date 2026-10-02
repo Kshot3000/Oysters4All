@@ -60,7 +60,7 @@
       b.classList.toggle("active", s === step);
       if (steps.indexOf(s) < steps.indexOf(step)) b.classList.add("done");
     });
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth") });
   }
   document.querySelectorAll("#steps button").forEach((b) => b.addEventListener("click", () => goto(b.dataset.step)));
 

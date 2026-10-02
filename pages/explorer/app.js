@@ -143,7 +143,7 @@
         list.appendChild(li);
       });
       $('blockDetail').hidden = false;
-      $('blockDetail').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      $('blockDetail').scrollIntoView({ behavior: (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 'auto' : 'smooth'), block: 'start' });
     }).catch(function (e) {
       showErr(lookupErr, 'Lookup failed: ' + e.message);
     });

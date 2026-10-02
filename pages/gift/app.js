@@ -45,7 +45,7 @@
       b.classList.toggle("done", steps.indexOf(s) < steps.indexOf(step));
     });
     if (step === "card") renderCard();
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth") });
   }
   document.querySelectorAll("#steps button").forEach((b) => b.addEventListener("click", () => goto(b.dataset.step)));
 

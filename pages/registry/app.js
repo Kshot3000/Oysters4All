@@ -195,7 +195,7 @@ function showDetail(handle) {
     $("v-id").value = e.inscriptionId;
     $("v-run").click();
   });
-  $("dir-detail").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  $("dir-detail").scrollIntoView({ behavior: (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: "nearest" });
 }
 
 $("idx-scan").addEventListener("click", async () => {

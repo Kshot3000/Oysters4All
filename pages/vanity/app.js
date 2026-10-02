@@ -37,7 +37,7 @@
       b.classList.toggle("active", b.dataset.step === step);
       if (b.dataset.step === step) b.classList.add("done");
     });
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth") });
   }
   stepBtns.forEach((b) => b.addEventListener("click", () => { if (!state.running) goto(b.dataset.step); }));
 

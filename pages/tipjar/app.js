@@ -114,7 +114,7 @@
     els.verifyResult.hidden = true;
     els.descPanel.hidden = false;
 
-    els.previewPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    els.previewPanel.scrollIntoView({ behavior: (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: "nearest" });
   }
 
   function verify() {

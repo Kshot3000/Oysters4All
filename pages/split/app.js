@@ -34,7 +34,7 @@
     document.querySelectorAll("#steps button").forEach((b) => {
       b.classList.toggle("active", b.dataset.step === name);
     });
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth") });
   }
   function unlock(upto) {
     const idx = ORDER.indexOf(upto);

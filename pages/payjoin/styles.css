@@ -130,3 +130,8 @@ input:focus, textarea:focus { outline: 2px solid var(--teal); outline-offset: 1p
 .skip-link { position: absolute; left: 12px; top: -64px; z-index: 1000; padding: 10px 16px; border: 2px solid var(--gold); border-radius: 8px; background: #0b0e14; color: var(--gold); font-weight: 700; text-decoration: none; transition: top .15s ease; }
 .skip-link:focus-visible { top: 12px; }
 main:focus { outline: none; }
+
+/* Reduced motion: when the OS asks for reduced motion, animations and transitions finish near-instantly and scrolling is not smoothed (fleet reduced-motion pass). Near-zero durations — not animation: none — so fade-ins still land on their end state and no content can be stranded invisible. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}

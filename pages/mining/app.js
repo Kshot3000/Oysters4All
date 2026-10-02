@@ -369,7 +369,7 @@
   });
 
   $('fillLiveBtn').addEventListener('click', function () {
-    document.getElementById('node').scrollIntoView({ behavior: 'smooth' });
+    document.getElementById('node').scrollIntoView({ behavior: (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 'auto' : 'smooth') });
     $('fetchBtn').focus();
   });
 

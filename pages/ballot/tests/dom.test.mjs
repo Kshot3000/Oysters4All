@@ -231,6 +231,6 @@ test("five steps + honest limits + cache-busted assets", () => {
   }
   assert.ok(html.includes('id="honest-limits"'), "honest limits panel");
   assert.ok(html.includes('src="pearl-ballot.bundle.js?v=1"'), "bundle cache key");
-  assert.ok(html.includes('src="app.js?v=1"'), "app.js cache key");
-  assert.ok(html.includes('href="styles.css?v=5"'), "css cache key");
+  assert.ok(html.includes('src="app.js?v=2"'), "app.js cache key");
+  assert.ok(html.includes('href="styles.css?v=6"'), "css cache key");
 });

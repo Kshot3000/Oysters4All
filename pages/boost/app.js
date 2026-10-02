@@ -37,7 +37,7 @@
     b.classList.add("active");
     document.querySelectorAll("main .panel").forEach((p) => p.classList.remove("active"));
     $("tab-" + b.dataset.tab).classList.add("active");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth") });
   });
 
   $("cfg-network").addEventListener("change", (e) => { S.network = e.target.value; });

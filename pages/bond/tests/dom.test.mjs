@@ -301,5 +301,5 @@ test("index.html carries attribution, honest limits, and cache keys", () => {
   assert.match(html, /honest-limits|Honest limits/i, "honest limits panel");
   assert.match(html, /pearl-bond\.bundle\.js\?v=2/, "bundle cache key");
   assert.match(html, /app\.js\?v=2/, "app cache key");
-  assert.match(html, /styles\.css\?v=3/, "css cache key");
+  assert.match(html, /styles\.css\?v=4/, "css cache key");
 });

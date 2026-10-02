@@ -14,7 +14,7 @@
     const e = $("err");
     e.hidden = false;
     e.textContent = String(msg).slice(0, 600);
-    e.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    e.scrollIntoView({ behavior: (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"), block: "nearest" });
   }
   function clearErr() { $("err").hidden = true; $("err").textContent = ""; }
   function toast(msg) {
@@ -53,7 +53,7 @@
     TABNAMES.forEach((n) => { $("panel-" + n).hidden = true; });
     $("panel-" + b.dataset.tab).hidden = false;
     clearErr();
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth") });
   }));
   const gotoTab = (name) => $("tb-" + name).click();
 

@@ -77,7 +77,29 @@ on `<main>`, zero console errors. (Pearl Wallet's `<main>` sits inside its
 app view, so while its onboarding or lock view is showing, the link lands
 focus on that visible view instead; Batch and Payroll no longer scroll to
 their first panel on load, which had moved the first Tab stop past the
-link.)
+link.) A sixth pass the same day made the fleet respect
+`prefers-reduced-motion`: most apps animate — fade-in panels, pulsing
+status lamps, drifting glows, marquee tapes — and scroll smoothly, but
+only a handful honored the OS reduced-motion setting that users with
+vestibular disorders rely on. Every stylesheet now carries a universal
+reduced-motion block: animation and transition durations collapse to
+near-zero (deliberately not `animation: none`, so fade-ins still land on
+their end state and no content can be stranded invisible),
+infinite animations run a single iteration, and smooth scrolling turns
+off; the hub, Pay, and Wallet pages' earlier hand-tuned rules (Pay's
+payment-status text still settles on its final state) are completed by
+the same block, and Pool plus the two Hermes pages carry it inline. The
+21 places in 20 apps that forced `behavior: "smooth"` from JavaScript —
+which the CSS setting cannot reach — now check `matchMedia` and scroll
+instantly under reduced motion instead. Verified in a real browser with
+reduced motion emulated on all 82 pages (80 here, both Hermes pages):
+every computed animation and transition duration is near-zero, every
+iteration count is 1, computed scroll behavior is `auto`, and the one
+element the sweep found at opacity 0 is Wallet's toast, which is hidden
+until shown by design; with the preference off, motion is untouched
+(Auction's 22-second glow drift still runs). All 127 test suites match
+their pre-pass results exactly, and every changed stylesheet and script
+carries a bumped `?v=` cache key.
 
 ## Support this work
 

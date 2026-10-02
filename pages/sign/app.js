@@ -81,7 +81,7 @@ function gotoStep(n) {
     if (s < n) li.classList.add("done");
   });
   panels.forEach((p) => { p.hidden = Number(p.dataset.panel) !== n; });
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  window.scrollTo({ top: 0, behavior: (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth") });
 }
 steps.forEach((li) => li.addEventListener("click", () => gotoStep(Number(li.dataset.step))));
 
