@@ -551,3 +551,6 @@ code { background: rgba(201, 167, 255, 0.1); }
 .skip-link { position: absolute; left: 12px; top: -64px; z-index: 1000; padding: 10px 16px; border: 2px solid var(--accent-2); border-radius: 8px; background: #0b0e14; color: var(--accent-2); font-weight: 700; text-decoration: none; transition: top .15s ease; }
 .skip-link:focus-visible { top: 12px; }
 main:focus { outline: none; }
+
+/* Touch targets (fleet WCAG 2.5.8 pass): standalone nav links measured 22-24px tall in the fleet probe — pad them past the 24px minimum. */
+.nav a { padding: 4px 6px; }

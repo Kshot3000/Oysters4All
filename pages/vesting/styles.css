@@ -126,3 +126,6 @@ main:focus { outline: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
+
+/* Touch targets (fleet WCAG 2.5.8 pass): native checkboxes/radios measured 13-18px in the fleet probe — size them to the 24px minimum. */
+input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; flex: none; }

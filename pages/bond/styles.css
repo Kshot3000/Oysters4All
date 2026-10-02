@@ -127,7 +127,7 @@ textarea { resize: vertical; }
 .copy-btn {
   font-family: inherit; font-size: 0.8rem; cursor: pointer;
   background: transparent; color: var(--gold); border: 1px solid var(--line);
-  border-radius: 2px; padding: 0.2rem 0.6rem; margin-left: 0.5rem;
+  border-radius: 2px; padding: 0.38rem 0.6rem; margin-left: 0.5rem;
 }
 .copy-btn:hover { border-color: var(--gold); }
 

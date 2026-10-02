@@ -99,6 +99,21 @@ element the sweep found at opacity 0 is Wallet's toast, which is hidden
 until shown by design; with the preference off, motion is untouched
 (Auction's 22-second glow drift still runs). All 127 test suites match
 their pre-pass results exactly, and every changed stylesheet and script
+carries a bumped `?v=` cache key. A seventh pass the same day fixed color
+contrast fleet-wide: 4,425 text elements were probed in a real browser and
+every one of the 264 that fell short of WCAG AA (4.5:1 for text, 3:1 for
+large text) was brought up to standard — muted text colors brightened with
+their hue preserved, gradient button stops deepened where white or dark
+text sat on them, and the one light-themed app (Pearl Prove) darkened
+instead. An eighth pass the same day fixed touch-target size (WCAG 2.5.8):
+1,633 interactive elements were measured in a real browser at a phone
+viewport, and all 61 standalone targets under the 24px minimum were padded
+or sized up to it — header nav links in Faucet, Mining, PRL-20 Launcher,
+Prove, Rig, and Sign, Bond's copy buttons, Invoice's row-remove buttons,
+the Hermes landing page's card links, and every native checkbox and radio
+in the fleet (previously 13–18px, now 24px). Links inside a sentence keep
+their inline size, which 2.5.8 explicitly allows. Re-probed after the fix:
+0 standalone targets under 24px remain, and every changed stylesheet
 carries a bumped `?v=` cache key.
 
 ## Support this work

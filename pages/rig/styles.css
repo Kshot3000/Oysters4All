@@ -208,3 +208,6 @@ main:focus { outline: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
+
+/* Touch targets (fleet WCAG 2.5.8 pass): standalone nav links measured 22.8px tall (one 22.1px wide) in the fleet probe — pad them past the 24px minimum. */
+.nav a { padding: 4px 7px; }
