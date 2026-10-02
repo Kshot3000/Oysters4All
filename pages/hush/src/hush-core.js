@@ -235,6 +235,13 @@ const isP2wpkh = (spk) => spk.length === 22 && spk[0] === 0x00 && spk[1] === 0x1
 const isP2sh = (spk) => spk.length === 23 && spk[0] === 0xa9 && spk[1] === 0x14 && spk[22] === 0x87;
 const isP2pkh = (spk) => spk.length === 25 && spk[0] === 0x76 && spk[1] === 0xa9 && spk[2] === 0x14 && spk[23] === 0x88 && spk[24] === 0xac;
 
+// An empty witness string is an empty witness stack: the desk's Send tab
+// advertises scriptSig/witness "(empty ok)" for key-path spends, and the
+// P2TR key-path branch only inspects the stack for script-path evidence.
+function deserWitnessOrEmpty(hex) {
+  return hex ? deserWitness(hex) : [];
+}
+
 /**
  * Extract the eligible public key for an input per BIP-352.
  * vin = { prevoutSpk (hex), scriptSig (hex), txinwitness (hex, may be "") }.
@@ -259,21 +266,21 @@ export function classifyInput(vin) {
     if (scriptSig.length < 2) return null;
     const redeem = scriptSig.slice(1);
     if (!isP2wpkh(redeem)) return null;
-    const wit = deserWitness(vin.txinwitness || "");
+    const wit = deserWitnessOrEmpty(vin.txinwitness);
     if (!wit.length) return null;
     const cand = wit[wit.length - 1];
     if (cand.length !== 33 || (cand[0] !== 0x02 && cand[0] !== 0x03)) return null;
     try { return { kind: "p2sh-p2wpkh", pubkey: secp256k1.ProjectivePoint.fromHex(cand) }; } catch { return null; }
   }
   if (isP2wpkh(spk)) {
-    const wit = deserWitness(vin.txinwitness || "");
+    const wit = deserWitnessOrEmpty(vin.txinwitness);
     if (!wit.length) return null;
     const cand = wit[wit.length - 1];
     if (cand.length !== 33 || (cand[0] !== 0x02 && cand[0] !== 0x03)) return null;
     try { return { kind: "p2wpkh", pubkey: secp256k1.ProjectivePoint.fromHex(cand) }; } catch { return null; }
   }
   if (isP2tr(spk)) {
-    const wit = deserWitness(vin.txinwitness || "");
+    const wit = deserWitnessOrEmpty(vin.txinwitness);
     const stack = [...wit];
     if (stack.length >= 1) {
       if (stack.length > 1 && stack[stack.length - 1][0] === 0x50) stack.pop(); // annex

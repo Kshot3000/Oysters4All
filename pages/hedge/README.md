@@ -75,6 +75,9 @@ commitment).
   localStorage, full write→fund→exercise→verify flow, put role-label swap,
   honest refusals, PROVEN/NOT PROVEN verdicts, @kshot9000 + donation address
   in the footer.
+- Real-browser QA (`hidden_files/qa-hedge-browser.mjs`): 44/44 checks green
+  in headless Chromium 152 (file:// + CDP), zero console/page errors
+  (2026-10-02).
 
 ## Crypto lineage
 

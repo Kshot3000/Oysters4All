@@ -57,11 +57,14 @@
 
   /* ---------- keys tab ---------- */
   function wipeKey() {
+    clearIdentityOnly();
+    $("pid-import-input").value = "";
+  }
+  function clearIdentityOnly() {
     if (key && key.priv) { try { key.priv.fill(0); } catch (e) {} }
     key = null;
     show($("pid-key-out"), false);
     show($("pid-wipe"), false);
-    $("pid-import-input").value = "";
   }
   function loadKey(w, source) {
     wipeKey();
@@ -93,7 +96,13 @@
       setErr("pid-identity-err", "");
       var w = E.idKeyFromInput($("pid-import-input").value);
       loadKey(w, w.source);
-    } catch (e) { setErr("pid-identity-err", String((e && e.message) || e)); }
+    } catch (e) {
+      // A failed import must not leave a stale identity active: the user asked
+      // to switch keys, and signing as the old one afterwards would be a real
+      // footgun. Clear the identity but keep their input so they can fix it.
+      clearIdentityOnly();
+      setErr("pid-identity-err", String((e && e.message) || e));
+    }
   });
   $("pid-wipe").addEventListener("click", wipeKey);
 

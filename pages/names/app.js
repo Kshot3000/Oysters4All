@@ -95,8 +95,8 @@
     var net = E.NETWORKS[regNetwork || "mainnet"];
     var w;
     if (/\s/.test(text)) w = E.walletFromMnemonic(text, net);
-    else if (/^[5KL][1-9A-HJ-NP-Za-km-z]{50,51}$/.test(text) || text.length > 50) w = E.walletFromWIF(text, net);
-    else w = E.walletFromPriv(text.replace(/^0x/, ""), net);
+    else if (/^(0x)?[0-9a-fA-F]{64}$/.test(text)) w = E.walletFromPriv(text.replace(/^0x/, ""), net);
+    else w = E.walletFromWIF(text, net);
     return { priv: w.priv, internalXOnly: w.internalXOnly, address: w.address, xonly: E.bytesToHex(w.internalXOnly), network: regNetwork };
   }
   $("r-prove").addEventListener("click", function () {

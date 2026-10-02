@@ -34,7 +34,7 @@ import {
   tapLeafHash, commitKeyInfo, revealTxVBytes,
   decodeBech32m, encodeBech32m, bytesToHex, hexToBytes, sha256, schnorr,
   tweakKeypath, tweakPrivKeypath,
-  newMnemonic, walletFromMnemonic, walletFromWIF,
+  newMnemonic, walletFromMnemonic, walletFromWIF, walletFromPriv,
   fetchUtxos, fetchFeeRateGrainsPerVByte, broadcastTx,
 } from "../../sign/src/crypto.js";
 import {
@@ -45,7 +45,7 @@ import { utf8ToBytes } from "@noble/hashes/utils";
 
 export {
   NETWORKS, GRAIN_PER_PRL, DUST_GRAIN,
-  newMnemonic, walletFromMnemonic, walletFromWIF,
+  newMnemonic, walletFromMnemonic, walletFromWIF, walletFromPriv,
   fetchUtxos, fetchFeeRateGrainsPerVByte, broadcastTx,
   buildCommitTx, buildRevealTxSigned,
   extractEnvelopes, verifyRevealWitness,
@@ -93,13 +93,14 @@ export const displayName = (name) => `${name}${NAME_SUFFIX}`;
 /* ---------------- canonical binding ---------------- */
 
 /** Seconds-level UTC ISO timestamp sanity window: not before 2026-01-01, not
- *  more than 10 minutes in the future. */
+ *  more than 10 minutes in the future (registered_at). expires_at may be any
+ *  future time — it is the one timestamp allowed to point far ahead. */
 const MIN_TS = Date.UTC(2026, 0, 1) / 1000;
 
-function checkTimestamp(ts, field) {
+function checkTimestamp(ts, field, allowFuture) {
   if (!Number.isInteger(ts)) throw new Error(`${field} must be an integer unix timestamp`);
   if (ts < MIN_TS) throw new Error(`${field} is before the Pearl Names epoch`);
-  if (ts > Math.floor(Date.now() / 1000) + 600)
+  if (!allowFuture && ts > Math.floor(Date.now() / 1000) + 600)
     throw new Error(`${field} is more than 10 minutes in the future`);
 }
 
@@ -112,9 +113,9 @@ export function composeBinding({ name, address, xonly, network, registeredAt, ex
   if (typeof xonly !== "string" || !/^[0-9a-f]{64}$/i.test(xonly))
     throw new Error("xonly must be 64 lowercase hex chars");
   if (typeof network !== "string" || !network) throw new Error("network is required");
-  checkTimestamp(registeredAt, "registered_at");
+  checkTimestamp(registeredAt, "registered_at", false);
   if (expiresAt !== null && expiresAt !== undefined) {
-    checkTimestamp(expiresAt, "expires_at");
+    checkTimestamp(expiresAt, "expires_at", true); // expiry may point years ahead
     if (expiresAt <= registeredAt) throw new Error("expires_at must be after registered_at");
   }
   // Bind the address to the key: decode, re-encode with the SAME program and

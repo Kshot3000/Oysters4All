@@ -117,3 +117,12 @@ table.dir th { color: var(--gold); font-weight: normal; text-transform: uppercas
 
 footer { text-align: center; color: var(--dim); font-size: 0.9rem; padding: 26px 16px 40px; border-top: 1px solid var(--line); }
 footer a { color: var(--gold); }
+
+/* Small screens: let the directory table scroll inside its tab instead of
+ * pushing the page wider than the viewport; stack key/value pairs. */
+@media (max-width: 600px) {
+  #tab-directory { overflow-x: auto; }
+  table.dir { min-width: 620px; }
+  .kv > div { grid-template-columns: 1fr; }
+  .kv dt { font-size: 0.85rem; }
+}

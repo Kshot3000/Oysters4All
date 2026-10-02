@@ -66,6 +66,21 @@ t("composeBinding rejects bad fields", () => {
   throws(() => composeBinding({ ...good, expiresAt: 1788000000 }), "after registered_at");
   throws(() => composeBinding({ ...good, name: "root" }), "reserved");
 });
+t("composeBinding allows expires_at years in the future", () => {
+  const good = { name: "alice", address: W.address, xonly: bytesToHex(W.internalXOnly), network: NET, registeredAt: 1788000000, expiresAt: null };
+  const far = Math.floor(Date.now() / 1000) + 5 * 365 * 86400; // 5 years out
+  const b = composeBinding({ ...good, expiresAt: far });
+  assert.equal(JSON.parse(b.json).expires_at, far);
+  throws(() => composeBinding({ ...good, expiresAt: 1700000000 }), "epoch");
+  // and the verifier rules it VALID ⚠ only when inside the 30-day warning window
+  const soon = Math.floor(Date.now() / 1000) + 10 * 86400;
+  const b2 = composeBinding({ ...good, registeredAt: Math.floor(Date.now() / 1000), expiresAt: soon });
+  const sig = signBinding(W.priv, b2, NETWORKS[NET]);
+  const v = verifySignedBinding({ json: b2.json, sig: bytesToHex(sig) });
+  assert.equal(v.ok, true, JSON.stringify(v.checks.filter((c) => !c.ok)));
+  assert.ok(v.checks.some((c) => c.label === "not expired" && c.warn), "expiring-soon warning expected");
+  assert.ok(v.checks.some((c) => c.label === "not expired" && c.ok));
+});
 t("validateNameRecord round-trips", () => {
   const b = composeBinding({ name: "alice", address: W.address, xonly: bytesToHex(W.internalXOnly), network: NET, registeredAt: 1788000000, expiresAt: null });
   validateNameRecord(JSON.parse(b.json));

@@ -146,7 +146,7 @@ covenant-style contract on top of it.
 ```sh
 node --no-warnings --loader ./tests/loader.mjs --test tests/legacy.test.mjs   # 18/18
 node --no-warnings --loader ./tests/loader.mjs --test tests/dom.test.mjs       # 6/6
-node ../../../../hidden_files/qa-legacy-browser.mjs                            # real-browser QA (hidden_files, not committed)
+node ../../../../hidden_files/qa-legacy-browser.mjs                            # real-browser QA (hidden_files, not committed) — 47/47 checks green (2026-10-02)
 ```
 
 Core tests cover: exact leaf byte vectors, NUMS internal-key properties,

@@ -99,6 +99,11 @@ main { max-width: 1020px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
   display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; margin: 1rem 0;
 }
 .form-grid label.wide { grid-column: 1 / -1; }
+/* grid items must be allowed to shrink below content min-width, or a long
+   <select> option (e.g. the put description) forces the track wider than a
+   phone viewport */
+.form-grid > * { min-width: 0; }
+input, select, textarea { min-width: 0; max-width: 100%; }
 label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.88rem; color: var(--ink-dim); }
 input, select, textarea {
   background: var(--storm-0); border: 1px solid var(--line); color: var(--ink);

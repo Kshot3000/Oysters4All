@@ -66,14 +66,15 @@ registry resolver, and the standalone verifier.
 
 ## Tests
 
-- `node --no-warnings --loader ./tests/loader.mjs tests/names.test.mjs` — 24/24
+- `node --no-warnings --loader ./tests/loader.mjs tests/names.test.mjs` — 25/25
   (name rules, canonical order, wrong-key refusal, tamper rejection, fee math,
   full commit→reveal→envelope→verify round-trip, first-seen resolution).
 - `node tests/dom.test.mjs` — boots the committed bundle in a VM and drives
   the register wizard + verifier DOM flows.
 - Real-browser QA (`hidden_files/qa-names-browser.mjs`): headless Chromium via
-  `file://` + CDP — full name check → demo key → sign → plan → commit/reveal
-  build → witness self-verify, zero console/page errors.
+  `file://` + CDP — 46/46 checks green (2026-10-02): full name check →
+  demo key → sign → plan → commit/reveal build → witness self-verify,
+  zero console/page errors.
 
 Built by [@kshot9000](https://x.com/kshot9000) for the Pearl blockchain.
 Donations: `prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`

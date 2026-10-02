@@ -85,6 +85,7 @@ body {
 }
 .field textarea { min-height: 90px; resize: vertical; }
 .hint { color: var(--dim); font-size: 13px; margin-top: 6px; }
+.hint code { word-break: break-all; }
 .alert { border-radius: 10px; padding: 10px 14px; margin: 12px 0; font-size: 14px; }
 .alert.error { background: #3a1620; border: 1px solid var(--bad); color: #ffc9c9; }
 .alert.ok { background: #0f2c1c; border: 1px solid var(--ok); color: #c9f5d8; }
@@ -92,7 +93,8 @@ body {
 .kv dt { color: var(--dim); }
 .kv dd { margin: 0; word-break: break-all; }
 .addr-row { display: flex; gap: 8px; align-items: center; }
-.addr-row code { flex: 1; word-break: break-all; }
+.addr-row > input { min-width: 0; }
+.addr-row code { flex: 1; min-width: 0; word-break: break-all; }
 code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; color: var(--cyan); }
 .copy-btn {
   padding: 6px 12px; border-radius: 8px; cursor: pointer; white-space: nowrap;
@@ -116,16 +118,16 @@ pre.code {
 .check.warn .cs { background: #2c230f; color: var(--warn); }
 .check.fail .cs { background: #3a1620; color: var(--bad); }
 .check .cn { font-weight: 600; font-size: 14px; }
-.check .cd { color: var(--dim); font-size: 13px; }
+.check .cd { color: var(--dim); font-size: 13px; overflow-wrap: anywhere; }
 .steps { color: var(--dim); padding-left: 22px; }
 .steps li { margin: 8px 0; }
 .steps b, .steps code { color: var(--txt); }
 .notes { color: var(--dim); padding-left: 22px; font-size: 14px; }
 .notes li { margin: 8px 0; }
 .notes code { color: var(--cyan); }
-.foot { text-align: center; color: var(--dim); font-size: 13px; padding: 26px 16px 40px; }
+.foot { text-align: center; color: var(--dim); font-size: 13px; padding: 26px 16px 40px; overflow-wrap: anywhere; }
 .foot a { color: var(--iris); }
-.foot .donate code { color: var(--gold); font-size: 12px; }
+.foot .donate code { color: var(--gold); font-size: 12px; word-break: break-all; }
 @media (max-width: 640px) {
   .kv { grid-template-columns: 1fr; }
   .top h1 { font-size: 30px; }

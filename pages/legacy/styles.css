@@ -189,6 +189,7 @@ nav#steps button.done { border-color: var(--ok); color: var(--ok); }
   font-size: 0.92rem;
   line-height: 1.5;
 }
+.alert code { word-break: break-all; } /* unbroken payloads: descriptor, broadcast JSON */
 .alert.error {
   background: rgba(209, 96, 79, 0.12);
   border: 1px solid var(--bad);
@@ -292,7 +293,7 @@ footer.site {
   font-size: 0.88rem;
 }
 footer.site a { color: var(--gold-bright); }
-footer.site code { color: var(--parchment); font-size: 0.8rem; }
+footer.site code { color: var(--parchment); font-size: 0.8rem; word-break: break-all; } /* donation address is unbroken */
 footer.site p { margin: 0.45rem 0; }
 
 .confirm-banner {

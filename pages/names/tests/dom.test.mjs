@@ -191,8 +191,25 @@ test("verifier: pasted binding rules VALID, witness reveal rules VALID", () => {
   assert.ok(getEl("v-verdict").textContent.includes("VALID"), "witness verdict: " + getEl("v-verdict").textContent);
 });
 
+test("register step 2: raw 64-hex private key proves ownership", () => {
+  // derive the demo wallet's priv as hex through the bundle, then feed it
+  // through the UI's raw-hex key path (was broken: missing export + routed to WIF)
+  setVal("r-name", "hex-path");
+  click("r-check");
+  assert.equal(getEl("r-name-err").hidden, true, "no name error: " + getEl("r-name-err").textContent);
+  const mn = getEl("r-key").value.split(" ").length === 12 ? getEl("r-key").value : N.newMnemonic();
+  const w = N.walletFromMnemonic(mn, N.NETWORKS.mainnet);
+  setVal("r-key", N.bytesToHex(w.priv));
+  click("r-prove");
+  assert.equal(getEl("r-prove-err").hidden, true, "no prove error: " + getEl("r-prove-err").textContent);
+  assert.equal(getEl("r-proof").hidden, false);
+  assert.match(getEl("r-proof-id").textContent, /^[0-9a-f]{64}$/);
+  assert.ok(getEl("r-proof-json").value.includes(w.address), "bound to the hex key's address");
+});
+
 test("bundle API surface sanity", () => {
   assert.equal(typeof N.validateName, "function");
+  assert.equal(typeof N.walletFromPriv, "function");
   assert.equal(typeof N.signBinding, "function");
   assert.equal(typeof N.verifySignedBinding, "function");
   assert.equal(typeof N.resolveRegistry, "function");

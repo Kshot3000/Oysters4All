@@ -216,5 +216,6 @@ test("honest limits + footer attribution present", () => {
   assert.ok(html.includes("@kshot9000"), "X attribution");
   assert.ok(html.includes("prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d"), "exact PRL address in footer");
   assert.ok(html.includes("pearl-id.bundle.js?v=1"), "bundle cache key");
-  assert.ok(html.includes("app.js?v=1"), "app cache key");
+  assert.ok(html.includes("app.js?v=2"), "app cache key");
+  assert.ok(html.includes("styles.css?v=2"), "stylesheet cache key");
 });

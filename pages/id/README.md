@@ -53,7 +53,7 @@ committed `pearl-id.bundle.js` (`window.PearlID`).
 
 ## Files
 
-- `index.html` / `styles.css` / `app.js` — the desk (`?v=1` cache keys)
+- `index.html` / `styles.css` / `app.js` — the desk (`?v=2` cache keys; bundle stays `?v=1`)
 - `src/id-core.js` — protocol core (canonicalization, sign, verify)
 - `src/index.js` — bundle entry (`window.PearlID`)
 - `build.mjs` — esbuild bundle script (resolves `../sign` import map)
@@ -62,6 +62,7 @@ committed `pearl-id.bundle.js` (`window.PearlID`).
 - `tests/loader.mjs` — node ESM loader reusing `../sign` vendored libs
 
 Run tests: `node --no-warnings --loader ./tests/loader.mjs --test tests/id.test.mjs tests/dom.test.mjs`
+Real-browser QA: `node ../../../../hidden_files/qa-id-browser.mjs` — 40/40 checks green in headless Chromium 152 (file:// + CDP), zero console/page errors (2026-10-02)
 Rebuild: `node build.mjs`
 
 Built by [@kshot9000](https://x.com/kshot9000) · PRL tips: `prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`

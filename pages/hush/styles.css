@@ -176,7 +176,7 @@ footer {
 }
 footer a { color: var(--peri-soft); }
 footer .fine { color: var(--ink-faint); font-size: 0.82rem; max-width: 70ch; margin: 8px auto 0; }
-footer code { color: var(--peri-soft); }
+footer code { color: var(--peri-soft); word-break: break-all; } /* tip address must wrap on narrow screens */
 
 @media (max-width: 640px) {
   .topbar { padding: 18px; }

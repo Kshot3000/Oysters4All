@@ -62,6 +62,7 @@ var PearlNames = (() => {
     verifyRevealWitness: () => verifyRevealWitness,
     verifySignedBinding: () => verifySignedBinding,
     walletFromMnemonic: () => walletFromMnemonic,
+    walletFromPriv: () => walletFromPriv,
     walletFromWIF: () => walletFromWIF
   });
 
@@ -6236,10 +6237,10 @@ zoo`.split("\n");
   }
   var displayName = (name) => `${name}${NAME_SUFFIX}`;
   var MIN_TS = Date.UTC(2026, 0, 1) / 1e3;
-  function checkTimestamp(ts, field) {
+  function checkTimestamp(ts, field, allowFuture) {
     if (!Number.isInteger(ts)) throw new Error(`${field} must be an integer unix timestamp`);
     if (ts < MIN_TS) throw new Error(`${field} is before the Pearl Names epoch`);
-    if (ts > Math.floor(Date.now() / 1e3) + 600)
+    if (!allowFuture && ts > Math.floor(Date.now() / 1e3) + 600)
       throw new Error(`${field} is more than 10 minutes in the future`);
   }
   function composeBinding({ name, address, xonly, network, registeredAt, expiresAt }) {
@@ -6248,9 +6249,9 @@ zoo`.split("\n");
     if (typeof xonly !== "string" || !/^[0-9a-f]{64}$/i.test(xonly))
       throw new Error("xonly must be 64 lowercase hex chars");
     if (typeof network !== "string" || !network) throw new Error("network is required");
-    checkTimestamp(registeredAt, "registered_at");
+    checkTimestamp(registeredAt, "registered_at", false);
     if (expiresAt !== null && expiresAt !== void 0) {
-      checkTimestamp(expiresAt, "expires_at");
+      checkTimestamp(expiresAt, "expires_at", true);
       if (expiresAt <= registeredAt) throw new Error("expires_at must be after registered_at");
     }
     const d = decodeBech32m(address, network === "mainnet" ? "prl" : network === "testnet" ? "tprl" : "rprl");

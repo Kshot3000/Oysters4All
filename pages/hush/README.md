@@ -34,7 +34,7 @@ on a midnight-indigo "hush" theme (nocturnal, soft glow, quiet).
   BIP's own `reference.py` and its test harness.
 - The shipped bundle (`pearl-hush.bundle.js`) is **code-only** — the official
   `vectors-bip352.json` never ships to the browser. All 28 official vectors
-  pass in the repo's node suite (`tests/hush.test.mjs`, 342/342): sending
+  pass in the repo's node suite (`tests/hush.test.mjs`, 343/343): sending
   output-sets vs candidates, shared secrets, input sums/pubkeys byte-exact;
   receiving address re-encoding, found-output sets, shared secret/tweak/input-sum
   pins, vector schnorr signatures re-verified under derived spend keys,
@@ -73,7 +73,7 @@ on a midnight-indigo "hush" theme (nocturnal, soft glow, quiet).
   `?v=` cache keys, bumped on every change).
 - `src/` — `hush-core.js` (the BIP-352 engine), `index.js`, `vectors-bip352.json`
   (official vectors, test-only — never bundled), `build.mjs`.
-- `tests/hush.test.mjs` — 342 vector/property tests; `tests/dom.test.mjs` —
+- `tests/hush.test.mjs` — 343 vector/property tests; `tests/dom.test.mjs` —
   76 bundle-boot/wiring tests.
 - `pearl-hush.bundle.js` — the built code-only bundle.
 - `qrcode.min.js` — vendored QR generator.
@@ -81,6 +81,7 @@ on a midnight-indigo "hush" theme (nocturnal, soft glow, quiet).
 ## Running the tests
 
 ```sh
-node --loader ./tests/loader.mjs --test tests/hush.test.mjs   # 342/342
+node --loader ./tests/loader.mjs --test tests/hush.test.mjs   # 343/343
 node --no-warnings --loader ./tests/loader.mjs tests/dom.test.mjs  # 76/76
+node ../../../../hidden_files/qa-hush-browser.mjs                  # 37/37 checks, headless Chromium 152, zero console/page errors (2026-10-02)
 ```

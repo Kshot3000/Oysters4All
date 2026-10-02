@@ -279,6 +279,36 @@ describe("sender refusals", () => {
     const res = H.senderCreateOutputs({ inputs: [p2trIn("aa".repeat(32))], recipients: [{ address: addr }], taprootOnly: true });
     assert.equal(res.outputs.length, 1);
   });
+  it("empty txinwitness is an empty stack: taproot input with (empty ok) witness accepted", () => {
+    // The Send tab advertises scriptSig/witness "(empty ok)" for key-path spends;
+    // the P2TR branch must treat "" as an empty witness stack, not fail with
+    // "witness truncated". The shared secret must equal the explicit-witness case.
+    const tw = H.tapTweakPrivkey("44".repeat(32)); // consistent taproot key material
+    const mkIn = (txid, wit) => ({
+      txid, vout: 0,
+      prevoutSpk: "5120" + tw.tweakedXonlyHex,
+      scriptSig: "", txinwitness: wit,
+      privkey: tw.tweakedPrivHex,
+    });
+    const bare = mkIn("aa".repeat(32), "");
+    assert.equal(H.classifyInput(bare).kind, "p2tr");
+    const res = H.senderCreateOutputs({ inputs: [bare], recipients: [{ address: addr }], taprootOnly: true });
+    const ref = H.senderCreateOutputs({
+      inputs: [mkIn("aa".repeat(32), "01" + "40" + "ab".repeat(64))],
+      recipients: [{ address: addr }], taprootOnly: true });
+    assert.equal(res.outputs.length, 1);
+    assert.equal(res.outputs[0].pubkeyXonly, ref.outputs[0].pubkeyXonly);
+    assert.equal(res.inputHash, ref.inputHash);
+    assert.deepEqual(res.sharedSecrets, ref.sharedSecrets);
+    // receiver scan with the empty-witness vin still finds the payment
+    const scan = H.receiverScan({
+      bscanHex: "22".repeat(32), bspendHex: "33".repeat(32), labelMs: [],
+      vins: [{ txid: "aa".repeat(32), vout: 0, prevoutSpk: bare.prevoutSpk, scriptSig: "", txinwitness: "" }],
+      outputs: [res.outputs[0].pubkeyXonly],
+    });
+    assert.equal(scan.matches.length, 1);
+    assert.equal(scan.matches[0].pubkeyXonly, res.outputs[0].pubkeyXonly);
+  });
   it("empty inputs refused", () => {
     assert.throws(() => H.senderCreateOutputs({ inputs: [], recipients: [{ address: addr }] }), /at least one input/);
   });

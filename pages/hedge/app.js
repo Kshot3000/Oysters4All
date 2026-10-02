@@ -452,7 +452,7 @@
         $("t-countdown").textContent = "";
       }
       $("t-out").hidden = false;
-    } catch (e) { showErr("t-err", e.message); }
+    } catch (e) { showErr("t-err", "lifecycle scan failed: " + e.message); }
   });
 
   /* ---------- VERIFY ---------- */
