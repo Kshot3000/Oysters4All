@@ -96,6 +96,7 @@
       const input = document.createElement("input");
       input.type = "text"; input.autocomplete = "off"; input.spellcheck = false;
       input.placeholder = "64-hex x-only pubkey · priv hex · WIF · mnemonic";
+      input.setAttribute("aria-label", "Cosigner " + i + " key");
       const lab = document.createElement("label");
       lab.className = "priv";
       lab.title = "Tick if this row holds YOUR private key (lets you sign later)";

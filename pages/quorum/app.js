@@ -84,7 +84,7 @@
       const row = document.createElement("div");
       row.className = "key-row";
       row.innerHTML = `<span class="slot">Slot ${i + 1}</span>` +
-        `<input data-key="${i}" autocomplete="off" spellcheck="false" placeholder="64-hex x-only or 66-hex compressed pubkey">`;
+        `<input data-key="${i}" aria-label="Slot ${i + 1} pubkey" autocomplete="off" spellcheck="false" placeholder="64-hex x-only or 66-hex compressed pubkey">`;
       box.appendChild(row);
     }
     const mSel = $("v-m");

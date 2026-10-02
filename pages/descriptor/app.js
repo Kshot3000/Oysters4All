@@ -171,7 +171,12 @@
   });
 
   /* footer tip copy */
-  $("tip-addr").addEventListener("click", () => {
+  const tipEl = $("tip-addr");
+  tipEl.setAttribute("aria-label", "Copy tip address: " + tipEl.textContent.trim());
+  tipEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tipEl.click(); }
+  });
+  tipEl.addEventListener("click", () => {
     const t = $("tip-addr").textContent;
     if (navigator.clipboard) navigator.clipboard.writeText(t).catch(() => {});
   });

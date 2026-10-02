@@ -206,7 +206,7 @@
         <div class="card">
           <div class="toggle-row">
             <div><strong>Demo mode</strong><br><span class="muted small">Deterministic simulated tokens, listings and trades.</span></div>
-            <label class="switch"><input type="checkbox" id="set-demo" ${settings.demo ? "checked" : ""}><span class="track"></span></label>
+            <label class="switch"><input type="checkbox" id="set-demo" aria-label="Demo mode" ${settings.demo ? "checked" : ""}><span class="track"></span></label>
           </div>
           <div class="field" style="margin-top:1rem">
             <label for="set-indexer">Pearlscriptions indexer base URL</label>
@@ -558,9 +558,9 @@
 
     function showFillForm() {
     $("#fill-body", m).innerHTML = `
-      <div class="field"><label>Your Pearl address (buyer)</label>
+      <div class="field"><label for="fill-buyer">Your Pearl address (buyer)</label>
         <input id="fill-buyer" class="mono" value="${esc(settings.address)}" placeholder="prl1..."></div>
-      <div class="field"><label>Your key (mnemonic, WIF, or hex — memory only, never stored)</label>
+      <div class="field"><label for="fill-key">Your key (mnemonic, WIF, or hex — memory only, never stored)</label>
         <input id="fill-key" type="password" placeholder="paste key to sign" autocomplete="off"></div>
       <div id="fill-quote"></div>
       <div style="display:flex;gap:0.75rem;margin-top:1rem">
@@ -712,9 +712,9 @@
       show(`
         <h2>Who is selling?</h2>
         <p class="muted">Your keys stay in memory only — they are never stored or sent anywhere. You need the key that controls the lot's address to presign the listing.</p>
-        <div class="field"><label>Your Pearl address</label>
+        <div class="field"><label for="w-address">Your Pearl address</label>
           <input id="w-address" class="mono" value="${esc(W.address)}" placeholder="prl1..."></div>
-        <div class="field"><label>Key for this address (mnemonic, WIF, or hex priv) — needed at signing</label>
+        <div class="field"><label for="w-key">Key for this address (mnemonic, WIF, or hex priv) — needed at signing</label>
           <input id="w-key" type="password" placeholder="paste when ready to sign" autocomplete="off">
           <p class="hint">You can pick the lot first and paste the key at the review step.</p></div>
         <div class="wizard-nav"><span></span><button class="btn btn-primary" id="w-next" type="button">Continue</button></div>`);
@@ -746,8 +746,8 @@
         <h3>Or create a new transfer lot</h3>
         <p class="muted small">Inscribe a <span class="mono">transfer</span> op (commit + reveal) from your available balance. Needs Blockbook for UTXOs/fees and your key.</p>
         <div class="input-row">
-          <div class="field"><label>Tick</label><input id="nl-tick" value="${esc(W.tick)}" placeholder="prls"></div>
-          <div class="field"><label>Amount (base units)</label><input id="nl-amt" placeholder="100000"></div>
+          <div class="field"><label for="nl-tick">Tick</label><input id="nl-tick" value="${esc(W.tick)}" placeholder="prls"></div>
+          <div class="field"><label for="nl-amt">Amount (base units)</label><input id="nl-amt" placeholder="100000"></div>
         </div>
         <button class="btn btn-ghost" id="nl-go" type="button">Inscribe transfer lot</button>
         <div id="nl-status" style="margin-top:1rem"></div>
@@ -856,12 +856,12 @@
         <h2>Set the price</h2>
         <p class="muted">Selling <strong>${esc(M.fmtInt(W.amt))}</strong> base units of <strong>${esc(W.tick.toUpperCase())}</strong>.</p>
         <div class="input-row">
-          <div class="field"><label>Price per whole token (PRL)</label>
+          <div class="field"><label for="p-per">Price per whole token (PRL)</label>
             <input id="p-per" inputmode="decimal" placeholder="0.025" value="${esc(W.pricePerToken)}"></div>
-          <div class="field"><label>Token decimals</label>
+          <div class="field"><label for="p-dec">Token decimals</label>
             <input id="p-dec" inputmode="numeric" value="${decimals}"></div>
         </div>
-        <div class="field"><label>Listing duration</label>
+        <div class="field"><label for="p-exp">Listing duration</label>
           <select id="p-exp">
             <option value="1">24 hours</option>
             <option value="7" selected>7 days</option>
@@ -914,7 +914,7 @@
         <div class="banner info">Your signature uses <span class="mono">SIGHASH_SINGLE | ANYONECANPAY (0x83)</span>:
           it commits to the lot outpoint and this exact price output — nothing else.
           The buyer appends their own inputs; they cannot change your price.</div>
-        ${needKey ? `<div class="field"><label>Key for ${esc(M.shortAddr(W.address))} (memory only)</label>
+        ${needKey ? `<div class="field"><label for="w-key2">Key for ${esc(M.shortAddr(W.address))} (memory only)</label>
           <input id="w-key2" type="password" autocomplete="off"></div>` : ""}
         <div id="sign-out"></div>
         <div class="wizard-nav"><button class="btn btn-ghost" id="w-back" type="button">Back</button>
@@ -940,7 +940,7 @@
           $("#sign-out").innerHTML = `
             <div class="banner ${chk.ok ? "info" : "warn"}">Presignature ${chk.ok ? "<strong>valid</strong> — verified locally before publishing." : "INVALID: " + esc(chk.reason)}</div>
             <div class="field"><label>Signed listing (shareable JSON)</label>
-              <textarea class="mono" rows="4" readonly>${esc(M.encodeListing(signed))}</textarea></div>
+              <textarea class="mono" rows="4" readonly aria-label="Signed listing (shareable JSON)">${esc(M.encodeListing(signed))}</textarea></div>
             <button class="btn btn-primary" id="w-publish" type="button" ${chk.ok ? "" : "disabled"}>Publish to local board</button>`;
           const pub = $("#w-publish");
           if (pub) pub.addEventListener("click", () => {

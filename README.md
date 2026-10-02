@@ -127,7 +127,28 @@ Verified in a real browser on all 82 pages: every message element sits
 in a live region, zero console errors, and triggering a real error in
 Hush surfaces the message through its alert region. No styles or
 scripts changed, so no cache keys moved; all 77 test suites match their
-pre-pass results exactly.
+pre-pass results exactly. A tenth pass the same day audited the live
+DOM after JavaScript runs — the earlier passes had largely read static
+markup, and two classes of bug only exist at runtime. Reference
+integrity was already clean on all 83 pages (hub, apps, and the two
+Hermes pages): no duplicate ids, no broken `aria-labelledby` /
+`aria-describedby` / `aria-controls` or label-`for` references, no
+positive tabindex, no images without alt text. But fields rendered by
+JavaScript in six apps carried no accessible name beyond their
+placeholder — Covenant's cosigner key boxes, Quorum's slot pubkeys,
+Vault's key rows, Invoice's line-item rows, Pearl Market's buy/sell
+wizard fields and Demo-mode switch, and Pearl Wallet's
+change-password sheet — and several controls answered only to a mouse:
+Sighash's sighash-flag cards are now a proper radiogroup (arrow keys
+move and select, with `aria-checked` and a roving tabindex), Sign's
+step navigation and Notary's two file dropzones now respond to Enter
+and Space, and the click-to-copy donation addresses in Descriptor,
+Gallery, and Prove are real buttons with the address in their name.
+Verified in a real browser: 17/17 targeted keyboard checks pass
+(arrow/Enter/Space flows, keyboard-triggered clipboard copies, live-DOM
+label associations), the fleet census re-run shows 0 unnamed and 0
+placeholder-only controls, and all test suites match their pre-pass
+results exactly. Every changed script carries a bumped `?v=` cache key.
 
 ## Support this work
 

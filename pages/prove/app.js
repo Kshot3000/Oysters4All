@@ -241,7 +241,12 @@ $("btnDecode").addEventListener("click", () => {
 });
 
 /* ---------------- footer: click-to-copy donation ---------------- */
-$("donateAddr").addEventListener("click", async () => {
+const donateEl = $("donateAddr");
+donateEl.setAttribute("aria-label", "Copy donation address: " + donateEl.textContent.trim());
+donateEl.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); donateEl.click(); }
+});
+donateEl.addEventListener("click", async () => {
   try {
     await navigator.clipboard.writeText($("donateAddr").textContent.trim());
     $("copiedMsg").hidden = false;

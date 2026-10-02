@@ -426,6 +426,10 @@ function boot() {
   $("coll-go").addEventListener("click", runCollection);
   $("coll-addr").addEventListener("keydown", (e) => { if (e.key === "Enter") runCollection(); });
   $("donate-addr").textContent = DONATE_ADDRESS;
+  $("donate-addr").setAttribute("aria-label", "Copy donation address: " + DONATE_ADDRESS);
+  $("donate-addr").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("donate-addr").click(); }
+  });
   $("donate-addr").addEventListener("click", () => {
     const v = DONATE_ADDRESS;
     const done = () => { $("donate-msg").textContent = "Copied. Thank you!"; };

@@ -54,6 +54,7 @@
   }
   const dz = $("dropzone");
   dz.addEventListener("click", (e) => { if (e.target.tagName !== "INPUT") $("file-input").click(); });
+  dz.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("file-input").click(); } });
   dz.addEventListener("dragover", (e) => { e.preventDefault(); dz.classList.add("over"); });
   dz.addEventListener("dragleave", () => dz.classList.remove("over"));
   dz.addEventListener("drop", async (e) => {
@@ -337,6 +338,7 @@
   $("v-blockbook").value = S.blockbook;
   const vdz = $("v-dropzone");
   vdz.addEventListener("click", (e) => { if (e.target.tagName !== "INPUT") $("v-file-input").click(); });
+  vdz.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("v-file-input").click(); } });
   vdz.addEventListener("dragover", (e) => { e.preventDefault(); vdz.classList.add("over"); });
   vdz.addEventListener("dragleave", () => vdz.classList.remove("over"));
   vdz.addEventListener("drop", async (e) => {

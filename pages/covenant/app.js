@@ -119,7 +119,7 @@
       card.className = "party-card";
       card.innerHTML =
         "<h3>Cosigner " + (i + 1) + "</h3>" +
-        "<textarea id=\"ckey-" + i + "\" rows=\"2\" spellcheck=\"false\" " +
+        "<textarea id=\"ckey-" + i + "\" rows=\"2\" spellcheck=\"false\" aria-label=\"Cosigner " + (i + 1) + " key\" " +
         "placeholder=\"64-hex x-only pubkey or 12/24-word mnemonic\"></textarea>" +
         "<div class=\"row\"><button class=\"btn ghost gen-key\" data-for=\"ckey-" + i + "\">Generate fresh key</button>" +
         "<span class=\"key-ok\" id=\"ok-" + i + "\"></span></div>";

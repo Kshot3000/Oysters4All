@@ -1031,9 +1031,9 @@ $("btn-lock-now").addEventListener("click", function () { lock("Locked"); });
 $("btn-change-pw").addEventListener("click", function () {
   openSheet(
     "<h2>Change password</h2>" +
-    '<div class="field"><label>Current password</label><input class="input" id="cpw-old" type="password"></div>' +
-    '<div class="field"><label>New password (min 8)</label><input class="input" id="cpw-new" type="password"></div>' +
-    '<div class="field"><label>Confirm new</label><input class="input" id="cpw-new2" type="password"><div class="ferr" id="cpw-err"></div></div>' +
+    '<div class="field"><label for="cpw-old">Current password</label><input class="input" id="cpw-old" type="password"></div>' +
+    '<div class="field"><label for="cpw-new">New password (min 8)</label><input class="input" id="cpw-new" type="password"></div>' +
+    '<div class="field"><label for="cpw-new2">Confirm new</label><input class="input" id="cpw-new2" type="password"><div class="ferr" id="cpw-err"></div></div>' +
     '<div class="btnrow"><button class="btn ghost" id="cpw-cancel">Cancel</button><button class="btn" id="cpw-go">Change</button></div>'
   );
   $("cpw-cancel").addEventListener("click", closeSheet);

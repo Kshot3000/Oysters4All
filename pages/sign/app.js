@@ -83,7 +83,13 @@ function gotoStep(n) {
   panels.forEach((p) => { p.hidden = Number(p.dataset.panel) !== n; });
   window.scrollTo({ top: 0, behavior: (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth") });
 }
-steps.forEach((li) => li.addEventListener("click", () => gotoStep(Number(li.dataset.step))));
+steps.forEach((li) => {
+  li.tabIndex = 0;
+  li.addEventListener("click", () => gotoStep(Number(li.dataset.step)));
+  li.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); gotoStep(Number(li.dataset.step)); }
+  });
+});
 
 /* ---------- step 1: key ---------- */
 function setNetwork(id) {

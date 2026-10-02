@@ -152,7 +152,10 @@
   }
   function selectFlag(ht) {
     Array.prototype.forEach.call(document.querySelectorAll("#b-flags .flag-card"), function (c) {
-      c.classList.toggle("sel", parseInt(c.getAttribute("data-ht"), 10) === ht);
+      var on = parseInt(c.getAttribute("data-ht"), 10) === ht;
+      c.classList.toggle("sel", on);
+      c.setAttribute("aria-checked", on ? "true" : "false");
+      c.tabIndex = on ? 0 : -1;
     });
   }
   ORDER.forEach(function (ht) {
@@ -163,7 +166,22 @@
     card.innerHTML = '<div class="fname">' + f.name + '</div><div class="fcode">0x' +
       ht.toString(16).toUpperCase().padStart(2, "0") + "</div>" +
       '<div class="fdesc">' + f.blurb + "</div>";
+    card.setAttribute("role", "radio");
+    card.setAttribute("aria-checked", ht === 0x00 ? "true" : "false");
+    card.tabIndex = ht === 0x00 ? 0 : -1;
     card.addEventListener("click", function () { selectFlag(ht); });
+    card.addEventListener("keydown", function (e) {
+      var cards = Array.prototype.slice.call(document.querySelectorAll("#b-flags .flag-card"));
+      var idx = cards.indexOf(card);
+      var next = null;
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") next = cards[(idx + 1) % cards.length];
+      else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = cards[(idx - 1 + cards.length) % cards.length];
+      else if (e.key === " " || e.key === "Enter") { e.preventDefault(); selectFlag(ht); return; }
+      else return;
+      e.preventDefault();
+      selectFlag(parseInt(next.getAttribute("data-ht"), 10));
+      next.focus();
+    });
     $("b-flags").appendChild(card);
   });
   [ ["c-flag-a", 0x01], ["c-flag-b", 0x02] ].forEach(function (pair) {

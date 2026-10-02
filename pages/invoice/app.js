@@ -98,10 +98,12 @@
     const tdD = document.createElement("td");
     const inpD = document.createElement("input");
     inpD.className = "inv-item-desc"; inpD.placeholder = "e.g. Logo design"; inpD.value = desc || "";
+    inpD.setAttribute("aria-label", "Description");
     tdD.appendChild(inpD);
     const tdA = document.createElement("td");
     const inpA = document.createElement("input");
     inpA.className = "inv-item-amt"; inpA.placeholder = "0.00"; inpA.inputMode = "decimal"; inpA.value = amt || "";
+    inpA.setAttribute("aria-label", "Amount (PRL)");
     tdA.appendChild(inpA);
     const tdX = document.createElement("td");
     const btn = document.createElement("button");
