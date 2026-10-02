@@ -125,7 +125,15 @@
   function showVault(v) {
     S.vault = v;
     S.network = net();
+    // A newly forged/imported vault invalidates any previously loaded spend
+    // bundle, collected signatures, and finalize output — never let the
+    // Cosign step act on another vault's state.
+    S.bundle = null;
+    S.sigBundles = [];
+    S.finalized = null;
+    $("c-final").hidden = true;
     $("vault-result").hidden = false;
+    resetArm(); // S.finalized was just cleared above
     $("v-r-addr").textContent = v.address;
     $("v-r-fp").textContent = v.fingerprint;
     $("v-r-asm").textContent = v.scriptAsm;
@@ -138,6 +146,7 @@
     $("f-blockbook").value = v.network === "mainnet" ? P.DEFAULT_BLOCKBOOK : "";
     drawQR(v.address);
     refreshCosignSlots();
+    drawRing();
     unlock("broadcast");
   }
 
@@ -295,7 +304,10 @@
     try {
       const base = bb("s-blockbook", P.DEFAULT_BLOCKBOOK);
       const r = await P.fetchFeeRate(base, 2);
-      $("s-feerate").value = Math.max(1, Math.ceil(r));
+      // Blockbook quotes PRL/kB as a decimal; the grains/vB conversion can
+      // land a hair above an integer in binary float (e.g. 2.0000000004),
+      // and a naive Math.ceil would then overcharge by a whole grain/vB.
+      $("s-feerate").value = Math.max(1, Math.ceil(r - 1e-9));
     } catch (e) { err("spend-error", e.message); }
   });
 
@@ -355,11 +367,12 @@
   function refreshCosignSlots() {
     const sel = $("c-slot");
     sel.innerHTML = "";
-    const n = S.vault ? S.vault.n : 3;
+    const src = S.bundle || S.vault; // an imported bundle defines the slots, not the forged vault
+    const n = src ? src.n : 3;
     for (let i = 0; i < n; i++) {
       const o = document.createElement("option");
       o.value = i;
-      o.textContent = `Slot ${i + 1} (${S.vault ? S.vault.pubkeys[i].slice(0, 12) + "…" : ""})`;
+      o.textContent = `Slot ${i + 1} (${src ? src.pubkeys[i].slice(0, 12) + "…" : ""})`;
       sel.appendChild(o);
     }
   }
@@ -401,6 +414,7 @@
       S.sigBundles = [];
       S.finalized = null;
       $("c-final").hidden = true;
+      refreshCosignSlots();
       drawRing();
       err("cosign-error", "");
     } catch (e) { err("cosign-error", e.message); }

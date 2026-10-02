@@ -154,8 +154,11 @@ export function planInscription({ network, internalXOnly, ops, ownerAddress, fee
 
   const revealOutputs = [...ownerOutputs, ...feeOutputs];
   const revealOutSum = revealOutputs.reduce((n, o) => n + o.value, 0);
-  // +1 output slot for reveal change; the change lands back at changeAddress.
-  const revealFee = revealTxVBytes(script.length, revealOutputs.length + 1) * rate;
+  // Fee is estimated for exactly the outputs the reveal will carry. (No
+  // phantom change-output slot: with commitValue defined below, the reveal
+  // change is identically zero, so budgeting an extra output would just
+  // overpay the fee by one P2TR output of weight every time.)
+  const revealFee = revealTxVBytes(script.length, revealOutputs.length) * rate;
   const commitValue = revealOutSum + revealFee;
 
   return {
@@ -198,7 +201,7 @@ export function buildRevealTxSigned({ plan, commitTxid, commitVout, internalPriv
   const changeProgram = addressToProgram(changeAddress, plan.network);
   const outputs = [...plan.ownerOutputs, ...plan.feeOutputs];
   const outSum = outputs.reduce((n, o) => n + o.value, 0);
-  const fee = revealTxVBytes(plan.script.length, outputs.length + 1) * plan.feeRate;
+  const fee = revealTxVBytes(plan.script.length, outputs.length) * plan.feeRate;
   const change = plan.commitValue - outSum - fee;
   if (change < 0) throw new Error("commit value too small for reveal outputs + fee");
   if (change >= DUST_GRAIN) outputs.push({ program: changeProgram, value: change });

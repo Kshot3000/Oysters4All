@@ -6805,13 +6805,14 @@ zoo`.split("\n");
     const th = Number(m);
     if (!Number.isInteger(th) || th < 1 || th > n) throw new Error(`threshold m must be 1..${n} (got ${m})`);
     const script = buildQuorumScript(cosigners.map((c) => c.xonly), th);
-    let internalXOnly, backdoor = null;
+    let internalXOnly, backdoor = null, internalKeySlotOut = null;
     if (internalKeyMode === "nums") {
       internalXOnly = numsInternalKeyQuorum(script);
     } else if (internalKeyMode === "cosigner") {
       const slot = Number(internalKeySlot);
       if (!Number.isInteger(slot) || slot < 0 || slot >= n) throw new Error("internal-key slot out of range");
       internalXOnly = cosigners[slot].xonly;
+      internalKeySlotOut = slot;
       backdoor = `KEYPATH BACKDOOR: internal key is cosigner ${slot + 1}'s key \u2014 that cosigner can compute the tweaked private key and spend UNILATERALLY, bypassing the ${th}-of-${n} quorum. Use NUMS unless you understand this.`;
     } else {
       throw new Error('internalKeyMode must be "nums" or "cosigner"');
@@ -6826,6 +6827,8 @@ zoo`.split("\n");
       n,
       pubkeys: cosigners.map((c) => c.hex),
       internalKeyMode,
+      internalKeySlot: internalKeySlotOut,
+      // null in NUMS mode; the designated slot otherwise
       backdoorWarning: backdoor,
       scriptHex: bytesToHex(script),
       scriptAsm: scriptAsm(script),
@@ -6834,7 +6837,7 @@ zoo`.split("\n");
       spkHex: bytesToHex(tree.spk),
       controlBlockHex: bytesToHex(tree.controlBlock)
     };
-    descriptor.fingerprint = descriptorFingerprint({
+    const fpFields = {
       kind: descriptor.kind,
       name: descriptor.name,
       network: descriptor.network,
@@ -6843,7 +6846,9 @@ zoo`.split("\n");
       pubkeys: descriptor.pubkeys,
       internalKeyMode: descriptor.internalKeyMode,
       scriptHex: descriptor.scriptHex
-    });
+    };
+    if (internalKeyMode === "cosigner") fpFields.internalKeySlot = internalKeySlotOut;
+    descriptor.fingerprint = descriptorFingerprint(fpFields);
     return descriptor;
   }
   function exportDescriptorText(v) {
@@ -6854,6 +6859,7 @@ zoo`.split("\n");
       `m: ${v.m}`,
       `n: ${v.n}`,
       `internal-key: ${v.internalKeyMode}`,
+      ...v.internalKeyMode === "cosigner" && v.internalKeySlot != null ? [`internal-key-slot: ${v.internalKeySlot}`] : [],
       ...v.pubkeys.map((k, i) => `pubkey[${i}]: ${k}`),
       `address: ${v.address}`,
       `fingerprint: ${v.fingerprint}`
@@ -6867,14 +6873,14 @@ zoo`.split("\n");
     if (t.startsWith("{")) {
       const j = JSON.parse(t);
       if (j.kind !== QUORUM_DESCRIPTOR_KIND) throw new Error("not a pearl-quorum descriptor");
-      fields = { name: j.name, network: j.network, m: j.m, n: j.n, internalKeyMode: j.internalKeyMode, pubkeys: j.pubkeys, address: j.address, fingerprint: j.fingerprint };
+      fields = { name: j.name, network: j.network, m: j.m, n: j.n, internalKeyMode: j.internalKeyMode, internalKeySlot: j.internalKeySlot, pubkeys: j.pubkeys, address: j.address, fingerprint: j.fingerprint };
     } else {
       const lines = t.split(/\n/).map((l) => l.trim()).filter(Boolean);
       if (lines[0] !== QUORUM_DESCRIPTOR_KIND) throw new Error("not a pearl-quorum descriptor (first line must be pearl-quorum:v1:)");
       for (const line of lines.slice(1)) {
-        const mm = line.match(/^(name|network|m|n|internal-key|address|fingerprint):\s*(.+)$/);
+        const mm = line.match(/^(name|network|m|n|internal-key-slot|internal-key|address|fingerprint):\s*(.+)$/);
         const pm = line.match(/^pubkey\[(\d+)\]:\s*([0-9a-fA-F]+)$/i);
-        if (mm) fields[mm[1].replace("internal-key", "internalKeyMode")] = mm[2];
+        if (mm) fields[mm[1].replace("internal-key-slot", "internalKeySlot").replace("internal-key", "internalKeyMode")] = mm[2];
         else if (pm) {
           (fields.pubkeys = fields.pubkeys || [])[Number(pm[1])] = pm[2].toLowerCase();
         } else throw new Error(`unparseable descriptor line: ${line.slice(0, 40)}`);
@@ -6886,7 +6892,7 @@ zoo`.split("\n");
       m: Number(fields.m),
       keys: fields.pubkeys || [],
       internalKeyMode: fields.internalKeyMode || "nums",
-      internalKeySlot: 0
+      internalKeySlot: fields.internalKeySlot == null ? 0 : Number(fields.internalKeySlot)
     });
     if (fields.address && fields.address !== v.address) {
       throw new Error(`DESCRIPTOR REFUSED: claimed address ${fields.address} does not match the re-derived ${v.address} \u2014 tampered descriptor`);
@@ -7103,8 +7109,10 @@ zoo`.split("\n");
     if (!bundle || bundle.bundle !== QUORUM_BUNDLE_KIND) throw new Error("not a quorum unsigned bundle");
     const s = Number(slot);
     if (!Number.isInteger(s) || s < 0 || s >= bundle.n) throw new Error(`slot must be 0..${bundle.n - 1}`);
-    const p = hexToBytes(String(privHex || "").trim());
-    if (p.length !== 32) throw new Error("private key must be 32 hex bytes");
+    const clean2 = String(privHex || "").trim();
+    if (!/^[0-9a-fA-F]{64}$/.test(clean2)) throw new Error("private key must be 32 bytes (64 hex characters)");
+    const p = hexToBytes(clean2);
+    if (p.length !== 32) throw new Error("private key must be 32 bytes (64 hex characters)");
     const d = bytesToNumberBE2(p);
     if (d <= 0n || d >= secp256k1.CURVE.n) throw new Error("private key out of range");
     const pub = bytesToHex(schnorr.getPublicKey(p));

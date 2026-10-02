@@ -40,9 +40,14 @@ Live: https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/gift/
 - `tests/dom.test.mjs` — 5/5: boots the committed bundle + real `index.html`
   + `app.js` in a DOM shim and drives create → load → card → redeem, plus
   hostile-`localStorage` fallback and footer-attribution checks.
-- Real-browser QA (headless Chromium, `file://` + CDP): 13/13 checks green —
-  QR rendering, design switch, live card preview, derive/plan/sign flow, zero
-  page errors.
+- Real-browser QA (headless Chromium 152, `file://` + CDP,
+  `hidden_files/qa-gift-browser.mjs`): 75/75 checks green — boot/assets/?v=
+  keys, step nav, create (fresh + WIF/hex/mnemonic imports, all import error
+  paths), QR canvas+SVG rendering, design switch, live card preview, load +
+  funding check (confirmed-only balance, unconfirmed/empty/down/404 paths),
+  print CSS isolation, full redeem flow (derive → manual UTXOs → exact-fee
+  plan → sign → independent signature re-verification → broadcast), footer
+  attribution, 390px mobile overflow, zero page errors.
 
 Run: `node build.mjs` (committed bundle), then
 `node --no-warnings --loader ./tests/loader.mjs tests/gift.test.mjs` and

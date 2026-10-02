@@ -109,7 +109,7 @@ footer {
   color: var(--ink-dim); font-size: .85rem;
 }
 .donate { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
-.donate code { color: var(--copper-hi); }
+.donate code { color: var(--copper-hi); overflow-wrap: anywhere; }
 .meta a { color: var(--copper); text-decoration: none; }
 @media (max-width: 640px) {
   .form-grid { grid-template-columns: 1fr; }

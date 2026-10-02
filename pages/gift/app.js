@@ -42,7 +42,7 @@
       $("step-" + s).classList.toggle("active", s === step);
       const b = document.querySelector(`#steps button[data-step="${s}"]`);
       b.classList.toggle("active", s === step);
-      if (steps.indexOf(s) < steps.indexOf(step)) b.classList.add("done");
+      b.classList.toggle("done", steps.indexOf(s) < steps.indexOf(step));
     });
     if (step === "card") renderCard();
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -92,11 +92,21 @@
     err("gift-error", null);
     try {
       const src = fresh ? "generate" : $("key-source").value;
+      const pasted = $("key-input").value.trim();
       let gift;
       if (src === "generate") gift = N.createGift({ network: S.network });
-      else if (src === "mnemonic") gift = N.createGift({ mnemonic: $("key-input").value, network: S.network });
-      else if (src === "wif") gift = N.createGift({ wif: $("key-input").value.trim(), network: S.network });
-      else gift = N.createGift({ privHex: $("key-input").value.trim(), network: S.network });
+      else if (src === "mnemonic") {
+        if (!pasted) throw new Error("paste a mnemonic first — or switch the key source back to “Generate a fresh gift wallet”.");
+        gift = N.createGift({ mnemonic: pasted, network: S.network });
+      }
+      else if (src === "wif") {
+        if (!pasted) throw new Error("paste a WIF private key first — or switch the key source back to “Generate a fresh gift wallet”.");
+        gift = N.createGift({ wif: pasted, network: S.network });
+      }
+      else {
+        if (!pasted) throw new Error("paste a 64-hex private key first — or switch the key source back to “Generate a fresh gift wallet”.");
+        gift = N.createGift({ privHex: pasted, network: S.network });
+      }
       S.gift = gift;
       renderGiftCard();
     } catch (e) { err("gift-error", e.message); }
@@ -111,6 +121,8 @@
     $("gift-path").textContent = g.account == null ? "imported key (no derivation path)" : `m/86'/${g.network.coinType}'/${g.account}'/0/${g.index}`;
     $("gift-wif").textContent = "••••••••••••••••";
     $("gift-wif").dataset.real = g.wif;
+    $("copy-address").textContent = "Copy address";
+    $("copy-wif").textContent = "Copy WIF";
     $("secret-wrap") && ($("secret-wrap").hidden = true);
     $("reveal-secret").textContent = "Reveal private key";
     const mw = $("gift-mnemonic-wrap");

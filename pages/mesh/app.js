@@ -69,6 +69,10 @@
     mnemonic: "",
   };
   const networkId = () => $("s-network").value;
+  // the descriptor caches the network it was built for — a network change
+  // must rebuild it, or the Aggregate/Fund/Sign steps would keep showing
+  // the old network's address while the selector says otherwise
+  $("s-network").addEventListener("change", () => { S.descriptor = null; });
 
   /* ---------- setup ---------- */
   function refreshMemberList() {

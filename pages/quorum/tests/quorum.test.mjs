@@ -132,6 +132,38 @@ test("designated-cosigner internal key stamps the backdoor warning", () => {
   assert.notEqual(v.address, mkVault(2, 3).address);
 });
 
+test("cosigner-mode descriptor round-trips at any slot (regression: slot was dropped)", () => {
+  for (const slot of [0, 1, 2]) {
+    const v = Q.createVault({ name: `risky-${slot}`, network: TNET, m: 2, keys: PKS.slice(0, 3), internalKeyMode: "cosigner", internalKeySlot: slot });
+    assert.equal(v.internalKeySlot, slot);
+    const text = Q.exportDescriptorText(v);
+    assert.match(text, new RegExp(`internal-key-slot: ${slot}`));
+    const back = Q.importDescriptorText(text);
+    assert.equal(back.address, v.address, `slot ${slot} re-derives the same address`);
+    assert.equal(back.fingerprint, v.fingerprint);
+    assert.equal(back.internalKeySlot, slot);
+    // JSON form carries the slot too
+    const jback = Q.importDescriptorText(JSON.stringify(v));
+    assert.equal(jback.address, v.address);
+  }
+});
+
+test("cosigner-mode fingerprint is slot-distinct; NUMS fingerprint unchanged", () => {
+  const a = Q.createVault({ name: "r", network: TNET, m: 2, keys: PKS.slice(0, 3), internalKeyMode: "cosigner", internalKeySlot: 0 });
+  const b = Q.createVault({ name: "r", network: TNET, m: 2, keys: PKS.slice(0, 3), internalKeyMode: "cosigner", internalKeySlot: 2 });
+  assert.notEqual(a.fingerprint, b.fingerprint, "different slots must not share a fingerprint");
+  assert.notEqual(a.address, b.address);
+  // garbage slot refused loudly
+  const bad = Q.exportDescriptorText(a).replace("internal-key-slot: 0", "internal-key-slot: 9");
+  assert.throws(() => Q.importDescriptorText(bad), /slot out of range|REFUSED/);
+});
+
+test("signSlot names a malformed private key clearly", () => {
+  const { bundle } = signedPair();
+  assert.throws(() => Q.signSlot({ bundle, slot: 0, privHex: "zzzz" }), /private key must be 32 bytes/);
+  assert.throws(() => Q.signSlot({ bundle, slot: 0, privHex: SKS[0].slice(0, 62) }), /private key must be 32 bytes/);
+});
+
 /* ---------- descriptor export/import ---------- */
 
 test("descriptor text round-trips; tampered address refused", () => {

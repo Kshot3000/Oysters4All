@@ -22,6 +22,32 @@
   };
 
   const fmtPRL = (g) => (g / E.GRAIN_PER_PRL).toFixed(8).replace(/0+$/, "").replace(/\.$/, ".0") + " PRL";
+  /* clipboard that never throws: file:// and denied permissions fall back
+   * to a manual-select copy, with an honest label either way */
+  function copyText(text, btn) {
+    const flash = (ok) => {
+      if (!btn) return;
+      const orig = btn.dataset.orig || (btn.dataset.orig = btn.textContent);
+      btn.textContent = ok ? "copied" : "copy failed — select manually";
+      setTimeout(() => { btn.textContent = orig; }, 1600);
+    };
+    const legacy = () => {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+        document.body.appendChild(ta); ta.select();
+        const ok = document.execCommand("copy");
+        ta.remove(); flash(!!ok);
+      } catch { flash(false); }
+    };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => flash(true), legacy);
+        return;
+      }
+    } catch { /* fall through to legacy */ }
+    legacy();
+  }
   const err = (id, msg) => { const e = $(id); e.hidden = !msg; e.textContent = msg || ""; };
   const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
@@ -154,7 +180,11 @@
     return text.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => {
       const [txid, vout, value] = l.split(":");
       if (!/^[0-9a-f]{64}$/i.test(txid || "")) throw new Error("bad txid: " + l);
-      return { txid: txid.toLowerCase(), vout: parseInt(vout, 10), value: parseInt(value, 10) };
+      const voutN = Number(vout);
+      if (!/^\d+$/.test(vout || "") || !Number.isSafeInteger(voutN)) throw new Error("bad vout (must be a non-negative integer): " + l);
+      const valueN = Number(value);
+      if (!/^\d+$/.test(value || "") || !Number.isSafeInteger(valueN) || valueN <= 0) throw new Error("bad value (must be a positive integer number of grains): " + l);
+      return { txid: txid.toLowerCase(), vout: voutN, value: valueN };
     });
   }
   function renderUtxos() {
@@ -180,6 +210,7 @@
   $("fetch-utxos").addEventListener("click", async () => {
     err("commit-error", null);
     try {
+      if (!S.wallet) throw new Error("Create a key first (step 2).");
       if (!S.blockbook) throw new Error("Set a blockbook endpoint first.");
       const list = await E.fetchUtxos(S.blockbook, S.wallet.address);
       S.utxos = list.filter((u) => u.confirmations > 0 || list.length === 1);
@@ -208,6 +239,7 @@
   $("build-commit").addEventListener("click", () => {
     err("commit-error", null);
     try {
+      if (!S.wallet) throw new Error("Create a key first (step 2).");
       const need = S.plan.commitValue;
       const { picked, sum } = selectCoins(need);
       if (sum < need) throw new Error(`Selected UTXOs cover ${fmtPRL(sum)} but the commit needs ${fmtPRL(need)}.`);
@@ -226,7 +258,7 @@
       err("commit-broadcast", null); $("commit-broadcast").hidden = true;
     } catch (e) { err("commit-error", e.message); }
   });
-  $("copy-commit").addEventListener("click", () => navigator.clipboard.writeText($("commit-hex").value));
+  $("copy-commit").addEventListener("click", (e) => copyText($("commit-hex").value, e.currentTarget));
   $("broadcast-commit").addEventListener("click", async () => {
     try {
       const txid = await E.broadcastTx(S.blockbook, S.commit.hex);
@@ -276,7 +308,7 @@
       $("reveal-broadcast").hidden = true;
     } catch (e) { err("reveal-error", e.message); }
   });
-  $("copy-reveal").addEventListener("click", () => navigator.clipboard.writeText($("reveal-hex").value));
+  $("copy-reveal").addEventListener("click", (e) => copyText($("reveal-hex").value, e.currentTarget));
   $("broadcast-reveal").addEventListener("click", async () => {
     try {
       const txid = await E.broadcastTx(S.blockbook, S.reveal.hex);
@@ -304,7 +336,7 @@
   $("restart").addEventListener("click", () => location.reload());
 
   /* ---------- footer ---------- */
-  $("copy-donate").addEventListener("click", () => navigator.clipboard.writeText(DONATE));
+  $("copy-donate").addEventListener("click", (e) => copyText(DONATE, e.currentTarget));
 
   renderOpForm();
   setFee(5, true);

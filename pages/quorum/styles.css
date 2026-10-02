@@ -77,12 +77,16 @@ code.asm { word-break: break-all; color: var(--ink-dim); }
 .hint { color: var(--ink-faint); font-weight: 400; font-size: .8em; }
 .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px 16px; margin: 12px 0; }
 .form-grid .wide { grid-column: 1 / -1; }
-label { display: flex; flex-direction: column; gap: 6px; font-size: .9rem; color: var(--ink-dim); }
+label { display: flex; flex-direction: column; gap: 6px; font-size: .9rem; color: var(--ink-dim); min-width: 0; }
 input, select, textarea {
   background: #0a0806; color: var(--ink);
   border: 1px solid var(--line); border-radius: 8px;
   padding: 9px 11px; font-size: .92rem; font-family: var(--mono);
+  min-width: 0; /* grid/flex children must be allowed to shrink below intrinsic width */
 }
+/* a <select>'s intrinsic width is its longest option (~600px here) — without
+ * this it forces .form-grid columns wider than a phone viewport. */
+input:not([type="checkbox"]), select, textarea { width: 100%; max-width: 100%; }
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--brass-dim); box-shadow: 0 0 0 2px rgba(217,164,65,.15); }
 textarea { resize: vertical; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0; align-items: center; }
@@ -140,6 +144,7 @@ th { color: var(--brass); font-family: var(--serif); font-weight: 600; }
 .limits strong { color: var(--brass-hi); }
 footer { border-top: 1px solid var(--line); padding: 22px; text-align: center; color: var(--ink-dim); font-size: .88rem; }
 footer a { color: var(--brass-hi); }
+footer code { word-break: break-all; } /* the 62-char donation address must wrap on phones */
 footer .fine { color: var(--ink-faint); font-size: .8rem; max-width: 70ch; margin: 8px auto 0; }
 .ledger-item { border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; margin: 10px 0; background: rgba(0,0,0,.25); }
 .ledger-item h4 { margin: 0 0 6px; color: var(--brass-hi); }
