@@ -179,7 +179,14 @@ color, so mobile browser chrome matches each app's palette instead of
 defaulting to white. Two honest exceptions: the branded `404.html` is
 `noindex` and carries no canonical, and Pearl Atlas (Descriptor) carries
 no canonical URL — its page guarantees zero http(s) URLs so it can run
-fully offline.
+fully offline. Every public page also carries schema.org structured data
+(a JSON-LD block: `WebSite` for the hub, `WebApplication` for each app)
+whose name, description, and URL are copied from that page's own title,
+meta description, and canonical — no ratings, reviews, or claims the
+pages themselves don't make. The same two exceptions apply: the `noindex`
+404 carries none, and Descriptor carries none (its zero-URL offline
+guarantee again); the wPRL bridge page asserts no canonical URL, so its
+block carries name and description only.
 
 ## Support this work
 
