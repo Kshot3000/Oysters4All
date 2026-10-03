@@ -172,7 +172,14 @@ with each URL taken from that page's own canonical `og:url`, plus a
 `404.html` in the hub's dark Pearl palette — fully self-contained inline
 styles, because GitHub Pages serves it at any path depth where relative
 assets would break — with absolute links back to the hub and the app
-index.
+index. Every public page also carries a `<link rel="canonical">` identical
+to its own `og:url` (the same URL the sitemap lists) and a
+`<meta name="theme-color">` set to that page's own rendered background
+color, so mobile browser chrome matches each app's palette instead of
+defaulting to white. Two honest exceptions: the branded `404.html` is
+`noindex` and carries no canonical, and Pearl Atlas (Descriptor) carries
+no canonical URL — its page guarantees zero http(s) URLs so it can run
+fully offline.
 
 ## Support this work
 
