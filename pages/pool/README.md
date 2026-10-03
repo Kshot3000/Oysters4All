@@ -22,6 +22,22 @@ as-is on GitHub Pages.
   point it at your own Foundry server's dashboard API (default
   `127.0.0.1:8888`).
 
+## Dashboard API
+
+On every refresh (and every 10 seconds) the page reads exactly four
+endpoints from the configured backend — all GET, `cache: no-store`:
+
+- `/api/stats` — pool + payout summary (status cards and rounds)
+- `/api/miners` — connected miners
+- `/api/balances` — payout balances
+- `/api/config` — public pool config (stratum port for the connect panel)
+
+Every value those endpoints return is treated as untrusted display data:
+wallet and worker strings come straight from miner logins, so `app.js`
+HTML-escapes every backend-supplied string before it reaches the page, and
+round rewards/fees (integer grains, 1 PRL = 1e8 grains) are formatted
+exactly with BigInt rather than lossy floats.
+
 ## Honest limits
 
 - **Demo mode is loud, never disguised.** When no pool backend is reachable
@@ -35,10 +51,20 @@ as-is on GitHub Pages.
 
 ## Tests
 
-The dashboard has no build step and no test suite of its own; the pool server
-it displays is covered by `files/pool-server` tests — 48/48 pass
-(stratum dialects, share pipeline, vardiff, PPLNS payouts, templates,
-verifier protocol):
+The dashboard logic lives in `app.js` (extracted from its old inline
+script so it can be tested in Node) and has its own suites in `tests/` —
+28 logic tests (escaping of hostile API strings, grain-exact `fmtPRL`,
+`timeAgo`/`hashrate`, API-base resolution, miner filtering, the section
+builders) and 7 DOM/docs tests (every `$('id')` lookup resolves, the
+`app.js?v=1` cache pin, attribution, and the exact four-endpoint contract
+above, pinned against the code so docs and code cannot drift apart):
+
+Run: `node --test tests/pool.test.mjs` and `node --test tests/dom.test.mjs`
+(per-file — the bare directory form fails on Node 24).
+
+The pool server it displays is covered by `files/pool-server` tests —
+48/48 pass (stratum dialects, share pipeline, vardiff, PPLNS payouts,
+templates, verifier protocol):
 
 Run: `cd files/pool-server && node --test tests/*.js` (per-file glob — the
 bare directory form fails on Node 24).
