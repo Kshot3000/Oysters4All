@@ -9,6 +9,42 @@
   var LS_KEY = 'pearl-explorer-rpc';
   var $ = function (id) { return document.getElementById(id); };
 
+  /* ---------- pure helpers (unit-tested in tests/explorer.test.mjs) ---------- */
+  function fmtTime(ts) {
+    if (typeof ts !== 'number') return '—';
+    return new Date(ts * 1000).toISOString().replace('T', ' ').replace('Z', ' UTC');
+  }
+  function fmtNum(n) {
+    return typeof n === 'number' ? n.toLocaleString('en-US') : '—';
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function isHeightQuery(q) {
+    return /^\d+$/.test(q);
+  }
+  function rpcBody(method, params) {
+    return { jsonrpc: '1.0', id: method, method: method, params: params || [] };
+  }
+
+  /* Node export for the test suites: when there is no DOM, expose the pure
+   * helpers and stop before any UI wiring. In the browser this never runs. */
+  if (typeof document === 'undefined') {
+    if (typeof module !== 'undefined' && module.exports) {
+      module.exports = {
+        fmtTime: fmtTime,
+        fmtNum: fmtNum,
+        escapeHtml: escapeHtml,
+        isHeightQuery: isHeightQuery,
+        rpcBody: rpcBody,
+        LS_KEY: LS_KEY
+      };
+    }
+    return;
+  }
+
   var connBadge = $('connBadge');
   var demoHint = $('demoHint');
   var statusErr = $('statusErr');
@@ -51,7 +87,7 @@
     return fetch(s.url, {
       method: 'POST',
       headers: headers,
-      body: JSON.stringify({ jsonrpc: '1.0', id: method, method: method, params: params || [] })
+      body: JSON.stringify(rpcBody(method, params))
     }).then(function (res) {
       if (!res.ok) throw new Error('HTTP ' + res.status + ' from RPC endpoint');
       return res.json();
@@ -65,14 +101,6 @@
       }
       throw e;
     });
-  }
-
-  function fmtTime(ts) {
-    if (typeof ts !== 'number') return '—';
-    return new Date(ts * 1000).toISOString().replace('T', ' ').replace('Z', ' UTC');
-  }
-  function fmtNum(n) {
-    return typeof n === 'number' ? n.toLocaleString('en-US') : '—';
   }
 
   function refreshStatus() {
@@ -108,16 +136,10 @@
     });
   }
 
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-    });
-  }
-
   function lookup(q) {
     showErr(lookupErr, '');
     $('blockDetail').hidden = true;
-    var isHeight = /^\d+$/.test(q);
+    var isHeight = isHeightQuery(q);
     var hashPromise = isHeight
       ? rpc('getblockhash', [parseInt(q, 10)])
       : Promise.resolve(q);

@@ -7,7 +7,7 @@ Static websites built by the Pearl 24/7 AI builder, published via GitHub Pages.
 | Path | Description |
 |---|---|
 | `/` (repo root: `index.html`) | **Pearl website** — recreated project homepage: Proof-of-Useful-Work explainer, mining quickstart, developer components, ecosystem directory, donation section |
-| `pages/explorer/` | **Pearl Explorer** — static block explorer: chain status + block/tx lookup against your own `pearld` JSON-RPC (mainnet port 44107). Settings persist in localStorage; zero dependencies |
+| `pages/explorer/` | **Pearl Explorer** — static block explorer: chain status + block/tx lookup against your own `pearld` JSON-RPC (mainnet port 44107). Settings persist in localStorage; zero dependencies; 9/9 logic + 7/7 DOM tests (DOM suite pins the docs to exactly the five RPC methods app.js calls), 27/27 real-browser QA |
 | `pages/faucet/` | **Testnet Faucet** — static tPRL faucet frontend: bech32m address validation in-browser, drip requests to a configurable backend. Reference backend in `examples/faucet-backend/` (Node, zero deps; pays via Oyster `sendtoaddress`) |
 | `pages/prl20/` | **PRL-20 Explorer** — static Pearlscriptions / PRL-20 dashboard: tokens with mint progress, inscription browser, operations feed, address balances/transfer-lots/UTXOs — all from a configurable public Pearlscriptions indexer API (`GET`-only, read-only) |
 | `pages/prl20-launcher/` | **PRL-20 Token Launcher** — design, validate, and inscribe PRL-20 deploy/mint operations entirely in the browser: strict spec validation, BIP-86 in-page wallet, Taproot commit/reveal pair built + signed locally with real fee math, live token directory from your Pearlscriptions indexer; 49/49 verification checks |

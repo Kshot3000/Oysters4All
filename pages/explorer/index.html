@@ -94,8 +94,8 @@
   <section id="settings" class="card">
     <h2>RPC settings</h2>
     <p class="note">The explorer calls <code>getinfo</code>,
-    <code>getblockcount</code>, <code>getblockhash</code>, <code>getblock</code>
-    and <code>getrawtransaction</code> on the endpoint you configure. Your node must allow browser requests:</p>
+    <code>getblockcount</code>, <code>getbestblockhash</code>, <code>getblockhash</code>
+    and <code>getblock</code> (verbosity 1) on the endpoint you configure. Your node must allow browser requests:</p>
     <pre class="code"># pearld RPC is mainnet :44107 by default. Browsers can't reach it directly
 # unless it serves CORS headers — easiest is the upstream node/proxy
 # Caddy sidecar (TLS + CORS), or serve this page from the node host.</pre>
@@ -135,6 +135,6 @@
   </div>
 </footer>
 
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

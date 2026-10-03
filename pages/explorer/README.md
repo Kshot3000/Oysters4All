@@ -9,8 +9,9 @@ A zero-dependency static block explorer for Pearl (PRL) that talks directly to a
 
 ## Features
 
-- **Chain status**: best height, best hash, chain, difficulty, connections, headers
-  (via `getblockchaininfo` / `getblockcount`)
+- **Chain status**: best height (via `getblockcount`), best block hash
+  (via `getbestblockhash`), and chain, difficulty, connections and protocol
+  version (via `getinfo`)
 - **Block lookup** by height or hash (via `getblockhash` / `getblock`), with
   coinbase-marked transaction list
 - **RPC settings**: endpoint URL + optional basic-auth credentials, persisted in
@@ -21,14 +22,15 @@ A zero-dependency static block explorer for Pearl (PRL) that talks directly to a
 
 | Method            | Purpose                          |
 |-------------------|----------------------------------|
-| `getblockchaininfo` | chain, blocks, headers, difficulty |
-| `getblockcount`     | fallback best height             |
-| `getblockhash`      | height → hash                     |
-| `getblock <hash> 1` | full block with txids              |
+| `getinfo`         | chain (testnet flag), difficulty, connections, protocol version |
+| `getblockcount`   | best block height                |
+| `getbestblockhash` | hash of the best block          |
+| `getblockhash`    | height → hash                    |
+| `getblock <hash> 1` | full block with txids          |
 
-Addresses on Pearl use the `prl1` bech32 prefix (Taproot-only, like the
-`pearld` node from pearl-research-labs/pearl). Default RPC host in the
-node's client examples is `127.0.0.1:8332`.
+Addresses on Pearl use the `prl1` bech32m prefix (Taproot-only, like the
+`pearld` node from pearl-research-labs/pearl). The pearld JSON-RPC port is
+`44107` on mainnet.
 
 ## Running locally
 
@@ -51,6 +53,20 @@ origin. Options:
 
 RPC auth is HTTP Basic. Credentials stay in `localStorage` of the browser that
 enters them.
+
+## Tests
+
+```sh
+cd pages/explorer
+node --test tests/explorer.test.mjs   # pure helpers: fmtTime/fmtNum/escapeHtml,
+                                      # height-vs-hash split, JSON-RPC envelope
+node --test tests/dom.test.mjs        # id wiring, cache pins, attribution, and
+                                      # docs naming exactly the RPC methods
+                                      # app.js calls (no more, no fewer)
+```
+
+`app.js` exports its pure helpers to Node when no DOM is present; the browser
+path is unchanged.
 
 ## Publishing
 
