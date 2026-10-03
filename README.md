@@ -2,7 +2,7 @@
 
 Autonomous builder workspace for the **Pearl Blockchain** — maintained 24/7 by Muse.
 
-> Tagging the Pearl team: @pearl-research-labs — this repo is 50+ open-source apps
+> Tagging the Pearl team: @pearl-research-labs — this repo is 75 open-source apps
 > and tools built for the Pearl (PRL) ecosystem. Team feedback and corrections welcome.
 
 ## What is Pearl?
@@ -17,14 +17,18 @@ and Plonky2 zk-SNARK block certificates.
 - Official code: https://github.com/pearl-research-labs/pearl
 - This builder repo: https://github.com/Kshot3000/Pearl-Muse-24-7-Ai-builder
 
-## Planned apps (in progress)
+## Selected apps and tools
+
+Everything below is built and live. This table is a selection — the full fleet
+is 75 apps under `pages/`, each catalogued in [`pages/README.md`](pages/README.md)
+and linked from the [hub](https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/).
 
 | App | Status | Description |
 |---|---|---|
 | `index.html` (Pearl website) | ✅ live | Recreated project homepage — PoUW explainer, mining quickstart, dev docs, ecosystem. Served via GitHub Pages |
-| `examples/hello-pearl` | ✅ scaffolded | Minimal TypeScript JSON-RPC client — your first `pearld` connection |
-| `pearl-rpc-client` | ✅ built | Fuller typed TypeScript RPC client library (20+ methods; typechecked + built) |
-| `wallet-helper` | ✅ built | BIP-39/32/86 Taproot address derivation + Oyster wallet JSON-RPC helpers (27 tests, incl. official BIP-86 vectors) |
+| `examples/hello-pearl` | ✅ built | Minimal TypeScript JSON-RPC client — your first `pearld` connection |
+| `examples/pearl-rpc-client` | ✅ built | Fuller typed TypeScript RPC client library (20+ methods; typechecked + built) |
+| `examples/wallet-helper` | ✅ built | BIP-39/32/86 Taproot address derivation + Oyster wallet JSON-RPC helpers (27 tests, incl. official BIP-86 vectors) |
 | `pages/explorer/` | ✅ built | Static block explorer querying a `pearld` RPC node |
 | `pages/faucet/` | ✅ built | Static testnet faucet frontend (bech32m validation) + reference Node backend paying via Oyster `sendtoaddress` |
 | `pages/prl20/` | ✅ built | Static Pearlscriptions / PRL-20 dashboard reading a configurable public indexer API |
@@ -35,12 +39,16 @@ and Plonky2 zk-SNARK block certificates.
 
 ## How the 24/7 builder loop works
 
-1. **Every 2 hours** the builder wakes up and syncs the upstream Pearl mirror
-   (kept in the goal workspace, never pushed).
-2. It works the prioritized queue: fix broken builds → scaffold apps → improve docs.
-3. Each run appends to `hidden_files/build-log.md` so you can see exactly what
-   changed and why.
-4. Finished work is **committed and pushed to `main`** automatically every run.
+1. The builder wakes up on a recurring schedule and checks the state of every
+   Pearl project in this repo (and its companion Hermes repo).
+2. Since 2026-10-01 the loop is in **improvement mode**: new apps are paused,
+   and each run hardens what already exists — correctness first (cross-app bug
+   hunts in the shared Taproot/crypto code), then real-browser re-verification,
+   accessibility, performance, and docs accuracy.
+3. Anything a run ships is tested and verified in a real browser before it is
+   claimed done; a run that can't produce a genuine improvement ships nothing.
+4. Finished work is **committed and pushed to `main`** with a descriptive
+   message — the commit history is the run log.
 
 ## Accessibility
 
@@ -199,11 +207,11 @@ If this builder saved you time, donations are welcome:
 ## Quick start
 
 ```bash
-# 1. Build and run a pearld node (from the upstream mirror)
-task build:pearld
+# 1. Build and run a pearld node from the upstream repo
+#    (https://github.com/pearl-research-labs/pearl — see guides/running-pearld.md)
 
-# 2. Try the hello-pearl RPC example
-cd files/examples/hello-pearl
+# 2. Try the hello-pearl RPC example against it
+cd examples/hello-pearl
 npm install
 PEARL_RPCUSER=youruser PEARL_RPCPASS=yourpass npm start
 ```
