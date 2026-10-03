@@ -33,13 +33,17 @@ function fmtNum(v) {
   } catch { return esc(String(v)); }
 }
 
+function buildUrl(base, path, query = {}) {
+  const url = new URL(base + path);
+  for (const [k, v] of Object.entries(query)) if (v !== "" && v != null) url.searchParams.set(k, v);
+  return url.toString();
+}
+
 async function api(path, query = {}) {
   const base = store.api;
   if (!base) return { ok: false, error: "NO_API" };
-  const url = new URL(base + path);
-  for (const [k, v] of Object.entries(query)) if (v !== "" && v != null) url.searchParams.set(k, v);
   try {
-    const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+    const res = await fetch(buildUrl(base, path, query), { headers: { Accept: "application/json" } });
     if (!res.ok) return { ok: false, error: `HTTP_${res.status}` };
     const data = await res.json().catch(() => null);
     return { ok: true, data };
@@ -247,6 +251,13 @@ async function loadInscriptions() {
   });
 }
 
+function locText(l) {
+  if (!l) return null;
+  if (l.outpoint) return l.outpoint;
+  if (l.txid) return l.txid + ":" + (l.vout ?? "?");
+  return null;
+}
+
 async function loadInscDetail(id) {
   const box = $("insc-detail");
   if (!id) return;
@@ -262,15 +273,16 @@ async function loadInscDetail(id) {
   }
   const d = meta.data || {};
   const l = loc.ok && loc.data ? (loc.data.current || loc.data) : null;
+  const clen = d.contentLength ?? d.content_length;
   const rows = [
     ["Inscription #", esc(d.inscriptionNumber ?? d.number ?? "—")],
     ["Id", `<code class="mono">${esc(d.inscriptionId ?? d.id ?? id)}</code>`],
     ["Content type", esc(d.contentType || d.content_type || "—")],
-    ["Content size", fmtNum(d.contentLength ?? d.content_length) + (d.contentLength ? " bytes" : "")],
+    ["Content size", fmtNum(clen) + (clen ? " bytes" : "")],
     ["Block", fmtNum(d.blockHeight)],
     ["Tx", d.txid ? `<code class="mono">${esc(short(d.txid))}</code>` : "—"],
     ["Owner", l && l.address ? `<code class="mono">${esc(short(l.address, 10))}</code>` : "—"],
-    ["Location", l ? `<code class="mono">${esc(l.outpoint || (l.txid + ":" + (l.vout ?? "?")))}</code>` : "—"]
+    ["Location", locText(l) ? `<code class="mono">${esc(locText(l))}</code>` : "—"]
   ];
   box.innerHTML = `<div class="detail"><h3>Inscription detail</h3>
     <dl class="dl">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join("")}</dl></div>`;
@@ -386,6 +398,16 @@ async function loadAddress(addr) {
   safeScroll(box);
 }
 
+/* Node export for the test suites (tests/prl20.test.mjs): when there is no
+ * DOM, expose the pure helpers and card builders and skip all UI wiring.
+ * In the browser this branch never runs — the else below is the old wiring,
+ * unchanged. */
+if (typeof document === "undefined") {
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = { esc, short, fmtNum, buildUrl, locText, emptyBox, stat, tokenCard, inscCard, LS_KEY };
+  }
+} else {
+
 /* ---------- wiring ---------- */
 
 document.querySelectorAll(".tab").forEach((btn) => {
@@ -436,3 +458,5 @@ $("donate-copy").addEventListener("click", async () => {
 /* init */
 $("api-url").value = store.api;
 connect();
+
+} /* end browser-only wiring guard */

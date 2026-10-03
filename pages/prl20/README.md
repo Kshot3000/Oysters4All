@@ -16,13 +16,18 @@ read-only HTTP API from [`Pearlscriptions/indexer`](https://github.com/Pearlscri
 - The API base URL is typed into the "Indexer API" card and saved in this
   browser's `localStorage` only (`prl20.api`). No keys, no wallet, nothing is
   sent anywhere except `GET` requests to that API.
+- Connection & status — `GET /health` (liveness; the chain/service name is
+  shown in the connection pill), `GET /indexer/status` and `GET /network`
+  (indexed/best height, sync state, checkpoint — the Indexer status card).
 - Tabs:
   - **Tokens** — `GET /tokens` (deployed PRL-20 summaries with mint progress),
     `GET /tokens/:ticker` (deploy/mint/holder state).
   - **Inscriptions** — `GET /inscriptions?order=desc`, `GET /inscriptions/:id`,
     `GET /inscriptions/:id/location`.
   - **Operations** — `GET /operations` (deploy/mint/transfer with validity flags).
-  - **Address** — `GET /addresses/:address/{balances,transfer-lots,utxos,inscriptions}`.
+  - **Address** — `GET /addresses/:address/balances`,
+    `GET /addresses/:address/transfer-lots`, `GET /addresses/:address/utxos`,
+    `GET /addresses/:address/inscriptions`.
 - Every field is read defensively: the UI renders only what the API returns.
   If the API is unreachable or unconfigured, the page says so honestly — no
   bundled or fabricated data anywhere.
@@ -46,6 +51,21 @@ To verify rendering without a live indexer, run any stub HTTP server that
 returns the shapes from the API contract above on `/tokens`, `/inscriptions`,
 `/operations`, and `/addresses/*` — the page is agnostic to the backend as
 long as it follows the contract.
+
+## Tests
+
+`tests/prl20.test.mjs` (logic) pins the pure helpers and card builders —
+HTML escaping, truncation, BigInt-exact number formatting, URL building,
+the inscription-location guard, and token/inscription cards including
+hostile and missing fields. `tests/dom.test.mjs` (wiring/docs) pins every
+`$("id")` lookup against `index.html`, the `styles.css?v=4` / `app.js?v=4`
+cache keys, attribution, the GET-only contract, and the exact endpoint
+set above against the calls `app.js` actually makes.
+
+```sh
+cd pages/prl20
+node --test tests/prl20.test.mjs tests/dom.test.mjs
+```
 
 ## Credits
 
