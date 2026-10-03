@@ -7,9 +7,26 @@
 import { readFileSync } from "node:fs";
 import { webcrypto } from "node:crypto";
 import { createRequire } from "node:module";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
-const require = createRequire("/tmp/package.json");
-const { JSDOM: JSDOMC } = require("jsdom");
+// jsdom is a test-only dependency, kept out of this repo (it ships as a
+// static site). Resolve it from, in order: a node_modules next to this
+// suite, $PEARL_QA_PACKAGE (path to a package.json whose node_modules
+// provides jsdom), the durable QA tools dir ~/workspace/.qa-tools, and
+// the legacy /tmp install. (/tmp alone was unreliable: it is a shared
+// tmpfs that gets wiped, which silently darkened this suite.)
+function loadJsdom() {
+  const bases = [new URL("./package.json", import.meta.url)];
+  if (process.env.PEARL_QA_PACKAGE) bases.push(new URL(`file://${process.env.PEARL_QA_PACKAGE}`));
+  bases.push(new URL(`file://${join(homedir(), "workspace/.qa-tools/package.json")}`));
+  bases.push(new URL("file:///tmp/package.json"));
+  for (const base of bases) {
+    try { return createRequire(base)("jsdom"); } catch { /* try next */ }
+  }
+  throw new Error("jsdom not found — install it into ~/workspace/.qa-tools (npm i jsdom) or set PEARL_QA_PACKAGE");
+}
+const { JSDOM: JSDOMC } = loadJsdom();
 
 const DIR = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 
@@ -23,6 +40,10 @@ const { window } = dom;
 const { document } = window;
 
 // --- browser APIs jsdom lacks ---
+// jsdom's window has no TextEncoder/TextDecoder globals, but the bundle's
+// noble crypto calls them — lend it Node's implementations.
+if (typeof window.TextEncoder === "undefined") window.TextEncoder = TextEncoder;
+if (typeof window.TextDecoder === "undefined") window.TextDecoder = TextDecoder;
 // jsdom ships window.crypto (Node webcrypto) as a getter-only prop — use it.
 if (!window.crypto || !window.crypto.subtle) {
   Object.defineProperty(window, "crypto", { value: webcrypto, configurable: true });

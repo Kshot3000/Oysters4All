@@ -15,10 +15,26 @@ import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { homedir } from "node:os";
 import { randomBytes } from "node:crypto";
 
-const require = createRequire("/tmp/package.json");
-const { JSDOM } = require("jsdom");
+// jsdom is a test-only dependency, kept out of this repo (it ships as a
+// static site). Resolve it from, in order: a node_modules next to this
+// suite, $PEARL_QA_PACKAGE (path to a package.json whose node_modules
+// provides jsdom), the durable QA tools dir ~/workspace/.qa-tools, and
+// the legacy /tmp install. (/tmp alone was unreliable: it is a shared
+// tmpfs that gets wiped, which silently darkened this suite.)
+function loadJsdom() {
+  const bases = [new URL("./package.json", import.meta.url)];
+  if (process.env.PEARL_QA_PACKAGE) bases.push(new URL(`file://${process.env.PEARL_QA_PACKAGE}`));
+  bases.push(new URL(`file://${join(homedir(), "workspace/.qa-tools/package.json")}`));
+  bases.push(new URL("file:///tmp/package.json"));
+  for (const base of bases) {
+    try { return createRequire(base)("jsdom"); } catch { /* try next */ }
+  }
+  throw new Error("jsdom not found — install it into ~/workspace/.qa-tools (npm i jsdom) or set PEARL_QA_PACKAGE");
+}
+const { JSDOM } = loadJsdom();
 
 const dir = dirname(fileURLToPath(import.meta.url));
 const root = join(dir, "..");
@@ -44,6 +60,10 @@ function loadPage(file, query = "", { beforeEval } = {}) {
     runScripts: "outside-only",
   });
   const win = dom.window;
+  // jsdom's window has no TextEncoder/TextDecoder globals, but the bundle's
+  // noble crypto calls them — lend it Node's implementations.
+  if (typeof win.TextEncoder === "undefined") win.TextEncoder = TextEncoder;
+  if (typeof win.TextDecoder === "undefined") win.TextDecoder = TextDecoder;
   win.addEventListener("error", (e) => errors.push("window.onerror: " + (e.message || e.error)));
   // jsdom has no canvas backend: stub getContext so drawChart's null-guard is exercised quietly
   if (win.HTMLCanvasElement && win.HTMLCanvasElement.prototype)
@@ -52,6 +72,10 @@ function loadPage(file, query = "", { beforeEval } = {}) {
   const inline = [];
   for (const s of win.document.querySelectorAll("script")) {
     if (s.src) continue;
+    // Only executable scripts run in a browser; data blocks such as
+    // application/ld+json (the fleet's SEO structured data) never eval.
+    const type = (s.getAttribute("type") || "").trim().toLowerCase();
+    if (type && !["text/javascript", "application/javascript", "module"].includes(type)) continue;
     inline.push(s.textContent);
     s.textContent = ""; // prevent double-run if anything re-evals
   }
