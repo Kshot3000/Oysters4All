@@ -51,6 +51,23 @@ subsidy decays every block, and tx fees are excluded — all stated on the page.
 - `styles.css` — dark + luminous theme, animated aurora background
 - `app.js` — calculator, charts, RPC client (no libraries)
 
+## Tests
+
+`tests/` (Node's built-in runner, no dependencies):
+
+- `tests/mining.test.mjs` — the emission core, exercised through the
+  guarded Node export in `app.js`: exact-grain known answers for all seven
+  heights in upstream `emission_test.go`'s table, genesis/invalid heights
+  paying zero, strict monotonic decay, the cumulative closed form hitting
+  upstream's milestone supplies (exactly 1.05B at h = 650226), and the
+  telescoping property — per-block floored subsidies sum to the closed-form
+  supply within one grain per block.
+- `tests/dom.test.mjs` — wiring: every id `app.js` looks up exists in
+  `index.html`, cache-buster pins, attribution, chart-tab modes, and the
+  pearld RPC methods the node panel uses.
+
+Run: `node --test tests/`
+
 ## Publish
 
 This directory is served as-is by GitHub Pages from the repo root (`/`).

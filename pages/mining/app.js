@@ -35,6 +35,25 @@
     return 2100000000 * H / (H + 650226);
   }
 
+  /* Node export for the test suites (tests/mining.test.mjs): when there is
+   * no DOM, expose the pure emission math and stop before any UI wiring.
+   * In the browser this branch never runs. */
+  if (typeof document === 'undefined') {
+    if (typeof module !== 'undefined' && module.exports) {
+      module.exports = {
+        subsidyGrains: subsidyGrains,
+        subsidyPrl: subsidyPrl,
+        cumulativePrl: cumulativePrl,
+        GRAINS_PER_PRL: GRAINS_PER_PRL,
+        TOTAL_SUPPLY_GRAINS: TOTAL_SUPPLY_GRAINS,
+        EMISSION_CONSTANT: EMISSION_CONSTANT,
+        BLOCK_SECS: BLOCK_SECS,
+        BLOCKS_PER_DAY: BLOCKS_PER_DAY
+      };
+    }
+    return;
+  }
+
   /* ---------- dom helpers ---------- */
   var $ = function (id) { return document.getElementById(id); };
   var els = {
