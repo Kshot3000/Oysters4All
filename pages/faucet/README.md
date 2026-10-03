@@ -41,6 +41,16 @@ python3 -m http.server 8080
 # (optionally run examples/faucet-backend locally first)
 ```
 
+## Tests
+
+```bash
+node --test tests/faucet.test.mjs  # 18: bech32m decode/validate — real mainnet
+                                   # vector, independent-encoder tprl vectors,
+                                   # v0/padding/length/case/tamper rejections
+node --test tests/dom.test.mjs     # 5: id wiring, ?v= pins, attribution,
+                                   # testnet-only network select
+```
+
 ## Standing requirements
 
 Donation address and X account are in the page footer + donate section:

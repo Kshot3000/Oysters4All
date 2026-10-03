@@ -48,7 +48,8 @@ Then set **proxy base** in the app to `http://127.0.0.1:8787` (routes
 
 ```sh
 cd pages/rig
-node --test test/rig.test.mjs   # 20/20: subsidy vectors, plan math, parsers, formatters
+node --test tests/rig.test.mjs   # 20/20: subsidy vectors, plan math, parsers, formatters
+node --test tests/dom.test.mjs    # 3/3: id wiring, attribution, cache keys
 node --check js/rig-core.js && node --check js/app.js
 ```
 
