@@ -163,6 +163,17 @@ dashboard's wide pool table while the landing page's cards and hero
 glow are clipped to the screen. Re-probed after the fix: 0 of 82 pages
 scroll horizontally at 320px, with zero console errors.
 
+## Discovery
+
+The hub ships a `sitemap.xml` covering all 80 public pages (the hub, all
+75 apps, the three Pearl Bazaar sub-pages, and the Pearl Pay invoice page)
+with each URL taken from that page's own canonical `og:url`, plus a
+`robots.txt` that points crawlers at it. Missed URLs serve a branded
+`404.html` in the hub's dark Pearl palette — fully self-contained inline
+styles, because GitHub Pages serves it at any path depth where relative
+assets would break — with absolute links back to the hub and the app
+index.
+
 ## Support this work
 
 If this builder saved you time, donations are welcome:
