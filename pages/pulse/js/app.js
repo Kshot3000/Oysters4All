@@ -47,7 +47,19 @@ function load() {
     if (!raw) return structuredClone(DEFAULTS);
     const s = JSON.parse(raw);
     return {
-      watchlist: Array.isArray(s.watchlist) ? s.watchlist : [],
+      // Re-validate persisted entries: localStorage is untrusted input on
+      // load (it is only written through the validated add-form today, but
+      // nothing may reach the innerHTML renderers below without having
+      // passed the same bech32m mainnet check the add-form enforces).
+      watchlist: Array.isArray(s.watchlist)
+        ? s.watchlist
+            .filter((w) => {
+              try {
+                return w && validatePearlAddress(String(w.addr ?? '')).network === 'mainnet';
+              } catch { return false; }
+            })
+            .map((w) => ({ ...w, addr: String(w.addr).trim().toLowerCase() }))
+        : [],
       settings: { ...DEFAULTS.settings, ...(s.settings || {}) },
       cache: s.cache && typeof s.cache === 'object' ? s.cache : {},
     };
@@ -75,6 +87,19 @@ function save() {
 }
 
 const $ = (id) => document.getElementById(id);
+
+/** Escape a string for interpolation into innerHTML (element or attribute
+ * context). Backend responses and persisted state are untrusted: the
+ * blockbook base URL is user-configurable, so a hostile or compromised
+ * backend must never be able to inject markup into this origin. */
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 function alert(id, kind, html) {
   let el = document.getElementById('alert-' + id);
@@ -211,7 +236,7 @@ async function loadWatchlist() {
     } catch (e) {
       if (!rec) {
         alert('addr-' + w.addr.slice(0, 12), 'warn',
-          `⚠ Could not load ${shortAddress(w.addr)}: ${e.message}. ${PROXY_HINT}`);
+          `⚠ Could not load ${esc(shortAddress(w.addr))}: ${esc(e.message)}. ${PROXY_HINT}`);
       }
     }
     recs.push({ w, rec });
@@ -233,7 +258,7 @@ function renderWatchlist(recs) {
     const bal = rec ? rec.balance : null;
     const usd = bal !== null && lastPrice !== null ? fmtUSD(grainsUsd(bal, lastPrice)) : '—';
     tr.innerHTML = `
-      <td class="addr-cell" title="${w.addr}">${shortAddress(w.addr)}
+      <td class="addr-cell" title="${esc(w.addr)}">${esc(shortAddress(w.addr))}
         ${w.label ? `<span class="lbl"></span>` : ''}</td>
       <td class="num">${bal === null ? '—' : fmtPRL(bal) + ' PRL'}</td>
       <td class="num">${usd}</td>
@@ -241,9 +266,9 @@ function renderWatchlist(recs) {
       <td class="num">${rec ? fmtPRL(rec.totalReceived) : '—'}</td>
       <td class="num">${rec ? fmtPRL(rec.totalSent) : '—'}</td>
       <td class="row-actions">
-        <button class="link-btn" data-act="txs" data-addr="${w.addr}">txs</button>
-        <button class="link-btn" data-act="open" data-addr="${w.addr}">open ↗</button>
-        <button class="link-btn" data-act="rm" data-addr="${w.addr}">remove</button>
+        <button class="link-btn" data-act="txs" data-addr="${esc(w.addr)}">txs</button>
+        <button class="link-btn" data-act="open" data-addr="${esc(w.addr)}">open ↗</button>
+        <button class="link-btn" data-act="rm" data-addr="${esc(w.addr)}">remove</button>
       </td>`;
     if (w.label) tr.querySelector('.lbl').textContent = w.label;
     body.appendChild(tr);
@@ -295,14 +320,14 @@ async function loadTxs(addr) {
       const tr = document.createElement('tr');
       const confs = tx.confirmations ?? (tx.blockHeight ? '—' : '0');
       tr.innerHTML = `
-        <td><a class="link-btn" href="${bb('/tx/' + tx.txid)}" target="_blank" rel="noopener">${shortHash(tx.txid)} ↗</a></td>
+        <td><a class="link-btn" href="${esc(bb('/tx/' + tx.txid))}" target="_blank" rel="noopener">${esc(shortHash(tx.txid))} ↗</a></td>
         <td>${tx.blockTime ? timeAgo(tx.blockTime) : '—'}</td>
         <td><span class="dir ${dir}">${dir}</span></td>
         <td class="num">${r > 0n ? fmtPRL(r) : '—'}</td>
         <td class="num">${s > 0n ? fmtPRL(s) : '—'}</td>
         <td class="num">${net === 0n ? '0' : (net > 0n ? '+' : '−') + fmtPRL(net < 0n ? -net : net)}</td>
         <td class="num">${tx.fees ? fmtPRL(tx.fees) : '—'}</td>
-        <td class="num">${typeof confs === 'number' ? confs.toLocaleString('en-US') : confs}</td>`;
+        <td class="num">${typeof confs === 'number' ? confs.toLocaleString('en-US') : esc(String(confs))}</td>`;
       body.appendChild(tr);
     }
   } catch (e) {

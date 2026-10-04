@@ -78,13 +78,17 @@ addresses, labels, and cached balances.
 
 ## Tests
 
-`node --test tests/verify.mjs` — 28/28 green: address validation vectors
+`node --test tests/verify.mjs` — 33/33 green: address validation vectors
 (valid mainnet P2TR, uppercase, whitespace, mixed-case, checksum mutation,
 witness-v0 rejection, Bitcoin HRP rejection, base58 rejection, tprl/rprl,
 oversize program), money formatting, `timeAgo`, live-captured blockbook
 status/address fixtures (2026-09-27), live-captured CoinEx **PEARLUSDT** ticker
 fixture (changePct math) and CoinGecko `pearl-2` fixture, per-address
-received/sent/net/direction, portfolio totals. Plus `node proxy.mjs`
+received/sent/net/direction, portfolio totals. Five source pins cover the
+2026-10-04 XSS hardening: backend-supplied txids/confirmations and
+persisted watchlist addresses are escaped before every `innerHTML`
+render, and persisted watchlist entries are re-validated (bech32m,
+mainnet) on load. Plus `node proxy.mjs`
 smoke-tested locally (blockbook status/address + CoinEx through the proxy,
 `access-control-allow-origin: *` present).
 

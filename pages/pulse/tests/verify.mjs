@@ -7,6 +7,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   GRAIN_PER_PRL,
   validatePearlAddress,
@@ -296,4 +297,39 @@ test('portfolioTotal and fundedCount', () => {
 test('grainsToBigInt accepts bigint/string/number forms', () => {
   assert.equal(grainsToBigInt('42'), 42n);
   assert.equal(grainsToBigInt(42n), 42n);
+});
+
+// ------------------------------------------------- XSS hardening (app.js)
+// Regression pins for the 2026-10-04 fleet XSS audit (the pool-dashboard
+// bug class): Pulse renders data from a user-configurable blockbook
+// backend and from localStorage into innerHTML, so every non-numeric
+// interpolation must be escaped and persisted watchlist entries must be
+// re-validated on load. These are source pins in the fleet dom-suite style.
+const APP_JS = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
+const INDEX_HTML = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+
+test('app.js defines the fleet esc() helper (& escaped first)', () => {
+  assert.match(APP_JS, /function esc\(s\) \{\s*return String\(s \?\? ''\)\s*\.replace\(\/&\/g, '&amp;'\)/);
+});
+
+test('watchlist row escapes the address in title, content and data-addr', () => {
+  assert.match(APP_JS, /title="\$\{esc\(w\.addr\)\}"/);
+  assert.match(APP_JS, /\$\{esc\(shortAddress\(w\.addr\)\)\}/);
+  assert.equal(APP_JS.match(/data-addr="\$\{esc\(w\.addr\)\}"/g)?.length, 3);
+  assert.doesNotMatch(APP_JS, /data-addr="\$\{w\.addr\}"/);
+});
+
+test('watchlist load alert escapes address and error message', () => {
+  assert.match(APP_JS, /Could not load \$\{esc\(shortAddress\(w\.addr\)\)\}: \$\{esc\(e\.message\)\}/);
+});
+
+test('tx row escapes backend-supplied txid and confirmations', () => {
+  assert.match(APP_JS, /href="\$\{esc\(bb\('\/tx\/' \+ tx\.txid\)\)\}"/);
+  assert.match(APP_JS, /\$\{esc\(shortHash\(tx\.txid\)\)\}/);
+  assert.match(APP_JS, /: esc\(String\(confs\)\)\}/);
+});
+
+test('load() re-validates persisted watchlist entries (mainnet only)', () => {
+  assert.match(APP_JS, /validatePearlAddress\(String\(w\.addr \?\? ''\)\)\.network === 'mainnet'/);
+  assert.match(INDEX_HTML, /js\/app\.js\?v=1\.2\.1/);
 });
