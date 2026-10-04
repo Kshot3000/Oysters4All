@@ -331,5 +331,11 @@ test('tx row escapes backend-supplied txid and confirmations', () => {
 
 test('load() re-validates persisted watchlist entries (mainnet only)', () => {
   assert.match(APP_JS, /validatePearlAddress\(String\(w\.addr \?\? ''\)\)\.network === 'mainnet'/);
-  assert.match(INDEX_HTML, /js\/app\.js\?v=1\.2\.1/);
+  assert.match(INDEX_HTML, /js\/app\.js\?v=1\.2\.2/);
+});
+
+
+test('core module import is cache-versioned (structural ?v= gap)', () => {
+  assert.ok(APP_JS.includes("from './pulse-core.js?v=1'"), 'pulse-core import carries ?v=');
+  assert.ok(!APP_JS.includes("from './pulse-core.js';"), 'no unversioned core import remains');
 });

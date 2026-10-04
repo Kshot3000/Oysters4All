@@ -7,6 +7,9 @@
   if (!G) { document.body.innerHTML = "<p style='padding:40px'>Pearl Games failed to load (bundle missing).</p>"; return; }
 
   const $ = (id) => document.getElementById(id);
+  function esc(s) {
+    return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
   const els = {};
   ["steps", "role-switch", "role-hint", "in-game", "in-bet", "game-desc", "in-stake", "in-timeout",
    "timeout-est", "stakes-preview", "in-net", "in-dealer", "in-player", "in-blockbook", "in-feerate",
@@ -153,7 +156,7 @@
         `<div><div class="k">Dealer posts</div><div class="v">${G.grainsToPRL(stakes.dealer)} PRL</div></div>` +
         `<div><div class="k">Player posts</div><div class="v">${G.grainsToPRL(stakes.player)} PRL</div></div>` +
         `<div><div class="k">Winner takes</div><div class="v gold-text">${G.grainsToPRL(stakes.dealer + stakes.player)} PRL</div></div>`;
-    } catch (e) { els.stakes_preview.innerHTML = `<p class="hint">${e.message}</p>`; }
+    } catch (e) { els.stakes_preview.innerHTML = `<p class="hint">${esc(e.message)}</p>`; }
   }
   updateStakesPreview();
 

@@ -69,8 +69,8 @@ table. CSV export per run, full CSV export, and a clear button.
 ```bash
 cd files/pages/payroll
 node build.mjs                                   # rebuilds pearl-payroll.bundle.js
-node --no-warnings --loader ./tests/loader.mjs tests/payroll.test.mjs      # 44 core tests
-node --no-warnings --loader ./tests/loader.mjs tests/payroll.dom.test.mjs  # 14 DOM tests
+node --no-warnings --loader ./tests/loader.mjs tests/payroll.test.mjs      # 45 core tests
+node --no-warnings --loader ./tests/loader.mjs tests/payroll.dom.test.mjs  # 15 DOM tests
 ```
 
 Protocol facts reused from the audited Pearl Sign lineage: bech32m `prl1…`/

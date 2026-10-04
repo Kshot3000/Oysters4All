@@ -57,7 +57,7 @@ no new cryptography.
 
 ## Tests
 
-- `tests/fund.test.mjs` — 34/34: campaign/pledge descriptor round-trips +
+- `tests/fund.test.mjs` — 35/35: campaign/pledge descriptor round-trips +
   tamper refusal, NUMS + leaf construction, release/refund signing flows,
   deadline gating, funding classification.
 

@@ -153,7 +153,7 @@
       const tb = $("m-tbody"); tb.innerHTML = "";
       m.recipients.forEach((r, i) => {
         const tr = document.createElement("tr");
-        tr.innerHTML = `<td class="mut">${i + 1}</td><td class="addr-short" title="${r.address}">${shortAddr(r.address)}</td>` +
+        tr.innerHTML = `<td class="mut">${i + 1}</td><td class="addr-short" title="${escapeHtml(r.address)}">${escapeHtml(shortAddr(r.address))}</td>` +
           `<td>${R.fmtPRL(r.amount)} <span class="mut">PRL</span></td><td class="mut">${r.memo ? escapeHtml(r.memo) : "—"}</td>`;
         tb.appendChild(tr);
       });
@@ -192,7 +192,7 @@
       cb.addEventListener("change", () => { u.checked = cb.checked; tr.classList.toggle("sel", cb.checked); renderTotals(); });
       const td0 = document.createElement("td"); td0.appendChild(cb); tr.appendChild(td0);
       tr.insertAdjacentHTML("beforeend",
-        `<td class="mut">${i + 1}</td><td title="${u.txid}">${shortTxid(u.txid)}</td>` +
+        `<td class="mut">${i + 1}</td><td title="${escapeHtml(u.txid)}">${escapeHtml(shortTxid(u.txid))}</td>` +
         `<td>${u.vout}</td><td>${R.fmtPRL(BigInt(u.value))} <span class="mut">PRL</span></td><td class="mut">${u.confirmations ?? "?"}</td>`);
       tb.appendChild(tr);
     });
@@ -293,7 +293,7 @@
       r.hidden = false; return;
     }
     $("r-summary").innerHTML =
-      `<div><dt>Sender</dt><dd title="${state.senderAddress}">${shortAddr(state.senderAddress)}</dd></div>` +
+      `<div><dt>Sender</dt><dd title="${escapeHtml(state.senderAddress)}">${escapeHtml(shortAddr(state.senderAddress))}</dd></div>` +
       `<div><dt>Network</dt><dd>${net().label} (${net().hrp}1…)</dd></div>` +
       `<div><dt>Inputs</dt><dd>${plan.nIn} UTXO(s) → ${R.fmtPRL(plan.total)} PRL</dd></div>` +
       `<div><dt>Recipients</dt><dd>${m.recipients.length} → ${R.fmtPRL(plan.sumOut)} PRL</dd></div>` +
@@ -302,7 +302,7 @@
     const tb = $("r-tbody"); tb.innerHTML = "";
     m.recipients.forEach((r, i) => {
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td class="mut">${i + 1}</td><td class="addr-short" title="${r.address}">${shortAddr(r.address)}</td>` +
+      tr.innerHTML = `<td class="mut">${i + 1}</td><td class="addr-short" title="${escapeHtml(r.address)}">${escapeHtml(shortAddr(r.address))}</td>` +
         `<td>${R.fmtPRL(r.amount)} <span class="mut">PRL</span></td><td class="mut">${r.memo ? escapeHtml(r.memo) : "—"}</td>`;
       tb.appendChild(tr);
     });
@@ -310,7 +310,7 @@
     const ib = $("r-itbody"); ib.innerHTML = "";
     plan.inputs.forEach((u, i) => {
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td class="mut">${i + 1}</td><td title="${u.txid}">${shortTxid(u.txid)}</td><td>${u.vout}</td><td>${R.fmtPRL(BigInt(u.value))} <span class="mut">PRL</span></td>`;
+      tr.innerHTML = `<td class="mut">${i + 1}</td><td title="${escapeHtml(u.txid)}">${escapeHtml(shortTxid(u.txid))}</td><td>${u.vout}</td><td>${R.fmtPRL(BigInt(u.value))} <span class="mut">PRL</span></td>`;
       ib.appendChild(tr);
     });
     $("r-fee").innerHTML =

@@ -55,7 +55,7 @@ Five steps — **Recipients → Fund → Review → Sign → Broadcast**:
   incl. dust-absorption, bundle round-trip + tamper refusal, signing, audit.
 - `node --no-warnings --loader ./tests/loader.mjs tests/batch.dom.test.mjs` —
   DOM integration tests driving the real `pearl-batch.bundle.js` + `app.js`
-  with a stubbed Blockbook (15/15): full 5-step wizard, manual/auto selection,
+  with a stubbed Blockbook (16/16): full 5-step wizard, manual/auto selection,
   bundle export/import, wrong-key refusal, key wipe, broadcast POST, tracking,
   standalone verifier.
 - `node ~/workspace/goals/pearl-blockchain-24-7-builder/hidden_files/qa-batch-browser.mjs` —

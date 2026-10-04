@@ -2,6 +2,7 @@
 // Run: node --no-warnings --loader ./tests/loader.mjs tests/games.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   GAMES, parseGame, parseBet, stakesFor, validateTimeout,
   newSecret, commitmentFor, verifyReveal, outcomeFor, winnerFor, revealAndScore,
@@ -384,4 +385,17 @@ test("gameKeyFromInput accepts x-only, mnemonic, WIF", () => {
   assert.equal(b.xonly, dealerX);
   assert.ok(b.priv instanceof Uint8Array);
   assert.throws(() => gameKeyFromInput("nope", net), /must be/);
+});
+
+// ------------------------------------------------- XSS hardening (app.js)
+// Regression pins for the 2026-10-04 fleet XSS audit latent queue:
+// the stakes-preview catch was the fleet's last unescaped e.message ->
+// innerHTML (the core error echoes the user's own stake input).
+test("stakes preview escapes the prlToGrains error message", () => {
+  const app = readFileSync(new URL("../app.js", import.meta.url), "utf8");
+  const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  assert.match(app, /function esc\(s\)/);
+  assert.ok(app.includes("${esc(e.message)}"), "preview error escaped");
+  assert.ok(!app.includes("${e.message}"), "no raw e.message interpolation remains");
+  assert.ok(html.includes('app.js?v=2'), "cache key bumped");
 });

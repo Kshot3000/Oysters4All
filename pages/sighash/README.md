@@ -60,7 +60,7 @@ engineering-drafting theme (cyan drafting ink on deep-blue grid paper).
 
 ## Verification
 
-- 84/84 core tests, 56/56 DOM tests.
+- 84/84 core tests, 57/57 DOM tests.
 - 31/31 real-browser QA checks in headless Chromium 152 (file:// + CDP),
   zero console/page errors — harness at
   `~/workspace/goals/pearl-blockchain-24-7-builder/hidden_files/qa-sighash-browser.mjs`

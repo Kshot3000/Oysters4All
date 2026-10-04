@@ -8,7 +8,7 @@ import {
   estimateFromYield, plan, fleetWatts,
   parseCoinGeckoPayload, parseCoinExPayload,
   fmtPRL, fmtUSD, fmtDays, fmtPct, timeAgo,
-} from './rig-core.js';
+} from './rig-core.js?v=1';
 
 const LS_KEY = 'pearlRig.v1';
 const DONATE = 'prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d';

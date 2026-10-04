@@ -25,3 +25,10 @@ test('cache-buster keys present on css + js', () => {
   assert.ok(html.includes('styles.css?v='));
   assert.ok(html.includes('js/app.js?v='));
 });
+
+
+test('core module import is cache-versioned (structural ?v= gap)', () => {
+  assert.ok(js.includes("from './rig-core.js?v=1'"), 'rig-core import carries ?v=');
+  assert.ok(!js.includes("from './rig-core.js';"), 'no unversioned core import remains');
+  assert.ok(html.includes('js/app.js?v=1.0.3'));
+});

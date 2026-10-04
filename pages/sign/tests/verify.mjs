@@ -8,6 +8,7 @@
 // selection, amount parsing, UTXO list parsing, spk description.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   NETWORKS, GRAIN_PER_PRL, DUST_GRAIN,
@@ -220,4 +221,17 @@ test("RPC helpers distinguish unreachable endpoints from rejections", async () =
     () => core.pearldRpc("http://127.0.0.1:1", "u", "p", "getblockcount"),
     /unreachable/
   );
+});
+
+// ------------------------------------------------- XSS hardening (app.js)
+// Regression pins for the 2026-10-04 fleet XSS audit latent queue:
+// renderSigResults interpolates r.reason into innerHTML; one reason path
+// passes a caught error message through from verifying pasted tx data.
+test("signature results escape r.reason before innerHTML", () => {
+  const app = readFileSync(new URL("../app.js", import.meta.url), "utf8");
+  const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  assert.match(app, /function esc\(s\)/);
+  assert.ok(app.includes("${esc(r.reason)}"), "reason escaped");
+  assert.ok(!app.includes("— ${r.reason}"), "no raw reason interpolation remains");
+  assert.ok(html.includes('app.js?v=5'), "cache key bumped");
 });

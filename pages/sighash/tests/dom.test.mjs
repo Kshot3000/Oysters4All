@@ -72,5 +72,13 @@ const css = fs.readFileSync(path.join(root, "styles.css"), "utf8");
 ok("blueprint grid background", /linear-gradient/.test(css) && /0a2249/.test(css));
 ok("cyan drafting ink", /7df9ff/.test(css));
 
+/* 8. row builders escape value attributes (XSS audit latent queue) */
+ok("input/output row values pass through escAttr",
+  appSrc.includes("escAttr(txid || ") && appSrc.includes("escAttr(spk || ") &&
+  appSrc.includes("escAttr(value == null") && appSrc.includes("escAttr(vout == null") &&
+  appSrc.includes("escAttr(seq == null") && !appSrc.includes("+ (txid || ") &&
+  html.includes("app.js?v=4"));
+
 console.log(`\ndom: ${pass} pass, ${fail} fail`);
 process.exit(fail ? 1 : 0);
+

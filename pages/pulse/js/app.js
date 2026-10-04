@@ -15,7 +15,7 @@ import {
   txReceived, txSent, txNet, txDirection,
   parseTickerPayload, parseCoinGeckoPayload,
   portfolioTotal, fundedCount,
-} from './pulse-core.js';
+} from './pulse-core.js?v=1';
 
 const LS_KEY = 'pearlPulse.v1';
 const DONATE = 'prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d';

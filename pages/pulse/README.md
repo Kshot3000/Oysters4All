@@ -78,7 +78,7 @@ addresses, labels, and cached balances.
 
 ## Tests
 
-`node --test tests/verify.mjs` — 33/33 green: address validation vectors
+`node --test tests/verify.mjs` — 34/34 green: address validation vectors
 (valid mainnet P2TR, uppercase, whitespace, mixed-case, checksum mutation,
 witness-v0 rejection, Bitcoin HRP rejection, base58 rejection, tprl/rprl,
 oversize program), money formatting, `timeAgo`, live-captured blockbook

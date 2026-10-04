@@ -8,6 +8,7 @@
   if (!PS) { document.body.innerHTML = "<p style='padding:40px;font-family:monospace'>PearlSighash failed to load (bundle missing?).</p>"; return; }
 
   var $ = function (id) { return document.getElementById(id); };
+  var escAttr = function (s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
   var STEPS = ["build", "anatomy", "compare", "sign", "verify"];
   var PRL_ADDR = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
 
@@ -79,11 +80,11 @@
     var tr = document.createElement("tr");
     tr.innerHTML =
       '<td class="num">' + i + '</td>' +
-      '<td><input type="text" spellcheck="false" size="40" value="' + (txid || "") + '"></td>' +
-      '<td><input type="text" size="4" value="' + (vout == null ? "" : vout) + '"></td>' +
-      '<td><input type="text" size="14" value="' + (value == null ? "" : value) + '"></td>' +
-      '<td><input type="text" spellcheck="false" size="40" value="' + (spk || "") + '"></td>' +
-      '<td><input type="text" size="10" value="' + (seq == null ? "4294967295" : seq) + '"></td>' +
+      '<td><input type="text" spellcheck="false" size="40" value="' + escAttr(txid || "") + '"></td>' +
+      '<td><input type="text" size="4" value="' + escAttr(vout == null ? "" : vout) + '"></td>' +
+      '<td><input type="text" size="14" value="' + escAttr(value == null ? "" : value) + '"></td>' +
+      '<td><input type="text" spellcheck="false" size="40" value="' + escAttr(spk || "") + '"></td>' +
+      '<td><input type="text" size="10" value="' + escAttr(seq == null ? "4294967295" : seq) + '"></td>' +
       '<td><button class="mini danger rm">×</button></td>';
     tr.querySelector(".rm").addEventListener("click", function () { tr.remove(); renumber("#b-inputs"); });
     return tr;
@@ -92,8 +93,8 @@
     var tr = document.createElement("tr");
     tr.innerHTML =
       '<td class="num">' + i + '</td>' +
-      '<td><input type="text" size="14" value="' + (value == null ? "" : value) + '"></td>' +
-      '<td><input type="text" spellcheck="false" size="52" value="' + (spk || "") + '"></td>' +
+      '<td><input type="text" size="14" value="' + escAttr(value == null ? "" : value) + '"></td>' +
+      '<td><input type="text" spellcheck="false" size="52" value="' + escAttr(spk || "") + '"></td>' +
       '<td><button class="mini danger rm">×</button></td>';
     tr.querySelector(".rm").addEventListener("click", function () { tr.remove(); renumber("#b-outputs"); });
     return tr;

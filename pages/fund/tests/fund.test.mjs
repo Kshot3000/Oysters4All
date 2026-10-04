@@ -2,6 +2,7 @@
 // Run: node --no-warnings --loader ./tests/loader.mjs tests/fund.test.mjs
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   buildReleaseScript, buildRefundScript, numsInternalKey,
   createCampaign, campaignDescriptor, campaignFromDescriptor,
@@ -492,4 +493,17 @@ test("summarizePledges: totals, goal-met, countdown", () => {
   assert.equal(s.matured, false);
   assert.equal(s.backerCount, 2);
   assert.equal(s.progressPct, 110);
+});
+
+// ------------------------------------------------- XSS hardening (app.js)
+// Regression pins for the 2026-10-04 fleet XSS audit latent queue:
+// tracker/release rows interpolated core-derived address/backer/txid into
+// title attributes unescaped; safe only while core canonicalisation holds.
+test("fund rows escape address/backer/txid in titles and text", () => {
+  const app = readFileSync(new URL("../app.js", import.meta.url), "utf8");
+  const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  assert.match(app, /function esc\(s\)/);
+  assert.ok(!/title="\$\{(r|e)\.(address|backer|txid)\}"/.test(app), "no raw title interpolation");
+  assert.equal((app.match(/title="\$\{esc\(/g) || []).length, 4, "all four titles escaped");
+  assert.ok(html.includes('app.js?v=2'), "cache key bumped");
 });

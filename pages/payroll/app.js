@@ -165,7 +165,7 @@
       const tr = document.createElement("tr");
       tr.innerHTML = `<td class="mut">${i + 1}</td>` +
         `<td>${r.label ? escapeHtml(r.label) : '<span class="mut">—</span>'}</td>` +
-        `<td class="addr-short" title="${r.address}">${shortAddr(r.address)}</td>` +
+        `<td class="addr-short" title="${escapeHtml(r.address)}">${escapeHtml(shortAddr(r.address))}</td>` +
         `<td>${R.fmtPRL(r.amount)} <span class="mut">PRL</span></td>`;
       const td = document.createElement("td");
       const eb = document.createElement("button");
@@ -356,7 +356,7 @@
       cb.addEventListener("change", () => { u.checked = cb.checked; tr.classList.toggle("sel", cb.checked); renderTotals(); });
       const td0 = document.createElement("td"); td0.appendChild(cb); tr.appendChild(td0);
       tr.insertAdjacentHTML("beforeend",
-        `<td class="mut">${i + 1}</td><td title="${u.txid}">${shortTxid(u.txid)}</td>` +
+        `<td class="mut">${i + 1}</td><td title="${escapeHtml(u.txid)}">${escapeHtml(shortTxid(u.txid))}</td>` +
         `<td>${u.vout}</td><td>${R.fmtPRL(BigInt(u.value))} <span class="mut">PRL</span></td><td class="mut">${u.confirmations ?? "?"}</td>`);
       tb.appendChild(tr);
     });
@@ -465,7 +465,7 @@
       r.hidden = false; return;
     }
     $("r2-summary").innerHTML =
-      `<div><dt>Sender</dt><dd title="${state.senderAddress}">${shortAddr(state.senderAddress)}</dd></div>` +
+      `<div><dt>Sender</dt><dd title="${escapeHtml(state.senderAddress)}">${escapeHtml(shortAddr(state.senderAddress))}</dd></div>` +
       `<div><dt>Network</dt><dd>${net().label} (${net().hrp}1…)</dd></div>` +
       `<div><dt>Run</dt><dd>${escapeHtml(sch.runLabel)} — ${sch.payDate} (${sch.period})</dd></div>` +
       `<div><dt>Inputs</dt><dd>${plan.nIn} UTXO(s) → ${R.fmtPRL(plan.total)} PRL</dd></div>` +
@@ -476,7 +476,7 @@
     roster.payees.forEach((r, i) => {
       const tr = document.createElement("tr");
       tr.innerHTML = `<td class="mut">${i + 1}</td><td>${r.label ? escapeHtml(r.label) : '<span class="mut">—</span>'}</td>` +
-        `<td class="addr-short" title="${r.address}">${shortAddr(r.address)}</td>` +
+        `<td class="addr-short" title="${escapeHtml(r.address)}">${escapeHtml(shortAddr(r.address))}</td>` +
         `<td>${R.fmtPRL(r.amount)} <span class="mut">PRL</span></td>`;
       tb.appendChild(tr);
     });
@@ -484,7 +484,7 @@
     const ib = $("r2-itbody"); ib.innerHTML = "";
     plan.inputs.forEach((u, i) => {
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td class="mut">${i + 1}</td><td title="${u.txid}">${shortTxid(u.txid)}</td><td>${u.vout}</td><td>${R.fmtPRL(BigInt(u.value))} <span class="mut">PRL</span></td>`;
+      tr.innerHTML = `<td class="mut">${i + 1}</td><td title="${escapeHtml(u.txid)}">${escapeHtml(shortTxid(u.txid))}</td><td>${u.vout}</td><td>${R.fmtPRL(BigInt(u.value))} <span class="mut">PRL</span></td>`;
       ib.appendChild(tr);
     });
     $("r2-fee").innerHTML =
@@ -679,7 +679,7 @@
       const tr = document.createElement("tr");
       tr.innerHTML = `<td>${escapeHtml(r.payDate) || '<span class="mut">—</span>'}</td>` +
         `<td>${escapeHtml(r.runLabel) || '<span class="mut">—</span>'}</td>` +
-        `<td class="addr-short" title="${r.txid}">${shortTxid(r.txid)}</td>` +
+        `<td class="addr-short" title="${escapeHtml(r.txid)}">${escapeHtml(shortTxid(r.txid))}</td>` +
         `<td class="mut">${r.payees.length}</td>` +
         `<td>${R.fmtPRL(BigInt(r.feeGrains))} <span class="mut">PRL</span></td>`;
       tb.appendChild(tr);
@@ -692,7 +692,7 @@
       .forEach((e) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `<td>${e.label ? escapeHtml(e.label) : '<span class="mut">—</span>'}</td>` +
-          `<td class="addr-short" title="${e.address}">${shortAddr(e.address)}</td>` +
+          `<td class="addr-short" title="${escapeHtml(e.address)}">${escapeHtml(shortAddr(e.address))}</td>` +
           `<td>${R.fmtPRL(e.totalGrains)} <span class="mut">PRL</span></td><td class="mut">${e.runs}</td>`;
         ttb.appendChild(tr);
       });

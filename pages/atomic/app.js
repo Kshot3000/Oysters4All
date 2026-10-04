@@ -40,6 +40,9 @@
     settleMode: "claim",
   };
 
+  function esc(s) {
+    return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
   function err(id, msg) {
     const el = $(id);
     if (msg == null) { el.hidden = true; el.textContent = ""; }
@@ -228,7 +231,7 @@
         const w = $("deal-warnings");
         w.hidden = false;
         w.innerHTML = "<strong>Warnings — read before funding:</strong><ul>" +
-          warns.map((x) => `<li>${x.replace(/</g, "&lt;")}</li>`).join("") + "</ul>";
+          warns.map((x) => `<li>${esc(x)}</li>`).join("") + "</ul>";
       }
       renderContract();
       goto("contract");

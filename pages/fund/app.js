@@ -119,6 +119,9 @@
   }
 
   function grains(g) { return R.grainsToPRL(g) + " PRL"; }
+  function esc(s) {
+    return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
   function shortTxid(t) { return t.slice(0, 10) + "…" + t.slice(-6); }
   function shortKey(x) { return String(x).slice(0, 12) + "…" + String(x).slice(-8); }
 
@@ -407,8 +410,8 @@
       for (const r of summary.rows) {
         const tr = document.createElement("tr");
         tr.innerHTML =
-          `<td class="mono" title="${r.address}">${r.address.slice(0, 14)}…${r.address.slice(-8)}</td>` +
-          `<td class="mono" title="${r.backer}">${shortKey(r.backer)}</td>` +
+          `<td class="mono" title="${esc(r.address)}">${esc(r.address.slice(0, 14))}…${esc(r.address.slice(-8))}</td>` +
+          `<td class="mono" title="${esc(r.backer)}">${esc(shortKey(r.backer))}</td>` +
           `<td class="mono">${grains(r.totalValue)}${r.totalValue === "0" ? " (unfunded)" : ""}</td>`;
         els.trTbody.appendChild(tr);
       }
@@ -430,8 +433,8 @@
       const tr = document.createElement("tr");
       tr.innerHTML =
         `<td><input type="checkbox" data-i="${i}" checked aria-label="include pledge UTXO"></td>` +
-        `<td class="mono" title="${e.address}">${e.address.slice(0, 14)}…${e.address.slice(-8)}</td>` +
-        `<td class="mono" title="${e.txid}">${shortTxid(e.txid)}:${e.vout}</td>` +
+        `<td class="mono" title="${esc(e.address)}">${esc(e.address.slice(0, 14))}…${esc(e.address.slice(-8))}</td>` +
+        `<td class="mono" title="${esc(e.txid)}">${esc(shortTxid(e.txid))}:${e.vout}</td>` +
         `<td class="mono">${grains(e.value)}</td>`;
       els.rlTbody.appendChild(tr);
     });

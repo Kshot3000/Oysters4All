@@ -31,6 +31,9 @@ function msg(el, kind, text) {
   el.textContent = text;
 }
 function hide(el) { el.hidden = true; }
+function esc(s) {
+  return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
 function shortAddr(a) { return a.length > 46 ? a.slice(0, 24) + "…" + a.slice(-14) : a; }
 function copyText(t) {
   navigator.clipboard.writeText(t).catch(() => {
@@ -425,7 +428,7 @@ function renderSigResults(box, results) {
   for (const r of results) {
     const div = document.createElement("div");
     div.className = "sig-row " + (r.ok ? "ok" : "bad");
-    div.innerHTML = `<span class="tick">${r.ok ? "✓" : "✕"}</span><span><strong>input ${r.index}</strong> — ${r.reason}</span>`;
+    div.innerHTML = `<span class="tick">${r.ok ? "✓" : "✕"}</span><span><strong>input ${r.index}</strong> — ${esc(r.reason)}</span>`;
     box.appendChild(div);
   }
 }

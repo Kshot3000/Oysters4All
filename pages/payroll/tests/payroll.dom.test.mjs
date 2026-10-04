@@ -488,3 +488,11 @@ test("wipe button clears key material", async () => {
   assert.equal(get("s-key").value, "");
   assert.match(get("wipe-msg").textContent, /wiped/);
 });
+
+
+test("address/txid title attributes are escaped (XSS audit latent queue)", () => {
+  const src = fs.readFileSync(resolvePath(dir, "app.js"), "utf8");
+  assert.ok(!/title="\$\{(r\.address|u\.txid|r\.txid|state\.senderAddress|e\.address)\}"/.test(src), "no raw title interpolation");
+  assert.equal((src.match(/title="\$\{escapeHtml\(/g) || []).length, 7, "all seven titles escaped");
+  assert.ok(html.includes('app.js?v=4'), "cache key bumped");
+});
