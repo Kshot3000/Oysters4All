@@ -6505,7 +6505,12 @@ zoo`.split("\n");
     if (b.payments.length !== terms.periods) failures.push(`bundle has ${b.payments.length} payments, terms say ${terms.periods}`);
     const seenTxids = /* @__PURE__ */ new Set();
     let prevLock = 0;
-    for (const p of b.payments) {
+    for (let pi = 0; pi < b.payments.length; pi++) {
+      const p = b.payments[pi];
+      if (!p || !Number.isInteger(p.period) || p.period < 1) {
+        failures.push(`payment ${pi + 1}: bad period (not a positive integer)`);
+        continue;
+      }
       const tag = `period ${p.period}`;
       if (!/^[0-9a-f]{64}$/.test(p.txid || "") || !/^[0-9a-f]+$/.test(p.hex || "")) {
         failures.push(`${tag}: malformed txid/hex`);

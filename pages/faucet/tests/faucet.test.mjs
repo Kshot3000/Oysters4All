@@ -17,7 +17,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { bech32Decode, validatePearlAddress } = require("../app.js");
+const { bech32Decode, validatePearlAddress, esc } = require("../app.js");
 
 // Real mainnet address carried in the page footer (donation address).
 const MAINNET = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
@@ -130,4 +130,11 @@ test("malformed inputs rejected", () => {
   assert.throws(() => bech32Decode("tprl1qq"), /invalid length/);
   assert.throws(() => bech32Decode("tprl1" + "q".repeat(100)), /invalid length/);
   assert.throws(() => bech32Decode("tprlqqqqqqq"), /missing separator/);
+});
+
+// ------------------------------------------------------------- esc helper
+test("esc() neutralizes markup in backend-supplied strings (& first)", () => {
+  assert.equal(esc('<img src=x onerror="a&b">'), "&lt;img src=x onerror=&quot;a&amp;b&quot;&gt;");
+  assert.equal(esc("testnet"), "testnet");
+  assert.equal(esc(null), "");
 });

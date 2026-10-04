@@ -203,3 +203,9 @@ test("service refuses invalid terms loudly", () => {
   assert.equal($("service-err").hidden, false, "invalid terms must error");
   assert.ok($("service-err").textContent.length > 20, "error explains the problems");
 });
+
+test("verifier render escapes checks/failures (pasted-bundle XSS pin)", () => {
+  assert.match(appSrc, /const esc = \(s\) => String\(s \?\? ""\)/);
+  assert.match(appSrc, /\$\("vf-checks"\)\.innerHTML =\s*res\.checks\.map\(\(c\) => `<li class="ok">✓ \$\{esc\(c\)\}<\/li>`\)/);
+  assert.match(appSrc, /res\.failures\.map\(\(f\) => `<li class="bad">✗ \$\{esc\(f\)\}<\/li>`\)/);
+});

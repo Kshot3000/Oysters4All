@@ -9,6 +9,11 @@
     return;
   }
   const $ = (id) => document.getElementById(id);
+  /** Escape for innerHTML interpolation — verifier output strings are built
+   * from pasted, counterparty-supplied bundles and must render as text. */
+  const esc = (s) => String(s ?? "")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   const DONATE = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
 
   /* storage that survives hostile localStorage (Gallery lesson) */
@@ -349,8 +354,8 @@
       `<p class="sub">${res.checks.length} checks passed${res.failures.length ? `, ${res.failures.length} failed` : ""} — ` +
       `descriptor, locktimes, amounts, change outputs, sequences, and every BIP-341 signature re-checked.</p>`;
     $("vf-checks").innerHTML =
-      res.checks.map((c) => `<li class="ok">✓ ${c}</li>`).join("") +
-      res.failures.map((f) => `<li class="bad">✗ ${f}</li>`).join("");
+      res.checks.map((c) => `<li class="ok">✓ ${esc(c)}</li>`).join("") +
+      res.failures.map((f) => `<li class="bad">✗ ${esc(f)}</li>`).join("");
   });
 
   /* ---------- footer ---------- */

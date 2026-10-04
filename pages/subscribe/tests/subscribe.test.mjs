@@ -399,3 +399,19 @@ test("selectCoins covers the funding total (audited path)", () => {
   const sel = selectCoins(utxos, plan.totalGrains, 5, plan.outputs.length);
   assert.ok(sel.selected.reduce((a, u) => a + u.value, 0n) >= plan.totalGrains + sel.fee);
 });
+
+test("verifySignedBundle: markup in a payment's period cannot reach the failure strings", () => {
+  // Regression (2026-10-04 fleet XSS audit): period is counterparty JSON and
+  // the page renders failures via innerHTML — a non-integer period must be
+  // rejected under a safe index tag, never interpolated.
+  const terms = goodTerms();
+  const { payments } = signPaymentTxs(terms, "bb".repeat(32), key1());
+  const { json } = makeSignedBundle(terms, "bb".repeat(32), payments);
+  const b = JSON.parse(json);
+  b.payments[0].period = "<img src=x onerror=alert(1)>";
+  b.payments[0].txid = "zz";
+  const r = verifySignedBundle(JSON.stringify(b));
+  assert.ok(!r.ok, "crafted bundle must fail");
+  assert.ok(r.failures.some((f) => f.includes("payment 1: bad period")), "safe index-tagged failure: " + r.failures.join(";"));
+  assert.ok(![...r.checks, ...r.failures].join(" ").includes("<img"), "no markup in verifier output");
+});

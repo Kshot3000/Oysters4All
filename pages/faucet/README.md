@@ -44,11 +44,13 @@ python3 -m http.server 8080
 ## Tests
 
 ```bash
-node --test tests/faucet.test.mjs  # 18: bech32m decode/validate — real mainnet
+node --test tests/faucet.test.mjs  # 19: bech32m decode/validate — real mainnet
                                    # vector, independent-encoder tprl vectors,
-                                   # v0/padding/length/case/tamper rejections
-node --test tests/dom.test.mjs     # 5: id wiring, ?v= pins, attribution,
-                                   # testnet-only network select
+                                   # v0/padding/length/case/tamper rejections,
+                                   # esc() markup neutralization
+node --test tests/dom.test.mjs     # 6: id wiring, ?v= pins, attribution,
+                                   # testnet-only network select, backend-hint
+                                   # escaping pin
 ```
 
 ## Standing requirements

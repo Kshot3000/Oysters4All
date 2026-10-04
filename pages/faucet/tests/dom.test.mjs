@@ -23,7 +23,7 @@ test('all $(\'id\') lookups resolve to an element in index.html', () => {
 
 test("cache-buster keys present and pinned on css + js", () => {
   assert.ok(html.includes('href="styles.css?v=6"'), "styles.css ?v= pin moved — bump it deliberately, never silently");
-  assert.ok(html.includes('src="app.js?v=1"'), "app.js ?v= pin moved — bump it deliberately, never silently");
+  assert.ok(html.includes('src="app.js?v=2"'), "app.js ?v= pin moved — bump it deliberately, never silently");
 });
 
 test("footer + donate section carry the PRL address and @kshot9000", () => {
@@ -42,4 +42,13 @@ test("network select is testnet-only (no mainnet option)", () => {
 test("honest-limits copy present: mainnet rejection + self-run backend", () => {
   assert.ok(html.includes("rejected"), "page states mainnet addresses are rejected");
   assert.ok(html.includes("faucet-backend"), "page links the reference backend");
+});
+
+test("backend hint escapes backend URL and backend-supplied network name", () => {
+  // Regression pin (2026-10-04 fleet XSS audit): refreshStatus renders the
+  // free-text backend URL and the backend JSON's network field into
+  // backendHint.innerHTML — both must go through esc().
+  assert.match(js, /function esc\(s\) \{\s*return String\(s \?\? ''\)\s*\.replace\(\/&\/g, '&amp;'\)/);
+  assert.match(js, /esc\(base\) \+ '<\/code> on ' \+ esc\(st\.network \|\| 'testnet'\)/);
+  assert.doesNotMatch(js, /\+ \(st\.network \|\| 'testnet'\) \+ '\.'/);
 });

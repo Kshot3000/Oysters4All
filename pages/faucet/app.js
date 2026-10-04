@@ -92,6 +92,19 @@ function validatePearlAddress(addr, network) {
   return dec;
 }
 
+/** Escape for innerHTML interpolation — the backend base URL is free-text
+ * user input and status fields come from that backend's JSON, so both must
+ * render as text (the URL previously got only a partial `<`-escape and the
+ * network name none at all). Top-level so node tests can pin it directly. */
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 /* ---------- UI wiring (browser only; pure functions above stay testable) ---------- */
 if (typeof document !== 'undefined') {
 const $ = (id) => document.getElementById(id);
@@ -174,7 +187,7 @@ async function refreshStatus() {
     setConn(true, 'backend connected');
     backendHint.classList.add('ok');
     backendHint.innerHTML = '<strong>Backend connected.</strong> Requests below go to <code>' +
-      base.replace(/</g, '&lt;') + '</code> on ' + (st.network || 'testnet') + '.';
+      esc(base) + '</code> on ' + esc(st.network || 'testnet') + '.';
   } catch (e) {
     $('statusErr').textContent = 'Could not reach the faucet backend at ' + base +
       ' (' + e.message + '). Start one — see "Run your own" below.';
@@ -256,5 +269,5 @@ addrInput.dispatchEvent(new Event('input'));
 
 // Expose for node-based unit tests (no-op in browsers without module systems)
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { bech32Decode, validatePearlAddress };
+  module.exports = { bech32Decode, validatePearlAddress, esc };
 }

@@ -33,10 +33,10 @@ any key that isn't the anchor's, keys are wiped the moment signing finishes,
 and every signature is re-verified against the wire before anything is shown.
 The page only ever reads the chain (GET) and broadcasts at your explicit click.
 
-**Tests.** 21/21 core tests (`tests/subscribe.test.mjs`) — the locktime-aware
+**Tests.** 22/22 core tests (`tests/subscribe.test.mjs`) — the locktime-aware
 verifier is pinned two ways: byte-identical output to the audited
 `buildKeypathTxEx` at locktime 0, and an independent Node `crypto` SHA-256
-reconstruction of the BIP-341 digest at nonzero locktime. 4/4 DOM tests boot
+reconstruction of the BIP-341 digest at nonzero locktime. 5/5 DOM tests boot
 the committed bundle and drive service → terms → fund → pre-sign → verify in a
 stub DOM, including wrong-key refusal and tamper rejection.
 
