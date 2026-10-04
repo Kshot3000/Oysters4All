@@ -61,6 +61,29 @@
     const grains = Math.ceil(vsize * Math.max(0, rateGrainsPerVb));
     return { grains, prl: grains / GRAINS_PER_PRL };
   }
+  function parsePRLToGrains(s) {
+    if (typeof s !== "string") throw new Error("amount must be a string");
+    const t = s.trim();
+    const m = /^(\d+)(?:\.(\d{1,8}))?$/.exec(t);
+    if (!m) throw new Error(`invalid PRL amount: ${t.slice(0, 40)}`);
+    const grains = BigInt(m[1]) * BigInt(GRAINS_PER_PRL) + (m[2] ? BigInt(m[2].padEnd(8, "0")) : 0n);
+    if (grains > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw new Error(`PRL amount out of range: ${t.slice(0, 40)}`);
+    }
+    return Number(grains);
+  }
+  function parseFeeToGrains(s, unit) {
+    if (unit === "prl") return parsePRLToGrains(s);
+    if (unit !== "grains") throw new Error(`unknown fee unit: ${unit}`);
+    if (typeof s !== "string") throw new Error("fee must be a string");
+    const t = s.trim();
+    if (!/^\d+$/.test(t)) throw new Error(`invalid fee in grains (whole grains only): ${t.slice(0, 40)}`);
+    const grains = BigInt(t);
+    if (grains > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw new Error(`fee out of range: ${t.slice(0, 40)}`);
+    }
+    return Number(grains);
+  }
   function fmtGrains(g) {
     return Math.round(g).toLocaleString("en-US");
   }
@@ -403,14 +426,25 @@
   }
   els["b-run"].addEventListener("click", async () => {
     const txid = els["b-txid"].value.trim();
-    const feeVal = parseFloat(els["b-fee"].value || "0");
     els["b-err"].textContent = "";
     els["b-out"].innerHTML = "";
     if (!/^[0-9a-fA-F]{64}$/.test(txid)) {
       els["b-err"].textContent = "Enter a 64-hex-char txid.";
       return;
     }
-    if (!(feeVal > 0)) {
+    const feeRaw = els["b-fee"].value;
+    if (!feeRaw.trim()) {
+      els["b-err"].textContent = "Enter the fee the stuck transaction paid.";
+      return;
+    }
+    let feeGrains;
+    try {
+      feeGrains = parseFeeToGrains(feeRaw, els["b-feeunit"].value);
+    } catch (e) {
+      els["b-err"].textContent = e.message;
+      return;
+    }
+    if (!(feeGrains > 0)) {
       els["b-err"].textContent = "Enter the fee the stuck transaction paid.";
       return;
     }
@@ -428,8 +462,6 @@
       els["b-err"].textContent = "Could not parse transaction hex: " + e.message;
       return;
     }
-    const unit = els["b-feeunit"].value;
-    const feeGrains = unit === "prl" ? Math.round(feeVal * GRAINS_PER_PRL) : Math.round(feeVal);
     const targetRate = parseFloat(els["b-target"].value);
     const plan = bumpPlan({ stuckVsize: parsed.vsize, stuckFeeGrains: feeGrains, targetRate });
     els["b-out"].innerHTML = `

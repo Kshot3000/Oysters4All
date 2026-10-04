@@ -1,10 +1,11 @@
 // Pearl Fees — browser app. Bundled by build.mjs into pearl-fees.bundle.js
 // (window.PearlFees). Works from file:// and GitHub Pages with zero deps.
 import {
-  GRAINS_PER_PRL, BLOCK_TARGET_SECONDS, MAX_BLOCK_VSIZE,
+  BLOCK_TARGET_SECONDS, MAX_BLOCK_VSIZE,
   feeRateGrainsPerVb, percentile, feeRecommendations, bucketize,
   estimateVsize, feeFor, fmtGrains, fmtPRL, fmtDuration,
   blocksAhead, etaForRate, parseTxVsize, bumpPlan, demoMempool,
+  parseFeeToGrains,
 } from "./logic.js";
 
 const LS_KEY = "pearl-fees-settings-v1";
@@ -227,11 +228,18 @@ function renderBumpTargets() {
 
 els["b-run"].addEventListener("click", async () => {
   const txid = els["b-txid"].value.trim();
-  const feeVal = parseFloat(els["b-fee"].value || "0");
   els["b-err"].textContent = "";
   els["b-out"].innerHTML = "";
   if (!/^[0-9a-fA-F]{64}$/.test(txid)) { els["b-err"].textContent = "Enter a 64-hex-char txid."; return; }
-  if (!(feeVal > 0)) { els["b-err"].textContent = "Enter the fee the stuck transaction paid."; return; }
+  /* Exact fee parse (core): the old parseFloat + Math.round silently
+   * rounded sub-grain PRL fees to 0 grains and fractional grains up —
+   * the planner then computed rates from an amount never typed. */
+  const feeRaw = els["b-fee"].value;
+  if (!feeRaw.trim()) { els["b-err"].textContent = "Enter the fee the stuck transaction paid."; return; }
+  let feeGrains;
+  try { feeGrains = parseFeeToGrains(feeRaw, els["b-feeunit"].value); }
+  catch (e) { els["b-err"].textContent = e.message; return; }
+  if (!(feeGrains > 0)) { els["b-err"].textContent = "Enter the fee the stuck transaction paid."; return; }
   let hex = null;
   try { hex = await rpc("getrawtransaction", [txid, 0]); }
   catch (e) {
@@ -243,8 +251,6 @@ els["b-run"].addEventListener("click", async () => {
   let parsed;
   try { parsed = parseTxVsize(hex); }
   catch (e) { els["b-err"].textContent = "Could not parse transaction hex: " + e.message; return; }
-  const unit = els["b-feeunit"].value;
-  const feeGrains = unit === "prl" ? Math.round(feeVal * GRAINS_PER_PRL) : Math.round(feeVal);
   const targetRate = parseFloat(els["b-target"].value);
   const plan = bumpPlan({ stuckVsize: parsed.vsize, stuckFeeGrains: feeGrains, targetRate });
   els["b-out"].innerHTML = `

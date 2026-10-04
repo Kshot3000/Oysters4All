@@ -6,6 +6,7 @@ import {
   feeRateGrainsPerVb, percentile, feeRecommendations, bucketize,
   estimateVsize, feeFor, fmtGrains, fmtPRL, fmtDuration,
   blocksAhead, etaForRate, parseTxVsize, bumpPlan, demoMempool,
+  parsePRLToGrains, parseFeeToGrains,
 } from "../src/logic.js";
 
 test("protocol constants", () => {
@@ -129,4 +130,37 @@ test("demoMempool is labeled sample with sane rates", () => {
   const rates = rows.map((r) => feeRateGrainsPerVb(r.fee, r.vsize));
   assert.ok(Math.min(...rates) >= 1);
   assert.ok(Math.max(...rates) <= 1000);
+});
+
+test("parsePRLToGrains exact (fleet-standard strict form)", () => {
+  assert.equal(parsePRLToGrains("1"), 100_000_000);
+  assert.equal(parsePRLToGrains("0.00000001"), 1);
+  assert.equal(parsePRLToGrains("1.2"), 120_000_000);
+  assert.equal(parsePRLToGrains(" 2.5 "), 250_000_000);
+  assert.equal(parsePRLToGrains("0"), 0);
+});
+
+test("parsePRLToGrains rejects what parseFloat silently accepted", () => {
+  for (const bad of ["1.2.3", "10abc", "0x10", "1e3", "-1", "", "1.", ".5", "0.000000001", "25.123456789"]) {
+    assert.throws(() => parsePRLToGrains(bad), /invalid PRL amount/, bad);
+  }
+  assert.throws(() => parsePRLToGrains("99999999999"), /out of range/);
+  assert.throws(() => parsePRLToGrains(5), /must be a string/);
+});
+
+test("parseFeeToGrains: grains are whole-only, PRL delegates to the exact parser", () => {
+  assert.equal(parseFeeToGrains("14100", "grains"), 14100);
+  assert.equal(parseFeeToGrains("0.000141", "prl"), 14100);
+  assert.throws(() => parseFeeToGrains("100.5", "grains"), /whole grains only/);
+  assert.throws(() => parseFeeToGrains("1e3", "grains"), /whole grains only/);
+  assert.throws(() => parseFeeToGrains("0.000000001", "prl"), /invalid PRL amount/);
+  assert.throws(() => parseFeeToGrains("10", "sats"), /unknown fee unit/);
+});
+
+test("bumpPlan from an exactly-parsed fee (regression: sub-grain fee must not plan as 0)", () => {
+  const feeGrains = parseFeeToGrains("0.000141", "prl");
+  const plan = bumpPlan({ stuckVsize: 141, stuckFeeGrains: feeGrains, targetRate: 200 });
+  assert.equal(plan.currentRate, 100);
+  assert.equal(plan.wantFeeGrains, 28200);
+  assert.equal(plan.extraGrains, 14100);
 });

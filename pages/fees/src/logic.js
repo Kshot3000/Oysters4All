@@ -92,6 +92,45 @@ export function feeFor(vsize, rateGrainsPerVb) {
   return { grains, prl: grains / GRAINS_PER_PRL };
 }
 
+/** Parse a PRL amount string into grains (Number, exact). Fleet-standard
+ *  strict form — digits with an optional fraction of at most 8 decimal
+ *  places, computed in BigInt and range-checked to a safe integer. This
+ *  replaces the bump planner's old float parse (parseFloat +
+ *  Math.round(x * 1e8)), which silently rounded a sub-grain fee like
+ *  "0.000000001" PRL down to 0 grains (the old > 0 check ran on the
+ *  float, before conversion, so the planner happily planned around a
+ *  0-grain fee) and silently rounded fractional grains like "100.5"
+ *  up to 101: rates and replacement fees were computed from an amount
+ *  the user never typed. Throws on bad input. */
+export function parsePRLToGrains(s) {
+  if (typeof s !== "string") throw new Error("amount must be a string");
+  const t = s.trim();
+  const m = /^(\d+)(?:\.(\d{1,8}))?$/.exec(t);
+  if (!m) throw new Error(`invalid PRL amount: ${t.slice(0, 40)}`);
+  const grains = BigInt(m[1]) * BigInt(GRAINS_PER_PRL) + (m[2] ? BigInt(m[2].padEnd(8, "0")) : 0n);
+  if (grains > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error(`PRL amount out of range: ${t.slice(0, 40)}`);
+  }
+  return Number(grains);
+}
+
+/** Parse the bump planner's fee field into grains (Number, exact).
+ *  Unit "prl" uses parsePRLToGrains; unit "grains" accepts whole grains
+ *  only — a fractional grain does not exist, so "100.5" is rejected,
+ *  never rounded. Throws on bad input. */
+export function parseFeeToGrains(s, unit) {
+  if (unit === "prl") return parsePRLToGrains(s);
+  if (unit !== "grains") throw new Error(`unknown fee unit: ${unit}`);
+  if (typeof s !== "string") throw new Error("fee must be a string");
+  const t = s.trim();
+  if (!/^\d+$/.test(t)) throw new Error(`invalid fee in grains (whole grains only): ${t.slice(0, 40)}`);
+  const grains = BigInt(t);
+  if (grains > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error(`fee out of range: ${t.slice(0, 40)}`);
+  }
+  return Number(grains);
+}
+
 /** format grains with thousands separators */
 export function fmtGrains(g) {
   return Math.round(g).toLocaleString("en-US");
