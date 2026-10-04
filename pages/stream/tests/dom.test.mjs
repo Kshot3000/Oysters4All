@@ -347,3 +347,22 @@ test("forge rejects dust rates honestly", () => {
   assert.equal($("forge-err").hidden, false);
   assert.ok(/dust/.test($("forge-err").textContent), "error text: " + $("forge-err").textContent);
 });
+
+test("forge rejects sub-grain rates instead of silently rounding them", () => {
+  const e = E();
+  $("beneficiary").value = e.walletFromMnemonic(BEN_MNEMONIC, e.NETWORKS.mainnet).address;
+  $("funder").value = FUNDER_MNEMONIC;
+  // the old float parse silently turned 1.5 grains into 1 grain per tick
+  $("rate").value = "0.000000015";
+  $("ticks").value = "4";
+  $("forge").click();
+  assert.equal($("forge-err").hidden, false);
+  assert.ok(/invalid PRL amount/.test($("forge-err").textContent), "error text: " + $("forge-err").textContent);
+  // source pins: the rate enters only through the exact core parser
+  const src = fs.readFileSync(resolvePath(dir, "app.js"), "utf8");
+  assert.ok(src.includes("E.parsePRLToGrains($(\"rate\").value)"), "rate uses exact parser");
+  assert.ok(!/parseFloat\([^)]*\)\s*\*\s*E\.GRAIN_PER_PRL/.test(src), "no float money parse remains");
+  assert.ok(html.includes("pearl-stream.bundle.js?v=3"), "bundle cache pin");
+  assert.ok(html.includes("app.js?v=2"), "app cache pin");
+  assert.deepEqual(errors, [], "console errors: " + errors.join(" | "));
+});

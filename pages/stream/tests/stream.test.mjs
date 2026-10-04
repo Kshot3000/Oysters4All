@@ -11,6 +11,7 @@ import {
   batchScriptPathSigDigest, batchClaimVBytes, planBatchClaim,
   buildBatchClaimTx, buildBatchScriptPathSpend, committedLeafKey, tickLeafFor,
   beneficiaryKeyFromInput, beneficiarySignerFor, isMature,
+  parsePRLToGrains,
   partyKeyFromInput, parseXOnlyKey, scriptAsm, addressToProgram,
   verifySchnorrSig, signForXOnly, encodeScriptNum,
   tweakKeypath, walletFromMnemonic,
@@ -404,4 +405,20 @@ test("beneficiaryKeyFromInput reuse: x-only, address, mnemonic", () => {
   assert.throws(() => parseXOnlyKey("00".repeat(31)), /64 hex/);
   const prog = addressToProgram(w.address, net);
   assert.equal(prog.length, 32);
+});
+
+test("parsePRLToGrains: exact decimal parsing, strict rejection (float-parse regression)", () => {
+  assert.equal(parsePRLToGrains("1"), 100_000_000);
+  assert.equal(parsePRLToGrains("0.5"), 50_000_000);
+  assert.equal(parsePRLToGrains("0.00000001"), 1);
+  assert.equal(parsePRLToGrains("25.12345678"), 2_512_345_678);
+  assert.equal(parsePRLToGrains("90071992.54740991"), Number.MAX_SAFE_INTEGER);
+  // the old Math.round(parseFloat(x) * 1e8) silently mangled 1.5 grains to 1
+  assert.throws(() => parsePRLToGrains("0.000000015"), /invalid PRL amount/);
+  assert.throws(() => parsePRLToGrains("1.2.3"), /invalid PRL amount/);
+  for (const bad of ["", ".5", "1.", "1e3", "1,000", "-1", "abc", "10 PRL"]) {
+    assert.throws(() => parsePRLToGrains(bad), /invalid PRL amount/, JSON.stringify(bad));
+  }
+  assert.throws(() => parsePRLToGrains("90071992.54740992"), /out of range/);
+  assert.throws(() => parsePRLToGrains(5), /must be a string/);
 });

@@ -278,3 +278,31 @@ test("forge rejects dust tranches honestly", () => {
   assert.equal($("forge-err").hidden, false);
   assert.ok(/dust/.test($("forge-err").textContent), "error text: " + $("forge-err").textContent);
 });
+
+test("forge rejects silently-misparsed custom amounts and impossible dates", () => {
+  $("beneficiary").value = E().walletFromMnemonic(BEN_MNEMONIC, E().NETWORKS.mainnet).address;
+  $("funder").value = FUNDER_MNEMONIC;
+  // the old float parse silently truncated "1.2.3" to a 1.2 PRL tranche
+  $("custom").value = "2030-01-01, 1.2.3";
+  $("forge").click();
+  assert.equal($("forge-err").hidden, false);
+  assert.ok(/bad amount/.test($("forge-err").textContent), "error text: " + $("forge-err").textContent);
+  // sub-grain precision is refused, not rounded
+  $("custom").value = "2030-01-01, 25.123456789";
+  $("forge").click();
+  assert.equal($("forge-err").hidden, false);
+  assert.ok(/bad amount/.test($("forge-err").textContent), "error text: " + $("forge-err").textContent);
+  // Date.UTC used to roll 2027-02-30 over to 2027-03-02 silently
+  $("custom").value = "2027-02-30, 25";
+  $("forge").click();
+  assert.equal($("forge-err").hidden, false);
+  assert.ok(/not a real calendar date/.test($("forge-err").textContent), "error text: " + $("forge-err").textContent);
+  // source pins: money enters only through the exact core parser
+  const src = fs.readFileSync(resolvePath(dir, "app.js"), "utf8");
+  assert.ok(src.includes("E.parsePRLToGrains($(\"total\").value)"), "total uses exact parser");
+  assert.ok(src.includes("E.parsePRLToGrains(m[4])"), "custom amounts use exact parser");
+  assert.ok(!/parseFloat\([^)]*\)\s*\*\s*E\.GRAIN_PER_PRL/.test(src), "no float money parse remains");
+  assert.ok(html.includes("pearl-vesting.bundle.js?v=3"), "bundle cache pin");
+  assert.ok(html.includes("app.js?v=2"), "app cache pin");
+  assert.deepEqual(errors, [], "console errors: " + errors.join(" | "));
+});

@@ -55,8 +55,8 @@ unmatured ticks in one transaction.
 
 ## Tests
 
-- `node --no-warnings --loader ./tests/loader.mjs tests/stream.test.mjs` — 13 core tests
-- `node --no-warnings --loader ./tests/loader.mjs tests/dom.test.mjs` — 8 DOM tests
+- `node --no-warnings --loader ./tests/loader.mjs tests/stream.test.mjs` — 14 core tests
+- `node --no-warnings --loader ./tests/loader.mjs tests/dom.test.mjs` — 9 DOM tests
   (real `index.html` + committed bundle + `app.js` against a minimal DOM shim, hostile localStorage)
 - Real-browser QA (headless Chromium, file:// + CDP) — 18/18 checks green,
   zero console/page errors, plus a 375px mobile tab-sweep

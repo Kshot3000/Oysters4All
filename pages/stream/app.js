@@ -119,7 +119,7 @@
       const net = S.network;
       const ben = E.beneficiaryKeyFromInput($("beneficiary").value, net);
       const funderIn = E.partyKeyFromInput($("funder").value, net);
-      const rateGrainsPerTick = Math.round(parseFloat($("rate").value) * E.GRAIN_PER_PRL);
+      const rateGrainsPerTick = E.parsePRLToGrains($("rate").value);
       if (!(rateGrainsPerTick > 0)) throw new Error("rate must be positive");
       const tickSeconds = Math.round(parseFloat($("tick-value").value) * parseInt($("tick-unit").value, 10));
       const startTime = Math.floor(new Date($("start").value).getTime() / 1000);

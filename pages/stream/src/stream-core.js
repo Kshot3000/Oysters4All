@@ -106,6 +106,26 @@ export function forgeTick(network, beneficiaryXOnly, funderXOnly, lock, revocabl
   return { ...t, lockKind: "time" };
 }
 
+/** Parse a PRL amount string into grains (Number, exact). Fleet-standard
+ *  strict form — digits with an optional fraction of at most 8 decimal
+ *  places, computed in BigInt and range-checked to a safe integer. This
+ *  replaces the UI's old float parse (Math.round(parseFloat(x) * 1e8)),
+ *  which silently rounded sub-grain rates like "0.000000015" (1.5 grains)
+ *  to a whole grain instead of rejecting them: in a stream forge the
+ *  parsed rate is locked into every tick, so a misparse is a
+ *  wrong-amount stream, not a display glitch. Throws on bad input. */
+export function parsePRLToGrains(s) {
+  if (typeof s !== "string") throw new Error("amount must be a string");
+  const t = s.trim();
+  const m = /^(\d+)(?:\.(\d{1,8}))?$/.exec(t);
+  if (!m) throw new Error(`invalid PRL amount: ${t.slice(0, 40)}`);
+  const grains = BigInt(m[1]) * BigInt(GRAIN_PER_PRL) + (m[2] ? BigInt(m[2].padEnd(8, "0")) : 0n);
+  if (grains > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error(`PRL amount out of range: ${t.slice(0, 40)}`);
+  }
+  return Number(grains);
+}
+
 function validateRate(rateGrainsPerTick) {
   if (!Number.isSafeInteger(rateGrainsPerTick) || rateGrainsPerTick < DUST_GRAIN) {
     throw new Error(`rate must be an integer >= dust (${DUST_GRAIN} grains per tick)`);

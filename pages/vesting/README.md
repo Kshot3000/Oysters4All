@@ -53,14 +53,17 @@ matured tranches through the clawback leaf with their own mnemonic or WIF.
 ## Verification
 
 - `node --no-warnings --loader ./tests/loader.mjs tests/vesting.test.mjs` —
-  14/14 core tests: locktime shapes, NUMS Taproot trees with independent
+  15/15 core tests: locktime shapes, NUMS Taproot trees with independent
   control-block verification, revocable/non-revocable tranches, linear/custom
   planning, dust and tranche-count constraints, descriptor round trips and
   tampering, exact claim-sweep fee math, full beneficiary claim and funder
-  clawback signing, wrong-key refusal, raw/address/mnemonic signer modes.
+  clawback signing, wrong-key refusal, raw/address/mnemonic signer modes,
+  exact PRL amount parsing (sub-grain and malformed amounts rejected, never
+  silently rounded or truncated).
 - `node --no-warnings --loader ./tests/loader.mjs tests/dom.test.mjs` —
-  7/7 DOM integration tests against the real `index.html` + committed bundle:
-  forge → track → claim error paths, step navigation, footer attribution.
+  8/8 DOM integration tests against the real `index.html` + committed bundle:
+  forge → track → claim error paths, step navigation, footer attribution,
+  rejection of misparsed custom amounts and impossible calendar dates.
 
 Crypto lineage: key derivation, TapTweak, bech32m, BIP-341 sighash and wire
 serialization come from the audited `files/pages/sign/src/crypto.js`;

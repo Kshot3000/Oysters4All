@@ -94,10 +94,25 @@
   function parseCustom(text) {
     const lines = String(text || "").split("\n").map((l) => l.trim()).filter(Boolean);
     return lines.map((line, i) => {
-      const m = /^(\d{4})-(\d{2})-(\d{2})\s*,\s*([\d.]+)$/.exec(line);
+      const m = /^(\d{4})-(\d{2})-(\d{2})\s*,\s*(\S+)$/.exec(line);
       if (!m) throw new Error(`custom line ${i + 1}: expected "YYYY-MM-DD, PRL"`);
       const lock = Math.floor(Date.UTC(+m[1], +m[2] - 1, +m[3]) / 1000);
-      const amountGrains = Math.round(parseFloat(m[4]) * E.GRAIN_PER_PRL);
+      /* Date.UTC silently rolls impossible dates over (2027-02-30 becomes
+         2027-03-02, month 13 becomes next January) — a rolled date would
+         lock a tranche at a time the funder never chose. Round-trip the
+         components and refuse anything that is not a real calendar date. */
+      const rt = new Date(lock * 1000);
+      if (rt.getUTCFullYear() !== +m[1] || rt.getUTCMonth() !== +m[2] - 1 || rt.getUTCDate() !== +m[3]) {
+        throw new Error(`custom line ${i + 1}: ${m[1]}-${m[2]}-${m[3]} is not a real calendar date`);
+      }
+      /* Exact parser: the old Math.round(parseFloat(x) * 1e8) silently
+         truncated "1.2.3" to 1.2 PRL and rounded sub-grain amounts. */
+      let amountGrains;
+      try {
+        amountGrains = E.parsePRLToGrains(m[4]);
+      } catch {
+        throw new Error(`custom line ${i + 1}: bad amount "${m[4]}" — decimal PRL, at most 8 decimal places`);
+      }
       if (!(amountGrains > 0)) throw new Error(`custom line ${i + 1}: bad amount`);
       return { lock, amountGrains };
     });
@@ -137,7 +152,7 @@
           revocable, customTranches: parseCustom(customText),
         });
       } else {
-        const totalGrains = Math.round(parseFloat($("total").value) * E.GRAIN_PER_PRL);
+        const totalGrains = E.parsePRLToGrains($("total").value);
         const startTime = Math.floor(new Date($("start").value).getTime() / 1000);
         if (!Number.isFinite(startTime) || startTime <= 0) throw new Error("start date is invalid");
         const cliffSeconds = Math.round(parseFloat($("cliff").value) * 86400);

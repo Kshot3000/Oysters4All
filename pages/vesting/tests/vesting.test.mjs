@@ -10,6 +10,7 @@ import {
   scheduleFromDescriptor, isMature, planClaimSweep, buildClaimTx,
   expectedAddress, parseXOnlyKey, scriptAsm, addressToProgram,
   verifySchnorrSig, signForXOnly, scriptPathSigDigestEx, encodeScriptNum,
+  parsePRLToGrains,
   beneficiaryKeyFromInput, beneficiarySignerFor,
   tweakKeypath, tweakPrivKeypath,
   walletFromMnemonic,
@@ -312,4 +313,26 @@ test("mnemonic beneficiary key end-to-end forge", () => {
   });
   assert.ok(claim.hex.length > 200);
   assert.ok(verifySchnorrSig(hexToBytes(claim.sigHex), hexToBytes(claim.digestHex), w.internalXOnly));
+});
+
+test("parsePRLToGrains: exact decimal parsing, strict rejection (float-parse regression)", () => {
+  // exact known answers
+  assert.equal(parsePRLToGrains("1"), 100_000_000);
+  assert.equal(parsePRLToGrains("0.00000001"), 1);
+  assert.equal(parsePRLToGrains("25.12345678"), 2_512_345_678);
+  assert.equal(parsePRLToGrains(" 10.5 "), 1_050_000_000);
+  assert.equal(parsePRLToGrains("0"), 0);
+  // largest safe-integer grain count parses exactly (9007199254740991 grains)
+  assert.equal(parsePRLToGrains("90071992.54740991"), Number.MAX_SAFE_INTEGER);
+  // the old Math.round(parseFloat(x) * 1e8) silently truncated this to 1.2 PRL
+  assert.throws(() => parsePRLToGrains("1.2.3"), /invalid PRL amount/);
+  // sub-grain precision is refused, never silently rounded
+  assert.throws(() => parsePRLToGrains("25.123456789"), /invalid PRL amount/);
+  assert.throws(() => parsePRLToGrains("0.000000001"), /invalid PRL amount/);
+  // other lenient-parse shapes the float path accepted are refused
+  for (const bad of ["", ".5", "1.", "1e3", "1,000", "-1", "+1", "abc", "10 PRL", "0x10"]) {
+    assert.throws(() => parsePRLToGrains(bad), /invalid PRL amount/, JSON.stringify(bad));
+  }
+  assert.throws(() => parsePRLToGrains("90071992.54740992"), /out of range/);
+  assert.throws(() => parsePRLToGrains(5), /must be a string/);
 });
