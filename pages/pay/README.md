@@ -105,12 +105,12 @@ either the merchant xpub + derivation index or a fixed address.
 | `lib/` | Vendored ESM deps (`@scure/*`, `@noble/*`) for the source + tests |
 | `importmap.json` | Import map for the ESM source (used by `tests/`) |
 | `woocommerce/` | Installable WooCommerce gateway plugin (bundles `pearl-pay.js`) |
-| `tests/verify.mjs` / `tests/verify-sdk.mjs` | 82-check verification suite |
+| `tests/verify.mjs` / `tests/verify-sdk.mjs` | 95-check verification suite |
 
 ## Verification
 
 ```sh
-node --no-warnings --loader ./tests/loader.mjs ./tests/verify.mjs      # 63 checks
+node --no-warnings --loader ./tests/loader.mjs ./tests/verify.mjs      # 76 checks
 node --no-warnings --loader ./tests/loader.mjs ./tests/verify-sdk.mjs   # 19 checks
 ```
 

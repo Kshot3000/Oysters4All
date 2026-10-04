@@ -4,6 +4,7 @@
 const {
   NETWORKS, parseAccountXpub, deriveInvoiceAddress, findNextUnusedIndex,
   encodeInvoice, usdToGrains, grainsToUsd, fetchPrlUsd, formatPRL, formatUSD, pearlUri,
+  parsePRLToGrains,
 } = window.PearlPayCore || {};
 if (!window.PearlPayCore) {
   document.body.innerHTML = "<p style='padding:2rem'>Failed to load pearl-pay-core.bundle.js</p>";
@@ -152,14 +153,23 @@ function drawHeroQr() {
 
 /* ---------- amounts ---------- */
 function grainsFor(cur, amountStr) {
-  const a = parseFloat(amountStr);
-  if (!isFinite(a) || a <= 0) throw new Error("Enter an amount greater than zero.");
   if (cur === "USD") {
+    /* Fiat has no exact grain value (usdToGrains rounds at the quoted
+     * rate), but the typed amount must still be one clean decimal —
+     * the old parseFloat silently accepted "10abc" and "1.2.3". */
+    const t = String(amountStr).trim();
+    if (!/^\d+(?:\.\d+)?$/.test(t)) throw new Error("Enter a valid USD amount.");
+    const a = Number(t);
+    if (!isFinite(a) || a <= 0) throw new Error("Enter an amount greater than zero.");
     if (!rate.usd) throw new Error("No USD rate available — refresh the rate or set a manual one.");
     return { grains: usdToGrains(a, rate.usd), usdNote: formatUSD(a) };
   }
-  const grains = Math.round(a * 100_000_000);
-  if (!Number.isSafeInteger(grains) || grains <= 0) throw new Error("Amount out of range.");
+  /* Exact parser (core): the old parseFloat+Math.round silently
+   * truncated "1.2.3", accepted "10abc", and rounded sub-grain amounts
+   * instead of rejecting them — the result is baked into invoices and
+   * payment buttons, so a misparse charges the wrong amount. */
+  const grains = parsePRLToGrains(amountStr);
+  if (grains <= 0) throw new Error("Enter an amount greater than zero.");
   const usdNote = rate.usd ? "≈ " + formatUSD(grainsToUsd(String(grains), rate.usd)) : "";
   return { grains: String(grains), usdNote };
 }

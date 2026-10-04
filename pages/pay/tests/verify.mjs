@@ -1,7 +1,7 @@
 // Pearl Pay verification suite.
 // Usage (from the pay directory):
 //   node --no-warnings --loader tests/loader.mjs tests/verify.mjs
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve as resolvePath } from "node:path";
 
@@ -17,6 +17,7 @@ import {
   encodeInvoice, decodeInvoice,
   classifyPayment, summarizeAddress, fetchAddressSummary, fetchConfirmationAwareSummary, watchPayment,
   fetchPrlUsd, usdToGrains, grainsToUsd, formatPRL, formatUSD, pearlUri,
+  parsePRLToGrains,
   bytesToHex, hexToBytes,
 } from "../pearl-pay-core.js";
 import { HDKey } from "@scure/bip32";
@@ -322,6 +323,31 @@ if (existsSync(launcherIns)) {
     ok("watchPayment: detected→confirmed only at depth 2",
       JSON.stringify(seen) === JSON.stringify(["detected", "confirmed"]), JSON.stringify(seen));
   }
+}
+
+/* exact PRL amount parser + UI wiring pins (the float-parse class) */
+{
+  ok("parsePRLToGrains exact 1.5", parsePRLToGrains("1.5") === 150000000);
+  ok("parsePRLToGrains exact 1 grain", parsePRLToGrains("0.00000001") === 1);
+  ok("parsePRLToGrains trims", parsePRLToGrains(" 2.25 ") === 225000000);
+  ok("parsePRLToGrains safe-integer boundary", parsePRLToGrains("90071992.54740991") === Number.MAX_SAFE_INTEGER);
+  const bad = ["25.123456789", "1.2.3", "10abc", "0x10", "1e3", "1,000", ".5", "5.", "-5", "", "NaN", "Infinity"];
+  ok("parsePRLToGrains rejects the float-parse class",
+    bad.every((b) => { try { parsePRLToGrains(b); return false; } catch { return true; } }),
+    bad.join(","));
+  let oor = false; try { parsePRLToGrains("90071992.54740992"); } catch { oor = true; }
+  ok("parsePRLToGrains rejects out-of-range", oor);
+  let ns = false; try { parsePRLToGrains(1.5); } catch { ns = true; }
+  ok("parsePRLToGrains rejects non-strings", ns);
+  const appSrc = readFileSync(resolvePath(payDir, "app.js"), "utf8");
+  ok("app.js grainsFor uses the exact parser", appSrc.includes("parsePRLToGrains(amountStr)"));
+  ok("app.js has no float amount parse left",
+    !appSrc.includes("parseFloat(amountStr)") && !appSrc.includes("Math.round(a * 100_000_000)"));
+  const idxHtml = readFileSync(resolvePath(payDir, "index.html"), "utf8");
+  const invHtml = readFileSync(resolvePath(payDir, "invoice.html"), "utf8");
+  ok("index.html bundle+app cache keys at ?v=2",
+    idxHtml.includes("pearl-pay-core.bundle.js?v=2") && idxHtml.includes('src="app.js?v=2"'));
+  ok("invoice.html bundle cache key at ?v=2", invHtml.includes("pearl-pay-core.bundle.js?v=2"));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

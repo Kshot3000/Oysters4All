@@ -385,3 +385,13 @@ test("refund guard: Bob's key cannot refund", () => {
   assert.equal($("refund-error").hidden, false, "bob-key refund refused");
   assert.ok(/alice/i.test($("refund-error").textContent), $("refund-error").textContent);
 });
+
+test("amount inputs use the exact core parsers (float-parse class closed)", () => {
+  const src = fs.readFileSync(resolvePath(dir, "app.js"), "utf8");
+  assert.ok(src.includes("E.parsePRLToGrains(str)"), "parsePRL delegates to the core exact parser");
+  assert.ok(src.includes("E.parseBTCToSats(str)"), "parseBTC delegates to the core exact parser");
+  assert.ok(!src.includes("Math.round(v * E.GRAIN_PER_PRL)"), "no float PRL parse left");
+  assert.ok(!src.includes("Math.round(v * 1e8)"), "no float BTC parse left");
+  assert.ok(html.includes("pearl-swap.bundle.js?v=3"), "bundle cache key bumped");
+  assert.ok(html.includes('src="app.js?v=2"'), "app cache key bumped");
+});

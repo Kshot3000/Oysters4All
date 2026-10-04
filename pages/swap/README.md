@@ -69,13 +69,15 @@ use). Every built transaction is signed and re-verified locally.
 
 ## Tests (2026-09-29)
 
-- Core: **18/18** — script byte vectors, NUMS determinism, control-block
+- Core: **19/19** — script byte vectors, NUMS determinism, control-block
   verification, known-answer SHA-256, descriptor round-trip + tamper
   detection, timelock guards, wrong-preimage/wrong-key refusals, lock tx +
   sig re-verification, synthetic lock→claim and lock→refund flows, sighash
-  cross-checks, preimage extraction, lifecycle classification, BTC mirror.
-- DOM: **12/12** — boots real index.html + bundle + app.js in a VM harness;
-  propose→lock→track→claim→refund, guard refusals, attribution.
+  cross-checks, preimage extraction, lifecycle classification, BTC mirror,
+  exact amount parsers (the float-parse class).
+- DOM: **13/13** — boots real index.html + bundle + app.js in a VM harness;
+  propose→lock→track→claim→refund, guard refusals, attribution,
+  exact-parser wiring pins.
 - Real Chromium (headless, CDP, stubbed Blockbook): **27/27** checks, zero
   console/page errors — full flow incl. QR render, BC1P mirror, preimage
   extraction, maturity guard.

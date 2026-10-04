@@ -31,17 +31,16 @@
   function hideErr(id) { $(id).hidden = true; }
   function fmtPRL(grains) { return (grains / E.GRAIN_PER_PRL).toFixed(8).replace(/0+$/, "").replace(/\.$/, ".0"); }
   function parsePRL(str) {
-    const v = Number(String(str).trim());
-    if (!Number.isFinite(v) || v <= 0) throw new Error("PRL amount must be a positive number");
-    const g = Math.round(v * E.GRAIN_PER_PRL);
-    if (!Number.isSafeInteger(g) || g <= 0) throw new Error("PRL amount out of range");
+    /* Exact parser (core): the old Number()+Math.round float parse
+     * silently rounded sub-grain amounts and accepted "0x10"/"1e3". */
+    const g = E.parsePRLToGrains(str);
+    if (g <= 0) throw new Error("PRL amount must be a positive number");
     return g;
   }
   function parseBTC(str) {
-    const v = Number(String(str).trim());
-    if (!Number.isFinite(v) || v <= 0) throw new Error("BTC amount must be a positive number");
-    const s = Math.round(v * 1e8);
-    if (!Number.isSafeInteger(s) || s <= 0) throw new Error("BTC amount out of range");
+    /* Exact parser (core) — same class as parsePRL, in satoshis. */
+    const s = E.parseBTCToSats(str);
+    if (s <= 0) throw new Error("BTC amount must be a positive number");
     return s;
   }
   function parseHeight(str, name) {

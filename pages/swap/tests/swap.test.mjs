@@ -15,6 +15,7 @@ import {
   refundSpendVBytes, buildRefundSpend, REFUND_SEQUENCE,
   parseTx, extractPreimage, classifySwapState, swapCountdown,
   btcMirrorTemplate,
+  parsePRLToGrains, parseBTCToSats,
   partyKeyFromInput, parseXOnlyKey, addressToProgram,
   verifySchnorrSig, signForXOnly, scriptPathSigDigestEx, buildScriptPathSpend,
   walletFromMnemonic, walletToWIF,
@@ -459,4 +460,23 @@ test("describeSwap is human-readable", () => {
   assert.equal(d.btc, "0.05000000 BTC");
   assert.equal(d.gap, 500);
   assert.ok(d.descriptor.startsWith("swap:v1:"));
+});
+
+test("exact amount parsers: PRL->grains and BTC->sats reject the float-parse class", () => {
+  // exact vectors
+  assert.equal(parsePRLToGrains("1.5"), 150_000_000);
+  assert.equal(parsePRLToGrains("0.00000001"), 1);
+  assert.equal(parsePRLToGrains(" 2.25 "), 225_000_000);
+  assert.equal(parsePRLToGrains("90071992.54740991"), Number.MAX_SAFE_INTEGER);
+  assert.equal(parseBTCToSats("0.05"), 5_000_000);
+  assert.equal(parseBTCToSats("21000000"), 2_100_000_000_000_000);
+  assert.equal(parsePRLToGrains("0"), 0); // zero parses; the UI layer refuses it as non-positive
+  // the old Number()+Math.round class: silent rounding / junk / hex / exponent
+  for (const bad of ["0.000000015", "1.234567891", "1.2.3", "10abc", "0x10", "1e3", "1,000", ".5", "5.", "-5", "", "  ", "NaN", "Infinity"]) {
+    assert.throws(() => parsePRLToGrains(bad), /invalid PRL amount/, bad);
+    assert.throws(() => parseBTCToSats(bad), /invalid BTC amount/, bad);
+  }
+  assert.throws(() => parsePRLToGrains("90071992.54740992"), /out of range/);
+  assert.throws(() => parsePRLToGrains(1.5), /must be a string/);
+  assert.throws(() => parseBTCToSats(null), /must be a string/);
 });

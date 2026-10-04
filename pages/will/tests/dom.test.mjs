@@ -103,3 +103,12 @@ test("styles.css exists and is non-trivial", () => {
 test("qrcode lib vendored", () => {
   assert.ok(existsSync(P(appDir, "qrcode.min.js")), "qrcode.min.js vendored");
 });
+
+test("offline tally uses the exact core parser (float-parse class closed)", () => {
+  const js = readFileSync(P(appDir, "app.js"), "utf8");
+  assert.ok(js.includes("W.parsePRLToGrains(parts[1])"), "tally delegates to the core exact parser");
+  assert.ok(!js.includes("Math.round(amt * 1e8)"), "no float tally parse left");
+  const html = readFileSync(P(appDir, "index.html"), "utf8");
+  assert.ok(html.includes("pearl-will.bundle.js?v=2"), "bundle cache key bumped");
+  assert.ok(html.includes('src="app.js?v=2"'), "app cache key bumped");
+});

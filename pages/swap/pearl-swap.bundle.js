@@ -65,7 +65,9 @@ var PearlSwap = (() => {
     newMnemonic: () => newMnemonic,
     numsInternalKey: () => numsInternalKey,
     p2trScriptPubKey: () => p2trScriptPubKey,
+    parseBTCToSats: () => parseBTCToSats,
     parseDescriptor: () => parseDescriptor,
+    parsePRLToGrains: () => parsePRLToGrains,
     parsePreimage: () => parsePreimage,
     parseSwapSpec: () => parseSwapSpec,
     parseTx: () => parseTx,
@@ -6124,6 +6126,23 @@ zoo`.split("\n");
   var MIN_T1_T2_GAP = 144;
   var MIN_TIP_CLEARANCE = 6;
   var PREIMAGE_LEN = 32;
+  function parseDecimalToSmallest(s, unitName) {
+    if (typeof s !== "string") throw new Error("amount must be a string");
+    const t = s.trim();
+    const m = /^(\d+)(?:\.(\d{1,8}))?$/.exec(t);
+    if (!m) throw new Error(`invalid ${unitName} amount: ${t.slice(0, 40)}`);
+    const smallest = BigInt(m[1]) * BigInt(GRAIN_PER_PRL) + (m[2] ? BigInt(m[2].padEnd(8, "0")) : 0n);
+    if (smallest > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw new Error(`${unitName} amount out of range: ${t.slice(0, 40)}`);
+    }
+    return Number(smallest);
+  }
+  function parsePRLToGrains(s) {
+    return parseDecimalToSmallest(s, "PRL");
+  }
+  function parseBTCToSats(s) {
+    return parseDecimalToSmallest(s, "BTC");
+  }
   function constEq(a, b) {
     if (!(a instanceof Uint8Array) || !(b instanceof Uint8Array) || a.length !== b.length) return false;
     let d = 0;

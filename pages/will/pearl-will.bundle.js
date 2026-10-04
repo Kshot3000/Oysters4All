@@ -40,6 +40,7 @@
     newMnemonic: () => newMnemonic,
     numsInternalKeyWill: () => numsInternalKeyWill,
     p2trScriptPubKey: () => p2trScriptPubKey,
+    parsePRLToGrains: () => parsePRLToGrains,
     parseXOnlyKey: () => parseXOnlyKey,
     partyKeyFromInput: () => partyKeyFromInput,
     planSpend: () => planSpend,
@@ -6223,6 +6224,17 @@ zoo`.split("\n");
   };
   var MAX_SEQ_NONFINAL = 4294967294;
   var EXPIRY_MAX_HEIGHT = 5e8;
+  function parsePRLToGrains(s) {
+    if (typeof s !== "string") throw new Error("amount must be a string");
+    const t = s.trim();
+    const m = /^(\d+)(?:\.(\d{1,8}))?$/.exec(t);
+    if (!m) throw new Error(`invalid PRL amount: ${t.slice(0, 40)}`);
+    const grains = BigInt(m[1]) * BigInt(GRAIN_PER_PRL) + (m[2] ? BigInt(m[2].padEnd(8, "0")) : 0n);
+    if (grains > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw new Error(`PRL amount out of range: ${t.slice(0, 40)}`);
+    }
+    return Number(grains);
+  }
   function buildOwnerScript(ownerXOnly) {
     let k;
     try {

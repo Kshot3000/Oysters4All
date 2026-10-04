@@ -60,8 +60,8 @@ exact bundle in a VM.
 
 ## Tests
 
-- `tests/will.test.mjs` — 25/25 green (script construction + canonical key sort, CLTV prologue byte-match vs audited escrow, NUMS domain separation, vault determinism + pinned address/seal, descriptor PROVEN/NOT PROVEN incl. tamper cases, claim-gate refusals, full owner + 2-of-3 + 1-of-1 claim builds with independent hex-decode re-verification, tamper-caught regression).
-- `tests/dom.test.mjs` — 7/7 green (committed bundle boots in a VM and exposes the full surface; pinned bundle vault + PROVEN; pre-unlock refusal from shipped code; every `app.js` id wired in `index.html`; cache-busted assets; footer attribution).
+- `tests/will.test.mjs` — 26/26 green (script construction + canonical key sort, CLTV prologue byte-match vs audited escrow, NUMS domain separation, vault determinism + pinned address/seal, descriptor PROVEN/NOT PROVEN incl. tamper cases, claim-gate refusals, full owner + 2-of-3 + 1-of-1 claim builds with independent hex-decode re-verification, tamper-caught regression, exact amount parser for the offline tally).
+- `tests/dom.test.mjs` — 8/8 green (committed bundle boots in a VM and exposes the full surface; pinned bundle vault + PROVEN; pre-unlock refusal from shipped code; every `app.js` id wired in `index.html`; cache-busted assets; footer attribution; exact-parser wiring pins).
 - Real-browser QA (headless Chromium 152, `file://` + CDP, zero console/page errors): full draft → fund → watch → claim (loud pre-unlock refusal) → verify flow driven in-page; see `hidden_files/qa-will-browser.mjs` (bookkeeping, not committed).
 
 ## Build

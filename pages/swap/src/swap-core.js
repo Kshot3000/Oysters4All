@@ -105,6 +105,31 @@ export const MIN_TIP_CLEARANCE = 6;
 /** Preimage is always 32 bytes. */
 export const PREIMAGE_LEN = 32;
 
+/** Parse a decimal amount string into its smallest unit (Number, exact).
+ *  Fleet-standard strict form — digits with an optional fraction of at
+ *  most 8 decimal places, computed in BigInt and range-checked to a safe
+ *  integer. This replaces the UI's old float parse
+ *  (Math.round(Number(x) * 1e8)), which silently rounded sub-unit inputs
+ *  like "0.000000015" instead of rejecting them and accepted hex/exponent
+ *  forms like "0x10" (= 16 whole units) and "1e3": in a swap forge the
+ *  parsed amounts are locked into the HTLC, so a misparse is a
+ *  wrong-amount swap, not a display glitch. Throws on bad input. */
+function parseDecimalToSmallest(s, unitName) {
+  if (typeof s !== "string") throw new Error("amount must be a string");
+  const t = s.trim();
+  const m = /^(\d+)(?:\.(\d{1,8}))?$/.exec(t);
+  if (!m) throw new Error(`invalid ${unitName} amount: ${t.slice(0, 40)}`);
+  const smallest = BigInt(m[1]) * BigInt(GRAIN_PER_PRL) + (m[2] ? BigInt(m[2].padEnd(8, "0")) : 0n);
+  if (smallest > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error(`${unitName} amount out of range: ${t.slice(0, 40)}`);
+  }
+  return Number(smallest);
+}
+/** Parse a PRL amount string into grains (exact). See above. */
+export function parsePRLToGrains(s) { return parseDecimalToSmallest(s, "PRL"); }
+/** Parse a BTC amount string into satoshis (exact). See above. */
+export function parseBTCToSats(s) { return parseDecimalToSmallest(s, "BTC"); }
+
 function constEq(a, b) {
   if (!(a instanceof Uint8Array) || !(b instanceof Uint8Array) || a.length !== b.length) return false;
   let d = 0;

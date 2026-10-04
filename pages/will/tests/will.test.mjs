@@ -374,3 +374,16 @@ test("1-of-1 heir vault works end to end", () => {
   });
   assert.equal(rv.ok, true); assert.equal(rv.sigs, 1);
 });
+
+test("parsePRLToGrains: exact parser rejects the float-parse class (offline tally)", () => {
+  assert.equal(W.parsePRLToGrains("1.50000000"), 150_000_000);
+  assert.equal(W.parsePRLToGrains("0.00000001"), 1);
+  assert.equal(W.parsePRLToGrains(" 2.25 "), 225_000_000);
+  assert.equal(W.parsePRLToGrains("90071992.54740991"), Number.MAX_SAFE_INTEGER);
+  assert.equal(W.parsePRLToGrains("0"), 0); // zero parses; the tally refuses it as a UTXO amount
+  for (const bad of ["1.000000005", "1.2.3", "10abc", "0x10", "1e3", "1,000", ".5", "5.", "-5", "", "  ", "NaN", "Infinity"]) {
+    assert.throws(() => W.parsePRLToGrains(bad), /invalid PRL amount/, bad);
+  }
+  assert.throws(() => W.parsePRLToGrains("90071992.54740992"), /out of range/);
+  assert.throws(() => W.parsePRLToGrains(1.5), /must be a string/);
+});

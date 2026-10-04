@@ -488,6 +488,29 @@ export async function fetchPrlUsd(fetchFn = fetch) {
   };
 }
 
+/** Parse a PRL amount string into grains (Number, exact). Fleet-standard
+ *  strict form — digits with an optional fraction of at most 8 decimal
+ *  places, computed in BigInt and range-checked to a safe integer. This
+ *  replaces the UI's old float parse (Math.round(parseFloat(x) * 1e8)),
+ *  which silently truncated "1.2.3" to 1.2 PRL, accepted trailing junk
+ *  like "10abc", and silently rounded sub-grain inputs like
+ *  "25.123456789" instead of rejecting them: in a payment app the parsed
+ *  amount is baked into the invoice and the generated payment button, so
+ *  a misparse charges the customer the wrong amount. Throws on bad
+ *  input. (The USD branch stays a float conversion — an FX quote has no
+ *  exact grain value; usdToGrains documents that it rounds.) */
+export function parsePRLToGrains(s) {
+  if (typeof s !== "string") throw new Error("amount must be a string");
+  const t = s.trim();
+  const m = /^(\d+)(?:\.(\d{1,8}))?$/.exec(t);
+  if (!m) throw new Error(`invalid PRL amount: ${t.slice(0, 40)}`);
+  const grains = BigInt(m[1]) * BigInt(GRAIN_PER_PRL) + (m[2] ? BigInt(m[2].padEnd(8, "0")) : 0n);
+  if (grains > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error(`PRL amount out of range: ${t.slice(0, 40)}`);
+  }
+  return Number(grains);
+}
+
 /** USD → grains at a given rate (rounds to whole grains). */
 export function usdToGrains(usd, rateUsd) {
   const u = Number(usd), r = Number(rateUsd);

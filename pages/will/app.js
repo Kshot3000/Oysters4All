@@ -245,9 +245,11 @@
       for (const l of lines) {
         const parts = l.split(/\s+/);
         if (parts.length < 3) throw new Error("bad line (want txid:vout amount address): " + l.slice(0, 40));
-        const amt = Number(parts[1]);
-        if (!Number.isFinite(amt) || amt <= 0) throw new Error("bad amount: " + parts[1]);
-        total += Math.round(amt * 1e8); n++;
+        /* Exact parser (core): the old Number()+Math.round float parse
+         * silently rounded sub-grain amounts and accepted "0x10"/"1e3". */
+        const amt = W.parsePRLToGrains(parts[1]);
+        if (amt <= 0) throw new Error("bad amount: " + parts[1]);
+        total += amt; n++;
       }
       $("f-tally-out").textContent = n + " UTXO(s) tallied · " + fmtPRL(total) + " (offline — nothing left your machine)";
     } catch (e) { $("f-tally-out").textContent = "Tally refused: " + e.message; }
