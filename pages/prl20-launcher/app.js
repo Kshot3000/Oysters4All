@@ -13,7 +13,18 @@ const MAINNET_BB = "https://blockbook.pearlresearch.ai";
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const fmtInt = (s) => { try { return BigInt(s).toLocaleString("en-US"); } catch { return String(s); } };
-const fmtPRL = (grains) => (Number(grains) / 1e8).toFixed(8).replace(/\.?0+$/, "") + " PRL";
+const fmtPRL = (grains) => {
+/* BigInt-exact (pool float-format class): the old float format
+   * silently rounds grain counts past Number.MAX_SAFE_INTEGER.
+   * Integer string/BigInt grain counts format exactly; anything
+   * else keeps the legacy float rendering. */
+  const s = typeof grains === "bigint" ? grains.toString() : String(grains).trim();
+  if (!/^-?\d+$/.test(s)) return (Number(grains) / 1e8).toFixed(8).replace(/\.?0+$/, "") + " PRL";
+  const b = BigInt(s), neg = b < 0n, a = neg ? -b : b;
+  const w = (a / 100000000n).toString();
+  const f = (a % 100000000n).toString().padStart(8, "0").replace(/0+$/, "");
+  return (neg ? "-" : "") + w + (f ? "." + f : "") + " PRL";
+};
 async function copyText(t, btn) {
   try { await navigator.clipboard.writeText(t); }
   catch {

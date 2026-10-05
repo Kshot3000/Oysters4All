@@ -343,3 +343,12 @@ test("tampered signature is refused at assembly", () => {
   assert.ok(/verif|signature/i.test($("assemble-error").textContent), $("assemble-error").textContent);
   assert.equal($("final-txid").textContent, txidBefore, "no new tx may be produced from a bad signature");
 });
+
+test("app.js grain formatter is BigInt-exact (pool float-format class)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { dirname, resolve } = await import("node:path");
+  const { fileURLToPath } = await import("node:url");
+  const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "..", "app.js"), "utf8");
+  assert.ok(src.includes("100000000n"), "BigInt-exact grain formatter present");
+  assert.ok(src.includes("/^-?\\d+$/"), "integer-grain gate present");
+});

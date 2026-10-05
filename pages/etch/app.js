@@ -21,7 +21,18 @@
     feeRate: 5, utxos: [], plan: null, commit: null, reveal: null,
   };
 
-  const fmtPRL = (g) => (g / E.GRAIN_PER_PRL).toFixed(8).replace(/0+$/, "").replace(/\.$/, ".0") + " PRL";
+  const fmtPRL = (g) => {
+/* BigInt-exact (pool float-format class): the old float format
+     * silently rounds grain counts past Number.MAX_SAFE_INTEGER.
+     * Integer string/BigInt grain counts format exactly; anything
+     * else keeps the legacy float rendering. */
+    const s = typeof g === "bigint" ? g.toString() : String(g).trim();
+    if (!/^-?\d+$/.test(s)) return (Number(g) / E.GRAIN_PER_PRL).toFixed(8).replace(/0+$/, "").replace(/\.$/, ".0") + " PRL";
+    const b = BigInt(s), neg = b < 0n, a = neg ? -b : b;
+    const w = (a / 100000000n).toString();
+    const f = (a % 100000000n).toString().padStart(8, "0").replace(/0+$/, "");
+    return (neg ? "-" : "") + w + "." + (f || "0") + " PRL";
+  };
   /* clipboard that never throws: file:// and denied permissions fall back
    * to a manual-select copy, with an honest label either way */
   function copyText(text, btn) {

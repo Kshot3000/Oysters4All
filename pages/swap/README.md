@@ -56,8 +56,8 @@ use). Every built transaction is signed and re-verified locally.
 
 ## Files
 
-- `index.html` — the app (references `styles.css?v=1`, `qrcode.min.js?v=1`,
-  `pearl-swap.bundle.js?v=1`, `app.js?v=1`)
+- `index.html` — the app (references `styles.css?v=4`, `qrcode.min.js?v=1`,
+  `pearl-swap.bundle.js?v=3`, `app.js?v=3`)
 - `styles.css` — "collision chamber" theme (deep-space navy, PRL-cyan vs
   BTC-magenta particle streams)
 - `app.js` — UI wiring for all five steps

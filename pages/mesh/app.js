@@ -225,7 +225,19 @@
       $("f-tally-result").hidden = true;
     } catch (e) { showErr("f-err", e.message); }
   }
-  function fmtPRL(grains) { return (Number(grains) / 1e8).toFixed(8) + " PRL"; }
+  function fmtPRL(grains) {
+/* BigInt-exact (pool float-format class): the old float format
+     * silently rounds grain counts past Number.MAX_SAFE_INTEGER.
+     * Both inputs here are exact already — the Blockbook balance is
+     * a grain string and the tally total is a BigInt — so they now
+     * render exactly; anything else keeps the legacy rendering. */
+    const s = typeof grains === "bigint" ? grains.toString() : String(grains).trim();
+    if (!/^-?\d+$/.test(s)) return (Number(grains) / 1e8).toFixed(8) + " PRL";
+    const b = BigInt(s), neg = b < 0n, a = neg ? -b : b;
+    const w = (a / 100000000n).toString();
+    const f = (a % 100000000n).toString().padStart(8, "0");
+    return (neg ? "-" : "") + w + "." + f + " PRL";
+  }
 
   $("f-check").addEventListener("click", async () => {
     hideErr("f-err");

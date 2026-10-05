@@ -120,8 +120,8 @@ the DOM test uses a strict VM shim, no browser needed).
 - `app.js` — page logic (ceremony coordination, verifiers, Blockbook
   GET-only balance, UTXO tally, QR).
 
-Cache keys: `?v=1` on `styles.css`, `qrcode.min.js`,
-`pearl-mesh.bundle.js`, `app.js`.
+Cache keys: `styles.css?v=7`, `qrcode.min.js?v=1`,
+`pearl-mesh.bundle.js?v=1`, `app.js?v=3`.
 
 ---
 Built by [@kshot9000](https://x.com/kshot9000) · tips:

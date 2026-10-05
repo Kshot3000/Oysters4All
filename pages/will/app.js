@@ -18,7 +18,18 @@
   function showErr(id, msg) { const e = $(id); e.textContent = msg; e.hidden = false; }
   function hideErr(id) { $(id).hidden = true; }
   function trunc(h, n) { n = n || 14; return h.length > 2 * n ? h.slice(0, n) + "…" + h.slice(-n) : h; }
-  function fmtPRL(g) { return (Number(g) / 100000000).toFixed(8) + " PRL"; }
+  function fmtPRL(g) {
+/* BigInt-exact (pool float-format class): the old float format
+     * silently rounds grain counts past Number.MAX_SAFE_INTEGER.
+     * Integer string/BigInt grain counts format exactly; anything
+     * else keeps the legacy float rendering. */
+    const s = typeof g === "bigint" ? g.toString() : String(g).trim();
+    if (!/^-?\d+$/.test(s)) return (Number(g) / 100000000).toFixed(8) + " PRL";
+    const b = BigInt(s), neg = b < 0n, a = neg ? -b : b;
+    const w = (a / 100000000n).toString();
+    const f = (a % 100000000n).toString().padStart(8, "0");
+    return (neg ? "-" : "") + w + "." + f + " PRL";
+  }
 
   /* hostile-localStorage-safe storage */
   const store = {

@@ -26,7 +26,18 @@
 
   function showErr(id, msg) { const e = $(id); e.textContent = msg; e.hidden = false; }
   function hideErr(id) { $(id).hidden = true; }
-  function grainsToPRL(g) { return (g / E.GRAIN_PER_PRL).toFixed(8).replace(/\.?0+$/, ""); }
+  function grainsToPRL(g) {
+/* BigInt-exact (pool float-format class): the old float format
+     * silently rounds grain counts past Number.MAX_SAFE_INTEGER.
+     * Integer string/BigInt grain counts format exactly; anything
+     * else keeps the legacy float rendering. */
+    const s = typeof g === "bigint" ? g.toString() : String(g).trim();
+    if (!/^-?\d+$/.test(s)) return (Number(g) / E.GRAIN_PER_PRL).toFixed(8).replace(/\.?0+$/, "");
+    const b = BigInt(s), neg = b < 0n, a = neg ? -b : b;
+    const w = (a / 100000000n).toString();
+    const f = (a % 100000000n).toString().padStart(8, "0").replace(/0+$/, "");
+    return (neg ? "-" : "") + w + (f ? "." + f : "");
+  }
   function fmtDate(lock) { return new Date(lock * 1000).toISOString().replace("T", " ").slice(0, 16) + " UTC"; }
   function countdown(lock, now) {
     const d = lock - now;

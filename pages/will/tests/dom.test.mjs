@@ -110,5 +110,14 @@ test("offline tally uses the exact core parser (float-parse class closed)", () =
   assert.ok(!js.includes("Math.round(amt * 1e8)"), "no float tally parse left");
   const html = readFileSync(P(appDir, "index.html"), "utf8");
   assert.ok(html.includes("pearl-will.bundle.js?v=2"), "bundle cache key bumped");
-  assert.ok(html.includes('src="app.js?v=2"'), "app cache key bumped");
+  assert.ok(html.includes('src="app.js?v=3"'), "app cache key bumped");
+});
+
+test("app.js grain formatter is BigInt-exact (pool float-format class)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { dirname, resolve } = await import("node:path");
+  const { fileURLToPath } = await import("node:url");
+  const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "..", "app.js"), "utf8");
+  assert.ok(src.includes("100000000n"), "BigInt-exact grain formatter present");
+  assert.ok(src.includes("/^-?\\d+$/"), "integer-grain gate present");
 });

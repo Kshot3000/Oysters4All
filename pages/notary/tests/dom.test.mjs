@@ -173,3 +173,12 @@ test("footer carries donation address", () => {
   assert.ok(html.includes("prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d"));
   assert.ok(html.includes("https://x.com/kshot9000"));
 });
+
+test("app.js grain formatter is BigInt-exact (pool float-format class)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { dirname, resolve } = await import("node:path");
+  const { fileURLToPath } = await import("node:url");
+  const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "..", "app.js"), "utf8");
+  assert.ok(src.includes("100000000n"), "BigInt-exact grain formatter present");
+  assert.ok(src.includes("/^-?\\d+$/"), "integer-grain gate present");
+});

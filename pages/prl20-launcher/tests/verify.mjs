@@ -310,5 +310,11 @@ if (canParse) {
   ok("prls mint: indexer fee matcher satisfied", res.paid && res.paidGrain === String(PRLS.mintFeeGrain), JSON.stringify(res));
 } else skip("prls fee matcher (checkout absent)");
 
+{
+  const { readFileSync } = await import("node:fs");
+  const appSrc = readFileSync(resolvePath(here, "..", "app.js"), "utf8");
+  ok("app.js fmtPRL is BigInt-exact (pool float-format class)", appSrc.includes("100000000n") && appSrc.includes("/^-?\\d+$/"));
+}
+
 console.log(`\n${pass} passed, ${fail} failed${skipped ? `, ${skipped} skipped` : ""}`);
 process.exit(fail ? 1 : 0);

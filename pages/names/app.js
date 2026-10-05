@@ -19,7 +19,18 @@
   }
   function show(el, on) { el.hidden = !on; }
   function setErr(id, msg) { var el = $(id); el.textContent = msg; show(el, !!msg); }
-  function fmtPRL(g) { return (g / 1e8).toFixed(8).replace(/\.?0+$/, "") + " PRL"; }
+  function fmtPRL(g) {
+/* BigInt-exact (pool float-format class): the old float format
+     * silently rounds grain counts past Number.MAX_SAFE_INTEGER.
+     * Integer string/BigInt grain counts format exactly; anything
+     * else keeps the legacy float rendering. */
+    const s = typeof g === "bigint" ? g.toString() : String(g).trim();
+    if (!/^-?\d+$/.test(s)) return (Number(g) / 1e8).toFixed(8).replace(/\.?0+$/, "") + " PRL";
+    const b = BigInt(s), neg = b < 0n, a = neg ? -b : b;
+    const w = (a / 100000000n).toString();
+    const f = (a % 100000000n).toString().padStart(8, "0").replace(/0+$/, "");
+    return (neg ? "-" : "") + w + (f ? "." + f : "") + " PRL";
+  }
   function fmtTs(ts) { return new Date(ts * 1000).toISOString().slice(0, 19) + "Z"; }
   function copyText(text, btn) {
     var done = function () {

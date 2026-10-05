@@ -393,3 +393,12 @@ test("footer carries @kshot9000 and the PRL tip address", () => {
   assert.ok(foot.includes("@kshot9000"), "x handle present");
   assert.ok(foot.includes(TIP), "PRL tip address present character-for-character");
 });
+
+test("app.js grain formatter is BigInt-exact (pool float-format class)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { dirname, resolve } = await import("node:path");
+  const { fileURLToPath } = await import("node:url");
+  const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), "..", "app.js"), "utf8");
+  assert.ok(src.includes("100000000n"), "BigInt-exact grain formatter present");
+  assert.ok(src.includes("/^-?\\d+$/"), "integer-grain gate present");
+});
