@@ -1,32 +1,5 @@
-From 0beae58b2acfbf8e67c24badb68eb9a18b278487 Mon Sep 17 00:00:00 2001
-From: Kshot3000 <kshot9000@gmail.com>
-Date: Wed, 7 Oct 2026 19:41:50 +0000
-Subject: [PATCH] =?UTF-8?q?fix(proxy):=20jsonrpc=20cache=20keyed=20on=20me?=
- =?UTF-8?q?thod=20only=20=E2=80=94=20different=20params=20replay=20the=20f?=
- =?UTF-8?q?irst=20caller's=20response?=
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
-
-The caddy-jsonrpc-cache lookup, singleflight group, and store all
-used req.Method as the sole key, and jsonrpcRequest didn't even
-parse params. Within the TTL, a getblocktemplate call with one
-set of params (mode/capabilities/rules) was replayed to callers
-asking with different params. Parse params and key on
-method + params (raw bytes; non-normalized misses are safe).
-
-TestCacheKeyIncludesParams with a param-echoing backend: red
-before (proposal request got the template-mode response, backend
-saw 1 call), green after (2 calls, identical params still HIT).
-Module suite + race clean. Independent of #377; may need a trivial
-signature rebase if that lands first.
----
- proxy/caddy-jsonrpc-cache/handler.go      | 28 +++++----
- proxy/caddy-jsonrpc-cache/handler_test.go | 73 +++++++++++++++++++++++
- 2 files changed, 91 insertions(+), 10 deletions(-)
-
 diff --git a/proxy/caddy-jsonrpc-cache/handler.go b/proxy/caddy-jsonrpc-cache/handler.go
-index bc825e0a..e0baeded 100644
+index bc825e0a..a47d91a7 100644
 --- a/proxy/caddy-jsonrpc-cache/handler.go
 +++ b/proxy/caddy-jsonrpc-cache/handler.go
 @@ -98,13 +98,20 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhtt
@@ -71,7 +44,7 @@ index bc825e0a..e0baeded 100644
  
  		h.logger.Debug("cached JSON-RPC response",
  			zap.String("method", method),
-@@ -149,23 +156,23 @@ func (h Handler) fetchFromUpstream(r *http.Request, body []byte, next caddyhttp.
+@@ -149,24 +156,41 @@ func (h Handler) fetchFromUpstream(r *http.Request, body []byte, next caddyhttp.
  	return entry, nil
  }
  
@@ -84,11 +57,22 @@ index bc825e0a..e0baeded 100644
  }
  
 -func (c *cache) get(method string) (*cacheEntry, bool) {
-+func (c *cache) get(key string) (*cacheEntry, bool) {
- 	c.mu.RLock()
- 	defer c.mu.RUnlock()
+-	c.mu.RLock()
+-	defer c.mu.RUnlock()
 -	e, ok := c.entries[method]
++func (c *cache) get(key string) (*cacheEntry, bool) {
++	c.mu.Lock()
++	defer c.mu.Unlock()
 +	e, ok := c.entries[key]
++	if ok && !e.fresh() {
++		// Evict on access: expired entries must not accumulate.
++		// Keys embed the request params, so each distinct params
++		// value is a distinct entry, and without eviction a caller
++		// minting distinct params could grow the map for the life
++		// of the process.
++		delete(c.entries, key)
++		return nil, false
++	}
  	return e, ok
  }
  
@@ -96,11 +80,21 @@ index bc825e0a..e0baeded 100644
 +func (c *cache) set(key string, entry *cacheEntry) {
  	c.mu.Lock()
 -	c.entries[method] = entry
+-	c.mu.Unlock()
++	defer c.mu.Unlock()
 +	c.entries[key] = entry
- 	c.mu.Unlock()
++
++	// Sweep every expired entry on insert, so retained memory is
++	// bounded to entries still inside their TTL window.
++	for k, e := range c.entries {
++		if !e.fresh() {
++			delete(c.entries, k)
++		}
++	}
  }
  
-@@ -188,6 +195,7 @@ func (e *cacheEntry) fresh() bool {
+ func (c *cache) clear() {
+@@ -188,6 +212,7 @@ func (e *cacheEntry) fresh() bool {
  type jsonrpcRequest struct {
  	ID     json.RawMessage `json:"id"`
  	Method string          `json:"method"`
@@ -109,10 +103,10 @@ index bc825e0a..e0baeded 100644
  
  type jsonrpcResponse struct {
 diff --git a/proxy/caddy-jsonrpc-cache/handler_test.go b/proxy/caddy-jsonrpc-cache/handler_test.go
-index e291aa8b..26f02cc7 100644
+index e291aa8b..99de7cd0 100644
 --- a/proxy/caddy-jsonrpc-cache/handler_test.go
 +++ b/proxy/caddy-jsonrpc-cache/handler_test.go
-@@ -204,3 +204,76 @@ func TestGETRequestsPassthrough(t *testing.T) {
+@@ -204,3 +204,106 @@ func TestGETRequestsPassthrough(t *testing.T) {
  	require.NoError(t, err)
  	assert.Equal(t, int64(1), backendCalls.Load(), "GET requests should pass through")
  }
@@ -189,6 +183,33 @@ index e291aa8b..26f02cc7 100644
 +	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 +	return string(resp.Result)
 +}
--- 
-2.43.0
-
++
++// TestCacheEvictsExpiredEntries ensures stale entries do not accumulate
++// for the life of the process: with params in the key, each distinct
++// params value is a distinct entry, so expired entries must be dropped
++// on access and swept on insert.
++func TestCacheEvictsExpiredEntries(t *testing.T) {
++	c := &cache{entries: make(map[string]*cacheEntry)}
++	stale := &cacheEntry{
++		body:     []byte(`{"result":1}`),
++		storedAt: time.Now().Add(-time.Minute),
++		ttl:      time.Millisecond,
++	}
++	c.set("getblocktemplate\x00{\"a\":1}", stale)
++	require.Empty(t, c.entries, "expired entry must be swept on set")
++
++	live := &cacheEntry{
++		body:     []byte(`{"result":2}`),
++		storedAt: time.Now(),
++		ttl:      time.Minute,
++	}
++	c.set("getblocktemplate\x00{\"a\":2}", live)
++	require.Len(t, c.entries, 1)
++
++	// An entry that expires while resident is dropped on get.
++	live.storedAt = time.Now().Add(-time.Minute)
++	live.ttl = time.Millisecond
++	_, ok := c.get("getblocktemplate\x00{\"a\":2}")
++	require.False(t, ok)
++	require.Empty(t, c.entries, "expired entry must be evicted on get")
++}

@@ -24,3 +24,8 @@ The BUG-REPORT-scriptclass-and-gwpass.md note calling the connmgr/addrmgr hunter
 "fabricated" referred to its INTERIM delivery (whose quoted code indeed exists nowhere).
 Its FINAL report was a different, largely accurate document — source of PRs #386/#387 above.
 Lesson appended to hidden_files/lessons-2026-10-07.md.
+
+## Follow-ups (2026-10-07 ~15:13 CDT run) — Bugbot rounds on #385 + #388, both verified + fixed
+
+- **PR #385 follow-up 94e3a3c1:** Bugbot was RIGHT — the fetcher skipping a malformed input left a missing prevout, and `txscript.NewTxSigHashes` dereferences it (`hashcache.go:241`, `IsPayToTaproot` on nil), so `FinalizePsbt` still panicked before the signing loop's bounds check ran; the PR body's "fail cleanly downstream" claim was wrong for this caller. Own RED reproduced at the real entry point (panic in NewTxSigHashes via psbt.go:393). Fix: `FinalizePsbt` runs new `checkNonWitnessUtxoIndices` after `InputsReadyToSign`, returning the descriptive error before sighash construction. `TestFinalizePsbtMalformedNonWitnessIndex` RED→GREEN; Fund/Finalize pass; PR comment posted.
+- **PR #388 follow-up dfccd291:** Bugbot + agentic security review were RIGHT — entries were never deleted (`fresh()` only skipped reuse, `clear()` only on Cleanup), so param-keyed entries (key + full body) accumulated for the process lifetime; unbounded growth by distinct-params minting. Fix: `get()` evicts expired on access, `set()` sweeps expired on insert (retained = TTL window only). `TestCacheEvictsExpiredEntries` RED→GREEN; full module suite green. Verified no hunk overlap with #377 (different functions); noted in PR comment.
