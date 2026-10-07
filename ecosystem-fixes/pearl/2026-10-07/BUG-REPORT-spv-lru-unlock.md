@@ -39,6 +39,18 @@ Fix: `Load` (not `LoadAndDelete`) first, then under `c.mtx` re-check the map sti
 
 Verification: new regression test `TestLoadAndDeleteSizeErrorKeepsEntry` — RED pre-fix (`Get` returns "unable to find element" after the failed delete), GREEN post-fix; full `spv/cache/lru` package passes; LoadAndDelete/callback/concurrency tests `-race` clean; `go test ./spv/cache/...` passes; gofmt + vet clean. Patch file regenerated (2 files, +135/−3 vs master). PR head `76bbc300`, MERGEABLE. Watches this run: wPRL #347 still 0 comments; PRs #370–#377 Bugbot = summaries only, no new findings; #336 unchanged, no rebase needed.
 
+## Follow-up 2 (2026-10-07 ~09:13 CDT run) — `Put` map access not atomic with its list update, same PR
+
+Commit `b135fc3e` pushed to the same PR #376 branch, with an explanatory comment on the PR (https://github.com/pearl-research-labs/pearl/pull/376#issuecomment-6040395523). Trigger: Bugbot's re-review of `76bbc300` (posted 13:33Z, after the 08:13 run) — "Delete can drop a concurrent Put", Medium. Verified claim-by-claim in code; the mechanism is real, with the root in `Put`, not in the reworked `LoadAndDelete`:
+
+`Put` loaded the existing element from the lookup map **before** acquiring `c.mtx` and stored its replacement **after** releasing it. A `LoadAndDelete` (or second `Put`) for the same key landing in either window left the first `Put` mutating the list and size accounting for an element that was no longer the one in the map — its size subtracted a second time (corrupting, potentially underflowing, the uint64 accounting), or the newer element orphaned in the list: counted in `Size()`, unreachable via `Get`. `LoadAndDelete`'s under-lock identity re-check cannot close this, because the stale snapshot is taken and published entirely outside the lock on the `Put` side.
+
+Fix: `Put` now loads any existing element and stores its replacement under the same `c.mtx` hold as the list/size mutations (`defer Unlock`, which also keeps the b297219d evict-error unlock intact), so map, list and accounting change atomically. Considered and left alone: `Get` returning a value a concurrent delete just removed is a linearizable stale read, and its `MoveToFront` is membership-guarded in `list.go` — it cannot corrupt the list.
+
+Verification: new regression test `TestConcurrentSameKeyPutDeleteInvariants` (in-package, 8 goroutines × 2000 same-key Put/LoadAndDelete/Get, then asserts map/list/size agreement) — RED on `76bbc300` in 3/3 runs (size accounting diverged from the list contents within milliseconds: 0x5f/0x62 vs the true total), GREEN after in 3/3 runs; full `spv/cache/lru` package passes with `-race`; `go vet` + `gofmt` clean; `go build ./spv/...` passes. Patch file regenerated (3 files, +249/−15 vs master 2f8b770c). PR head `b135fc3e`, MERGEABLE.
+
+Watches this run: wPRL #347 still OPEN, 0 comments — no Pearl-team reply, not re-sent. Kyle's PRs #336, #370–#375, #377 re-checked for reviews newer than their last fix pushes: none (the #373 comments that look recent are the 10:32Z reviews the 06:13 run already fixed in 40928d81 — judge by `created_at`, the API re-anchors `commit_id` to the current head). In-dev PRs #369/#311/#310/#366 and issue #303 unchanged since last check. Showcase digest for today was already posted (05:39Z) — no digest, no X post this run.
+
 ## Also checked and NOT duplicated this run
 
 - Issue #209 (desktop 10s RPC timeout): already fixed at master — `rpc-client.ts` defaults to 60s with a comment describing exactly this issue. Issue still open upstream; no PR needed.
