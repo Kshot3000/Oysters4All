@@ -1,5 +1,5 @@
 diff --git a/node/netsync/manager.go b/node/netsync/manager.go
-index 1dee98a1..8319b8b6 100644
+index 1dee98a1..5c3f29dd 100644
 --- a/node/netsync/manager.go
 +++ b/node/netsync/manager.go
 @@ -51,6 +51,14 @@ const (
@@ -29,31 +29,68 @@ index 1dee98a1..8319b8b6 100644
  }
  
  // resetHeaderState sets the headers-first mode state to values appropriate for
-@@ -380,6 +393,23 @@ func (sm *SyncManager) startSync() {
+@@ -346,6 +359,28 @@ func (sm *SyncManager) pickSyncCandidate() *peerpkg.Peer {
+ 	return candidates[rand.Intn(len(candidates))]
+ }
+ 
++// atTipSyncPromotionBlocked reports whether promoting a sync
++// candidate is barred while the chain believes it is current. The
++// bar applies when the candidate announced no block we lack (its
++// only claim is its unauthenticated version height), and also when
++// it announced an unknown block but advertises a height above ours:
++// that promotion would make current() false (our best below the
++// sync peer's advertised height) and silence every other peer's
++// announcements until the stall timer fires, on the strength of an
++// unverified hash plus an unauthenticated height. Factored out of
++// startSync with the current flag explicit because the in-process
++// test chain is never current, so the at-tip cases can only be
++// pinned through this seam.
++func atTipSyncPromotionBlocked(isCurrent bool, announced *chainhash.Hash, peerHeight, bestHeight int32) bool {
++	if !isCurrent {
++		return false
++	}
++	if announced == nil {
++		return true
++	}
++	return peerHeight > bestHeight
++}
++
+ // startSync will choose the best peer among the available candidate peers to
+ // download/sync the blockchain from.  When syncing is already running, it
+ // simply returns.
+@@ -380,6 +415,31 @@ func (sm *SyncManager) startSync() {
  		return
  	}
  
-+	// While the chain believes it is current, a candidate whose only
-+	// claim to new work is its version-message height must not be
-+	// promoted on that claim alone. The height is unauthenticated,
-+	// and promoting the peer would make current() false (our best
-+	// would be below the sync peer's advertised height), which makes
-+	// handleInvMsg ignore every other peer's announcements until the
-+	// stall timer fires. A candidate that announced a block we do
-+	// not have (checked above) is still promoted: that announcement
-+	// is how a synced node normally learns about the next block.
-+	if sm.chain.IsCurrent() && bestPeer.LastAnnouncedBlock() == nil {
++	// While the chain believes it is current, a candidate must not
++	// be promoted on unauthenticated claims alone. The version
++	// height is unauthenticated, and an announced hash is unverified
++	// until the block itself arrives and validates, so neither may
++	// flip current() false: if the sync peer's advertised height
++	// exceeds our best, current() goes false and handleInvMsg
++	// ignores every other peer's announcements until the stall
++	// timer fires. A candidate that announced a block we do not
++	// have (checked above) is still promoted when its advertised
++	// height does not exceed ours — that promotion cannot flip
++	// current(), and the honest next-block announcer is exactly
++	// that shape: its LastBlock only advances on blocks we have
++	// accepted, so it lags or matches our tip by construction.
++	// A skipped candidate's announced block is not lost: with no
++	// sync peer, handleInvMsg still fetches announcements directly.
++	if atTipSyncPromotionBlocked(sm.chain.IsCurrent(),
++		bestPeer.LastAnnouncedBlock(), bestPeer.LastBlock(),
++		best.Height) {
 +		log.Debugf("Skipping sync: candidate %s advertises "+
-+			"height %d but announced no new block and the "+
-+			"chain is current", bestPeer.Addr(),
-+			bestPeer.LastBlock())
++			"height %d, our best is %d, and the chain is "+
++			"current", bestPeer.Addr(), bestPeer.LastBlock(),
++			best.Height)
 +		return
 +	}
 +
  	// Clear the requestedBlocks if the sync peer changes, otherwise
  	// we may ignore blocks we need that the last sync peer failed
  	// to send.
-@@ -506,13 +536,25 @@ func (sm *SyncManager) handleStallSample() {
+@@ -506,13 +566,26 @@ func (sm *SyncManager) handleStallSample() {
  	}
  
  	// No syncpeer — retry selection periodically so cooled-down
@@ -66,7 +103,8 @@ index 1dee98a1..8319b8b6 100644
 +	// candidates that have nothing new to offer, so the retry is
 +	// cheap when we are genuinely at tip — and while current it
 +	// only promotes a candidate that announced a block we do not
-+	// have, never one claiming new work by version height alone.
++	// have without advertising a height above ours, so a promotion
++	// can never flip current() false on unauthenticated claims.
  	if sm.syncPeer == nil {
 -		if !sm.chain.IsCurrent() {
 -			sm.startSync()
@@ -82,7 +120,7 @@ index 1dee98a1..8319b8b6 100644
  
  	// If the stall timeout has not elapsed, exit early.
  	if time.Since(sm.lastProgressTime) <= maxStallDuration {
-@@ -538,6 +580,111 @@ func (sm *SyncManager) handleStallSample() {
+@@ -538,6 +611,137 @@ func (sm *SyncManager) handleStallSample() {
  	sm.updateSyncPeer(disconnectSyncPeer)
  }
  
@@ -109,10 +147,12 @@ index 1dee98a1..8319b8b6 100644
 +// merely paused, so the grace period restarts when the node actually
 +// becomes stranded.
 +//
-+// Rotation also stands down while any connected peer has announced a
-+// block we do not have. Such an announcement is proof that reachable
-+// work exists, whatever the advertised heights say: startSync picks
-+// one random candidate per sample, so a viable candidate can take
++// Rotation also stands down while an eligible sync candidate has
++// announced a block we do not have (see
++// anyPeerAnnouncedUnknownBlock for exactly which announcements
++// count). Such an announcement is evidence that reachable work
++// exists, whatever the advertised heights say: startSync picks one
++// random candidate per sample, so a viable candidate can take
 +// several samples to be picked, and the inv path fetches
 +// announcements directly while there is no sync peer. Rotating in
 +// that window could churn the very peer set that is about to
@@ -146,11 +186,35 @@ index 1dee98a1..8319b8b6 100644
 +	victim.Disconnect()
 +}
 +
-+// anyPeerAnnouncedUnknownBlock reports whether any connected peer's
-+// last announced block is one we do not have — proof that reachable
-+// work exists, whatever the peers' advertised heights say.
++// anyPeerAnnouncedUnknownBlock reports whether an eligible sync
++// candidate's last announced block is one we do not have — evidence
++// that reachable work exists, whatever the peers' advertised
++// heights say.
++//
++// Only announcements startSync could actually act on count: the
++// announcer must be an outbound, high-quality sync candidate that
++// is not in post-stall cooldown. LastAnnouncedBlock is written
++// from an unauthenticated inv before any quality, header, or PoW
++// gate and is only cleared when a matching block is accepted, so
++// counting every connected peer would let one fake inv from an
++// inbound or low-quality peer — which pickSyncCandidate will not
++// promote while outbound candidates exist, and whose announcement
++// nothing will fetch as sync — freeze rotation for the whole
++// stranded window. An eligible announcer, by contrast, will be
++// promoted on a coming sample; if it then stalls, it lands in
++// cooldown and its stale announcement stops standing rotation
++// down, so the stand-down is bounded rather than permanent.
 +func (sm *SyncManager) anyPeerAnnouncedUnknownBlock() bool {
-+	for peer := range sm.peerStates {
++	now := time.Now()
++	for peer, state := range sm.peerStates {
++		if peer.Inbound() || !state.syncCandidate ||
++			!isPeerHighQuality(state) {
++			continue
++		}
++		if t, ok := sm.recentlyFailedSync[peer.Addr()]; ok &&
++			now.Sub(t) < syncPeerCooldown {
++			continue
++		}
 +		announced := peer.LastAnnouncedBlock()
 +		if announced == nil {
 +			continue
@@ -195,10 +259,10 @@ index 1dee98a1..8319b8b6 100644
  // stalled sync peer. If the peer has stalled and its reported height is greater
  // than our own best height, we will disconnect it. Otherwise, we will keep the
 diff --git a/node/netsync/manager_test.go b/node/netsync/manager_test.go
-index 72a7e91c..84458152 100644
+index 72a7e91c..b5ade077 100644
 --- a/node/netsync/manager_test.go
 +++ b/node/netsync/manager_test.go
-@@ -234,6 +234,157 @@ func TestInvGateWithoutSyncPeer(t *testing.T) {
+@@ -234,6 +234,259 @@ func TestInvGateWithoutSyncPeer(t *testing.T) {
  	}
  }
  
@@ -313,9 +377,10 @@ index 72a7e91c..84458152 100644
 +}
 +
 +// TestAnyPeerAnnouncedUnknownBlock pins the rotation stand-down
-+// signal: a connected peer that announced a block we do not have is
-+// proof of reachable work, so rotation must not churn the peer set
-+// while selection retries are still working through the candidates.
++// signal: an eligible sync candidate that announced a block we do
++// not have is evidence of reachable work, so rotation must not
++// churn the peer set while selection retries are still working
++// through the candidates.
 +func TestAnyPeerAnnouncedUnknownBlock(t *testing.T) {
 +	sm := newTestSyncManager(t, &chaincfg.RegressionNetParams)
 +	assert.False(t, sm.anyPeerAnnouncedUnknownBlock(),
@@ -335,6 +400,107 @@ index 72a7e91c..84458152 100644
 +	p.UpdateLastAnnouncedBlock(&unknown)
 +	assert.True(t, sm.anyPeerAnnouncedUnknownBlock(),
 +		"the announced block is one we do not have")
++}
++
++// TestAnyPeerAnnouncedUnknownBlockEligibility pins which
++// announcements may stand rotation down. LastAnnouncedBlock is
++// written from an unauthenticated inv before any quality gate and
++// is only cleared when a matching block is accepted, so an
++// announcement may only count from a peer startSync could actually
++// promote on a coming sample: outbound, a sync candidate,
++// high-quality, and not in post-stall cooldown. Anything else —
++// above all a fake inv from an inbound peer, which is never
++// promoted while outbound candidates exist — must not freeze
++// rotation for the whole stranded window.
++func TestAnyPeerAnnouncedUnknownBlockEligibility(t *testing.T) {
++	sm := newTestSyncManager(t, &chaincfg.RegressionNetParams)
++	unknown := chainhash.Hash{0x07}
++
++	mkPeer := func(inbound bool, addr string, state *peerSyncState) *peer.Peer {
++		t.Helper()
++		cfg := &peer.Config{ChainParams: sm.chainParams}
++		var p *peer.Peer
++		if inbound {
++			p = peer.NewInboundPeer(cfg)
++		} else {
++			var err error
++			p, err = peer.NewOutboundPeer(cfg, addr)
++			require.NoError(t, err)
++		}
++		p.UpdateLastAnnouncedBlock(&unknown)
++		sm.peerStates[p] = state
++		return p
++	}
++
++	// Inbound announcer: never counts, even as a high-quality
++	// candidate — pickSyncCandidate will not promote it while
++	// outbound candidates exist.
++	mkPeer(true, "", &peerSyncState{syncCandidate: true})
++	assert.False(t, sm.anyPeerAnnouncedUnknownBlock(),
++		"an inbound announcement must not stand rotation down")
++
++	// Outbound but not a sync candidate.
++	mkPeer(false, "10.0.0.1:44108", &peerSyncState{syncCandidate: false})
++	assert.False(t, sm.anyPeerAnnouncedUnknownBlock(),
++		"a non-candidate announcement must not stand rotation down")
++
++	// Outbound candidate that has struck out to low quality: its
++	// announcements are gated through the getheaders probe, not
++	// acted on as sync evidence.
++	mkPeer(false, "10.0.0.2:44108", &peerSyncState{
++		syncCandidate: true, nonTipStrikes: lowQualityStrikeLimit,
++	})
++	assert.False(t, sm.anyPeerAnnouncedUnknownBlock(),
++		"a low-quality announcement must not stand rotation down")
++
++	// Eligible announcer in post-stall cooldown: startSync skips
++	// it, so its stale announcement must not stand rotation down
++	// either — this is what bounds the stand-down after a promoted
++	// announcer stalls without delivering its block.
++	cooling := mkPeer(false, "10.0.0.3:44108",
++		&peerSyncState{syncCandidate: true})
++	sm.recentlyFailedSync[cooling.Addr()] = time.Now()
++	assert.False(t, sm.anyPeerAnnouncedUnknownBlock(),
++		"a cooling-down announcement must not stand rotation down")
++
++	// The same announcer with the cooldown expired counts again.
++	sm.recentlyFailedSync[cooling.Addr()] =
++		time.Now().Add(-syncPeerCooldown - time.Second)
++	assert.True(t, sm.anyPeerAnnouncedUnknownBlock(),
++		"an eligible announcement with an expired cooldown counts")
++}
++
++// TestAtTipSyncPromotionBlocked pins the at-tip promotion bar:
++// while the chain is current, no candidate may be promoted in a way
++// that flips current() false — neither on its unauthenticated
++// version height alone, nor on an unverified announced hash paired
++// with an advertised height above ours. The honest next-block
++// announcer (announced a block we lack, advertised height at or
++// below ours, because its LastBlock only advances on blocks we
++// accepted) is still promoted, and nothing is barred once the
++// chain is not current.
++func TestAtTipSyncPromotionBlocked(t *testing.T) {
++	unknown := &chainhash.Hash{0x07}
++
++	assert.False(t, atTipSyncPromotionBlocked(false, nil, 100, 10),
++		"not current: a height claim still promotes")
++	assert.False(t, atTipSyncPromotionBlocked(false, unknown, 100, 10),
++		"not current: an announced block still promotes")
++
++	assert.True(t, atTipSyncPromotionBlocked(true, nil, 100, 10),
++		"current + height claim only: blocked")
++	assert.True(t, atTipSyncPromotionBlocked(true, nil, 10, 10),
++		"current + no announcement: blocked at any height")
++
++	assert.True(t, atTipSyncPromotionBlocked(true, unknown, 11, 10),
++		"current + announced block + advertised height above ours: "+
++			"blocked, the promotion would flip current() false")
++	assert.False(t, atTipSyncPromotionBlocked(true, unknown, 10, 10),
++		"current + announced block + advertised height at ours: "+
++			"promoted, current() stays true")
++	assert.False(t, atTipSyncPromotionBlocked(true, unknown, 9, 10),
++		"current + announced block + advertised height below ours: "+
++			"promoted, current() stays true")
 +}
 +
 +// TestStartSyncPromotesHeightClaimWhenNotCurrent pins that the at-tip
