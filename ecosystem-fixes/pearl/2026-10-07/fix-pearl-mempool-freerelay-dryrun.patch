@@ -1,0 +1,234 @@
+diff --git a/node/mempool/freerelay_dryrun_test.go b/node/mempool/freerelay_dryrun_test.go
+new file mode 100644
+index 00000000..1a10838c
+--- /dev/null
++++ b/node/mempool/freerelay_dryrun_test.go
+@@ -0,0 +1,128 @@
++package mempool
++
++// Regression test for the dry-run side effect in CheckMempoolAcceptance:
++// Run: go test ./node/mempool/ -run TestFreeTxRelayDryRun -race -v
++
++import (
++	"errors"
++	"strings"
++	"sync"
++	"testing"
++
++	"github.com/pearl-research-labs/pearl/node/btcutil"
++	"github.com/pearl-research-labs/pearl/node/chaincfg"
++)
++
++// CheckMempoolAcceptance (the testmempoolaccept RPC) is a dry run: it
++// holds only the pool read lock and never inserts the transaction. It
++// must therefore EVALUATE the free-relay rate limiter without CHARGING
++// it. Charging on this path both consumes the penny-flooding budget for
++// transactions that were never accepted and writes pennyTotal /
++// lastPennyUnix under a read lock, racing concurrent dry runs.
++func TestFreeTxRelayDryRunDoesNotConsumeBudget(t *testing.T) {
++	harness, spendableOuts, err := newPoolHarness(&chaincfg.MainNetParams)
++	if err != nil {
++		t.Fatalf("unable to create test pool: %v", err)
++	}
++	harness.txPool.cfg.Policy.DisableRelayPriority = false
++	// FreeTxRelayLimit stays at the harness/node default of 15.0.
++
++	zeroFeeTx, err := harness.CreateSignedTx(
++		[]spendableOutput{spendableOuts[0]}, 1, btcutil.Amount(0), false,
++	)
++	if err != nil {
++		t.Fatalf("unable to create zero-fee tx: %v", err)
++	}
++
++	// Pre-warm the transaction's lazily cached hashes: btcutil.Tx is
++	// not safe for concurrent first use, and each RPC dry run decodes
++	// its own transaction, so sharing an unwarmed Tx here would race
++	// in the test fixture rather than in the pool.
++	_ = zeroFeeTx.Hash()
++	_ = zeroFeeTx.WitnessHash()
++
++	// Concurrent dry runs: under -race this flags any write to the
++	// limiter state made while holding only the read lock.
++	const dryRuns = 8
++	var wg sync.WaitGroup
++	errs := make([]error, dryRuns)
++	for i := 0; i < dryRuns; i++ {
++		wg.Add(1)
++		go func(i int) {
++			defer wg.Done()
++			result, err := harness.txPool.CheckMempoolAcceptance(zeroFeeTx)
++			if err == nil && result == nil {
++				err = errNilResult
++			}
++			errs[i] = err
++		}(i)
++	}
++	wg.Wait()
++	for i, err := range errs {
++		if err != nil {
++			t.Fatalf("dry run %d: zero-fee tx within free-relay "+
++				"budget was rejected: %v", i, err)
++		}
++	}
++
++	if harness.txPool.IsTransactionInPool(zeroFeeTx.Hash()) {
++		t.Fatalf("dry run inserted the transaction into the pool")
++	}
++	if harness.txPool.pennyTotal != 0 {
++		t.Fatalf("dry runs consumed the free-relay budget: "+
++			"pennyTotal=%v, want 0", harness.txPool.pennyTotal)
++	}
++	if harness.txPool.lastPennyUnix != 0 {
++		t.Fatalf("dry runs mutated lastPennyUnix: %v, want 0",
++			harness.txPool.lastPennyUnix)
++	}
++
++	// A real acceptance afterwards must still find the full budget:
++	// the same transaction is admitted and charged exactly once.
++	accepted, err := harness.txPool.ProcessTransaction(zeroFeeTx, true, true, 0)
++	if err != nil {
++		t.Fatalf("real acceptance after dry runs was rejected: %v", err)
++	}
++	if len(accepted) != 1 {
++		t.Fatalf("expected 1 accepted tx, got %d", len(accepted))
++	}
++	if harness.txPool.pennyTotal <= 0 {
++		t.Fatalf("real acceptance did not charge the budget: "+
++			"pennyTotal=%v", harness.txPool.pennyTotal)
++	}
++
++	// With the budget configured to zero, a dry run must still be
++	// rejected by the rate limiter (the limiter is evaluated), while
++	// leaving the limiter state untouched.
++	harness2, spendableOuts2, err := newPoolHarness(&chaincfg.MainNetParams)
++	if err != nil {
++		t.Fatalf("unable to create test pool: %v", err)
++	}
++	harness2.txPool.cfg.Policy.DisableRelayPriority = false
++	harness2.txPool.cfg.Policy.FreeTxRelayLimit = 0
++
++	zeroFeeTx2, err := harness2.CreateSignedTx(
++		[]spendableOutput{spendableOuts2[0]}, 1, btcutil.Amount(0), false,
++	)
++	if err != nil {
++		t.Fatalf("unable to create zero-fee tx: %v", err)
++	}
++
++	_, err = harness2.txPool.CheckMempoolAcceptance(zeroFeeTx2)
++	if err == nil {
++		t.Fatalf("dry run accepted zero-fee tx despite zero " +
++			"free-relay budget")
++	}
++	if !strings.Contains(err.Error(), "rate limiter") {
++		t.Fatalf("expected dry-run rejection by the rate limiter, "+
++			"got: %v", err)
++	}
++	if harness2.txPool.pennyTotal != 0 || harness2.txPool.lastPennyUnix != 0 {
++		t.Fatalf("rejected dry run mutated limiter state: "+
++			"pennyTotal=%v lastPennyUnix=%v",
++			harness2.txPool.pennyTotal, harness2.txPool.lastPennyUnix)
++	}
++}
++
++var errNilResult = errors.New(
++	"CheckMempoolAcceptance returned nil result and nil error")
+diff --git a/node/mempool/mempool.go b/node/mempool/mempool.go
+index 335cc4e1..3d4efa75 100644
+--- a/node/mempool/mempool.go
++++ b/node/mempool/mempool.go
+@@ -907,7 +907,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit,
+ 
+ 	// Check for mempool acceptance.
+ 	r, err := mp.checkMempoolAcceptance(
+-		tx, isNew, rateLimit, rejectDupOrphans,
++		tx, isNew, rateLimit, rejectDupOrphans, false,
+ 	)
+ 	if err != nil {
+ 		return nil, nil, err
+@@ -1286,7 +1286,14 @@ func (mp *TxPool) CheckMempoolAcceptance(tx *btcutil.Tx) (
+ 	// which has the effect that we always check the fee paid from this tx
+ 	// is greater than min relay fee. We also reject this tx if it's
+ 	// already an orphan.
+-	result, err := mp.checkMempoolAcceptance(tx, true, true, true)
++	//
++	// This is a dry run: the transaction is never inserted, and this
++	// function holds only the read lock, so the final dryRun argument
++	// tells the free-relay rate limiter to evaluate the transaction
++	// against the current budget without charging it (charging here
++	// would both consume the budget for a transaction that was never
++	// accepted and race on the limiter state under the read lock).
++	result, err := mp.checkMempoolAcceptance(tx, true, true, true, true)
+ 	if err != nil {
+ 		log.Errorf("CheckMempoolAcceptance: %v", err)
+ 		return nil, err
+@@ -1302,7 +1309,8 @@ func (mp *TxPool) CheckMempoolAcceptance(tx *btcutil.Tx) (
+ // transaction. It returns an error when the transaction fails to meet the
+ // mempool policy, otherwise a `mempoolAcceptResult` is returned.
+ func (mp *TxPool) checkMempoolAcceptance(tx *btcutil.Tx,
+-	isNew, rateLimit, rejectDupOrphans bool) (*MempoolAcceptResult, error) {
++	isNew, rateLimit, rejectDupOrphans, dryRun bool) (
++	*MempoolAcceptResult, error) {
+ 
+ 	txHash := tx.Hash()
+ 
+@@ -1494,6 +1502,7 @@ func (mp *TxPool) checkMempoolAcceptance(tx *btcutil.Tx,
+ 	// block.
+ 	err = mp.validateRelayFeeMet(
+ 		tx, txFee, txSize, utxoView, nextBlockHeight, isNew, rateLimit,
++		dryRun,
+ 	)
+ 	if err != nil {
+ 		return nil, err
+@@ -1585,10 +1594,13 @@ func (mp *TxPool) validateStandardness(tx *btcutil.Tx, nextBlockHeight int32,
+ }
+ 
+ // validateRelayFeeMet checks that the min relay fee is covered by this
+-// transaction.
++// transaction. When dryRun is set the free-relay rate limiter is only
++// evaluated against the current budget: the transaction is not charged
++// and the limiter state is not mutated, since the caller holds only
++// the read lock and the transaction will not be inserted.
+ func (mp *TxPool) validateRelayFeeMet(tx *btcutil.Tx, txFee, txSize int64,
+ 	utxoView *blockchain.UtxoViewpoint, nextBlockHeight int32,
+-	isNew, rateLimit bool) error {
++	isNew, rateLimit, dryRun bool) error {
+ 
+ 	txHash := tx.Hash()
+ 
+@@ -1611,20 +1623,32 @@ func (mp *TxPool) validateRelayFeeMet(tx *btcutil.Tx, txFee, txSize int64,
+ 	nowUnix := time.Now().Unix()
+ 
+ 	// Decay passed data with an exponentially decaying ~10 minute window -
+-	// matches bitcoind handling.
+-	mp.pennyTotal *= math.Pow(
++	// matches bitcoind handling. The decayed total is computed in a
++	// local first: a dry run must leave the limiter state untouched,
++	// while a real acceptance commits the decay (even when the limiter
++	// then rejects) exactly as before.
++	pennyTotal := mp.pennyTotal * math.Pow(
+ 		1.0-1.0/600.0, float64(nowUnix-mp.lastPennyUnix),
+ 	)
+-	mp.lastPennyUnix = nowUnix
++	if !dryRun {
++		mp.pennyTotal = pennyTotal
++		mp.lastPennyUnix = nowUnix
++	}
+ 
+ 	// Are we still over the limit?
+-	if mp.pennyTotal >= mp.cfg.Policy.FreeTxRelayLimit*10*1000 {
++	if pennyTotal >= mp.cfg.Policy.FreeTxRelayLimit*10*1000 {
+ 		str := fmt.Sprintf("transaction %v has been rejected "+
+ 			"by the rate limiter due to low fees", txHash)
+ 
+ 		return txRuleError(wire.RejectInsufficientFee, str)
+ 	}
+ 
++	// A dry run is admitted against the current budget but never
++	// charged: the transaction is not entering the pool.
++	if dryRun {
++		return nil
++	}
++
+ 	oldTotal := mp.pennyTotal
+ 	mp.pennyTotal += float64(txSize)
+ 	log.Tracef("rate limit: curTotal %v, nextTotal: %v, limit %v",

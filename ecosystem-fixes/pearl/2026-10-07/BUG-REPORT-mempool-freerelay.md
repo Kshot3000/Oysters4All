@@ -49,3 +49,36 @@ which direction they intend.
   trimToSize accounting, RBF replacement/descendants, orphan handling,
   estimatefee, dust math, mining NewBlockTemplate, cpuminer locking —
   details in the hunter scan.md.
+
+## Follow-up (2026-10-07, Bugbot review on PR #378 — verified correct, fixed in 0787548f)
+
+Making the limiter reachable exposed a side effect on the dry-run path:
+`CheckMempoolAcceptance` (the `testmempoolaccept` RPC) holds only the
+pool **read lock**, passes `rateLimit=true`, and never inserts the
+transaction — but `validateRelayFeeMet` wrote `pennyTotal` /
+`lastPennyUnix` there. Dry runs consumed the penny-flooding budget for
+transactions never accepted, and concurrent dry runs raced on the
+limiter state.
+
+- Repro (red): 8 concurrent dry runs of one zero-fee tx left
+  `pennyTotal=888` (8 × 111 bytes), nothing in the pool; `-race`
+  reported data races on the limiter state.
+- Fix: a `dryRun` flag threaded `CheckMempoolAcceptance` →
+  `checkMempoolAcceptance` → `validateRelayFeeMet`. Dry runs evaluate
+  the limiter against the decayed current budget (zero budget still
+  rejects with the same rate-limiter error) but charge nothing and
+  mutate nothing. Real acceptances under the write lock keep the exact
+  previous semantics, including committing decay before the limit
+  check.
+- Green: `TestFreeTxRelayDryRunDoesNotConsumeBudget` passes with
+  `-race` clean (state untouched, following real acceptance charged
+  exactly once); full `node/mempool` + `node/mining` suites pass,
+  `go build ./node/...` clean. PR comment:
+  https://github.com/pearl-research-labs/pearl/pull/378#issuecomment-6042385473
+- Lesson: a fix that makes a previously dead code path reachable must
+  be audited against EVERY caller of that path — especially callers
+  holding a weaker lock or with dry-run semantics. Test-fixture caveat:
+  concurrent dry runs in one test must pre-warm `btcutil.Tx`'s lazily
+  cached hashes (each RPC call decodes its own Tx; sharing an unwarmed
+  one races in the fixture, not the pool).
+- Patch: `fix-pearl-mempool-freerelay-dryrun.patch`.
