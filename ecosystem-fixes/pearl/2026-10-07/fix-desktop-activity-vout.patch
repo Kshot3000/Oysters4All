@@ -1,0 +1,46 @@
+diff --git a/apps/apps/pearl-desktop-wallet/src/main/services/wallet-service/transaction-formatter.ts b/apps/apps/pearl-desktop-wallet/src/main/services/wallet-service/transaction-formatter.ts
+index 3d3660e5..6160b9c4 100644
+--- a/apps/apps/pearl-desktop-wallet/src/main/services/wallet-service/transaction-formatter.ts
++++ b/apps/apps/pearl-desktop-wallet/src/main/services/wallet-service/transaction-formatter.ts
+@@ -2,6 +2,7 @@ import {Transaction} from '../../../types/transaction';
+ 
+ export type RawTransaction = {
+   txid: string;
++  vout?: number;
+   category: string;
+   amount: number;
+   fee?: number;
+@@ -19,6 +20,7 @@ export function formatTransaction(tx: RawTransaction): Transaction {
+ 
+   return {
+     txid: tx.txid,
++    vout: tx.vout ?? 0,
+     type: isReceived ? 'received' : 'sent',
+     amount: Math.abs(tx.amount),
+     fee: tx.fee ? Math.abs(tx.fee) : 0,
+diff --git a/apps/apps/pearl-desktop-wallet/src/renderer/src/hooks/usePagination.ts b/apps/apps/pearl-desktop-wallet/src/renderer/src/hooks/usePagination.ts
+index 5aa8d256..31895d72 100644
+--- a/apps/apps/pearl-desktop-wallet/src/renderer/src/hooks/usePagination.ts
++++ b/apps/apps/pearl-desktop-wallet/src/renderer/src/hooks/usePagination.ts
+@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
+ import { Transaction } from '../../../types/transaction';
+ 
+ // A transaction can list several rows (a payment to several addresses), so match rows already shown by row, not txid.
+-const rowKey = (tx: Transaction) => `${tx.type}_${tx.txid}_${tx.address}_${tx.amount}`;
++// The vout is part of the key: one transaction can pay the same address the same amount in two outputs, and those
++// rows differ only in vout — without it the second row is mistaken for a duplicate of the first.
++const rowKey = (tx: Transaction) => `${tx.type}_${tx.txid}_${tx.vout}_${tx.address}_${tx.amount}`;
+ 
+ interface UsePaginationOptions {
+   pageSize?: number;
+diff --git a/apps/apps/pearl-desktop-wallet/src/types/transaction.ts b/apps/apps/pearl-desktop-wallet/src/types/transaction.ts
+index 2efe20ce..19804de2 100644
+--- a/apps/apps/pearl-desktop-wallet/src/types/transaction.ts
++++ b/apps/apps/pearl-desktop-wallet/src/types/transaction.ts
+@@ -1,5 +1,6 @@
+ export interface Transaction {
+   txid: string;
++  vout: number;
+   type: 'received' | 'sent';
+   amount: number;
+   fee: number;
