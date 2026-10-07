@@ -1,0 +1,46 @@
+/* Visual Refresh 2026.10 — additive, dependency-free, original vector artwork. */
+:root{--vu-accent:#99ddff;--vu-secondary:#d5b9ff;--vu-base:#08131d;--vu-surface:#142434;--vu-line:#99ddff30;--vu-radius:18px;--vu-shadow:0 12px 36px #0003;--vu-art:url("scene.svg")}
+body[data-vu-theme]{background-image:var(--vu-art);background-size:1600px 1000px;background-repeat:no-repeat;background-position:top center;background-color:var(--vu-base);-webkit-font-smoothing:antialiased}
+body[data-vu-theme] :is(h1,h2,h3){text-wrap:balance}
+body[data-vu-theme] :is(.lede,.lead,.hero-description,.hero p.sub){text-wrap:pretty;line-height:1.75}
+body[data-vu-theme] .hero h1{letter-spacing:-.035em;line-height:1.08}
+body[data-vu-theme] :is(.card,.donate-card,.code-card){border-color:var(--vu-line);border-radius:var(--vu-radius);box-shadow:var(--vu-shadow);background-image:linear-gradient(145deg,color-mix(in srgb,var(--vu-accent) 4%,transparent),transparent 65%)}
+body[data-vu-theme] :is(.stat,.stat-card,.stat-value,.epoch-big,.num,.odds){font-variant-numeric:tabular-nums}
+body[data-vu-theme] :is(.btn,.button,.connect-btn,.xbtn){min-height:44px;align-items:center;justify-content:center;gap:8px;transition:background .18s,border-color .18s,box-shadow .18s}
+body[data-vu-theme] :is(.btn,.button,.connect-btn):not(:disabled):hover{box-shadow:0 5px 20px color-mix(in srgb,var(--vu-accent) 13%,transparent)}
+body[data-vu-theme] :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=hidden]),select,textarea){max-width:100%}
+body[data-vu-theme] :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=hidden]),select){min-height:42px}
+body[data-vu-theme] :is(a,button,input,select,textarea,summary,[tabindex]):focus-visible{outline:2px solid var(--vu-accent);outline-offset:4px}
+body[data-vu-theme] :is(.brand-mark,.logo,.card-icon,.app-ico){box-shadow:0 0 0 1px var(--vu-line),0 8px 30px color-mix(in srgb,var(--vu-accent) 10%,transparent)}
+body[data-vu-theme] :is(.tbl-wrap,.table-wrap,.table-scroll){overscroll-behavior-inline:contain;scrollbar-width:thin;scrollbar-color:var(--vu-accent) transparent}
+body[data-vu-theme] :is(.eyebrow,.kicker,.stat-label){letter-spacing:.12em}
+body[data-vu-theme] :is(.card,.app-card,.tool,.launch-card) a{text-underline-offset:4px}
+body[data-vu-theme] :is(.card,.app-card,.tool,.launch-card):focus-within{border-color:var(--vu-accent)}
+body[data-vu-theme] :is(.don-addr,.addr,.address,.donation-address-row code,.tip-addr,footer){overflow-wrap:anywhere}
+.vu-skip{position:fixed;top:12px;left:12px;z-index:10001;transform:translateY(-160%);padding:12px 18px;border-radius:8px;background:var(--vu-accent);color:#081320;font:700 14px system-ui;text-decoration:none}
+.vu-skip:focus{transform:none}
+.vu-table{max-width:100%;overflow:auto;overscroll-behavior-inline:contain}
+@media(hover:hover){body[data-vu-theme] :is(a.card,a.app-card,a.tool,.launch-card):hover{border-color:var(--vu-accent);box-shadow:0 12px 32px color-mix(in srgb,var(--vu-accent) 9%,transparent)}}
+@media(max-width:640px){
+ body[data-vu-theme]{background-size:1000px 680px;background-position:center top;background-attachment:scroll}
+ body[data-vu-theme] :is(.hero-cta,.hero-actions,.cta-row,.btn-row){gap:10px;flex-wrap:wrap}
+ body[data-vu-theme] :is(.hero-cta,.hero-actions,.cta-row,.btn-row) .btn{min-height:46px}
+ body[data-vu-theme] :is(.grid2,.grid-2,.two-col){min-width:0}
+ body[data-vu-theme] :is(.hero,.page-heading,.intro) h1{overflow-wrap:break-word}
+ body[data-vu-theme] :is(.card,.panel,.stat,.tool,.swap-card){min-width:0}
+}
+@media(prefers-reduced-motion:reduce){
+ html{scroll-behavior:auto!important}
+ body[data-vu-theme] *,body[data-vu-theme] *::before,body[data-vu-theme] *::after{animation-duration:.01ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+ body[data-vu-theme] .reveal{opacity:1;transform:none}
+}
+@media print{body[data-vu-theme]{background:#fff!important;color:#111!important}.vu-skip{display:none}body[data-vu-theme] :is(.card,.donate-card,.code-card){box-shadow:none;border-color:#bbb;background:#fff}}
+
+/* Project-specific layout and art direction */
+body[data-vu-theme]{--card:#142434;--bg-alt:#0c1b29;--muted:#b1c4d7;--card-border:rgba(175,208,239,.2)}.hero-bg{opacity:.45}.hero h1{font-size:clamp(40px,6vw,76px);letter-spacing:-.05em}.stat-row{border-block:1px solid #99ddff22;padding-block:24px}.card{padding:28px}.card-icon{border-radius:14px}.nav{box-shadow:0 8px 30px #0003}.section-alt{background:linear-gradient(#0c1b2999,#0c1b29aa)}.footer{border-top:1px solid #99ddff25}.stat-value{letter-spacing:-.03em}.app-card{border-color:#99ddff2b}
+
+/* A native, keyboard-operable app catalog replaces the oversized nav rail. */
+.nav-inner{position:relative;gap:22px}.nav-inner>.brand{flex-shrink:0}.nav-links{align-items:center;gap:18px;min-width:0}.nav-links>a{white-space:nowrap}.vu-app-menu{position:relative;color:var(--muted)}.vu-app-menu summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--card-border);border-radius:10px;white-space:nowrap}.vu-app-menu summary::-webkit-details-marker{display:none}.vu-app-menu[open] summary{color:var(--text);background:#99ddff12;border-color:#99ddff55}.vu-app-links{position:absolute;top:calc(100% + 14px);right:0;width:500px;max-width:calc(100vw - 40px);max-height:65vh;overflow:auto;padding:18px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;background:#112234;border:1px solid #99ddff44;border-radius:18px;box-shadow:0 22px 80px #0008}.vu-app-links a{padding:10px 12px;border-radius:8px;font-size:13px}.vu-app-links a:hover,.vu-app-links a:focus-visible{background:#99ddff14;color:#fff;text-decoration:none}.vu-app-menu summary:focus-visible{outline:2px solid #99ddff;outline-offset:4px}@media(max-width:760px){.nav-links.open{align-items:stretch;max-height:85vh;overflow:auto}.vu-app-links{position:static;width:100%;max-width:none;grid-template-columns:repeat(2,minmax(0,1fr));max-height:55vh;margin-top:10px;padding:10px}.vu-app-menu summary{justify-content:space-between}.vu-app-links a{white-space:normal}.nav-links>a{padding:10px 12px}.code-card code{overflow-wrap:anywhere;white-space:pre-wrap}}
+
+body[data-vu-theme] :is(.grid,.grid2,.two-col,.wallet-grid,.fields,.svc-row,.forge,.trust,.gform,.form,.batch-row,.trace-form,.dossier-cols,.track-cards,.lab-grid,.foot-grid,.res-grid)>*{min-width:0}
+@media(max-width:600px){.deploy>div{grid-template-columns:minmax(0,1fr);gap:4px}.deploy code{overflow-wrap:anywhere}.outputs .addr{min-width:0;overflow-wrap:anywhere}.tabs{max-width:100%;flex-wrap:wrap}.tab{min-width:0;flex:1 1 140px}.topbar{flex-wrap:wrap;gap:10px}.topnav{min-width:0;flex-wrap:wrap}}

@@ -196,6 +196,20 @@ pages themselves don't make. The same two exceptions apply: the `noindex`
 guarantee again); the wPRL bridge page asserts no canonical URL, so its
 block carries name and description only.
 
+## Visual refresh (2026-10)
+
+Every public page carries the fleet visual layer in
+`visual-upgrade/theme.css` (cache-keyed `?v=20261007`): an original
+iridescent-pearl scene (`visual-upgrade/scene.svg`) as the page backdrop,
+rounder luminous cards, tabular numerals for stats, 44px touch targets,
+and a consistent focus ring — applied additively via
+`<body data-vu-theme="pearl">` so each app keeps its own palette and
+personality underneath. The hub's oversized nav rail is now a native,
+keyboard-operable **Apps** menu (`<details>`) listing every app. The
+overlay was merged onto the current tree rather than copied over it, so
+Pearl Metrics — which shipped after the overlay was authored — keeps its
+hub card and menu entry and carries the theme like every other app.
+
 ## Support this work
 
 If this builder saved you time, donations are welcome:

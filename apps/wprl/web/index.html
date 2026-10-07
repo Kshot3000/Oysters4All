@@ -12,8 +12,9 @@
 <script src="app.js?v=1" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js" defer></script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"wPRL — Wrapped Pearl (Pearl PoUW L1) · Bridge to Base","description":"wPRL — the wrapped ERC-20 of native PRL (Pearl Proof-of-Useful-Work L1) for Base. Custodial 1:1 bridge, 0.25% fee each way, public proof-of-reserves. Testnet only.","applicationCategory":"BrowserApplication","operatingSystem":"Any","isAccessibleForFree":true}</script>
+<link rel="stylesheet" href="../../../visual-upgrade/theme.css?v=20261007">
 </head>
-<body>
+<body data-vu-theme="pearl">
 <a class="skip-link" href="#top">Skip to main content</a>
 <canvas id="pearlfield" aria-hidden="true"></canvas>
 
@@ -204,7 +205,7 @@
     <p class="dim">One number, defined once as <span class="mono">BRIDGE_FEE_BPS = 25</span> (denominator 10,000).
     No other fees exist in the contracts.</p>
     <div class="card">
-      <table class="fees">
+      <div class="vu-table" role="region" aria-label="Fee comparison" tabindex="0"><table class="fees">
         <thead><tr><th>Direction</th><th>Fee</th><th>How it's taken</th><th>Goes to</th></tr></thead>
         <tbody>
           <tr>
@@ -220,7 +221,7 @@
             <td><code class="mono addr">0x4b6f3BC697D9dAF3e8dE182aEc56eD208B9087f1</code></td>
           </tr>
         </tbody>
-      </table>
+      </table></div>
       <h4>Exact unit conversion</h4>
       <p class="dim small">Pearl's smallest unit is the <strong>grain</strong>
       (upstream <span class="mono">node/btcutil/const.go</span>: 1 PRL = 100,000,000 grains).
