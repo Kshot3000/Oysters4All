@@ -1,0 +1,102 @@
+From c83c83bcf4b98877c0f8b1c1e6c79e19db1f6729 Mon Sep 17 00:00:00 2001
+From: Kshot3000 <kshot9000@gmail.com>
+Date: Wed, 7 Oct 2026 19:34:00 +0000
+Subject: [PATCH] fix(wallet): PSBT NonWitnessUtxo index out of range panics on
+ malformed packets
+
+PsbtPrevOutputFetcher and FinalizePsbt's signing loop indexed
+NonWitnessUtxo.TxOut with the unsigned tx's PreviousOutPoint.Index
+and no bounds check. InputsReadyToSign only checks the UTXO field
+is non-nil and PInput.IsSane is a stub, so a counterparty PSBT
+spending index 5 of a 1-output prev tx crashed the wallet before
+any validation. SumUtxoInputValues in the same tree does this exact
+indexing with the check.
+
+Fetcher now skips the malformed input (missing prevout downstream);
+FinalizePsbt returns a descriptive error. Regression test red
+(panic) before, green after; Fund/Finalize PSBT tests pass.
+---
+ wallet/wallet/psbt.go      | 14 ++++++++++++++
+ wallet/wallet/psbt_test.go | 30 ++++++++++++++++++++++++++++++
+ 2 files changed, 44 insertions(+)
+
+diff --git a/wallet/wallet/psbt.go b/wallet/wallet/psbt.go
+index 8344d839..2c3bc1e5 100644
+--- a/wallet/wallet/psbt.go
++++ b/wallet/wallet/psbt.go
+@@ -421,6 +421,13 @@ func (w *Wallet) FinalizePsbt(keyScope *waddrmgr.KeyScope, account uint32,
+ 		var signOutput *wire.TxOut
+ 		if in.NonWitnessUtxo != nil {
+ 			prevIndex := txIn.PreviousOutPoint.Index
++			if prevIndex >= uint32(len(in.NonWitnessUtxo.TxOut)) {
++				return fmt.Errorf("input %d has malformed "+
++					"NonWitnessUtxo: unsigned tx spends "+
++					"output index %d but the previous tx "+
++					"has only %d outputs", idx, prevIndex,
++					len(in.NonWitnessUtxo.TxOut))
++			}
+ 			signOutput = in.NonWitnessUtxo.TxOut[prevIndex]
+ 
+ 			if !psbt.TxOutsEqual(txOut, signOutput) {
+@@ -522,6 +529,13 @@ func PsbtPrevOutputFetcher(packet *psbt.Packet) *txscript.MultiPrevOutFetcher {
+ 
+ 		if in.NonWitnessUtxo != nil {
+ 			prevIndex := txIn.PreviousOutPoint.Index
++			if prevIndex >= uint32(len(in.NonWitnessUtxo.TxOut)) {
++				// The PSBT is malformed: the unsigned tx spends
++				// an output the attached previous tx does not
++				// have. Skip it instead of panicking; callers
++				// see a missing prevout and fail cleanly.
++				continue
++			}
+ 			fetcher.AddPrevOut(
+ 				txIn.PreviousOutPoint,
+ 				in.NonWitnessUtxo.TxOut[prevIndex],
+diff --git a/wallet/wallet/psbt_test.go b/wallet/wallet/psbt_test.go
+index 8d1142a6..a92c292f 100644
+--- a/wallet/wallet/psbt_test.go
++++ b/wallet/wallet/psbt_test.go
+@@ -15,6 +15,7 @@ import (
+ 
+ 	"github.com/pearl-research-labs/pearl/node/btcutil"
+ 	"github.com/pearl-research-labs/pearl/node/btcutil/psbt"
++	"github.com/pearl-research-labs/pearl/node/chaincfg/chainhash"
+ 	"github.com/pearl-research-labs/pearl/node/txscript"
+ 	"github.com/pearl-research-labs/pearl/node/wire"
+ 	"github.com/pearl-research-labs/pearl/wallet/waddrmgr"
+@@ -495,3 +496,32 @@ func TestFinalizePsbt(t *testing.T) {
+ 	)
+ 	require.NoError(t, err)
+ }
++
++// TestPsbtPrevOutputFetcherIndexOutOfRange ensures a PSBT whose unsigned
++// transaction spends an output index beyond the attached NonWitnessUtxo's
++// outputs does not panic the fetcher: the malformed input is skipped, so
++// callers see a missing prevout instead of a crash. PSBTs arrive from
++// untrusted counterparties, so this must never be a panic.
++func TestPsbtPrevOutputFetcherIndexOutOfRange(t *testing.T) {
++	prevHash := chainhash.Hash{0x01}
++	outPoint := wire.OutPoint{Hash: prevHash, Index: 5}
++	packet := &psbt.Packet{
++		UnsignedTx: &wire.MsgTx{
++			TxIn: []*wire.TxIn{
++				{PreviousOutPoint: outPoint},
++			},
++		},
++		Inputs: []psbt.PInput{
++			{
++				NonWitnessUtxo: &wire.MsgTx{
++					TxOut: []*wire.TxOut{
++						{Value: 1000, PkScript: testScriptP2TR1},
++					},
++				},
++			},
++		},
++	}
++
++	fetcher := PsbtPrevOutputFetcher(packet)
++	require.Nil(t, fetcher.FetchPrevOutput(outPoint))
++}
+-- 
+2.43.0
+

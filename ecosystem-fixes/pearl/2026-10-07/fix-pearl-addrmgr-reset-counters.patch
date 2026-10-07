@@ -1,0 +1,112 @@
+From 1b0a7db5386bdf5e038d3414e138c0a3c3cac505 Mon Sep 17 00:00:00 2001
+From: Kshot3000 <kshot9000@gmail.com>
+Date: Wed, 7 Oct 2026 19:36:17 +0000
+Subject: [PATCH] fix(addrmgr): reset() must zero nNew/nTried or a failed peers
+ load wedges GetAddress
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+deserializePeers counts bucketed addresses into nNew/nTried before
+its sanity checks can fail; loadPeers then nukes the file and calls
+reset() to start fresh — but reset() rebuilt the buckets and index
+without zeroing the counters. The empty manager reported phantom
+addresses, and GetAddress trusted the stale count and spun forever
+on empty buckets while holding a.mtx, wedging all AddrManager
+callers. Trigger: valid-JSON but inconsistent peers.json.
+
+Zero both counters in reset(). TestLoadPeersFailedResetsCounters:
+red (NumAddresses=1 after failed load) -> green (0, GetAddress nil);
+full addrmgr suite passes.
+---
+ node/addrmgr/addrmanager.go               |  2 +
+ node/addrmgr/addrmanager_internal_test.go | 54 +++++++++++++++++++++++
+ 2 files changed, 56 insertions(+)
+
+diff --git a/node/addrmgr/addrmanager.go b/node/addrmgr/addrmanager.go
+index 48c9c047..600c1e8b 100644
+--- a/node/addrmgr/addrmanager.go
++++ b/node/addrmgr/addrmanager.go
+@@ -708,6 +708,8 @@ func (a *AddrManager) getAddresses() []*wire.NetAddressV2 {
+ func (a *AddrManager) reset() {
+ 
+ 	a.addrIndex = make(map[string]*KnownAddress)
++	a.nNew = 0
++	a.nTried = 0
+ 
+ 	// fill key with bytes from a good random source.
+ 	io.ReadFull(crand.Reader, a.key[:])
+diff --git a/node/addrmgr/addrmanager_internal_test.go b/node/addrmgr/addrmanager_internal_test.go
+index 578ec1f3..b4231a11 100644
+--- a/node/addrmgr/addrmanager_internal_test.go
++++ b/node/addrmgr/addrmanager_internal_test.go
+@@ -1,8 +1,12 @@
+ package addrmgr
+ 
+ import (
++	"encoding/json"
++	"errors"
+ 	"math/rand"
+ 	"net"
++	"os"
++	"path/filepath"
+ 	"testing"
+ 	"time"
+ 
+@@ -205,3 +209,53 @@ func TestAddrManagerV1ToV2(t *testing.T) {
+ 	addrMgr.loadPeers()
+ 	assertAddrs(t, addrMgr, expectedAddrs)
+ }
++
++// TestLoadPeersFailedResetsCounters ensures that when peers.json is
++// valid JSON but internally inconsistent (an address listed in
++// Addresses that appears in no bucket and is not tried), the sanity
++// check in deserializePeers fails after it has already counted the
++// bucketed addresses — and loadPeers' "start fresh" reset leaves the
++// manager truly empty. Before the fix, reset() rebuilt the buckets
++// but left nNew/nTried stale, so NumAddresses reported phantom
++// addresses and GetAddress spun forever on empty buckets while
++// holding the manager lock.
++func TestLoadPeersFailedResetsCounters(t *testing.T) {
++	dir := t.TempDir()
++
++	sam := serializedAddrManager{Version: serialisationVersion}
++	sam.Addresses = []*serializedKnownAddress{
++		{Addr: "1.2.3.4:44108", Src: "1.2.3.4:44108", Services: wire.SFNodeNetwork, SrcServices: wire.SFNodeNetwork},
++		{Addr: "5.6.7.8:44108", Src: "5.6.7.8:44108", Services: wire.SFNodeNetwork, SrcServices: wire.SFNodeNetwork},
++	}
++	// Only the first address is bucketed; the second trips the
++	// "no references" sanity check, after nNew has been counted.
++	sam.NewBuckets[0] = []string{"1.2.3.4:44108"}
++
++	raw, err := json.Marshal(sam)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(dir, "peers.json"), raw, 0o600); err != nil {
++		t.Fatal(err)
++	}
++
++	am := New(dir, func(string) ([]net.IP, error) {
++		return nil, errors.New("not implemented")
++	})
++	am.loadPeers()
++
++	if got := am.NumAddresses(); got != 0 {
++		t.Fatalf("NumAddresses = %d after failed load + reset, want 0", got)
++	}
++
++	done := make(chan *KnownAddress, 1)
++	go func() { done <- am.GetAddress() }()
++	select {
++	case ka := <-done:
++		if ka != nil {
++			t.Fatalf("GetAddress = %v after failed load + reset, want nil", ka)
++		}
++	case <-time.After(5 * time.Second):
++		t.Fatal("GetAddress did not return within 5s (spins on empty buckets)")
++	}
++}
+-- 
+2.43.0
+
