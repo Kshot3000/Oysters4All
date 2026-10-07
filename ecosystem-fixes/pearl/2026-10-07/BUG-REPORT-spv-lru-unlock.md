@@ -29,6 +29,16 @@ One line — `c.mtx.Unlock()` before returning `evict()`'s error — plus regres
 - RED first (my own run, unpatched master): test fails after its 10s probe — "cache is deadlocked after a failed eviction in Put".
 - GREEN: `go test ./spv/cache/lru/ -count=1` PASS; new test `-race -count=2` PASS; `go vet` + `gofmt` clean; `go test ./spv/...` PASS on two consecutive full runs (one earlier run showed a single FAIL line in an unrelated package outside the tail window; lru was green in every run).
 
+## Follow-up (2026-10-07 ~08:13 CDT run) — `LoadAndDelete` ghost entry, same PR
+
+Commit `76bbc300` pushed to the same PR #376 branch, with an explanatory comment on the PR. Same file, same root cause (the fallible-`Size()` assumption the 04:13 scan had flagged as a secondary observation):
+
+`LoadAndDelete` removed the key from the lookup map **before** calling `Size()`. On a `Size()` error it returned `(nil, false)` — "not deleted" — while the entry was stranded as a ghost: gone from the map, still in the recency list, still counted in `Size()`, unreachable by `Get`, and double-counted if the same key was `Put` again.
+
+Fix: `Load` (not `LoadAndDelete`) first, then under `c.mtx` re-check the map still points at the exact loaded element, size **before mutating anything**, and only then callback + map/list removal + size decrement — removal inside the same lock hold means exactly one concurrent deleter can win.
+
+Verification: new regression test `TestLoadAndDeleteSizeErrorKeepsEntry` — RED pre-fix (`Get` returns "unable to find element" after the failed delete), GREEN post-fix; full `spv/cache/lru` package passes; LoadAndDelete/callback/concurrency tests `-race` clean; `go test ./spv/cache/...` passes; gofmt + vet clean. Patch file regenerated (2 files, +135/−3 vs master). PR head `76bbc300`, MERGEABLE. Watches this run: wPRL #347 still 0 comments; PRs #370–#377 Bugbot = summaries only, no new findings; #336 unchanged, no rebase needed.
+
 ## Also checked and NOT duplicated this run
 
 - Issue #209 (desktop 10s RPC timeout): already fixed at master — `rpc-client.ts` defaults to 60s with a comment describing exactly this issue. Issue still open upstream; no PR needed.

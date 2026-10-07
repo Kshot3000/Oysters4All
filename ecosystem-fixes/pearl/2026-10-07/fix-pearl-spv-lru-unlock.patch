@@ -1,25 +1,5 @@
-From b297219df8c63221e6a25efbf989abb21e13866b Mon Sep 17 00:00:00 2001
-From: Kshot3000 <kshot9000@gmail.com>
-Date: Wed, 7 Oct 2026 09:26:01 +0000
-Subject: [PATCH] fix(spv): unlock LRU cache mutex on Put eviction error
-
-Put acquired c.mtx and then returned evict()'s error without unlocking,
-unlike the neighbouring existing-value Size() error branch. One failed
-eviction (a resident entry whose Size() starts erroring, which
-CacheableFilter.Size can do via gcs Filter.NBytes) therefore locked the
-cache forever: every later Put/Get/LoadAndDelete/Len/Size blocked, and
-the neutrino FilterCache/BlockCache backed by this type wedged silently.
-
-Add the missing Unlock and a regression test that forces the eviction
-error and proves the cache stays usable.
----
- spv/cache/lru/lru.go                  |  2 +
- spv/cache/lru/lru_evict_error_test.go | 70 +++++++++++++++++++++++++++
- 2 files changed, 72 insertions(+)
- create mode 100644 spv/cache/lru/lru_evict_error_test.go
-
 diff --git a/spv/cache/lru/lru.go b/spv/cache/lru/lru.go
-index 6cc18ef4..e068a9f0 100644
+index 6cc18ef4..dca90c52 100644
 --- a/spv/cache/lru/lru.go
 +++ b/spv/cache/lru/lru.go
 @@ -165,6 +165,8 @@ func (c *Cache[K, V]) Put(key K, value V) (bool, error) {
@@ -31,12 +11,54 @@ index 6cc18ef4..e068a9f0 100644
  		return false, err
  	}
  
+@@ -221,7 +223,7 @@ func (c *Cache[K, V]) LoadAndDelete(key K) (V, bool) {
+ 	var defaultVal V
+ 
+ 	// Noop if the element doesn't exist.
+-	el, ok := c.cache.LoadAndDelete(key)
++	el, ok := c.cache.Load(key)
+ 	if !ok {
+ 		return defaultVal, false
+ 	}
+@@ -229,7 +231,20 @@ func (c *Cache[K, V]) LoadAndDelete(key K) (V, bool) {
+ 	c.mtx.Lock()
+ 	defer c.mtx.Unlock()
+ 
+-	// Get its size.
++	// A concurrent LoadAndDelete may have removed the element while we
++	// waited for the lock. Only proceed if the map still points at the
++	// exact element we loaded; the removal below happens under the same
++	// lock, so exactly one deleter can pass this check.
++	cur, ok := c.cache.Load(key)
++	if !ok || cur != el {
++		return defaultVal, false
++	}
++
++	// Get its size. Nothing has been mutated yet, so if sizing fails
++	// the entry stays fully in the cache — still reachable by key and
++	// still counted — instead of being stranded as a ghost that is
++	// gone from the map but still occupies the list and the size
++	// accounting.
+ 	vs, err := el.Value.value.Size()
+ 	if err != nil {
+ 		return defaultVal, false
+@@ -240,7 +255,9 @@ func (c *Cache[K, V]) LoadAndDelete(key K) (V, bool) {
+ 		cb(key, el.Value.value)
+ 	})
+ 
+-	// Remove the element from the list and update the cache's size.
++	// Remove the element from the cache and the list, and update the
++	// cache's size.
++	c.cache.Delete(key)
+ 	c.ll.Remove(el)
+ 	c.size -= vs
+ 
 diff --git a/spv/cache/lru/lru_evict_error_test.go b/spv/cache/lru/lru_evict_error_test.go
 new file mode 100644
-index 00000000..f842cd13
+index 00000000..471d0c62
 --- /dev/null
 +++ b/spv/cache/lru/lru_evict_error_test.go
-@@ -0,0 +1,70 @@
+@@ -0,0 +1,115 @@
 +package lru
 +
 +import (
@@ -107,6 +129,48 @@ index 00000000..f842cd13
 +		t.Fatal("cache is deadlocked after a failed eviction in Put")
 +	}
 +}
--- 
-2.43.0
-
++
++// TestLoadAndDeleteSizeErrorKeepsEntry ensures that when LoadAndDelete
++// cannot size the entry it was asked to delete, it leaves the cache fully
++// consistent: the entry must still be retrievable by key, still counted
++// in Len/Size, and deletable once Size() works again. Before the fix, the
++// key was removed from the lookup map before sizing, so a Size() error
++// returned "not deleted" while stranding a ghost entry — gone from the
++// map, still occupying the list and the size accounting, unreachable by
++// Get, and double-counted if the same key was Put again.
++func TestLoadAndDeleteSizeErrorKeepsEntry(t *testing.T) {
++	t.Parallel()
++
++	c := NewCache[int, *flakySizeValue](10)
++
++	resident := &flakySizeValue{size: 6}
++	_, err := c.Put(1, resident)
++	require.NoError(t, err)
++
++	// The resident entry's Size() now fails, as CacheableFilter.Size()
++	// can if its filter can no longer be measured.
++	resident.fail = true
++
++	// The delete cannot complete, and must report that it did not.
++	v, ok := c.LoadAndDelete(1)
++	require.False(t, ok)
++	require.Nil(t, v)
++
++	// Nothing may have changed: the entry is still in the cache, by key
++	// and in the accounting.
++	got, err := c.Get(1)
++	require.NoError(t, err)
++	require.Same(t, resident, got)
++	require.Equal(t, 1, c.Len())
++	require.Equal(t, uint64(6), c.Size())
++
++	// Once Size() works again, the same delete succeeds cleanly and the
++	// accounting drains to zero — no ghost is left behind.
++	resident.fail = false
++
++	v, ok = c.LoadAndDelete(1)
++	require.True(t, ok)
++	require.Same(t, resident, v)
++	require.Equal(t, 0, c.Len())
++	require.Equal(t, uint64(0), c.Size())
++}
