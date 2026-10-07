@@ -1,0 +1,194 @@
+diff --git a/node/netsync/manager.go b/node/netsync/manager.go
+index 1dee98a1..ab5ba50e 100644
+--- a/node/netsync/manager.go
++++ b/node/netsync/manager.go
+@@ -51,6 +51,14 @@ const (
+ 	// is excluded from re-selection.
+ 	syncPeerCooldown = 10 * time.Minute
+ 
++	// noSyncPeerRotateSamples is the number of consecutive stall
++	// samples with no sync peer and no viable candidate after which
++	// handleStallSample starts rotating out outbound peers that
++	// advertise a height below ours (see handleNoSyncPeer). At
++	// stallSampleInterval per sample this is a 5-minute grace period
++	// before the first rotation.
++	noSyncPeerRotateSamples = 10
++
+ 	// lowQualityStrikeLimit is the strike count at which a peer is
+ 	// downgraded back to low-quality (see nonTipStrikes).
+ 	lowQualityStrikeLimit = 5
+@@ -248,6 +256,11 @@ type SyncManager struct {
+ 	// while serving as syncnode. pickSyncCandidate skips entries
+ 	// within syncPeerCooldown and lazy-evicts expired ones.
+ 	recentlyFailedSync map[string]time.Time
++
++	// noSyncPeerSamples counts consecutive stall samples on which no
++	// sync peer could be selected. Reset whenever a sync peer exists.
++	// Only accessed from the blockHandler thread (handleStallSample).
++	noSyncPeerSamples int
+ }
+ 
+ // resetHeaderState sets the headers-first mode state to values appropriate for
+@@ -506,13 +519,23 @@ func (sm *SyncManager) handleStallSample() {
+ 	}
+ 
+ 	// No syncpeer — retry selection periodically so cooled-down
+-	// candidates get re-evaluated as their entries expire.
++	// candidates get re-evaluated as their entries expire. Selection
++	// is attempted regardless of IsCurrent: a node that loses its
++	// sync peer while at tip still looks current for up to 24h, and
++	// gating re-selection on !IsCurrent left it with no sync peer
++	// for that whole window (#301). startSync itself skips
++	// candidates that have nothing new to offer, so the retry is
++	// cheap when we are genuinely at tip.
+ 	if sm.syncPeer == nil {
+-		if !sm.chain.IsCurrent() {
+-			sm.startSync()
++		sm.startSync()
++		if sm.syncPeer != nil {
++			sm.noSyncPeerSamples = 0
++			return
+ 		}
++		sm.handleNoSyncPeer()
+ 		return
+ 	}
++	sm.noSyncPeerSamples = 0
+ 
+ 	// If the stall timeout has not elapsed, exit early.
+ 	if time.Since(sm.lastProgressTime) <= maxStallDuration {
+@@ -538,6 +561,56 @@ func (sm *SyncManager) handleStallSample() {
+ 	sm.updateSyncPeer(disconnectSyncPeer)
+ }
+ 
++// handleNoSyncPeer runs on a stall sample where startSync found no
++// viable sync candidate. Once that state persists for
++// noSyncPeerRotateSamples consecutive samples, it disconnects one
++// outbound peer that advertises a height below ours per sample,
++// freeing its outbound slot so the connection manager dials a
++// replacement that may be able to serve us blocks.
++//
++// Without this, a node whose outbound slots are all held by peers
++// behind it (e.g. nodes stranded on the far side of a hardfork) can
++// never make progress: startSync only considers connected peers, and
++// nothing ever rotates the useless ones out (#301).
++func (sm *SyncManager) handleNoSyncPeer() {
++	sm.noSyncPeerSamples++
++	if sm.noSyncPeerSamples < noSyncPeerRotateSamples {
++		return
++	}
++
++	best := sm.chain.BestSnapshot()
++	victim := sm.pickStaleOutboundPeer(best.Height)
++	if victim == nil {
++		return
++	}
++
++	log.Infof("No sync candidate for %v — disconnecting outbound "+
++		"peer %s at height %d (our best is %d) to free the slot "+
++		"for a replacement",
++		time.Duration(sm.noSyncPeerSamples)*stallSampleInterval,
++		victim.Addr(), victim.LastBlock(), best.Height)
++	victim.Disconnect()
++}
++
++// pickStaleOutboundPeer returns the outbound peer advertising the
++// lowest height strictly below bestHeight, or nil if there is none.
++// Peers at our height are never selected: they may simply be waiting
++// for the same next block we are. Inbound peers are never selected:
++// disconnecting one frees no outbound slot for the connection manager
++// to refill.
++func (sm *SyncManager) pickStaleOutboundPeer(bestHeight int32) *peerpkg.Peer {
++	var victim *peerpkg.Peer
++	for peer := range sm.peerStates {
++		if peer.Inbound() || peer.LastBlock() >= bestHeight {
++			continue
++		}
++		if victim == nil || peer.LastBlock() < victim.LastBlock() {
++			victim = peer
++		}
++	}
++	return victim
++}
++
+ // shouldDCStalledSyncPeer determines whether or not we should disconnect a
+ // stalled sync peer. If the peer has stalled and its reported height is greater
+ // than our own best height, we will disconnect it. Otherwise, we will keep the
+diff --git a/node/netsync/manager_test.go b/node/netsync/manager_test.go
+index 72a7e91c..1eba8cb8 100644
+--- a/node/netsync/manager_test.go
++++ b/node/netsync/manager_test.go
+@@ -234,6 +234,74 @@ func TestInvGateWithoutSyncPeer(t *testing.T) {
+ 	}
+ }
+ 
++// TestPickStaleOutboundPeer pins which peers the no-candidate rotation
++// may evict (#301): outbound peers only, strictly below our height,
++// lowest advertised height first. A peer at our height is never
++// selected — it may simply be waiting for the same next block we are —
++// and an inbound peer is never selected because disconnecting one
++// frees no outbound slot for the connection manager to refill.
++func TestPickStaleOutboundPeer(t *testing.T) {
++	sm := newTestSyncManager(t, &chaincfg.RegressionNetParams)
++
++	mkPeer := func(inbound bool, addr string, height int32) *peer.Peer {
++		t.Helper()
++		cfg := &peer.Config{ChainParams: sm.chainParams}
++		var p *peer.Peer
++		if inbound {
++			p = peer.NewInboundPeer(cfg)
++		} else {
++			var err error
++			p, err = peer.NewOutboundPeer(cfg, addr)
++			require.NoError(t, err)
++		}
++		p.UpdateLastBlockHeight(height)
++		sm.peerStates[p] = &peerSyncState{syncCandidate: true}
++		return p
++	}
++
++	low := mkPeer(false, "10.0.0.1:44108", 2)
++	mkPeer(false, "10.0.0.2:44108", 5)
++	mkPeer(true, "10.0.0.3:44108", 1)
++
++	assert.Equal(t, low, sm.pickStaleOutboundPeer(10),
++		"the lowest strictly-behind outbound peer must be picked")
++	assert.Nil(t, sm.pickStaleOutboundPeer(2),
++		"a peer at our height must never be rotated")
++	assert.Nil(t, sm.pickStaleOutboundPeer(0),
++		"no peer can be below genesis height")
++}
++
++// TestHandleStallSampleNoSyncPeer pins the stall-sample accounting for
++// the #301 wedge: with no sync peer, selection is retried on every
++// sample even though startSync keeps finding no viable candidate, the
++// no-candidate streak keeps counting, a peer at our own height is never
++// disconnected no matter how long the streak runs, and the streak
++// resets once a sync peer exists again.
++func TestHandleStallSampleNoSyncPeer(t *testing.T) {
++	sm := newTestSyncManager(t, &chaincfg.RegressionNetParams)
++
++	p, _ := connectedTestPeer(t, sm.chainParams, false)
++	sm.handleNewPeerMsg(p)
++	require.Nil(t, sm.syncPeer, "a peer at our height must not be picked as sync peer")
++
++	samples := noSyncPeerRotateSamples + 5
++	for i := 0; i < samples; i++ {
++		sm.handleStallSample()
++	}
++	assert.Equal(t, samples, sm.noSyncPeerSamples,
++		"every candidate-less sample must extend the streak")
++	assert.True(t, p.Connected(),
++		"a peer at our height must not be rotated out")
++
++	// Once a sync peer exists the streak resets; the peer is at our
++	// height, so the stall path must not disconnect it either.
++	sm.syncPeer = p
++	sm.handleStallSample()
++	assert.Equal(t, 0, sm.noSyncPeerSamples,
++		"having a sync peer must reset the streak")
++	assert.True(t, p.Connected())
++}
++
+ // TestIsSyncCandidate pins the services a peer must advertise to be a sync candidate. Regtest gets no localhost
+ // exemption: an integration harness that wants to feed blocks has to advertise that it serves them.
+ func TestIsSyncCandidate(t *testing.T) {
