@@ -1,0 +1,112 @@
+From b297219df8c63221e6a25efbf989abb21e13866b Mon Sep 17 00:00:00 2001
+From: Kshot3000 <kshot9000@gmail.com>
+Date: Wed, 7 Oct 2026 09:26:01 +0000
+Subject: [PATCH] fix(spv): unlock LRU cache mutex on Put eviction error
+
+Put acquired c.mtx and then returned evict()'s error without unlocking,
+unlike the neighbouring existing-value Size() error branch. One failed
+eviction (a resident entry whose Size() starts erroring, which
+CacheableFilter.Size can do via gcs Filter.NBytes) therefore locked the
+cache forever: every later Put/Get/LoadAndDelete/Len/Size blocked, and
+the neutrino FilterCache/BlockCache backed by this type wedged silently.
+
+Add the missing Unlock and a regression test that forces the eviction
+error and proves the cache stays usable.
+---
+ spv/cache/lru/lru.go                  |  2 +
+ spv/cache/lru/lru_evict_error_test.go | 70 +++++++++++++++++++++++++++
+ 2 files changed, 72 insertions(+)
+ create mode 100644 spv/cache/lru/lru_evict_error_test.go
+
+diff --git a/spv/cache/lru/lru.go b/spv/cache/lru/lru.go
+index 6cc18ef4..e068a9f0 100644
+--- a/spv/cache/lru/lru.go
++++ b/spv/cache/lru/lru.go
+@@ -165,6 +165,8 @@ func (c *Cache[K, V]) Put(key K, value V) (bool, error) {
+ 	// elements if we need more space.
+ 	evicted, err := c.evict(vs)
+ 	if err != nil {
++		c.mtx.Unlock()
++
+ 		return false, err
+ 	}
+ 
+diff --git a/spv/cache/lru/lru_evict_error_test.go b/spv/cache/lru/lru_evict_error_test.go
+new file mode 100644
+index 00000000..f842cd13
+--- /dev/null
++++ b/spv/cache/lru/lru_evict_error_test.go
+@@ -0,0 +1,70 @@
++package lru
++
++import (
++	"errors"
++	"testing"
++	"time"
++
++	"github.com/stretchr/testify/require"
++)
++
++// flakySizeValue is a cache value whose Size() can start failing after the
++// value has already been admitted to the cache. cache.Value explicitly
++// returns an error from Size(), and the production CacheableFilter.Size()
++// can error via gcs.Filter.NBytes(), so an eviction that re-sizes a
++// resident entry can legitimately fail.
++type flakySizeValue struct {
++	size uint64
++	fail bool
++}
++
++// Size implements the cache.Value interface.
++func (f *flakySizeValue) Size() (uint64, error) {
++	if f.fail {
++		return 0, errors.New("size unavailable")
++	}
++
++	return f.size, nil
++}
++
++// TestPutEvictErrorUnlocksCache ensures that when Put must evict a resident
++// entry and evicting fails on that entry's Size(), Put returns the error
++// without leaving the cache mutex locked. Before the fix, the eviction
++// error path returned while still holding the lock, so every later
++// mutex-taking operation (Put, Get, Len, Size, LoadAndDelete) blocked
++// forever and the SPV caches backed by this type wedged permanently.
++func TestPutEvictErrorUnlocksCache(t *testing.T) {
++	t.Parallel()
++
++	c := NewCache[int, *flakySizeValue](10)
++
++	resident := &flakySizeValue{size: 6}
++	_, err := c.Put(1, resident)
++	require.NoError(t, err)
++
++	// The resident entry's Size() now fails, as CacheableFilter.Size()
++	// can if its filter can no longer be measured.
++	resident.fail = true
++
++	// Inserting a 6-unit entry into a capacity-10 cache holding 6 units
++	// forces evict() to size (and evict) the resident entry.
++	_, err = c.Put(2, &flakySizeValue{size: 6})
++	require.Error(t, err)
++
++	// The cache must still be usable: any mutex-taking call has to
++	// complete promptly instead of deadlocking on the leaked lock.
++	done := make(chan struct{})
++	go func() {
++		defer close(done)
++
++		_ = c.Size()
++		_, _ = c.Get(1)
++		_, _ = c.Put(3, &flakySizeValue{size: 1})
++	}()
++
++	select {
++	case <-done:
++	case <-time.After(10 * time.Second):
++		t.Fatal("cache is deadlocked after a failed eviction in Put")
++	}
++}
+-- 
+2.43.0
+
