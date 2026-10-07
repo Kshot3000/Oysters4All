@@ -1,0 +1,460 @@
+From d39a228474ea15854f704ebd5cb27648370efd07 Mon Sep 17 00:00:00 2001
+From: Kshot3000 <kshot9000@gmail.com>
+Date: Wed, 7 Oct 2026 07:20:11 +0000
+Subject: [PATCH] refactor(server): return getdata messages from fetch helpers
+ instead of queuing them (#297)
+
+The pushInventory helpers each reimplemented 'signal completion exactly
+once, after my last message' by hand: they built wire messages, queued
+them, picked which message carried the done channel, and signaled the
+error paths themselves. Nothing enforced the rule, and one case was
+already wrong by construction: pushMerkleBlockMsg attached the channel
+to the last matched tx but queued it only inside the range guard, so an
+out-of-range last index would have stranded the signal and parked
+OnGetData until the peer disconnected.
+
+The fetch helpers (fetchInventory/fetchTx/fetchBlock/fetchMerkleBlock)
+now only build []outbound{msg, enc}; OnGetData owns queueing and
+attaches the done channel to the last returned message, so a dropped
+message means one fewer message, never a stranded receive. The three
+return shapes are preserved exactly: (nil, err) -> notfound, no signal;
+(nil, nil) -> deliberate no-reply for a peer with no filter loaded, no
+notfound; (msgs, nil) -> queue all, exactly one signal. Encodings are
+unchanged per message (block and matched txs use the caller's encoding,
+the continue inv and merkleblock use base encoding), as is the
+continueHash side effect in fetchBlock.
+
+Tests: TestFetchInventoryShapes pins the (nil, err) and (nil, nil)
+shapes through fetchInventory; TestMerkleOutbound covers merkle
+assembly including a last matched index out of range. Full node package
+suite passes untouched.
+---
+ node/server.go              | 215 ++++++++++++++++++------------------
+ node/server_getdata_test.go |  96 ++++++++++++++++
+ 2 files changed, 204 insertions(+), 107 deletions(-)
+ create mode 100644 node/server_getdata_test.go
+
+diff --git a/node/server.go b/node/server.go
+index abdeaf44..5866c907 100644
+--- a/node/server.go
++++ b/node/server.go
+@@ -828,17 +828,37 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
+ 	doneChans := make([]chan struct{}, 0, numBuffered)
+ 
+ 	for i, iv := range msg.InvList {
+-		// doneChan behaves like a semaphore - every time a msg is
+-		// processed, either succeeded or failed, a signal is sent to
+-		// this doneChan.
+-		doneChan := make(chan struct{}, 1)
++		// Fetch the messages for this inventory vector. The fetch
++		// helpers only build messages; queueing and completion
++		// signaling are owned here so that exactly one signal is
++		// owed per queued inventory vector.
++		//
++		// The three return shapes are:
++		//   - (nil, err): add the vector to the notfound reply; no
++		//     messages are queued and no signal is owed.
++		//   - (nil, nil): deliberately send nothing (e.g. a filtered
++		//     block request from a peer with no filter loaded); no
++		//     notfound entry and no signal.
++		//   - (msgs, nil): queue every message; the last one carries
++		//     this vector's doneChan.
++		msgs, err := sp.server.fetchInventory(sp, iv)
++		switch {
++		case err != nil:
++			failedMsg.AddInvVect(iv)
+ 
+-		// Add this doneChan for tracking.
+-		doneChans = append(doneChans, doneChan)
++		case len(msgs) > 0:
++			// doneChan behaves like a semaphore - it is signaled
++			// once the last message for this vector has been sent.
++			doneChan := make(chan struct{}, 1)
++			doneChans = append(doneChans, doneChan)
+ 
+-		err := sp.server.pushInventory(sp, iv, doneChan)
+-		if err != nil {
+-			failedMsg.AddInvVect(iv)
++			for j, m := range msgs {
++				var dc chan<- struct{}
++				if j == len(msgs)-1 {
++					dc = doneChan
++				}
++				sp.QueueMessageWithEncoding(m.msg, dc, m.enc)
++			}
+ 		}
+ 
+ 		// Move to the next item if we haven't processed 5 times yet.
+@@ -849,8 +869,9 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
+ 		// Empty all the slots.
+ 		for _, dc := range doneChans {
+ 			select {
+-			// NOTE: We always expect am empty struct to be sent to
+-			// this doneChan, even when `pushInventory` failed.
++			// NOTE: doneChans only holds channels for inventory
++			// vectors that actually queued messages, and each is
++			// signaled exactly once, by the vector's last message.
+ 			case <-dc:
+ 
+ 			// Exit if the server is shutting down.
+@@ -893,43 +914,43 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
+ 	}
+ }
+ 
+-// pushInventory sends the requested inventory to the given peer.
+-func (s *server) pushInventory(sp *serverPeer, iv *wire.InvVect,
+-	doneChan chan<- struct{}) error {
++// outbound is a single message to queue for a peer, together with the
++// encoding it must be sent with.
++type outbound struct {
++	msg wire.Message
++	enc wire.MessageEncoding
++}
++
++// fetchInventory builds the messages that answer the given inventory
++// request. It never queues anything and never signals completion: the
++// caller (OnGetData) owns queueing and attaches the completion channel
++// to the last message. See OnGetData for the three return shapes.
++func (s *server) fetchInventory(sp *serverPeer,
++	iv *wire.InvVect) ([]outbound, error) {
+ 
+ 	switch iv.Type {
+ 	case wire.InvTypeWitnessTx:
+-		return s.pushTxMsg(sp, &iv.Hash, doneChan, wire.WitnessEncoding)
++		return s.fetchTx(&iv.Hash, wire.WitnessEncoding)
+ 
+ 	case wire.InvTypeTx:
+-		return s.pushTxMsg(sp, &iv.Hash, doneChan, wire.BaseEncoding)
++		return s.fetchTx(&iv.Hash, wire.BaseEncoding)
+ 
+ 	case wire.InvTypeWitnessBlock:
+-		return s.pushBlockMsg(
+-			sp, &iv.Hash, doneChan, wire.WitnessEncoding,
+-		)
++		return s.fetchBlock(sp, &iv.Hash, wire.WitnessEncoding)
+ 
+ 	case wire.InvTypeBlock:
+-		return s.pushBlockMsg(sp, &iv.Hash, doneChan, wire.BaseEncoding)
++		return s.fetchBlock(sp, &iv.Hash, wire.BaseEncoding)
+ 
+ 	case wire.InvTypeFilteredWitnessBlock:
+-		return s.pushMerkleBlockMsg(
+-			sp, &iv.Hash, doneChan, wire.WitnessEncoding,
+-		)
++		return s.fetchMerkleBlock(sp, &iv.Hash, wire.WitnessEncoding)
+ 
+ 	case wire.InvTypeFilteredBlock:
+-		return s.pushMerkleBlockMsg(
+-			sp, &iv.Hash, doneChan, wire.BaseEncoding,
+-		)
++		return s.fetchMerkleBlock(sp, &iv.Hash, wire.BaseEncoding)
+ 
+ 	default:
+ 		peerLog.Warnf("Unknown type in inventory request %d", iv.Type)
+ 
+-		if doneChan != nil {
+-			doneChan <- struct{}{}
+-		}
+-
+-		return errors.New("unknown inventory type")
++		return nil, errors.New("unknown inventory type")
+ 	}
+ }
+ 
+@@ -1686,10 +1707,10 @@ func (s *server) TransactionConfirmed(tx *btcutil.Tx) {
+ 	s.RemoveRebroadcastInventory(iv)
+ }
+ 
+-// pushTxMsg sends a tx message for the provided transaction hash to the
+-// connected peer.  An error is returned if the transaction hash is not known.
+-func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash,
+-	doneChan chan<- struct{}, encoding wire.MessageEncoding) error {
++// fetchTx builds the tx message for the provided transaction hash.  An
++// error is returned if the transaction hash is not known.
++func (s *server) fetchTx(hash *chainhash.Hash,
++	encoding wire.MessageEncoding) ([]outbound, error) {
+ 
+ 	// Attempt to fetch the requested transaction from the pool.  A
+ 	// call could be made to check for existence first, but simply trying
+@@ -1699,21 +1720,16 @@ func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash,
+ 		peerLog.Tracef("Unable to fetch tx %v from transaction "+
+ 			"pool: %v", hash, err)
+ 
+-		if doneChan != nil {
+-			doneChan <- struct{}{}
+-		}
+-		return err
++		return nil, err
+ 	}
+ 
+-	sp.QueueMessageWithEncoding(tx.MsgTx(), doneChan, encoding)
+-
+-	return nil
++	return []outbound{{msg: tx.MsgTx(), enc: encoding}}, nil
+ }
+ 
+-// pushBlockMsg sends a block message for the provided block hash to the
+-// connected peer.  An error is returned if the block hash is not known.
+-func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash,
+-	doneChan chan<- struct{}, encoding wire.MessageEncoding) error {
++// fetchBlock builds the block message for the provided block hash.  An
++// error is returned if the block hash is not known.
++func (s *server) fetchBlock(sp *serverPeer, hash *chainhash.Hash,
++	encoding wire.MessageEncoding) ([]outbound, error) {
+ 
+ 	// Fetch the raw block bytes from the database.
+ 	var blockBytes []byte
+@@ -1726,10 +1742,7 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash,
+ 		peerLog.Tracef("Unable to fetch requested block hash %v: %v",
+ 			hash, err)
+ 
+-		if doneChan != nil {
+-			doneChan <- struct{}{}
+-		}
+-		return err
++		return nil, err
+ 	}
+ 
+ 	// Deserialize the block.
+@@ -1739,51 +1752,63 @@ func (s *server) pushBlockMsg(sp *serverPeer, hash *chainhash.Hash,
+ 		peerLog.Tracef("Unable to deserialize requested block hash "+
+ 			"%v: %v", hash, err)
+ 
+-		if doneChan != nil {
+-			doneChan <- struct{}{}
+-		}
+-		return err
++		return nil, err
+ 	}
+ 
+-	// We only send the channel for this message if we aren't sending
+-	// an inv straight after.
+-	var dc chan<- struct{}
+-	continueHash := sp.continueHash
+-	sendInv := continueHash != nil && continueHash.IsEqual(hash)
+-	if !sendInv {
+-		dc = doneChan
+-	}
+-	sp.QueueMessageWithEncoding(&msgBlock, dc, encoding)
++	msgs := []outbound{{msg: &msgBlock, enc: encoding}}
+ 
+ 	// When the peer requests the final block that was advertised in
+ 	// response to a getblocks message which requested more blocks than
+-	// would fit into a single message, send it a new inventory message
++	// would fit into a single message, append a new inventory message
+ 	// to trigger it to issue another getblocks message for the next
+-	// batch of inventory.
+-	if sendInv {
++	// batch of inventory. The caller attaches the completion channel
++	// to this final message instead of the block.
++	continueHash := sp.continueHash
++	if continueHash != nil && continueHash.IsEqual(hash) {
+ 		best := sp.server.chain.BestSnapshot()
+ 		invMsg := wire.NewMsgInvSizeHint(1)
+ 		iv := wire.NewInvVect(wire.InvTypeBlock, &best.Hash)
+ 		invMsg.AddInvVect(iv)
+-		sp.QueueMessage(invMsg, doneChan)
++		msgs = append(msgs, outbound{msg: invMsg, enc: wire.BaseEncoding})
+ 		sp.continueHash = nil
+ 	}
+-	return nil
++	return msgs, nil
+ }
+ 
+-// pushMerkleBlockMsg sends a merkleblock message for the provided block hash to
+-// the connected peer.  Since a merkle block requires the peer to have a filter
+-// loaded, this call will simply be ignored if there is no filter loaded.  An
+-// error is returned if the block hash is not known.
+-func (s *server) pushMerkleBlockMsg(sp *serverPeer, hash *chainhash.Hash,
+-	doneChan chan<- struct{}, encoding wire.MessageEncoding) error {
++// merkleOutbound assembles the messages answering a filtered block
++// request: the merkleblock itself (base encoding), followed by each
++// matched transaction (the caller's encoding). Matched indices outside
++// the block's transaction list are skipped; because the caller attaches
++// the completion channel to the last returned message, a skipped index
++// can no longer strand that signal the way it could when the channel
++// was attached to the last matched index before the range check.
++func merkleOutbound(merkle *wire.MsgMerkleBlock, matchedTxIndices []uint32,
++	blkTransactions []*wire.MsgTx, encoding wire.MessageEncoding) []outbound {
++
++	msgs := make([]outbound, 0, len(matchedTxIndices)+1)
++	msgs = append(msgs, outbound{msg: merkle, enc: wire.BaseEncoding})
++	for _, txIndex := range matchedTxIndices {
++		if txIndex < uint32(len(blkTransactions)) {
++			msgs = append(msgs, outbound{
++				msg: blkTransactions[txIndex],
++				enc: encoding,
++			})
++		}
++	}
++	return msgs
++}
++
++// fetchMerkleBlock builds the merkleblock message (and any matched
++// transaction messages) for the provided block hash.  Since a merkle
++// block requires the peer to have a filter loaded, a peer without one
++// gets the deliberate no-reply shape: (nil, nil).  An error is returned
++// if the block hash is not known.
++func (s *server) fetchMerkleBlock(sp *serverPeer, hash *chainhash.Hash,
++	encoding wire.MessageEncoding) ([]outbound, error) {
+ 
+ 	// Do not send a response if the peer doesn't have a filter loaded.
+ 	if !sp.filter.IsLoaded() {
+-		if doneChan != nil {
+-			doneChan <- struct{}{}
+-		}
+-		return nil
++		return nil, nil
+ 	}
+ 
+ 	// Fetch the raw block bytes from the database.
+@@ -1792,39 +1817,15 @@ func (s *server) pushMerkleBlockMsg(sp *serverPeer, hash *chainhash.Hash,
+ 		peerLog.Tracef("Unable to fetch requested block hash %v: %v",
+ 			hash, err)
+ 
+-		if doneChan != nil {
+-			doneChan <- struct{}{}
+-		}
+-		return err
++		return nil, err
+ 	}
+ 
+ 	// Generate a merkle block by filtering the requested block according
+-	// to the filter for the peer.
++	// to the filter for the peer, then assemble the merkleblock followed
++	// by any matched transactions.
+ 	merkle, matchedTxIndices := bloom.NewMerkleBlock(blk, sp.filter)
+-
+-	// Send the merkleblock.  Only send the done channel with this message
+-	// if no transactions will be sent afterwards.
+-	var dc chan<- struct{}
+-	if len(matchedTxIndices) == 0 {
+-		dc = doneChan
+-	}
+-	sp.QueueMessage(merkle, dc)
+-
+-	// Finally, send any matched transactions.
+-	blkTransactions := blk.MsgBlock().Transactions
+-	for i, txIndex := range matchedTxIndices {
+-		// Only send the done channel on the final transaction.
+-		var dc chan<- struct{}
+-		if i == len(matchedTxIndices)-1 {
+-			dc = doneChan
+-		}
+-		if txIndex < uint32(len(blkTransactions)) {
+-			sp.QueueMessageWithEncoding(blkTransactions[txIndex], dc,
+-				encoding)
+-		}
+-	}
+-
+-	return nil
++	return merkleOutbound(merkle, matchedTxIndices,
++		blk.MsgBlock().Transactions, encoding), nil
+ }
+ 
+ // handleUpdatePeerHeight updates the heights of all peers who were known to
+diff --git a/node/server_getdata_test.go b/node/server_getdata_test.go
+new file mode 100644
+index 00000000..3aa62583
+--- /dev/null
++++ b/node/server_getdata_test.go
+@@ -0,0 +1,96 @@
++// Copyright (c) 2026 The Pearl Research Labs
++// Use of this source code is governed by an ISC
++// license that can be found in the LICENSE file.
++
++package main
++
++import (
++	"testing"
++
++	"github.com/pearl-research-labs/pearl/node/chaincfg/chainhash"
++	"github.com/pearl-research-labs/pearl/node/wire"
++	"github.com/stretchr/testify/require"
++)
++
++// TestFetchInventoryShapes pins the three return shapes OnGetData relies
++// on: (nil, err) for failures that belong in the notfound reply,
++// (nil, nil) for the deliberate no-reply case, and (msgs, nil) with the
++// messages in wire order otherwise.
++func TestFetchInventoryShapes(t *testing.T) {
++	s, sp := newTestServerPeer(t)
++	hash := &chainhash.Hash{0x01}
++
++	// Unknown inventory type: (nil, err) — the vector belongs in the
++	// notfound reply.
++	msgs, err := s.fetchInventory(sp, wire.NewInvVect(99, hash))
++	require.Error(t, err)
++	require.Nil(t, msgs)
++
++	// Filtered block request from a peer with no filter loaded:
++	// (nil, nil) — deliberately send nothing, record no notfound, and
++	// owe no completion signal.
++	for _, invType := range []wire.InvType{
++		wire.InvTypeFilteredBlock, wire.InvTypeFilteredWitnessBlock,
++	} {
++		msgs, err = s.fetchInventory(sp, wire.NewInvVect(invType, hash))
++		require.NoError(t, err)
++		require.Nil(t, msgs)
++	}
++}
++
++// TestMerkleOutbound covers the message assembly for filtered block
++// replies, including a matched index list whose last entry is out of
++// range: the out-of-range index is skipped and the returned slice still
++// ends with a real message for the caller to attach the completion
++// signal to. Under the previous push-style code that case attached the
++// signal to a message that was never queued, parking OnGetData until
++// the peer disconnected.
++func TestMerkleOutbound(t *testing.T) {
++	merkle := &wire.MsgMerkleBlock{}
++	txs := []*wire.MsgTx{{Version: 1}, {Version: 2}, {Version: 3}}
++
++	tests := []struct {
++		name    string
++		matched []uint32
++		want    []wire.Message // expected messages, in order
++	}{
++		{
++			name:    "no matches sends only the merkleblock",
++			matched: nil,
++			want:    []wire.Message{merkle},
++		},
++		{
++			name:    "matches follow the merkleblock in index order",
++			matched: []uint32{0, 2},
++			want:    []wire.Message{merkle, txs[0], txs[2]},
++		},
++		{
++			name:    "last matched index out of range is skipped",
++			matched: []uint32{1, 3},
++			want:    []wire.Message{merkle, txs[1]},
++		},
++		{
++			name:    "all matched indices out of range",
++			matched: []uint32{7},
++			want:    []wire.Message{merkle},
++		},
++	}
++
++	for _, test := range tests {
++		t.Run(test.name, func(t *testing.T) {
++			msgs := merkleOutbound(merkle, test.matched, txs,
++				wire.WitnessEncoding)
++			require.Len(t, msgs, len(test.want))
++			for i, want := range test.want {
++				require.Same(t, want, msgs[i].msg)
++			}
++
++			// The merkleblock always uses the base encoding; matched
++			// transactions use the caller's encoding.
++			require.Equal(t, wire.BaseEncoding, msgs[0].enc)
++			for _, m := range msgs[1:] {
++				require.Equal(t, wire.WitnessEncoding, m.enc)
++			}
++		})
++	}
++}
+-- 
+2.43.0
+
