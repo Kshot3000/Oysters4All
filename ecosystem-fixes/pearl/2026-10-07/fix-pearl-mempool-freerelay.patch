@@ -1,0 +1,140 @@
+From c750f47f2153aff9159417271d6a204a128ea9c7 Mon Sep 17 00:00:00 2001
+From: Kshot3000 <kshot9000@gmail.com>
+Date: Wed, 7 Oct 2026 15:29:04 +0000
+Subject: [PATCH] fix(mempool): make the free-relay rate limiter reachable
+ again
+
+validateRelayFeeMet rejected every transaction below the minimum
+relay fee up front, which made everything below it unreachable: the
+penny-flooding rate limiter (pennyTotal/lastPennyUnix) never ran,
+and the isNew/rateLimit parameters were ignored. That contradicts
+the documented policy in this repo: Policy.FreeTxRelayLimit says
+no-fee transactions are rate limited (not rejected), and the node's
+--limitfreerelay flag (default 15 KB/min) had no effect at all.
+
+Remove the unconditional rejection. The surviving flow is exactly
+what the code below it describes: fee-met transactions exit early,
+non-new non-rate-limited ones exit early, and new rate-limited
+free/low-fee transactions are admitted against the decaying
+penny-flooding budget and rejected by the limiter once it is
+exhausted.
+
+TestFreeTxRelayRateLimiter pins both sides: a zero-fee transaction
+is admitted and charged to the budget at the default limit, and
+rejected by the rate limiter (not the old blanket error) when the
+limit is zero. Red before, green after; full mempool + mining
+suites pass, race clean.
+---
+ node/mempool/freerelay_test.go | 81 ++++++++++++++++++++++++++++++++++
+ node/mempool/mempool.go        |  7 ---
+ 2 files changed, 81 insertions(+), 7 deletions(-)
+ create mode 100644 node/mempool/freerelay_test.go
+
+diff --git a/node/mempool/freerelay_test.go b/node/mempool/freerelay_test.go
+new file mode 100644
+index 00000000..b4c70f8d
+--- /dev/null
++++ b/node/mempool/freerelay_test.go
+@@ -0,0 +1,81 @@
++package mempool
++
++// Regression test for the validateRelayFeeMet dead rate-limiter bug:
++// Run: go test ./node/mempool/ -run TestFreeTxRelayRateLimiter -v
++
++import (
++	"strings"
++	"testing"
++
++	"github.com/pearl-research-labs/pearl/node/btcutil"
++	"github.com/pearl-research-labs/pearl/node/chaincfg"
++)
++
++// A zero-fee transaction relayed to a node whose policy enables free
++// relay (DisableRelayPriority=false, the node's default
++// FreeTxRelayLimit=15.0 KB/min, per node/config.go `--limitfreerelay`:
++// "Limit relay of transactions with no transaction fee to the given
++// amount in thousands of bytes per minute") must be ADMITTED while the
++// penny-flooding budget is untouched, and REJECTED BY THE RATE LIMITER
++// once the budget is configured to zero. On the unpatched code both
++// cases fail: the tx is blanket-rejected up front with "under the
++// required amount" and the rate limiter never runs.
++func TestFreeTxRelayRateLimiter(t *testing.T) {
++	// Case 1: free tx, relay enabled, fresh budget -> must be accepted.
++	harness, spendableOuts, err := newPoolHarness(&chaincfg.MainNetParams)
++	if err != nil {
++		t.Fatalf("unable to create test pool: %v", err)
++	}
++	harness.txPool.cfg.Policy.DisableRelayPriority = false
++	// FreeTxRelayLimit stays at the harness/node default of 15.0.
++
++	zeroFeeTx, err := harness.CreateSignedTx(
++		[]spendableOutput{spendableOuts[0]}, 1, btcutil.Amount(0), false,
++	)
++	if err != nil {
++		t.Fatalf("unable to create zero-fee tx: %v", err)
++	}
++
++	accepted, err := harness.txPool.ProcessTransaction(zeroFeeTx, true, true, 0)
++	if err != nil {
++		t.Fatalf("CASE 1 FAIL: zero-fee tx within free-relay budget "+
++			"was rejected: %v", err)
++	}
++	if len(accepted) != 1 {
++		t.Fatalf("CASE 1 FAIL: expected 1 accepted tx, got %d", len(accepted))
++	}
++	if !harness.txPool.IsTransactionInPool(zeroFeeTx.Hash()) {
++		t.Fatalf("CASE 1 FAIL: zero-fee tx not in pool after acceptance")
++	}
++	if harness.txPool.pennyTotal <= 0 {
++		t.Fatalf("CASE 1 FAIL: pennyTotal was not charged (rate "+
++			"limiter never ran): pennyTotal=%v",
++			harness.txPool.pennyTotal)
++	}
++
++	// Case 2: free tx, relay enabled, budget configured to zero ->
++	// must be rejected specifically by the rate limiter.
++	harness2, spendableOuts2, err := newPoolHarness(&chaincfg.MainNetParams)
++	if err != nil {
++		t.Fatalf("unable to create test pool: %v", err)
++	}
++	harness2.txPool.cfg.Policy.DisableRelayPriority = false
++	harness2.txPool.cfg.Policy.FreeTxRelayLimit = 0
++
++	zeroFeeTx2, err := harness2.CreateSignedTx(
++		[]spendableOutput{spendableOuts2[0]}, 1, btcutil.Amount(0), false,
++	)
++	if err != nil {
++		t.Fatalf("unable to create zero-fee tx: %v", err)
++	}
++
++	_, err = harness2.txPool.ProcessTransaction(zeroFeeTx2, true, true, 0)
++	if err == nil {
++		t.Fatalf("CASE 2 FAIL: zero-fee tx accepted despite zero " +
++			"free-relay budget")
++	}
++	if !strings.Contains(err.Error(), "rate limiter") {
++		t.Fatalf("CASE 2 FAIL: expected rejection by the rate "+
++			"limiter, got: %v", err)
++	}
++}
+diff --git a/node/mempool/mempool.go b/node/mempool/mempool.go
+index 16a7fbab..335cc4e1 100644
+--- a/node/mempool/mempool.go
++++ b/node/mempool/mempool.go
+@@ -1595,13 +1595,6 @@ func (mp *TxPool) validateRelayFeeMet(tx *btcutil.Tx, txFee, txSize int64,
+ 	// Calculate the minimum required fee for this transaction.
+ 	minFee := calcMinRequiredTxRelayFee(txSize, mp.cfg.Policy.MinRelayTxFee)
+ 
+-	if txFee < minFee {
+-		str := fmt.Sprintf("transaction %v has %d fees which is under "+
+-			"the required amount of %d", txHash, txFee, minFee)
+-
+-		return txRuleError(wire.RejectInsufficientFee, str)
+-	}
+-
+ 	// Exit early if the min relay fee is met.
+ 	if txFee >= minFee {
+ 		return nil
+-- 
+2.43.0
+
