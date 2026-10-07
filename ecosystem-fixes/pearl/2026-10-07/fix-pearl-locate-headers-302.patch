@@ -1,0 +1,252 @@
+diff --git a/node/blockchain/chain.go b/node/blockchain/chain.go
+index 0c5feb6b..81185e01 100644
+--- a/node/blockchain/chain.go
++++ b/node/blockchain/chain.go
+@@ -1805,13 +1805,13 @@ func (b *BlockChain) LocateBlocks(locator BlockLocator, hashStop *chainhash.Hash
+ // See the comment on the exported function for more details on special cases.
+ //
+ // This function MUST be called with the chain state lock held (for reads).
+-func (b *BlockChain) locateHeaders(locator BlockLocator, hashStop *chainhash.Hash, maxHeaders uint32, includeCerts bool) []wire.MsgHeader {
++func (b *BlockChain) locateHeaders(locator BlockLocator, hashStop *chainhash.Hash, maxHeaders uint32, includeCerts bool) ([]wire.MsgHeader, error) {
+ 	// Find the node after the first known block in the locator and the
+ 	// total number of nodes after it needed while respecting the stop hash
+ 	// and max entries.
+ 	node, total := b.locateInventory(locator, hashStop, maxHeaders)
+ 	if total == 0 {
+-		return nil
++		return nil, nil
+ 	}
+ 
+ 	// Populate and return the found headers with their certificates.
+@@ -1840,10 +1840,9 @@ func (b *BlockChain) locateHeaders(locator BlockLocator, hashStop *chainhash.Has
+ 		return nil
+ 	})
+ 	if err != nil {
+-		log.Errorf("Error getting block headers: %v", err)
+-		return nil
++		return nil, err
+ 	}
+-	return headers
++	return headers, nil
+ }
+ 
+ // LocateHeaders returns the headers of the blocks after the first known block
+@@ -1861,12 +1860,20 @@ func (b *BlockChain) locateHeaders(locator BlockLocator, hashStop *chainhash.Has
+ //   - When locators are provided, but none of them are known, headers starting
+ //     after the genesis block will be returned
+ //
++// An error is returned instead of any headers when a located header or its
++// certificate cannot be read from the database, for example because the
++// block has been pruned: pruning deletes the block files that hold the
++// certificates while the headers themselves survive in the block index.
++// Callers can therefore distinguish "no headers after the locator" from
++// "the requested range cannot be served", which an empty result alone
++// cannot express.
++//
+ // This function is safe for concurrent access.
+-func (b *BlockChain) LocateHeaders(locator BlockLocator, hashStop *chainhash.Hash, includeCerts bool) []wire.MsgHeader {
++func (b *BlockChain) LocateHeaders(locator BlockLocator, hashStop *chainhash.Hash, includeCerts bool) ([]wire.MsgHeader, error) {
+ 	b.chainLock.RLock()
+-	headers := b.locateHeaders(locator, hashStop, wire.MaxBlockHeadersPerMsg, includeCerts)
++	headers, err := b.locateHeaders(locator, hashStop, wire.MaxBlockHeadersPerMsg, includeCerts)
+ 	b.chainLock.RUnlock()
+-	return headers
++	return headers, err
+ }
+ 
+ // InvalidateBlock invalidates the requested block and all its descedents.  If a block
+diff --git a/node/blockchain/chain_test.go b/node/blockchain/chain_test.go
+index 777f907b..402c127d 100644
+--- a/node/blockchain/chain_test.go
++++ b/node/blockchain/chain_test.go
+@@ -798,17 +798,19 @@ func TestLocateInventory(t *testing.T) {
+ 	for _, test := range tests {
+ 		// Ensure the expected headers with certificates are located.
+ 		var headers []wire.MsgHeader
++		var err error
+ 		if test.maxAllowed != 0 {
+ 			// Need to use the unexported function to override the
+ 			// max allowed for headers.
+ 			chain.chainLock.RLock()
+-			headers = chain.locateHeaders(test.locator,
++			headers, err = chain.locateHeaders(test.locator,
+ 				&test.hashStop, test.maxAllowed, true)
+ 			chain.chainLock.RUnlock()
+ 		} else {
+-			headers = chain.LocateHeaders(test.locator,
++			headers, err = chain.LocateHeaders(test.locator,
+ 				&test.hashStop, true)
+ 		}
++		require.NoError(err, "%s: unexpected error", test.name)
+ 		require.Equal(test.headers, headers, "%s: unexpected headers", test.name)
+ 
+ 		// Ensure the expected block hashes are located.
+@@ -839,23 +841,103 @@ func TestLocateHeadersCertificateFiltering(t *testing.T) {
+ 
+ 	// With includeCerts=true, all headers should have certificates.
+ 	chain.chainLock.RLock()
+-	headers := chain.locateHeaders(locator, &chainhash.Hash{}, 100, true)
++	headers, err := chain.locateHeaders(locator, &chainhash.Hash{}, 100, true)
+ 	chain.chainLock.RUnlock()
+ 
++	require.NoError(err)
+ 	require.Len(headers, 2)
+ 	require.NotNil(headers[0].BlockCertificate())
+ 	require.NotNil(headers[1].BlockCertificate())
+ 
+ 	// With includeCerts=false, no headers should have certificates.
+ 	chain.chainLock.RLock()
+-	headers = chain.locateHeaders(locator, &chainhash.Hash{}, 100, false)
++	headers, err = chain.locateHeaders(locator, &chainhash.Hash{}, 100, false)
+ 	chain.chainLock.RUnlock()
+ 
++	require.NoError(err)
++
+ 	require.Len(headers, 2)
+ 	require.Nil(headers[0].BlockCertificate())
+ 	require.Nil(headers[1].BlockCertificate())
+ }
+ 
++// addPrunedNode adds a block to the chain index and stores its header,
++// status, and vsize exactly like dbStoreBlock does, but deliberately omits
++// the block data itself. That is the state pruning leaves behind: the header
++// survives in the block index while the block file that held the block (and
++// its certificate) is gone.
++func addPrunedNode(t *testing.T, chain *BlockChain, tip *blockNode) *blockNode {
++	t.Helper()
++	require := require.New(t)
++
++	header := wire.BlockHeader{
++		Timestamp: time.Unix(int64(testNoncePrng.Uint32()), 0),
++	}
++	var height int32
++	if tip != nil {
++		header.PrevBlock = tip.hash
++		height = tip.height + 1
++	}
++	cert := &wire.CertificateV1{
++		Hash:      header.BlockHash(),
++		ProofData: []byte{0xde, 0xad, 0xbe, 0xef, 0xca, 0xfe, 0xba, 0xbe},
++	}
++	block := btcutil.NewBlock(&wire.MsgBlock{
++		MsgHeader: wire.MsgHeader{
++			BlockHeader:    header,
++			MsgCertificate: wire.MsgCertificate{Certificate: cert},
++		},
++	})
++	block.SetHeight(height)
++	blockVsize := GetBlockVsize(block)
++	err := chain.db.Update(func(dbTx database.Tx) error {
++		if err := dbStoreBlockHeader(dbTx, &header, uint32(height)); err != nil {
++			return err
++		}
++		if err := dbStoreBlockStatus(dbTx, *block.Hash(), statusDataStored); err != nil {
++			return err
++		}
++		return dbStoreBlockVsize(dbTx, *block.Hash(), blockVsize)
++	})
++	require.NoError(err, "failed to add pruned block header to database")
++	return chain.index.Add(&header, tip, statusNone, blockVsize)
++}
++
++// TestLocateHeadersPrunedBlock ensures that a headers request whose range
++// reaches a pruned block reports an error when certificates are requested,
++// instead of silently returning no headers at all. Before the fix, the
++// failed certificate read dropped the whole batch and the caller could not
++// distinguish "this range was pruned" from "no headers after the locator".
++func TestLocateHeadersPrunedBlock(t *testing.T) {
++	require := require.New(t)
++
++	chain, teardown, err := chainSetup("testprunedheaders", &chaincfg.MainNetParams)
++	require.NoError(err)
++	t.Cleanup(teardown)
++
++	// genesis -> pruned -> 1 -> 2, with the first block after genesis in
++	// the state pruning leaves behind.
++	genesis := chain.bestChain.Genesis()
++	pruned := addPrunedNode(t, chain, genesis)
++	nodes := addNodes(t, chain, pruned, 2)
++	chain.bestChain.SetTip(tstTip(nodes))
++
++	locator := BlockLocator{&genesis.hash}
++
++	// Without certificates the batch is served in full: headers are
++	// never pruned, only the block data holding the certificates is.
++	headers, err := chain.LocateHeaders(locator, &chainhash.Hash{}, false)
++	require.NoError(err)
++	require.Len(headers, 3)
++
++	// With certificates, the first block's certificate read fails, so
++	// the request must surface the error and return no headers rather
++	// than an empty result the caller would read as "fully synced".
++	headers, err = chain.LocateHeaders(locator, &chainhash.Hash{}, true)
++	require.Error(err)
++	require.Nil(headers)
++}
++
+ // TestHeightToHashRange ensures that fetching a range of block hashes by start
+ // height and end hash works as expected.
+ func TestHeightToHashRange(t *testing.T) {
+diff --git a/node/rpcadapters.go b/node/rpcadapters.go
+index b72fc5b4..bfb8b112 100644
+--- a/node/rpcadapters.go
++++ b/node/rpcadapters.go
+@@ -285,6 +285,6 @@ func (b *rpcSyncMgr) SyncPeerID() int32 {
+ //
+ // This function is safe for concurrent access and is part of the
+ // rpcserverSyncManager interface implementation.
+-func (b *rpcSyncMgr) LocateHeaders(locators []*chainhash.Hash, hashStop *chainhash.Hash, includeCerts bool) []wire.MsgHeader {
++func (b *rpcSyncMgr) LocateHeaders(locators []*chainhash.Hash, hashStop *chainhash.Hash, includeCerts bool) ([]wire.MsgHeader, error) {
+ 	return b.server.chain.LocateHeaders(locators, hashStop, includeCerts)
+ }
+diff --git a/node/rpcserver.go b/node/rpcserver.go
+index 7a8389bc..8dd4e895 100644
+--- a/node/rpcserver.go
++++ b/node/rpcserver.go
+@@ -2288,7 +2288,13 @@ func handleGetHeaders(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
+ 			return nil, rpcDecodeHexError(c.HashStop)
+ 		}
+ 	}
+-	headers := s.cfg.SyncMgr.LocateHeaders(blockLocators, &hashStop, true)
++	headers, err := s.cfg.SyncMgr.LocateHeaders(blockLocators, &hashStop, true)
++	if err != nil {
++		return nil, &btcjson.RPCError{
++			Code:    btcjson.ErrRPCDatabase,
++			Message: "Failed to get block headers: " + err.Error(),
++		}
++	}
+ 
+ 	// Return the serialized headers (certificate + header) as hex-encoded strings.
+ 	hexBlockHeaders := make([]string, len(headers))
+@@ -4826,7 +4832,7 @@ type rpcserverSyncManager interface {
+ 	// hashes. When includeCerts is true, each returned MsgHeader includes
+ 	// both the BlockHeader and its corresponding BlockCertificate.
+ 	// When false, certificates are omitted.
+-	LocateHeaders(locators []*chainhash.Hash, hashStop *chainhash.Hash, includeCerts bool) []wire.MsgHeader
++	LocateHeaders(locators []*chainhash.Hash, hashStop *chainhash.Hash, includeCerts bool) ([]wire.MsgHeader, error)
+ }
+ 
+ // rpcserverConfig is a descriptor containing the RPC server configuration.
+diff --git a/node/server.go b/node/server.go
+index abdeaf44..56654277 100644
+--- a/node/server.go
++++ b/node/server.go
+@@ -991,7 +991,17 @@ func (sp *serverPeer) OnGetHeaders(_ *peer.Peer, msg *wire.MsgGetHeaders) {
+ 	//
+ 	// This mirrors the behavior in the reference implementation.
+ 	chain := sp.server.chain
+-	headers := chain.LocateHeaders(msg.BlockLocatorHashes, &msg.HashStop, msg.IncludeCertificates)
++	headers, err := chain.LocateHeaders(msg.BlockLocatorHashes, &msg.HashStop, msg.IncludeCertificates)
++	if err != nil {
++		// The requested range cannot be served, for example because
++		// it reaches below the prune horizon and the certificates
++		// are gone. Ignore the request rather than sending an empty
++		// headers message, which the requester would read as "you
++		// are synced" and stall on.
++		srvrLog.Debugf("Ignoring getheaders request from %s: %v",
++			sp, err)
++		return
++	}
+ 
+ 	// Send found headers to the requesting peer.
+ 	sp.QueueMessage(&wire.MsgHeaders{Headers: headers}, nil)
