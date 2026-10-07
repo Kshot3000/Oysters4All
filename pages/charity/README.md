@@ -5,7 +5,7 @@ charity's own Taproot address** — this page never holds, moves, or broadcasts
 funds. Every chain read is GET-only Blockbook; every donation happens in the
 donor's own wallet.
 
-Live: https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/charity/
+Live: https://kshot3000.github.io/Oysters4All/pages/charity/
 
 ## How it works (five steps)
 

@@ -4,7 +4,7 @@ Create beautiful printable PRL gift cards backed by real BIP-86 paper wallets,
 and redeem them with a one-click sweep. All cryptography runs locally in the
 browser — keys never leave the page.
 
-Live: https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/gift/
+Live: https://kshot3000.github.io/Oysters4All/pages/gift/
 
 ## Flow
 

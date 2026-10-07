@@ -2,7 +2,7 @@
 
 Static, zero-dependency PRL mining profitability calculator + emission
 schedule visualizer. Live at
-https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/mining/
+https://kshot3000.github.io/Oysters4All/pages/mining/
 
 ## What it does
 

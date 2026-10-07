@@ -1,6 +1,6 @@
 # Pearl Channels — Off-Chain PRL Payment Channels
 
-**Live:** https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/channels/
+**Live:** https://kshot3000.github.io/Oysters4All/pages/channels/
 **By [@kshot9000](https://x.com/kshot9000)** · PRL tips: `prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`
 
 Two parties lock PRL into a 2-of-2 Taproot output and exchange **signed commitment

@@ -6,7 +6,7 @@ BIP-86 key that controls that address, then seal the record on-chain inside a
 `prl-name` Taproot inscription envelope. Anyone can verify the binding with
 the standalone verifier — no keys, no server.
 
-Live: `https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/names/`
+Live: `https://kshot3000.github.io/Oysters4All/pages/names/`
 
 ## Protocol
 

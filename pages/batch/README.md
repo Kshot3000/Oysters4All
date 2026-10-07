@@ -5,7 +5,7 @@ recipients. Paste a manifest, fund it from the sender's UTXOs, review the
 grain-exact bill of lading, seal it with a local Schnorr signature, and
 broadcast — or run the whole thing air-gapped with an unsigned bundle.
 
-**Live:** https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/batch/
+**Live:** https://kshot3000.github.io/Oysters4All/pages/batch/
 
 ## What it does
 

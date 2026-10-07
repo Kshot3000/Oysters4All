@@ -389,7 +389,7 @@
         return location.origin + location.pathname;
       }
     } catch { /* sandboxed */ }
-    return "https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/policy/";
+    return "https://kshot3000.github.io/Oysters4All/pages/policy/";
   }
   function renderExport() {
     const has = !!blueprint;

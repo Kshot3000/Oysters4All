@@ -5,7 +5,7 @@ A paymaster's office for Pearl: validate a roster of `prl1…` payees, plan payd
 grain-exact plan, sign it in the air-gapped signer, and broadcast the signed run.
 Every payday is a **manual signed dispatch** — the app never auto-pays.
 
-Live: https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/payroll/
+Live: https://kshot3000.github.io/Oysters4All/pages/payroll/
 
 Built by [@kshot9000](https://x.com/kshot9000) · tips: `prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`
 

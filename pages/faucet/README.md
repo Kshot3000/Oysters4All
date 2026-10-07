@@ -4,7 +4,7 @@ Zero-dependency static page that requests **tPRL** (testnet Pearl) from a
 faucet backend you run yourself. Live once pushed to `main` (GitHub Pages serves
 the repo root):
 
-https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/faucet/
+https://kshot3000.github.io/Oysters4All/pages/faucet/
 
 ## What it does
 

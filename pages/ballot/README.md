@@ -1,6 +1,6 @@
 # Pearl Ballot — Off-Chain DAO Governance with Schnorr-Signed Ballots
 
-Live: https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/ballot/
+Live: https://kshot3000.github.io/Oysters4All/pages/ballot/
 
 Pearl has no smart contracts, so a vote can't be enforced on-chain.
 Pearl Ballot makes governance fair anyway: an off-chain **signed-ballot

@@ -67,7 +67,7 @@ test("gallery boots, connects, renders wall, filters, opens detail modal", async
   const errors = [];
 
   const dom = new JSDOM(html, {
-    url: "https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/gallery/",
+    url: "https://kshot3000.github.io/Oysters4All/pages/gallery/",
     runScripts: "outside-only",
   });
   window = dom.window;

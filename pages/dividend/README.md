@@ -4,7 +4,7 @@ The luminous transfer-agent / mint-hall desk for paying PRL-20 token holders:
 seal a holder snapshot, compute grain-exact distribution shares, fund, sign,
 and broadcast payouts — all in the browser, keys never leaving the page.
 
-Live: <https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/dividend/>
+Live: <https://kshot3000.github.io/Oysters4All/pages/dividend/>
 
 ## What it does
 

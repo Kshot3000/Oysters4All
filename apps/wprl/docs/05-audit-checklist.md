@@ -79,4 +79,4 @@ writing by whoever holds the admin keys at launch. No exceptions, no
 Built by **@kshot9000** · PRL:
 `prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d` · EVM
 (Base): `0x4b6f3BC697D9dAF3e8dE182aEc56eD208B9087f1` ·
-https://github.com/Kshot3000/Pearl-Muse-24-7-Ai-builder
+https://github.com/Kshot3000/Oysters4All

@@ -1,6 +1,6 @@
 # Pearl Prove — Cryptographic Proof Desk for Pearl (PRL)
 
-Live: https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/prove/
+Live: https://kshot3000.github.io/Oysters4All/pages/prove/
 
 Three tools, all 100% client-side:
 
@@ -50,6 +50,6 @@ header decode round-trip, nBits target pass/fail, proof/txid-list parsers.
 ---
 
 Built by [@kshot9000](https://x.com/kshot9000) ·
-[Pearl-Muse-24-7-Ai-builder](https://github.com/Kshot3000/Pearl-Muse-24-7-Ai-builder)
+[Oysters4All](https://github.com/Kshot3000/Oysters4All)
 
 Support the build — tip PRL: `prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`

@@ -1,6 +1,6 @@
 # Pearl Auction — Sealed-Bid PRL Auction Hall
 
-Live: https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/auction/
+Live: https://kshot3000.github.io/Oysters4All/pages/auction/
 
 Pearl has no smart contracts, so a sealed-bid auction can't be enforced on-chain.
 Pearl Auction makes it fair anyway: an off-chain **commit-reveal protocol** with a

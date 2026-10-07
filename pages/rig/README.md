@@ -5,7 +5,7 @@ electricity rate and pool fees priced against the **exact** upstream
 block-subsidy formula and the live PRL/USD market. Zero dependencies —
 plain HTML/CSS/JS, works from any static host.
 
-Live: https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/rig/
+Live: https://kshot3000.github.io/Oysters4All/pages/rig/
 
 ## What it does
 

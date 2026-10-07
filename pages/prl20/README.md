@@ -5,7 +5,7 @@ Community-built static dashboard for Pearl **PRL-20 tokens** and **Pearlscriptio
 dashboard suitable for static hosting" gap in the ecosystem survey.
 
 Live (once GitHub Pages picks it up):
-`https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/prl20/`
+`https://kshot3000.github.io/Oysters4All/pages/prl20/`
 
 ## How it works
 

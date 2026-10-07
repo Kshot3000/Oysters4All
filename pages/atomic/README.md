@@ -7,7 +7,7 @@ maker after the timeout. The other chain's leg is tracked by reference — Pearl
 has no smart contracts, so this desk structures and verifies the PRL side and
 leaves the foreign leg to whatever HTLC-capable rails the counterparty uses.
 
-Live: `https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/atomic/`
+Live: `https://kshot3000.github.io/Oysters4All/pages/atomic/`
 
 ## What it does
 

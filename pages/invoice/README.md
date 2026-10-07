@@ -5,7 +5,7 @@ compose line-item invoices, seal them into tamper-evident descriptors, share a
 `pearl:` payment QR, watch for payment on-chain (GET-only Blockbook), and issue
 hash-bound receipts — with a standalone verifier anyone can use.
 
-Live: https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/invoice/
+Live: https://kshot3000.github.io/Oysters4All/pages/invoice/
 
 ## The flow
 

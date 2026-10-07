@@ -5,7 +5,7 @@ prefix, light the forge across up to 8 CPU threads (Web Workers), and claim a
 real keypair whose address opens with `prl1p` + your prefix. Keys never leave
 the page.
 
-Live: https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/vanity/
+Live: https://kshot3000.github.io/Oysters4All/pages/vanity/
 
 ## The model
 

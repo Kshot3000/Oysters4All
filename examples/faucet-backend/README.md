@@ -5,7 +5,7 @@ Zero-dependency Node.js backend for the static faucet frontend at
 own funded **Oyster** wallet on the Pearl testnet.
 
 Live frontend (after push to `main`):
-https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/faucet/
+https://kshot3000.github.io/Oysters4All/pages/faucet/
 
 ## How it works
 

@@ -5,7 +5,7 @@ Pearl has no smart contracts, so the option is a two-leaf script tree — the
 script enforces **collateral routing only**; everything economic is verified
 off-chain and stated honestly.
 
-Live: `https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/hedge/`
+Live: `https://kshot3000.github.io/Oysters4All/pages/hedge/`
 
 ## How it works
 

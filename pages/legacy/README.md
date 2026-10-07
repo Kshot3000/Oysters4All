@@ -1,6 +1,6 @@
 # Pearl Legacy — PRL Inheritance Vault (Dead-Man's Switch)
 
-Live: https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/legacy/
+Live: https://kshot3000.github.io/Oysters4All/pages/legacy/
 
 Pearl has no smart contracts, so an inheritance vault can't be enforced by
 on-chain code. Pearl Legacy enforces it with pure Bitcoin-style Taproot

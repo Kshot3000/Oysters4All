@@ -4,7 +4,7 @@ Seal any document's SHA-256 fingerprint into the Pearl blockchain with a
 Taproot inscription. Later, anyone can re-hash the document and verify it
 against the on-chain envelope — the chain is the witness.
 
-Live: https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/notary/
+Live: https://kshot3000.github.io/Oysters4All/pages/notary/
 
 ## How it works
 

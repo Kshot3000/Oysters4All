@@ -5,10 +5,10 @@ alert rules on incoming payments, balance crossings and confirmation
 milestones, and track any txid's confirmation progress. **Read-only — this
 page never asks for keys, seeds, or passwords.**
 
-Part of the [Pearl builder hub](https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/)
+Part of the [Pearl builder hub](https://kshot3000.github.io/Oysters4All/)
 lineup. Built by [@kshot9000](https://x.com/kshot9000).
 
-**Live:** https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/watch/
+**Live:** https://kshot3000.github.io/Oysters4All/pages/watch/
 
 ## What it does
 

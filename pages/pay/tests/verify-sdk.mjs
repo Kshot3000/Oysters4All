@@ -69,7 +69,7 @@ const cases = [
   ["30 bytes", "abcdefghij0123456789ABCDEFGHIJ"],
   ["60 bytes", "x".repeat(60)],
   ["100 bytes", "y".repeat(100)],
-  ["invoice url", "https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/pay/invoice.html?inv=" + "A".repeat(86)],
+  ["invoice url", "https://kshot3000.github.io/Oysters4All/pages/pay/invoice.html?inv=" + "A".repeat(86)],
   ["213 bytes max", "z".repeat(213)],
 ];
 

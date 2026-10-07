@@ -100,12 +100,12 @@ serves the repo root as-is.
 ## Publish / update
 
 GitHub Pages is configured on
-[`Kshot3000/Pearl-Muse-24-7-Ai-builder`](https://github.com/Kshot3000/Pearl-Muse-24-7-Ai-builder)
+[`Kshot3000/Oysters4All`](https://github.com/Kshot3000/Oysters4All)
 with source **branch `main`, path `/`** (the only paths the Pages API allows
 are `/` and `/docs`). Any push to `main` redeploys automatically — usually live
 within a minute at:
 
-https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/
+https://kshot3000.github.io/Oysters4All/
 
 ## Local preview
 

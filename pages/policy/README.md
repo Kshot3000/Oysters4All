@@ -5,7 +5,7 @@ templates, get the real P2TR address and spend-ready per-leaf control blocks,
 verify any descriptor standalone, export it all. Fully offline — zero network
 requests.
 
-Live: `https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/policy/`
+Live: `https://kshot3000.github.io/Oysters4All/pages/policy/`
 
 ## How it works
 

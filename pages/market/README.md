@@ -4,7 +4,7 @@ The trading venue for PRL-20 tokens on the Pearl blockchain. Sellers list
 **transfer lots** (inscription UTXOs); buyers fill them with **atomic swaps**.
 No escrow, no custody, no middlemen.
 
-Live: <https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/market/>
+Live: <https://kshot3000.github.io/Oysters4All/pages/market/>
 
 ## How it works
 

@@ -3,7 +3,7 @@
 A zero-dependency static block explorer for Pearl (PRL) that talks directly to a
 `pearld` JSON-RPC endpoint. No server, no build step.
 
-- Live at: https://kshot9000.github.io/Pearl-Muse-24-7-Ai-builder/pages/explorer/
+- Live at: https://kshot9000.github.io/Oysters4All/pages/explorer/
   (GitHub Pages serves this repo's root; `pages/` is a static subdirectory)
 - Source: `pages/explorer/` — `index.html`, `styles.css`, `app.js`
 

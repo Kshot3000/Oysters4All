@@ -5,7 +5,7 @@ blockchain. A 5-step wizard — **Compose → Key → Commit → Reveal → Done
 builds the Taproot commit/reveal transaction pair, signs both legs locally,
 and broadcasts. Your key never leaves the page.
 
-Live: https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/etch/
+Live: https://kshot3000.github.io/Oysters4All/pages/etch/
 
 ## How it works
 

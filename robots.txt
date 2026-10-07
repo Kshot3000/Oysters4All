@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/sitemap.xml
+Sitemap: https://kshot3000.github.io/Oysters4All/sitemap.xml

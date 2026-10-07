@@ -6,7 +6,7 @@ audio and video — fetched live from a public
 [Pearlscriptions indexer API](https://github.com/Pearlscriptions/indexer)
 (`GET`-only, read-only) that you point the gallery at.
 
-Live: https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/gallery/
+Live: https://kshot3000.github.io/Oysters4All/pages/gallery/
 
 ## Views
 

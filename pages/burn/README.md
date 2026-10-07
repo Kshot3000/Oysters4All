@@ -5,7 +5,7 @@ burn transaction, seal a tamper-evident burn certificate, and verify past
 burns — on the certificate math alone (offline) or against Blockbook
 (GET-only) for on-chain confirmation.
 
-Live: `https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/burn/`
+Live: `https://kshot3000.github.io/Oysters4All/pages/burn/`
 
 ## How a burn is provable
 

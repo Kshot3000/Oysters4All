@@ -4,7 +4,7 @@
  * no build step, no bundler. Renders payment buttons + checkout modals and
  * verifies payments against any Blockbook-compatible backend.
  *
- *   <script src="https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/pay/pearl-pay.js"></script>
+ *   <script src="https://kshot3000.github.io/Oysters4All/pages/pay/pearl-pay.js"></script>
  *   <script>
  *     PearlPay.createButton(document.getElementById('pay'), {
  *       address: 'prl1p…',          // fresh invoice address (derive per order!)

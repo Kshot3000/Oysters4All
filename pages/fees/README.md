@@ -1,6 +1,6 @@
 # Pearl Fees — the fee-rate desk for PRL
 
-**Live:** https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/fees/
+**Live:** https://kshot3000.github.io/Oysters4All/pages/fees/
 
 The fee-rate desk for Pearl (PRL). Connect your own `pearld` node's RPC and it
 reads the live mempool, ranks every transaction by **grains per vbyte**, and

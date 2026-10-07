@@ -6,7 +6,7 @@ exactly like a single-key Taproot payment — no scripts, no on-chain marker
 that the key is shared. Distinct from Pearl Quorum (script-path multisig);
 Mesh is pure keypath MuSig2.
 
-Live: `https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/mesh/`
+Live: `https://kshot3000.github.io/Oysters4All/pages/mesh/`
 
 ## How it works
 

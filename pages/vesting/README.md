@@ -5,7 +5,7 @@ tranches, each with its own Taproot address and an absolute `OP_CHECKLOCKTIMEVER
 claim leaf. No smart contracts (Pearl has none) — pure Taproot script trees,
 signed locally in the browser.
 
-Live: `https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/vesting/`
+Live: `https://kshot3000.github.io/Oysters4All/pages/vesting/`
 
 ## How it works
 

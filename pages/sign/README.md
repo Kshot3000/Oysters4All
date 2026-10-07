@@ -2,7 +2,7 @@
 
 A five-step workbench for Pearl (PRL) Taproot transactions: **Key → Coins → Build → Sign → Broadcast**.
 
-Live: https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/sign/
+Live: https://kshot3000.github.io/Oysters4All/pages/sign/
 
 ## What it does
 

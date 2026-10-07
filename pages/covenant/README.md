@@ -3,7 +3,7 @@
 Forge **m-of-n Taproot multisig vaults** on Pearl and coordinate cosigner signing
 rounds — fully client-side, no backend, no custody, no smart contracts (Pearl has none).
 
-**Live:** https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/covenant/
+**Live:** https://kshot3000.github.io/Oysters4All/pages/covenant/
 
 ## How it works
 

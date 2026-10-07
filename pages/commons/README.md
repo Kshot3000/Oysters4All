@@ -1,6 +1,6 @@
 # Pearl Commons — quadratic funding rounds for PRL
 
-**Live:** https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/commons/
+**Live:** https://kshot3000.github.io/Oysters4All/pages/commons/
 
 The quadratic funding desk for the Pearl ecosystem (commons-hearth theme: deep
 walnut, candlelight amber, parchment). Run a funding round with a fixed PRL

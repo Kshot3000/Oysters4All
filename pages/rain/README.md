@@ -5,7 +5,7 @@ airdrop tool for Pearl. Paste a funder key, paste a recipient list, plan the
 exact fee, sign locally, broadcast once. All cryptography runs locally in the
 browser — keys never leave the page.
 
-Live: https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/rain/
+Live: https://kshot3000.github.io/Oysters4All/pages/rain/
 
 ## Flow
 

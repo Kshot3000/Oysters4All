@@ -4,7 +4,7 @@ Read-only PRL tax bookkeeping: import your transaction history, classify every
 movement, supply your own PRL/USD prices, and get a grain-exact FIFO
 capital-gains report with CSV/JSON export.
 
-**Live:** https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/tax/
+**Live:** https://kshot3000.github.io/Oysters4All/pages/tax/
 
 ## What it does
 

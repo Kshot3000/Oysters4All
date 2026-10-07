@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name:       Pearl Gateway for WooCommerce
- * Plugin URI:        https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/pay/
+ * Plugin URI:        https://kshot3000.github.io/Oysters4All/pages/pay/
  * Description:       Accept Pearl (PRL) payments in WooCommerce. Each order gets a fresh BIP-86 Taproot address from your pre-generated pool; payments are verified live against Blockbook before orders are marked paid. No custody, no server, keys never touch WordPress.
  * Version:           1.0.0
  * Requires at least: 6.0

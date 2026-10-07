@@ -7,7 +7,7 @@ tamper-evident signature bundles — and broadcast with a double-confirm gate.
 No smart contracts. No servers. Keys never leave the page, and the key field is wiped
 after every signing.
 
-**Live:** https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/quorum/
+**Live:** https://kshot3000.github.io/Oysters4All/pages/quorum/
 
 ## The six steps
 

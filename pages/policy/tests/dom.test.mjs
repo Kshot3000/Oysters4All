@@ -324,7 +324,7 @@ test("export: json, markdown, share URL carry the blueprint", () => {
   assert.equal(j.address, PIN_ADDRESS);
   assert.equal(j.leaves.length, 3);
   assert.ok($("x-md").value.includes(PIN_ADDRESS) && $("x-md").value.includes("## Honest limits"));
-  assert.ok($("x-share").value.startsWith("https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/policy/#p="),
+  assert.ok($("x-share").value.startsWith("https://kshot3000.github.io/Oysters4All/pages/policy/#p="),
     "share url: " + $("x-share").value.slice(0, 80));
   assert.ok($("x-share").value.includes(encodeURIComponent(PIN_DESCRIPTOR).slice(0, 40)));
   assert.deepEqual(errors, [], "console errors: " + errors.join(" | "));

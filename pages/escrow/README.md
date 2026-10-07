@@ -3,7 +3,7 @@
 Bonded 2-of-3 escrow on Pearl's Taproot rails — buyer, seller, and arbiter
 agree on release; the buyer keeps a timelocked refund path if the deal dies.
 
-**Live:** `pages/escrow/` · [Pearl Escrow](https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/escrow/)
+**Live:** `pages/escrow/` · [Pearl Escrow](https://kshot3000.github.io/Oysters4All/pages/escrow/)
 
 ## The contract
 

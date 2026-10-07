@@ -25,7 +25,7 @@ Support Pearl development: `prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlx
 
 1. Upload the `pearl-gateway-for-woocommerce` folder to `/wp-content/plugins/` and activate it (or install the zip via Plugins → Add New → Upload).
 2. Go to **WooCommerce → Settings → Payments** and enable **Pearl (PRL)**.
-3. Generate receive addresses with any BIP-86 Pearl wallet (the [Pearl Pay toolkit](https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/pay/) can do this) and paste one per line into **Address pool**. Your seed/private keys never leave your wallet.
+3. Generate receive addresses with any BIP-86 Pearl wallet (the [Pearl Pay toolkit](https://kshot3000.github.io/Oysters4All/pages/pay/) can do this) and paste one per line into **Address pool**. Your seed/private keys never leave your wallet.
 4. Set the **PRL rate** (manual rate always works; CoinGecko auto mode works for USD stores with manual fallback).
 5. Choose **required confirmations** (2 recommended) and the **payment window**.
 

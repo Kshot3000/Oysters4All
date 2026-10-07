@@ -5,7 +5,7 @@ party, chalk up expenses, compute the minimal settlement transfers, have
 each debtor sign their own payment locally, and record it all in a
 local ledger book. Keys never leave the page.
 
-Live: <https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/split/>
+Live: <https://kshot3000.github.io/Oysters4All/pages/split/>
 
 ## What it does
 

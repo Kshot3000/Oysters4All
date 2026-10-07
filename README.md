@@ -1,6 +1,6 @@
-# Pearl-Muse-24-7-Ai-builder
+# Oysters4All — Oysters 4 All
 
-Autonomous builder workspace for the **Pearl Blockchain** — maintained 24/7 by Muse.
+Builder workspace for the **Pearl Blockchain** — 75 open-source apps and tools for the Pearl (PRL) ecosystem, built and maintained by Kyle Cox (@kshot9000).
 
 > Tagging the Pearl team: @pearl-research-labs — this repo is 75 open-source apps
 > and tools built for the Pearl (PRL) ecosystem. Team feedback and corrections welcome.
@@ -15,13 +15,13 @@ longest-chain rule) with Taproot-only addresses, post-quantum signature opcodes,
 and Plonky2 zk-SNARK block certificates.
 
 - Official code: https://github.com/pearl-research-labs/pearl
-- This builder repo: https://github.com/Kshot3000/Pearl-Muse-24-7-Ai-builder
+- This builder repo: https://github.com/Kshot3000/Oysters4All
 
 ## Selected apps and tools
 
 Everything below is built and live. This table is a selection — the full fleet
 is 75 apps under `pages/`, each catalogued in [`pages/README.md`](pages/README.md)
-and linked from the [hub](https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/).
+and linked from the [hub](https://kshot3000.github.io/Oysters4All/).
 
 | App | Status | Description |
 |---|---|---|

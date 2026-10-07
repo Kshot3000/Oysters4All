@@ -4,7 +4,7 @@ The tidal refinery: analyze a Pearl Taproot address's UTXO health, plan a
 dust/uneconomic-UTXO consolidation with grain-exact fee math, sign it locally,
 track the consolidation, and prove the sweep worked.
 
-**Live:** https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/sweep/
+**Live:** https://kshot3000.github.io/Oysters4All/pages/sweep/
 
 ## The five steps
 

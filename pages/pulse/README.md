@@ -1,10 +1,10 @@
 # Pearl Pulse — Live PRL Portfolio & Network Dashboard
 
 Watch-only, read-only Pearl (PRL) portfolio tracker + live network dashboard.
-Part of the [Pearl builder hub](https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/)
+Part of the [Pearl builder hub](https://kshot3000.github.io/Oysters4All/)
 lineup (Token Studio · Pearl Pay · Pearl Foundry · Pearl Vault · Pearl Bazaar · **Pulse**).
 
-**Live:** https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/pulse/
+**Live:** https://kshot3000.github.io/Oysters4All/pages/pulse/
 
 ## What it does
 

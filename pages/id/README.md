@@ -1,6 +1,6 @@
 # Pearl ID — Sign-in with Pearl
 
-Live: https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/id/
+Live: https://kshot3000.github.io/Oysters4All/pages/id/
 
 Pearl has no accounts, usernames, or OAuth — so Pearl ID makes your
 **BIP-86 key the account**. A relying party (any site or app) shows you a

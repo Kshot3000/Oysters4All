@@ -6,7 +6,7 @@ heirs** can claim only at/after an **unlock block** (CLTV-gated, enforced by
 consensus). No smart contracts — pure Pearl Taproot, like everything in this
 family.
 
-Live: `https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/will/`
+Live: `https://kshot3000.github.io/Oysters4All/pages/will/`
 
 ## How it works
 

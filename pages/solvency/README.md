@@ -1,6 +1,6 @@
 # Pearl Solvency — Proof-of-Reserves Desk for PRL
 
-Live: https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/solvency/
+Live: https://kshot3000.github.io/Oysters4All/pages/solvency/
 
 Pearl has no smart contracts, so a proof of reserves can't be enforced on-chain.
 Pearl Solvency enforces it the only way that works without contracts: a

@@ -4,7 +4,7 @@ Read-only mission-control console for your own `pearld` node: chain status,
 peer table, mempool depth, and mining telemetry over JSON-RPC. No build step —
 open `index.html` directly or serve the folder.
 
-**Live:** https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/node/
+**Live:** https://kshot3000.github.io/Oysters4All/pages/node/
 
 ## What it does
 

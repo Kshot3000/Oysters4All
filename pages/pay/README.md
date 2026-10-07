@@ -6,7 +6,7 @@ gets a **fresh BIP-86 Taproot address** derived from your account xpub — your
 keys never leave your wallet, and this page never sees them. Payments are
 verified live against Blockbook.
 
-**Live:** https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/pay/
+**Live:** https://kshot3000.github.io/Oysters4All/pages/pay/
 
 No build step, no server. Open `index.html` directly (`file://`) or serve the
 directory; it works as-is on GitHub Pages.
@@ -33,7 +33,7 @@ payment flow with no chain activity.
 Drop the SDK on any page — one `<script>` tag, no bundler:
 
 ```html
-<script src="https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/pay/pearl-pay.js"></script>
+<script src="https://kshot3000.github.io/Oysters4All/pages/pay/pearl-pay.js"></script>
 <script>
   PearlPay.createButton(document.getElementById('pay'), {
     address: 'prl1p…',          // derive a FRESH address per order (see below)

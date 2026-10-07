@@ -1,6 +1,6 @@
 # Pearl PSBT — the Taproot PSBT signing workbench
 
-**Live:** https://kshot3000.github.io/Pearl-Muse-24-7-Ai-builder/pages/psbt/
+**Live:** https://kshot3000.github.io/Oysters4All/pages/psbt/
 
 A six-tab, client-side desk for the full PSBT lifecycle on Pearl's Taproot
 rails: **Create → Inspect → Sign → Combine → Finalize → Method**.
