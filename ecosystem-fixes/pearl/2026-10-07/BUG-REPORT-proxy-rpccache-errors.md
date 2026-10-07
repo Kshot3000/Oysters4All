@@ -30,3 +30,26 @@
 - Issue #146 (empty zk-pow README / missing dnsseed README / stale pearl-website refs): still live in the tree, but fully covered by open PRs #147 (the issue author's own), #158 and #160 — a duplicate PR would be spam. Skipped.
 - Issue #347 (wPRL): still 0 comments — no Pearl-team reply to report.
 - `go test ./spv/...`: all packages PASS at master.
+
+## Follow-up (same PR #377, commit 1ef9c76c, 2026-10-07 ~10:13 CDT run)
+
+Sibling defect in the same handler, found by auditing what else the
+recorder captured but the serve path discarded:
+
+- `fetchFromUpstream` recorded the upstream status code, but
+  `ServeHTTP`/`writeCachedResponse` unconditionally answered HTTP 200. A
+  non-200 upstream response for a cacheable method — operationally, the
+  `reverse_proxy` 502 with a plain-text body while pearld restarts — was
+  rewritten to **200 OK** with the non-JSON body labelled
+  `application/json`. Miners and health checks saw a successful call
+  during an outage.
+- RED: `TestUpstreamErrorStatusPreserved` against the #377 head —
+  backend returns 502 "upstream unavailable", client got HTTP 200.
+- Fix: `cacheEntry` carries the upstream `statusCode` + `contentType`;
+  `writeCachedResponse` replays non-200 responses verbatim (no ID
+  rewrite). Non-200 responses were already never stored, so cache hits
+  are unaffected; the regression test also asserts the next request
+  retries upstream and succeeds.
+- GREEN: full package suite PASS, `-race` clean on the cache tests,
+  `go vet`/`gofmt` clean. Patch: `fix-pearl-proxy-rpccache-status.patch`.
+  PR comment: https://github.com/pearl-research-labs/pearl/pull/377#issuecomment-6040928586

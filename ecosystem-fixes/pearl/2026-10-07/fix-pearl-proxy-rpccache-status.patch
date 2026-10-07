@@ -1,0 +1,127 @@
+From 1ef9c76c4cd06f01a77956a8fd0fea9094fee357 Mon Sep 17 00:00:00 2001
+From: Kshot3000 <kshot9000@gmail.com>
+Date: Wed, 7 Oct 2026 15:19:20 +0000
+Subject: [PATCH] fix(proxy): replay non-200 upstream responses verbatim
+ instead of rewriting to 200
+
+fetchFromUpstream captured the upstream status code but ServeHTTP
+discarded it: writeCachedResponse always answered HTTP 200. A
+reverse_proxy 502 while pearld restarts (plain-text 'upstream
+unavailable') reached miners and health checks as a 200 with the
+non-JSON body labelled application/json.
+
+cacheEntry now records the upstream status and Content-Type, and
+writeCachedResponse replays non-200 responses verbatim. Non-200
+responses were already never stored, so cache hits are unaffected.
+Regression test TestUpstreamErrorStatusPreserved (red before, green
+after); full package suite + race clean.
+---
+ proxy/caddy-jsonrpc-cache/handler.go      | 29 ++++++++++++++--
+ proxy/caddy-jsonrpc-cache/handler_test.go | 40 +++++++++++++++++++++++
+ 2 files changed, 66 insertions(+), 3 deletions(-)
+
+diff --git a/proxy/caddy-jsonrpc-cache/handler.go b/proxy/caddy-jsonrpc-cache/handler.go
+index b9335cf0..7126b03c 100644
+--- a/proxy/caddy-jsonrpc-cache/handler.go
++++ b/proxy/caddy-jsonrpc-cache/handler.go
+@@ -131,9 +131,11 @@ func (h Handler) fetchFromUpstream(r *http.Request, body []byte, next caddyhttp.
+ 	}
+ 
+ 	entry := &cacheEntry{
+-		body:     rec.body.Bytes(),
+-		storedAt: time.Now(),
+-		ttl:      ttl,
++		body:        rec.body.Bytes(),
++		storedAt:    time.Now(),
++		ttl:         ttl,
++		statusCode:  rec.statusCode,
++		contentType: rec.Header().Get("Content-Type"),
+ 	}
+ 
+ 	if rec.statusCode == http.StatusOK && !isJSONRPCError(entry.body) {
+@@ -193,6 +195,13 @@ type cacheEntry struct {
+ 	body     []byte
+ 	storedAt time.Time
+ 	ttl      time.Duration
++	// statusCode and contentType record the upstream response's status and
++	// Content-Type so a non-200 response can be replayed verbatim instead
++	// of being rewritten as a 200 (see writeCachedResponse). Only 200
++	// responses are ever stored in the cache, so cache hits always carry
++	// statusCode == http.StatusOK.
++	statusCode  int
++	contentType string
+ }
+ 
+ func (e *cacheEntry) fresh() bool {
+@@ -212,6 +221,20 @@ type jsonrpcResponse struct {
+ }
+ 
+ func writeCachedResponse(w http.ResponseWriter, entry *cacheEntry, requestID json.RawMessage, hit bool) error {
++	// A non-200 upstream response is not a JSON-RPC success payload: replay
++	// it verbatim (status, Content-Type, body) instead of forcing HTTP 200.
++	// Rewriting e.g. a reverse_proxy 502 ("upstream unavailable", plain
++	// text) into a 200 would tell miners and health checks the call
++	// succeeded and hand them a non-JSON body labelled application/json.
++	if entry.statusCode != 0 && entry.statusCode != http.StatusOK {
++		if entry.contentType != "" {
++			w.Header().Set("Content-Type", entry.contentType)
++		}
++		w.WriteHeader(entry.statusCode)
++		_, writeErr := w.Write(entry.body)
++		return writeErr
++	}
++
+ 	var resp jsonrpcResponse
+ 	if err := json.Unmarshal(entry.body, &resp); err != nil {
+ 		w.Header().Set("Content-Type", "application/json")
+diff --git a/proxy/caddy-jsonrpc-cache/handler_test.go b/proxy/caddy-jsonrpc-cache/handler_test.go
+index 6a6c36fa..7ae9d463 100644
+--- a/proxy/caddy-jsonrpc-cache/handler_test.go
++++ b/proxy/caddy-jsonrpc-cache/handler_test.go
+@@ -264,3 +264,43 @@ func TestGETRequestsPassthrough(t *testing.T) {
+ 	require.NoError(t, err)
+ 	assert.Equal(t, int64(1), backendCalls.Load(), "GET requests should pass through")
+ }
++
++// TestUpstreamErrorStatusPreserved: when the upstream answers a cacheable
++// method with a non-200 status (e.g. reverse_proxy returns 502 with a
++// plain-text body while pearld restarts), the middleware must replay that
++// status and body verbatim. Forcing HTTP 200 would tell miners and health
++// checks the call succeeded and hand them a non-JSON body labelled
++// application/json. The response must still not be cached: the next
++// request retries upstream.
++func TestUpstreamErrorStatusPreserved(t *testing.T) {
++	var calls atomic.Int64
++	backend := caddyhttp.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
++		n := calls.Add(1)
++		_, _ = io.ReadAll(r.Body)
++		if n == 1 {
++			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
++			w.WriteHeader(http.StatusBadGateway)
++			_, _ = w.Write([]byte("upstream unavailable"))
++			return nil
++		}
++		resp := jsonrpcResponse{
++			JSONRPC: "2.0",
++			Result:  json.RawMessage(`{"capabilities":{}}`),
++		}
++		out, _ := json.Marshal(resp)
++		w.Header().Set("Content-Type", "application/json")
++		_, _ = w.Write(out)
++		return nil
++	})
++
++	h := newTestHandler(CacheRule{Method: "getblocktemplate", TTL: caddy.Duration(5 * time.Second)})
++
++	w1 := doRequest(t, h, backend, "getblocktemplate", 1)
++	assert.Equal(t, http.StatusBadGateway, w1.Code, "upstream 502 must not be rewritten to 200")
++	assert.Equal(t, "upstream unavailable", w1.Body.String())
++	assert.Contains(t, w1.Header().Get("Content-Type"), "text/plain")
++
++	w2 := doRequest(t, h, backend, "getblocktemplate", 2)
++	assert.Equal(t, int64(2), calls.Load(), "non-200 response must not be cached")
++	assert.Equal(t, http.StatusOK, w2.Code)
++}
+-- 
+2.43.0
+
