@@ -1,0 +1,283 @@
+From da94f11a16a3b4fd439cd1c80dcde6123341d9e5 Mon Sep 17 00:00:00 2001
+From: Kshot3000 <kshot9000@gmail.com>
+Date: Wed, 7 Oct 2026 18:40:04 +0000
+Subject: [PATCH] fix(pearl-gateway): ZKCertificate.deserialize must reject
+ truncated and length-lying wire data
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Python slicing silently shortens, so deserialize accepted certificates
+whose declared proof_data_len / public_data_len exceeded the bytes
+actually present, returning a different, shorter certificate (and
+re-serializing it changed the blob). The Go wire readers this format
+mirrors (node/wire/certificate_v1.go, certificate_v2.go) read exactly
+the declared lengths with io.ReadFull and reject proofLen >
+MaxZKProofSize (60000) and publicDataLen > PublicDataMaxSizeV2 (4807).
+
+- deserialize: validate every declared length against len(data) for
+  both the dense (v1) and MoE/V3 layouts, enforce both caps, and
+  reject too-short inputs with ValueError. Trailing bytes still
+  tolerated (stream semantics).
+- __post_init__: dense public data must be exactly PUBLICDATA_SIZE —
+  the fixed-size numpy field otherwise zero-pads or truncates it while
+  get_proof_commitment hashes the original bytes, producing a wire
+  certificate that disagrees with its own commitment; MoE/V3 public
+  data is capped at 4807, matching Go.
+- tests/test_zk_certificate.py: truncation, lying-length, oversized,
+  and round-trip coverage (no deserialize tests existed before).
+---
+ .../blockchain_utils/zk_certificate.py        |  78 +++++++++++-
+ .../tests/test_zk_certificate.py              | 120 ++++++++++++++++++
+ 2 files changed, 197 insertions(+), 1 deletion(-)
+ create mode 100644 miner/pearl-gateway/tests/test_zk_certificate.py
+
+diff --git a/miner/pearl-gateway/src/pearl_gateway/blockchain_utils/zk_certificate.py b/miner/pearl-gateway/src/pearl_gateway/blockchain_utils/zk_certificate.py
+index 53820ae3..e7596a2b 100644
+--- a/miner/pearl-gateway/src/pearl_gateway/blockchain_utils/zk_certificate.py
++++ b/miner/pearl-gateway/src/pearl_gateway/blockchain_utils/zk_certificate.py
+@@ -57,6 +57,8 @@ class ZKCertificate:
+     cert_version: CertificateVersion = field(default=CertificateVersion.ZK_DENSE)
+ 
+     ZK_MAX_PROOF_DATA_SIZE: ClassVar[int] = 60000
++    # Keep in sync with Go wire.PublicDataMaxSizeV2 (V2/V3 public data cap).
++    ZK_MAX_PUBLIC_DATA_SIZE_V2: ClassVar[int] = 4807
+ 
+     def __post_init__(self) -> None:
+         if len(self.proof.proof_data) > self.ZK_MAX_PROOF_DATA_SIZE:
+@@ -64,6 +66,22 @@ class ZKCertificate:
+                 f"Proof data is too large: {len(self.proof.proof_data)} bytes "
+                 f"(max {self.ZK_MAX_PROOF_DATA_SIZE} bytes)"
+             )
++        public_data_len = len(self.proof.public_data)
++        if self.cert_version == CertificateVersion.ZK_DENSE:
++            # The dense wire format has a fixed-size public data field;
++            # numpy would otherwise silently zero-pad or truncate it,
++            # and the proof commitment (hashed over the original bytes)
++            # would no longer match the serialized certificate.
++            if public_data_len != PUBLICDATA_SIZE:
++                raise ValueError(
++                    f"Dense public data must be exactly {PUBLICDATA_SIZE} bytes, "
++                    f"got {public_data_len} bytes"
++                )
++        elif public_data_len > self.ZK_MAX_PUBLIC_DATA_SIZE_V2:
++            raise ValueError(
++                f"Public data is too large: {public_data_len} bytes "
++                f"(max {self.ZK_MAX_PUBLIC_DATA_SIZE_V2} bytes)"
++            )
+ 
+     def serialize(self) -> bytes:
+         """Serialize to the wire format expected by the Go node.
+@@ -99,24 +117,82 @@ class ZKCertificate:
+ 
+     @classmethod
+     def deserialize(cls, data: bytes) -> "ZKCertificate":
+-        """Deserialize from raw wire bytes (version-first dispatch)."""
++        """Deserialize from raw wire bytes (version-first dispatch).
++
++        Every declared length is checked against the bytes actually
++        present, mirroring the Go node's wire readers (io.ReadFull plus
++        the MaxZKProofSize / PublicDataMaxSizeV2 caps in
++        node/wire/certificate_v1.go and certificate_v2.go). Python
++        slicing silently shortens, so without these checks a truncated
++        or length-lying blob would deserialize into a different, shorter
++        certificate instead of failing. Trailing bytes beyond the
++        certificate are left alone, as with a stream reader.
++        """
++        if len(data) < _CERT_VERSION_SIZE:
++            raise ValueError(
++                f"Certificate data too short: {len(data)} bytes "
++                f"(need at least {_CERT_VERSION_SIZE} for the version)"
++            )
+         (raw_version,) = struct.unpack_from("<I", data, 0)
+         cert_version = CertificateVersion(raw_version)
+ 
+         if cert_version == CertificateVersion.ZK_DENSE:
++            if len(data) < _DENSE_DTYPE.itemsize:
++                raise ValueError(
++                    f"Dense certificate data too short: {len(data)} bytes "
++                    f"(need at least {_DENSE_DTYPE.itemsize} for the header)"
++                )
+             arr = np.frombuffer(data, dtype=_DENSE_DTYPE, count=1)[0]
+             header_hash = bytes(arr["header_hash"])
+             public_data = bytes(arr["public_data"])
+             proof_data_len = int(arr["proof_data_len"])
++            if proof_data_len > cls.ZK_MAX_PROOF_DATA_SIZE:
++                raise ValueError(
++                    f"Proof data is too large: {proof_data_len} bytes "
++                    f"(max {cls.ZK_MAX_PROOF_DATA_SIZE} bytes)"
++                )
++            if _DENSE_DTYPE.itemsize + proof_data_len > len(data):
++                raise ValueError(
++                    f"Dense certificate truncated: declares {proof_data_len} "
++                    f"proof bytes but only "
++                    f"{len(data) - _DENSE_DTYPE.itemsize} are present"
++                )
+             proof_data = data[_DENSE_DTYPE.itemsize : _DENSE_DTYPE.itemsize + proof_data_len]
+         elif cert_version in (CertificateVersion.ZK_MOE, CertificateVersion.ZK_V3):
++            if len(data) < _MOE_PREAMBLE_DTYPE.itemsize:
++                raise ValueError(
++                    f"MoE certificate data too short: {len(data)} bytes "
++                    f"(need at least {_MOE_PREAMBLE_DTYPE.itemsize} "
++                    f"for the preamble)"
++                )
+             arr = np.frombuffer(data, dtype=_MOE_PREAMBLE_DTYPE, count=1)[0]
+             header_hash = bytes(arr["header_hash"])
+             pd_len = int(arr["public_data_len"])
++            if pd_len > cls.ZK_MAX_PUBLIC_DATA_SIZE_V2:
++                raise ValueError(
++                    f"Public data is too large: {pd_len} bytes "
++                    f"(max {cls.ZK_MAX_PUBLIC_DATA_SIZE_V2} bytes)"
++                )
+             pd_start = _MOE_PREAMBLE_DTYPE.itemsize
+             pd_end = pd_start + pd_len
++            if pd_end + _PROOF_DATA_LEN_SIZE > len(data):
++                raise ValueError(
++                    f"MoE certificate truncated: declares {pd_len} public "
++                    f"bytes but only {len(data) - pd_start} bytes remain"
++                )
+             public_data = data[pd_start:pd_end]
+             (proof_data_len,) = struct.unpack_from("<I", data, pd_end)
++            if proof_data_len > cls.ZK_MAX_PROOF_DATA_SIZE:
++                raise ValueError(
++                    f"Proof data is too large: {proof_data_len} bytes "
++                    f"(max {cls.ZK_MAX_PROOF_DATA_SIZE} bytes)"
++                )
++            if pd_end + _PROOF_DATA_LEN_SIZE + proof_data_len > len(data):
++                raise ValueError(
++                    f"MoE certificate truncated: declares {proof_data_len} "
++                    f"proof bytes but only "
++                    f"{len(data) - pd_end - _PROOF_DATA_LEN_SIZE} are present"
++                )
+             proof_data = data[
+                 pd_end + _PROOF_DATA_LEN_SIZE : pd_end + _PROOF_DATA_LEN_SIZE + proof_data_len
+             ]
+diff --git a/miner/pearl-gateway/tests/test_zk_certificate.py b/miner/pearl-gateway/tests/test_zk_certificate.py
+new file mode 100644
+index 00000000..b0355106
+--- /dev/null
++++ b/miner/pearl-gateway/tests/test_zk_certificate.py
+@@ -0,0 +1,120 @@
++"""
++Tests for ZKCertificate wire-format length validation.
++
++The Go node's wire readers (node/wire/certificate_v1.go and
++certificate_v2.go) read exactly the declared number of bytes and error
++on short input, and reject proof_data_len > MaxZKProofSize (60000) and
++public_data_len > PublicDataMaxSizeV2 (4807). The gateway's deserialize
++must do the same: Python slicing silently shortens, so without explicit
++checks a truncated or length-lying blob deserializes into a different,
++shorter certificate instead of failing.
++"""
++
++import struct
++
++import pytest
++from pearl_mining import PUBLICDATA_SIZE, ZKProof
++
++from pearl_gateway.blockchain_utils.zk_certificate import (
++    CertificateVersion,
++    ZKCertificate,
++)
++
++_DENSE_HEADER_SIZE = 4 + 32 + PUBLICDATA_SIZE  # version | hash | public data
++
++
++def _cert(version, public_data=None, proof_data=b"\x09" * 100):
++    if public_data is None:
++        public_data = bytes([7] * PUBLICDATA_SIZE)
++    return ZKCertificate(
++        header_hash=bytes(range(32)),
++        proof=ZKProof(public_data, proof_data),
++        cert_version=version,
++    )
++
++
++class TestDeserializeLengthValidation:
++    def test_dense_truncated_proof_rejected(self):
++        wire = _cert(CertificateVersion.ZK_DENSE).serialize()
++        with pytest.raises(ValueError):
++            ZKCertificate.deserialize(wire[:-10])
++
++    def test_dense_oversized_declared_proof_len_rejected(self):
++        wire = _cert(CertificateVersion.ZK_DENSE).serialize()
++        evil = (
++            wire[: _DENSE_HEADER_SIZE]
++            + struct.pack("<I", 60000)
++            + wire[_DENSE_HEADER_SIZE + 4 :]
++        )
++        with pytest.raises(ValueError):
++            ZKCertificate.deserialize(evil)
++
++    def test_moe_truncated_proof_rejected(self):
++        wire = _cert(CertificateVersion.ZK_MOE).serialize()
++        with pytest.raises(ValueError):
++            ZKCertificate.deserialize(wire[:-5])
++
++    def test_moe_truncated_public_data_rejected(self):
++        wire = _cert(CertificateVersion.ZK_MOE).serialize()
++        with pytest.raises(ValueError):
++            ZKCertificate.deserialize(wire[: 40 + PUBLICDATA_SIZE // 2])
++
++    def test_moe_oversized_public_data_len_rejected(self):
++        # Crafted by hand: a peer can send a public_data_len above the
++        # Go cap even though this gateway refuses to construct one.
++        wire = (
++            struct.pack("<I", int(CertificateVersion.ZK_MOE))
++            + bytes(range(32))
++            + struct.pack("<I", 5000)
++            + bytes(5000)
++            + struct.pack("<I", 4)
++            + b"\x09" * 4
++        )
++        with pytest.raises(ValueError):
++            ZKCertificate.deserialize(wire)
++
++    def test_v3_truncated_proof_rejected(self):
++        wire = _cert(CertificateVersion.ZK_V3).serialize()
++        with pytest.raises(ValueError):
++            ZKCertificate.deserialize(wire[:-1])
++
++    def test_too_short_for_version_rejected(self):
++        with pytest.raises(ValueError):
++            ZKCertificate.deserialize(b"\x01\x00")
++
++    @pytest.mark.parametrize(
++        "version",
++        [
++            CertificateVersion.ZK_DENSE,
++            CertificateVersion.ZK_MOE,
++            CertificateVersion.ZK_V3,
++        ],
++    )
++    def test_valid_certificates_round_trip(self, version):
++        cert = _cert(version)
++        wire = cert.serialize()
++        back = ZKCertificate.deserialize(wire)
++        assert back.header_hash == cert.header_hash
++        assert back.proof.public_data == cert.proof.public_data
++        assert back.proof.proof_data == cert.proof.proof_data
++        assert back.serialize() == wire
++
++
++class TestPublicDataSizeValidation:
++    """The dense wire field is fixed-size: serialize must not silently
++    zero-pad or truncate public data (the proof commitment is hashed
++    over the original bytes, so padding would make the wire certificate
++    disagree with its own commitment). MoE/V3 public data is capped at
++    the Go node's PublicDataMaxSizeV2."""
++
++    def test_short_public_data_rejected(self):
++        with pytest.raises(ValueError):
++            _cert(CertificateVersion.ZK_DENSE, public_data=bytes(100))
++
++    def test_long_public_data_rejected(self):
++        with pytest.raises(ValueError):
++            _cert(CertificateVersion.ZK_DENSE, public_data=bytes(200))
++
++    def test_moe_oversized_public_data_rejected_on_construct(self):
++        with pytest.raises(ValueError):
++            _cert(CertificateVersion.ZK_MOE, public_data=bytes(5000))
+-- 
+2.43.0
+
