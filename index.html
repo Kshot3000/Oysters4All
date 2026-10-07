@@ -64,6 +64,7 @@
         <a href="pages/bounty/">Bounty</a>
         <a href="pages/charity/">Charity</a>
         <a href="pages/node/">Node</a>
+        <a href="pages/metrics/">Metrics</a>
         <a href="pages/oracle/">Oracle</a>
         <a href="pages/treasury/">Treasury</a>
         <a href="pages/names/">Names</a>
@@ -372,6 +373,11 @@ cd miner && uv run pearl-miner \
             <h3>Pearl Node — pearld Operator Console</h3>
             <p>Mission control for your own pearld node — chain status, sortable peer table, mempool depth, and mining telemetry over JSON-RPC. Strictly read-only: it only ever calls the six read-only RPC methods (getinfo, getmininginfo, getmempoolinfo, getpeerinfo, getnettotals, getchaintips), never sends state-changing calls, and never touches wallets. Ships with a zero-dependency relay.mjs (browsers can't call pearld directly — no CORS, self-signed TLS), health heuristics with honest warn/error lamps, and a loud network-mismatch guard. Overview → Peers → Mempool → Mining → Settings.</p>
             <div class="card-links"><a href="pages/node/">Open Pearl Node →</a></div>
+          </article>
+          <article class="card reveal">
+            <h3>Pearl Metrics — pearld Prometheus Dashboard</h3>
+            <p>Browser-local dashboard for pearld's Prometheus metrics endpoint from upstream PR #310 (opt-in <code>--metricslisten</code>, default port 9105 — labelled honestly as not yet in a released pearld). Paste or fetch a <code>/metrics</code> scrape and read chain-tip freshness, peer health with ban/rejection reasons, wire traffic per P2P command, per-method RPC latency computed from the real histogram buckets (exact mean, bucket-interpolated p95), mempool pressure against its configured limit, and per-second counter rates between scrapes. Health notes are heuristics and say so; a clearly-labelled sample scrape in the exact PR format is built in.</p>
+            <div class="card-links"><a href="pages/metrics/">Open Pearl Metrics →</a></div>
           </article>
           <article class="card reveal">
             <h3>Pearl Treasury — DAO / Team Treasury Command Center</h3>

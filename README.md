@@ -1,8 +1,8 @@
 # Oysters4All — Oysters 4 All
 
-Builder workspace for the **Pearl Blockchain** — 75 open-source apps and tools for the Pearl (PRL) ecosystem, built and maintained by Kyle Cox (@kshot9000).
+Builder workspace for the **Pearl Blockchain** — 76 open-source apps and tools for the Pearl (PRL) ecosystem, built and maintained by Kyle Cox (@kshot9000).
 
-> Tagging the Pearl team: @pearl-research-labs — this repo is 75 open-source apps
+> Tagging the Pearl team: @pearl-research-labs — this repo is 76 open-source apps
 > and tools built for the Pearl (PRL) ecosystem. Team feedback and corrections welcome.
 
 ## What is Pearl?
@@ -20,7 +20,7 @@ and Plonky2 zk-SNARK block certificates.
 ## Selected apps and tools
 
 Everything below is built and live. This table is a selection — the full fleet
-is 75 apps under `pages/`, each catalogued in [`pages/README.md`](pages/README.md)
+is 76 apps under `pages/`, each catalogued in [`pages/README.md`](pages/README.md)
 and linked from the [hub](https://kshot3000.github.io/Oysters4All/).
 
 | App | Status | Description |
@@ -100,7 +100,7 @@ the same block, and Pool plus the two Hermes pages carry it inline. The
 21 places in 20 apps that forced `behavior: "smooth"` from JavaScript —
 which the CSS setting cannot reach — now check `matchMedia` and scroll
 instantly under reduced motion instead. Verified in a real browser with
-reduced motion emulated on all 82 pages (80 here, both Hermes pages):
+reduced motion emulated on all 83 pages (81 here, both Hermes pages):
 every computed animation and transition duration is near-zero, every
 iteration count is 1, computed scroll behavior is `auto`, and the one
 element the sweep found at opacity 0 is Wallet's toast, which is hidden
@@ -131,7 +131,7 @@ classified and marked up — every `*-error` element (140) now carries
 `role="alert"` so failures announce assertively, and every `*-msg`,
 `*-result`, and `*-status` element (124) carries `aria-live="polite"`,
 including the Pay invoice page's error card and the Wallet toast.
-Verified in a real browser on all 82 pages: every message element sits
+Verified in a real browser on all 83 pages: every message element sits
 in a live region, zero console errors, and triggering a real error in
 Hush surfaces the message through its alert region. No styles or
 scripts changed, so no cache keys moved; all 77 test suites match their
@@ -168,13 +168,13 @@ navigation wraps instead of running off-screen, Market's header,
 Pay's settings and invoice rows, and Vanity's prefix field all flex
 within the viewport, and on Hermes a scrollable wrapper carries the
 dashboard's wide pool table while the landing page's cards and hero
-glow are clipped to the screen. Re-probed after the fix: 0 of 82 pages
+glow are clipped to the screen. Re-probed after the fix: 0 of 83 pages
 scroll horizontally at 320px, with zero console errors.
 
 ## Discovery
 
-The hub ships a `sitemap.xml` covering all 80 public pages (the hub, all
-75 apps, the three Pearl Bazaar sub-pages, and the Pearl Pay invoice page)
+The hub ships a `sitemap.xml` covering all 81 public pages (the hub, all
+76 apps, the three Pearl Bazaar sub-pages, and the Pearl Pay invoice page)
 with each URL taken from that page's own canonical `og:url`, plus a
 `robots.txt` that points crawlers at it. Missed URLs serve a branded
 `404.html` in the hub's dark Pearl palette — fully self-contained inline

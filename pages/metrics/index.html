@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#070c09">
+<title>Pearl Metrics — pearld Prometheus Dashboard for Pearl (PRL)</title>
+<meta name="description" content="Pearl Metrics: a browser-local dashboard for pearld's Prometheus metrics endpoint (upstream PR #310) — chain tip, peers, wire traffic, RPC latency histograms, and mempool, from a pasted or fetched /metrics scrape.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2032%2032%27%3E%3Cdefs%3E%3CradialGradient%20id%3D%27p%27%20cx%3D%2738%25%27%20cy%3D%2732%25%27%20r%3D%2778%25%27%3E%3Cstop%20offset%3D%270%25%27%20stop-color%3D%27%23ffffff%27%2F%3E%3Cstop%20offset%3D%2755%25%27%20stop-color%3D%27%23d7ecff%27%2F%3E%3Cstop%20offset%3D%27100%25%27%20stop-color%3D%27%237aa7cc%27%2F%3E%3C%2FradialGradient%3E%3C%2Fdefs%3E%3Crect%20width%3D%2732%27%20height%3D%2732%27%20rx%3D%277%27%20fill%3D%27%2306090f%27%2F%3E%3Ccircle%20cx%3D%2716%27%20cy%3D%2716%27%20r%3D%279%27%20fill%3D%27url%28%23p%29%27%2F%3E%3Ccircle%20cx%3D%2712.6%27%20cy%3D%2712.2%27%20r%3D%272.5%27%20fill%3D%27%23ffffff%27%20opacity%3D%27.92%27%2F%3E%3C%2Fsvg%3E">
+<meta property="og:title" content="Pearl Metrics — pearld Prometheus Dashboard for Pearl (PRL)">
+<meta property="og:description" content="Pearl Metrics: a browser-local dashboard for pearld's Prometheus metrics endpoint (upstream PR #310) — chain tip, peers, wire traffic, RPC latency histograms, and mempool, from a pasted or fetched /metrics scrape.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://kshot3000.github.io/Oysters4All/pages/metrics/">
+<link rel="canonical" href="https://kshot3000.github.io/Oysters4All/pages/metrics/">
+<meta property="og:image" content="https://kshot3000.github.io/Oysters4All/assets/og-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Pearl Muse Builder — 50+ open-source apps and tools for the Pearl (PRL) ecosystem">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Pearl Metrics — pearld Prometheus Dashboard for Pearl (PRL)">
+<meta name="twitter:description" content="Pearl Metrics: a browser-local dashboard for pearld's Prometheus metrics endpoint (upstream PR #310) — chain tip, peers, wire traffic, RPC latency histograms, and mempool, from a pasted or fetched /metrics scrape.">
+<meta name="twitter:image" content="https://kshot3000.github.io/Oysters4All/assets/og-card.png">
+<meta name="twitter:site" content="@kshot9000">
+<meta name="twitter:creator" content="@kshot9000">
+<link rel="stylesheet" href="styles.css?v=1">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Pearl Metrics — pearld Prometheus Dashboard for Pearl (PRL)","description":"Pearl Metrics: a browser-local dashboard for pearld's Prometheus metrics endpoint (upstream PR #310) — chain tip, peers, wire traffic, RPC latency histograms, and mempool, from a pasted or fetched /metrics scrape.","url":"https://kshot3000.github.io/Oysters4All/pages/metrics/","applicationCategory":"BrowserApplication","operatingSystem":"Any","isAccessibleForFree":true}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+<header class="topbar">
+  <div class="wrap topbar-in">
+    <a class="brand" href="../../index.html">
+      <span class="glyph" aria-hidden="true">▦</span>
+      <span class="brand-name">Pearl&nbsp;Metrics</span>
+      <span class="brand-tag">pearld telemetry scope</span>
+    </a>
+    <nav class="topnav">
+      <a href="../../index.html">Apps</a>
+      <a href="../node/">Node console</a>
+      <a href="../pulse/">Pulse</a>
+      <a href="../pool/">Foundry</a>
+      <span class="net-badge">PR #310 · pre-release</span>
+    </nav>
+  </div>
+</header>
+
+<main id="main" tabindex="-1" class="wrap">
+  <section class="hero">
+    <h1>Your node's vital signs, <span class="accent">straight off the wire.</span></h1>
+    <p class="lede">Pearl Metrics renders a <code>pearld</code> Prometheus scrape the way an
+      operator actually reads it: chain-tip freshness, peer health, wire traffic by command,
+      per-method RPC latency from the real histogram buckets, mempool pressure, and
+      per-second rates between scrapes. Everything is parsed in this page — nothing is
+      uploaded anywhere.</p>
+    <div class="honest-note">
+      <strong>Status of the endpoint — read first.</strong> The <code>/metrics</code> endpoint
+      comes from upstream <a href="https://github.com/pearl-research-labs/pearl/pull/310">pearl-research-labs/pearl
+      PR #310</a> (<code>--metricslisten</code>, default port 9105), which is
+      <strong>not yet in a released pearld</strong> as of 2026-10-06. This dashboard is built
+      against that PR's published metric catalogue (<code>node/metrics/README.md</code> on the
+      branch) so it is ready the day the PR lands — until then, use it with a pearld built
+      from that branch, or explore it with the clearly-labelled sample scrape.
+      The endpoint is unauthenticated: upstream warns to bind it to loopback or a
+      firewalled private address, never the public internet.
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Get a scrape</h2>
+    <div class="grid2">
+      <div>
+        <label>Metrics endpoint URL
+          <input id="endpoint" spellcheck="false" value="http://127.0.0.1:9105/metrics">
+        </label>
+        <div class="row">
+          <button id="btnFetch" class="btn primary">Fetch scrape</button>
+          <label class="check"><input type="checkbox" id="autoRefresh"> Auto-refresh every 15s</label>
+        </div>
+        <p class="muted small">Enable it on the node with <code>pearld --metricslisten=127.0.0.1:9105</code>.
+          Browsers usually can't fetch it from this HTTPS page (pearld sends no CORS headers) —
+          running this page locally against a loopback node works, and paste always works.</p>
+      </div>
+      <div>
+        <label>…or paste a scrape (<code>curl -s 127.0.0.1:9105/metrics</code>)
+          <textarea id="paste" rows="7" spellcheck="false" placeholder="# HELP pearld_chain_tip_height …&#10;pearld_chain_tip_height 241318&#10;…"></textarea>
+        </label>
+        <div class="row">
+          <button id="btnPaste" class="btn primary">Render pasted scrape</button>
+          <button id="btnSample" class="btn">Load sample scrape</button>
+        </div>
+      </div>
+    </div>
+    <p id="status" class="status" role="status" aria-live="polite">No scrape loaded yet.</p>
+  </section>
+
+  <div id="results" hidden>
+    <section class="panel">
+      <div id="identity" class="identity"></div>
+      <div id="kpis" class="kpis"></div>
+      <div id="rates"></div>
+      <h3>Health notes <span class="muted small">(heuristics, not consensus)</span></h3>
+      <ul id="health" class="health"></ul>
+    </section>
+
+    <div class="grid2">
+      <section class="panel">
+        <h2>Chain</h2>
+        <table class="kv"><tbody id="chainBody"></tbody></table>
+      </section>
+      <section class="panel">
+        <h2>Peers</h2>
+        <table class="kv"><tbody id="peerBody"></tbody></table>
+        <h2 class="mt">Mempool</h2>
+        <table class="kv"><tbody id="mempoolBody"></tbody></table>
+      </section>
+    </div>
+
+    <section class="panel">
+      <h2>RPC by method</h2>
+      <p class="muted small">Latency is computed from the <code>pearld_rpc_request_duration_seconds</code>
+        histogram: mean is exact (sum ÷ count); p95 is approximated by interpolation inside
+        the bucket where the rank falls, and is hidden when the rank falls in the +Inf bucket.</p>
+      <div class="table-scroll"><table class="data">
+        <thead><tr><th>Method</th><th>Requests</th><th>Errors</th><th>Error %</th><th>Mean</th><th>p95 ≈</th></tr></thead>
+        <tbody id="rpcBody"></tbody>
+      </table></div>
+    </section>
+
+    <section class="panel">
+      <h2>Wire traffic by command</h2>
+      <div class="table-scroll"><table class="data">
+        <thead><tr><th>Command</th><th>Messages in</th><th>Messages out</th><th>Bytes in</th><th>Bytes out</th></tr></thead>
+        <tbody id="wireBody"></tbody>
+      </table></div>
+    </section>
+
+    <section class="panel">
+      <h2>All series</h2>
+      <label>Filter <input id="seriesFilter" spellcheck="false" placeholder="e.g. pearld_p2p or method=&quot;getblock&quot;"></label>
+      <div class="table-scroll"><table class="data">
+        <thead><tr><th>Series</th><th>Type</th><th>Value</th></tr></thead>
+        <tbody id="seriesBody"></tbody>
+      </table></div>
+      <p class="muted small">Includes the standard <code>go_*</code> and <code>process_*</code>
+        series pearld exports on the same endpoint — they're listed, just not summarised above.</p>
+    </section>
+  </div>
+
+  <section class="panel">
+    <h2>How this differs from the Node console</h2>
+    <p class="muted">The <a href="../node/">Pearl Node console</a> polls JSON-RPC
+      (<code>getinfo</code>, <code>getpeerinfo</code>, …) for live state. This dashboard reads the
+      Prometheus endpoint instead, which carries what RPC doesn't publish: cumulative RPC
+      request/latency statistics per method, auth failures, wire bytes per P2P command,
+      peer bans and rejection reasons, and block connect/disconnect counters. Operators running
+      Prometheus + Grafana don't need this page at all — it's for a quick, dependency-free look
+      at one scrape, on any machine, with nothing installed.</p>
+  </section>
+
+  <footer class="sitefoot">
+    <div class="foot-grid">
+      <div>
+        <strong>Pearl Metrics</strong> — the pearld telemetry scope for Pearl (PRL).<br>
+        <span class="muted">Built by <a href="https://x.com/kshot9000">@kshot9000</a> ·
+          <a href="https://github.com/Kshot3000/Oysters4All">Oysters4All</a> ·
+          metric catalogue: <a href="https://github.com/pearl-research-labs/pearl/pull/310">@pearl-research-labs PR #310</a></span>
+      </div>
+      <div class="donate">
+        <span class="muted">Support the build — tip PRL:</span>
+        <code class="addr" id="donateAddr" role="button" tabindex="0" title="Click to copy">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>
+        <span class="copied" id="copiedMsg" hidden>copied ✓</span>
+      </div>
+    </div>
+  </footer>
+</main>
+
+<script src="metrics-core.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
