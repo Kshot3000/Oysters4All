@@ -1,0 +1,68 @@
+From 943cadf9fe2f05450c53973add97825117083d5f Mon Sep 17 00:00:00 2001
+From: Kshot3000 <kshot9000@gmail.com>
+Date: Wed, 7 Oct 2026 19:22:00 +0000
+Subject: [PATCH] fix(txscript): ScriptClass.String panics on the boundary
+ value instead of returning Invalid
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The guard used int(t) > len(scriptClassToName), so ScriptClass(4) —
+exactly len(scriptClassToName) — passed the guard and the index
+scriptClassToName[t] panicked. Its own doc promises Invalid for
+invalid enums; every other value (5..255) already honours that.
+
+Same > vs >= boundary shape as the deploymentState fix.
+
+TestScriptClassString pins all defined names plus the boundary,
+boundary+1, and 255. Red before (panic at standard.go:58), green
+after; full txscript suite passes.
+---
+ node/txscript/standard.go      |  2 +-
+ node/txscript/standard_test.go | 20 ++++++++++++++++++++
+ 2 files changed, 21 insertions(+), 1 deletion(-)
+
+diff --git a/node/txscript/standard.go b/node/txscript/standard.go
+index cd7c1717..17187512 100644
+--- a/node/txscript/standard.go
++++ b/node/txscript/standard.go
+@@ -52,7 +52,7 @@ var scriptClassToName = []string{
+ // the enum script class. If the enum is invalid then "Invalid" will be
+ // returned.
+ func (t ScriptClass) String() string {
+-	if int(t) > len(scriptClassToName) || int(t) < 0 {
++	if int(t) >= len(scriptClassToName) || int(t) < 0 {
+ 		return "Invalid"
+ 	}
+ 	return scriptClassToName[t]
+diff --git a/node/txscript/standard_test.go b/node/txscript/standard_test.go
+index 7054af67..02ee4c3e 100644
+--- a/node/txscript/standard_test.go
++++ b/node/txscript/standard_test.go
+@@ -529,3 +529,23 @@ func TestNewScriptClass(t *testing.T) {
+ 		})
+ 	}
+ }
++
++// TestScriptClassString ensures String names every defined class and
++// returns "Invalid" — without panicking — for out-of-range values,
++// including the exact boundary len(scriptClassToName).
++func TestScriptClassString(t *testing.T) {
++	for class, want := range scriptClassToName {
++		if got := ScriptClass(class).String(); got != want {
++			t.Errorf("ScriptClass(%d).String() = %q, want %q", class, got, want)
++		}
++	}
++	for _, class := range []ScriptClass{
++		ScriptClass(len(scriptClassToName)),
++		ScriptClass(len(scriptClassToName) + 1),
++		ScriptClass(255),
++	} {
++		if got := class.String(); got != "Invalid" {
++			t.Errorf("ScriptClass(%d).String() = %q, want %q", byte(class), got, "Invalid")
++		}
++	}
++}
+-- 
+2.43.0
+
