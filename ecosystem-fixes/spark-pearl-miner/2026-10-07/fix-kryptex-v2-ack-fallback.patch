@@ -1,0 +1,183 @@
+diff --git a/crates/spm-governor/src/clockcap.rs b/crates/spm-governor/src/clockcap.rs
+index ccb54ce..ec0c8db 100644
+--- a/crates/spm-governor/src/clockcap.rs
++++ b/crates/spm-governor/src/clockcap.rs
+@@ -81,8 +81,18 @@ impl ClockCapDetector {
+     /// Feeds one sample with the duty in force while it was taken.
+     pub fn observe(&mut self, s: &Sample, duty_pct: u8) {
+         self.max_seen_mhz = self.max_seen_mhz.max(s.sm_mhz);
+-        self.last_ts = Some(s.ts);
++        let prev_ts = self.last_ts.replace(s.ts);
+         if s.sm_mhz > self.cap_mhz + CAP_TOLERANCE_MHZ {
++            // A telemetry gap breaks the run just like a below-cap sample
++            // does: with no sample for longer than MAX_SAMPLE_GAP there is
++            // no evidence the clock stayed above the cap for the whole
++            // interval, so the run restarts at this sample. (The loaded
++            // accumulator below already refuses to count such intervals.)
++            if let (Some(prev), Some(_)) = (prev_ts, self.exceed_since) {
++                if s.ts.saturating_sub(prev) > MAX_SAMPLE_GAP {
++                    self.exceed_since = Some(s.ts);
++                }
++            }
+             let since = *self.exceed_since.get_or_insert(s.ts);
+             if s.ts.saturating_sub(since) >= CAP_EXCEED_FOR {
+                 self.last_exceeded_ts = Some(s.ts);
+@@ -155,6 +165,22 @@ mod tests {
+         assert!(matches!(d.status(), CapStatus::Capped { .. }), "{:?}", d.status());
+     }
+ 
++    #[test]
++    fn a_telemetry_gap_does_not_confirm_an_exceedance() {
++        let mut d = ClockCapDetector::new(2000);
++        d.observe(&sample(0, 2400), 100);
++        // Ten seconds pass with no sample at all (telemetry stall, e.g. the
++        // post-restart idle boost straddling a hiccup): the two readings do
++        // not prove 3 s *uninterrupted* above the cap.
++        d.observe(&sample(10, 2400), 100);
++        assert!(!matches!(d.status(), CapStatus::Uncapped { .. }), "{:?}", d.status());
++        // A genuinely sustained run after the gap still confirms.
++        for t in 11..=13 {
++            d.observe(&sample(t, 2400), 100);
++        }
++        assert!(matches!(d.status(), CapStatus::Uncapped { max_seen_mhz: 2400 }), "{:?}", d.status());
++    }
++
+     #[test]
+     fn short_runs_above_the_cap_do_not_count() {
+         let mut d = ClockCapDetector::new(2000);
+diff --git a/crates/spm-proto/src/client.rs b/crates/spm-proto/src/client.rs
+index 719b17b..d3213ca 100644
+--- a/crates/spm-proto/src/client.rs
++++ b/crates/spm-proto/src/client.rs
+@@ -17,7 +17,7 @@ use tokio::time::Instant;
+ use crate::codec::{self, CodecError, NdjsonReader};
+ use crate::encode::{self, ProofEncoding, ProofField, ProofFormatLearner};
+ use crate::tls::{ConnectError, Connector, PoolStream, TlsMode, Transport};
+-use crate::{authorize_lines, classify_reject, parse_notify_value, reply_of, reply_type, submit_line};
++use crate::{authorize_lines, classify_reject, encoding_after_auth, parse_notify_value, reply_of, reply_type, submit_line};
+ use crate::{Dialect, FrameOpts, Job, RejectKind, Reply, AGENT};
+ 
+ pub const DEFAULT_SUBMIT_ACK_TIMEOUT: Duration = Duration::from_secs(30);
+@@ -237,11 +237,7 @@ impl State<'_> {
+                 Reply::Accepted => {
+                     self.authorized = true;
+                     let proof_type = reply_type(&v).map(str::to_string);
+-                    match proof_type.as_deref() {
+-                        Some("v2") => self.plain_encoding = ProofEncoding::Gzip,
+-                        Some("plain") => self.plain_encoding = ProofEncoding::Plain,
+-                        _ => {}
+-                    }
++                    self.plain_encoding = encoding_after_auth(self.cfg.dialect, proof_type.as_deref(), self.plain_encoding);
+                     tracing::info!(
+                         login = %format!("{}.{}", self.cfg.wallet, self.cfg.worker),
+                         proof_type = proof_type.as_deref().unwrap_or("-"),
+diff --git a/crates/spm-proto/src/lib.rs b/crates/spm-proto/src/lib.rs
+index 87d0414..b8668dd 100644
+--- a/crates/spm-proto/src/lib.rs
++++ b/crates/spm-proto/src/lib.rs
+@@ -59,6 +59,25 @@ impl Dialect {
+     }
+ }
+ 
++/// The proof encoding in force once the pool answers the authorize request.
++///
++/// Kryptex offers its gzip session by echoing `type: "v2"` in the ack; when it
++/// does not offer it, it answers without `type` and the session falls back to
++/// plain proofs by itself (the contract `dialect_for_host` documents). Only an
++/// explicit `"v2"` selects gzip and only an explicit `"plain"` selects plain;
++/// any other answer leaves the current encoding alone — except for KryptexV2,
++/// whose pre-auth default is gzip, so a missing or unrecognised answer must
++/// reset it to plain, or every proof goes out gzipped to a pool that never
++/// agreed to that and rejects them all.
++pub fn encoding_after_auth(dialect: Dialect, proof_type: Option<&str>, current: ProofEncoding) -> ProofEncoding {
++    match proof_type {
++        Some("v2") => ProofEncoding::Gzip,
++        Some("plain") => ProofEncoding::Plain,
++        _ if dialect == Dialect::KryptexV2 => ProofEncoding::Plain,
++        _ => current,
++    }
++}
++
+ /// A parsed `mining.notify`. Fields are identical across the object and kryptex dialects.
+ #[derive(Debug, Clone, PartialEq, Eq)]
+ pub struct Job {
+@@ -400,6 +419,22 @@ pub fn classify_reject(reason: &str) -> RejectKind {
+ mod tests {
+     use super::*;
+ 
++    #[test]
++    fn auth_ack_selects_the_proof_encoding() {
++        // Kryptex echoing "v2" keeps the gzip session it offered.
++        assert_eq!(encoding_after_auth(Dialect::KryptexV2, Some("v2"), ProofEncoding::Gzip), ProofEncoding::Gzip);
++        // An explicit "plain" answer selects plain for every dialect.
++        assert_eq!(encoding_after_auth(Dialect::KryptexV2, Some("plain"), ProofEncoding::Gzip), ProofEncoding::Plain);
++        // No `type` in the ack means Kryptex does not offer v2: the session
++        // must fall back to plain by itself, not keep the pre-auth gzip
++        // default (every proof would be rejected by that pool).
++        assert_eq!(encoding_after_auth(Dialect::KryptexV2, None, ProofEncoding::Gzip), ProofEncoding::Plain);
++        assert_eq!(encoding_after_auth(Dialect::KryptexV2, Some("v3"), ProofEncoding::Gzip), ProofEncoding::Plain);
++        // Other dialects start at plain and a missing answer changes nothing.
++        assert_eq!(encoding_after_auth(Dialect::Kryptex, None, ProofEncoding::Plain), ProofEncoding::Plain);
++        assert_eq!(encoding_after_auth(Dialect::Object, None, ProofEncoding::Plain), ProofEncoding::Plain);
++    }
++
+     #[test]
+     fn frames_have_fixed_member_order() {
+         let o = FrameOpts { jsonrpc: true, agent: "a/1" };
+diff --git a/docs/en/CONFIGURATION.md b/docs/en/CONFIGURATION.md
+index e892288..a828c0e 100644
+--- a/docs/en/CONFIGURATION.md
++++ b/docs/en/CONFIGURATION.md
+@@ -280,7 +280,7 @@ The order is the priority: the first entry is pool 1. A fourth entry is refused.
+ | `port` | – | 1–65535 |
+ | `tls` | `"auto"` | `auto` (TLS first; plain TCP only when the server does not speak TLS, never after a certificate error; the result is remembered per `host:port` for 7 days), `on`, `off`, `pinned` (TLS checked against `spki_pin` only, for self-signed pools) |
+ | `spki_pin` | – | base64 SHA-256 of the server's public key; only with `tls = "pinned"` |
+-| `dialect` | `"auto"` | `auto` (Kryptex hosts → `kryptex`, everything else → `object`), `object` (HeroMiners, LuckyPool), `kryptex`, `kryptex-v2` (gzip proofs; not confirmed live) |
++| `dialect` | `"auto"` | `auto` (Kryptex hosts → `kryptex-v2`, everything else → `object`), `object` (HeroMiners, LuckyPool), `kryptex`, `kryptex-v2` (gzip proofs, as Kryptex asks; falls back to plain by itself) |
+ | `jsonrpc` | `"auto"` | add `"jsonrpc":"2.0"` to requests: `auto` (on for `*.luckypool.io`, dialect default otherwise), `on`, `off` |
+ | `proof` | `"auto"` | proof encoding: `auto` (starts with `plain_proof`, switches after 3 format rejects and remembers the working field per pool), `plain`, `zstd` (`plain_proof_zst`) |
+ | `password` | `"x"` | stratum password, up to 64 printable characters (Kryptex also accepts `d=<N>`) |
+@@ -292,7 +292,7 @@ Settings pool rows; typing a preset's `host:port` uses all of its keys):
+ 
+ | Preset | Host:port | TLS | Dialect / jsonrpc | Status |
+ |---|---|---|---|---|
+-| Kryptex | `prl-br.kryptex.network:8048` | on | kryptex / auto | verified live, default pool 1 |
++| Kryptex | `prl-br.kryptex.network:8048` | on | kryptex-v2 / auto | verified live, default pool 1 |
+ | HeroMiners BR | `br.pearl.herominers.com:1200` | auto | auto / auto | verified live, default pool 2 |
+ | LuckyPool BR | `pearl-br.luckypool.io:3360` | pinned `d0ehDQxaU5IUv4UHWXItQKqdJ8anqZclQXcoIjwF/mk=` | object / on | verified live, default pool 3 |
+ | HeroMiners US / US2 / DE / FR | `{us,us2,de,fr}.pearl.herominers.com:1200` | auto | auto / auto | not verified |
+diff --git a/docs/pt-BR/CONFIGURACAO.md b/docs/pt-BR/CONFIGURACAO.md
+index b85fc8d..e6c5f20 100644
+--- a/docs/pt-BR/CONFIGURACAO.md
++++ b/docs/pt-BR/CONFIGURACAO.md
+@@ -288,7 +288,7 @@ A ordem é a prioridade: a primeira entrada é a pool 1. Uma quarta entrada é r
+ | `port` | – | 1–65535 |
+ | `tls` | `"auto"` | `auto` (TLS primeiro; TCP simples só quando o servidor não fala TLS, nunca depois de um erro de certificado; o resultado fica guardado por `host:porta` por 7 dias), `on`, `off`, `pinned` (TLS conferido só contra o `spki_pin`, para pools autoassinadas) |
+ | `spki_pin` | – | SHA-256 em base64 da chave pública do servidor; só com `tls = "pinned"` |
+-| `dialect` | `"auto"` | `auto` (hosts da Kryptex → `kryptex`, o resto → `object`), `object` (HeroMiners, LuckyPool), `kryptex`, `kryptex-v2` (provas em gzip; não confirmado ao vivo) |
++| `dialect` | `"auto"` | `auto` (hosts da Kryptex → `kryptex-v2`, o resto → `object`), `object` (HeroMiners, LuckyPool), `kryptex`, `kryptex-v2` (provas em gzip, como a Kryptex pede; volta para plain sozinho) |
+ | `jsonrpc` | `"auto"` | acrescenta `"jsonrpc":"2.0"` às requisições: `auto` (ligado para `*.luckypool.io`, padrão do dialeto nos outros), `on`, `off` |
+ | `proof` | `"auto"` | codificação da prova: `auto` (começa com `plain_proof`, troca depois de 3 rejeições de formato e guarda o campo que funcionou por pool), `plain`, `zstd` (`plain_proof_zst`) |
+ | `password` | `"x"` | senha do stratum, até 64 caracteres imprimíveis (a Kryptex aceita também `d=<N>`) |
+@@ -301,7 +301,7 @@ as chaves dela):
+ 
+ | Predefinição | Host:porta | TLS | Dialeto / jsonrpc | Situação |
+ |---|---|---|---|---|
+-| Kryptex | `prl-br.kryptex.network:8048` | on | kryptex / auto | verificada ao vivo, pool 1 padrão |
++| Kryptex | `prl-br.kryptex.network:8048` | on | kryptex-v2 / auto | verificada ao vivo, pool 1 padrão |
+ | HeroMiners BR | `br.pearl.herominers.com:1200` | auto | auto / auto | verificada ao vivo, pool 2 padrão |
+ | LuckyPool BR | `pearl-br.luckypool.io:3360` | pinned `d0ehDQxaU5IUv4UHWXItQKqdJ8anqZclQXcoIjwF/mk=` | object / on | verificada ao vivo, pool 3 padrão |
+ | HeroMiners US / US2 / DE / FR | `{us,us2,de,fr}.pearl.herominers.com:1200` | auto | auto / auto | não verificada |
+diff --git a/webui/js/presets.js b/webui/js/presets.js
+index d30d06a..7f73b07 100644
+--- a/webui/js/presets.js
++++ b/webui/js/presets.js
+@@ -8,7 +8,7 @@ function hero(region, label, verified = false) {
+ }
+ 
+ export const PRESETS = [
+-  { id: 'kryptex', name: 'Kryptex', host: 'prl-br.kryptex.network', port: 8048, tls: 'on', dialect: 'kryptex', jsonrpc: 'auto', verified: true },
++  { id: 'kryptex', name: 'Kryptex', host: 'prl-br.kryptex.network', port: 8048, tls: 'on', dialect: 'kryptex-v2', jsonrpc: 'auto', verified: true },
+   hero('br', 'BR', true),
+   { id: 'lucky-br', name: 'LuckyPool BR', host: 'pearl-br.luckypool.io', port: 3360, tls: 'pinned', spki_pin: LUCKY_PIN, dialect: 'object', jsonrpc: 'on', verified: true },
+   hero('us', 'US'),
