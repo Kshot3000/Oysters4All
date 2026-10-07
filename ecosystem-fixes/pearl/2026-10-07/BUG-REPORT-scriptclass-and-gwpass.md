@@ -17,3 +17,6 @@
 ## Also this run
 - PRs #381/#382 Bugbot summaries are clean overviews — no findings to act on. wPRL #347: still 0 comments, no Pearl-team reply.
 - A hunter subagent's addrmgr "mutex leak in updateAddress" and connmgr "negative retry" reports were FABRICATED (quoted code/log lines exist nowhere in the tree; real callers use defer Unlock, connmgr normalizes RetryDuration<=0 and uses atomic counters) — discarded at the verify gate, nothing shipped from them.
+
+## Hunter reconciliation (same run, after initial record)
+- The wallet/spv hunter's report arrived after the record above and was put through the same gate: its kahnsort finding matched my own independent read (dead-but-harmless dedup comparison — not a bug). Its C1 (validateMsgTx in wallet/wallet/createtx.go panics on mismatched prevScripts/inputValues lengths, calling txscript.NewEngine with a negative index) is REAL code and a real panic mode, but the hunter itself concedes no production path reaches it — NewUnsignedTransaction builds all three slices in lockstep and validateMsgTx is unexported with one caller. Recorded as a defense-in-depth LEAD for a future run, not shipped: a guard+test PR with no reachable trigger would dilute a 13-PR day. C2 (oystercli payout validates amounts, not output scripts) is bounds-safe API semantics — a maintainer question, not a bug; not shipped.
