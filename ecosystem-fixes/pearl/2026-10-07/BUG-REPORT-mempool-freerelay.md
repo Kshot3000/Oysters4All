@@ -82,3 +82,37 @@ limiter state.
   cached hashes (each RPC call decodes its own Tx; sharing an unwarmed
   one races in the fixture, not the pool).
 - Patch: `fix-pearl-mempool-freerelay-dryrun.patch`.
+
+## Follow-up 2 (2026-10-07, Agentic Security Review on PR #378 — verified correct, fixed in 5ff3b273)
+
+Same family, second half: `validateRelayFeeMet` committed the charge
+during `checkMempoolAcceptance`, but `validateReplacement` and
+`ValidateTransactionScripts` run AFTER that evaluation. A below-min-fee
+transaction failing either later check burned the penny-flooding budget
+without entering the pool — repeatable by any P2P peer with
+invalid-signature transactions. (Refinement vs the review text: the
+orphan path never reached the charge — missing-parents transactions
+exit before the fee evaluation.)
+
+- Repro (red): zero-fee tx with a corrupted witness signature is
+  rejected by script validation but leaves `pennyTotal=111` (its
+  vsize) on the pre-fix head.
+- Fix: `validateRelayFeeMet` is evaluate-only on every path — it
+  quotes the charge, `MempoolAcceptResult.freeRelayCharge` carries
+  the quote, and `maybeAcceptTransaction` commits it via the new
+  `chargeFreeRelay` only after every acceptance check has passed and
+  the tx is about to be inserted. The decay commit moves with the
+  charge (equivalent for later evaluations: decay is a pure function
+  of elapsed time). Dry-run behavior unchanged.
+- Green: `TestFreeTxRelayChargeOnAccept` passes (rejected tx leaves
+  pennyTotal/lastPennyUnix at 0; valid zero-fee tx on the same output
+  admitted and charged exactly once); full `node/mempool` suite
+  passes; all three free-relay tests race-clean; gofmt + vet clean.
+  PR comment:
+  https://github.com/pearl-research-labs/pearl/pull/378#issuecomment-6043227055
+- Lesson: charge-on-evaluate is the same defect shape as
+  delete-before-validate — any fallible step after a state commit
+  makes the commit a lie. When a check both judges and mutates, split
+  it into a pure evaluation returning a quote and a commit the caller
+  performs only at the point of no return.
+- Patch: `fix-pearl-mempool-freerelay-charge-on-accept.patch`.
