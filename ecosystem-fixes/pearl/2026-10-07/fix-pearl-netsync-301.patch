@@ -1,5 +1,5 @@
 diff --git a/node/netsync/manager.go b/node/netsync/manager.go
-index 1dee98a1..ab5ba50e 100644
+index 1dee98a1..8319b8b6 100644
 --- a/node/netsync/manager.go
 +++ b/node/netsync/manager.go
 @@ -51,6 +51,14 @@ const (
@@ -29,7 +29,31 @@ index 1dee98a1..ab5ba50e 100644
  }
  
  // resetHeaderState sets the headers-first mode state to values appropriate for
-@@ -506,13 +519,23 @@ func (sm *SyncManager) handleStallSample() {
+@@ -380,6 +393,23 @@ func (sm *SyncManager) startSync() {
+ 		return
+ 	}
+ 
++	// While the chain believes it is current, a candidate whose only
++	// claim to new work is its version-message height must not be
++	// promoted on that claim alone. The height is unauthenticated,
++	// and promoting the peer would make current() false (our best
++	// would be below the sync peer's advertised height), which makes
++	// handleInvMsg ignore every other peer's announcements until the
++	// stall timer fires. A candidate that announced a block we do
++	// not have (checked above) is still promoted: that announcement
++	// is how a synced node normally learns about the next block.
++	if sm.chain.IsCurrent() && bestPeer.LastAnnouncedBlock() == nil {
++		log.Debugf("Skipping sync: candidate %s advertises "+
++			"height %d but announced no new block and the "+
++			"chain is current", bestPeer.Addr(),
++			bestPeer.LastBlock())
++		return
++	}
++
+ 	// Clear the requestedBlocks if the sync peer changes, otherwise
+ 	// we may ignore blocks we need that the last sync peer failed
+ 	// to send.
+@@ -506,13 +536,25 @@ func (sm *SyncManager) handleStallSample() {
  	}
  
  	// No syncpeer — retry selection periodically so cooled-down
@@ -40,7 +64,9 @@ index 1dee98a1..ab5ba50e 100644
 +	// gating re-selection on !IsCurrent left it with no sync peer
 +	// for that whole window (#301). startSync itself skips
 +	// candidates that have nothing new to offer, so the retry is
-+	// cheap when we are genuinely at tip.
++	// cheap when we are genuinely at tip — and while current it
++	// only promotes a candidate that announced a block we do not
++	// have, never one claiming new work by version height alone.
  	if sm.syncPeer == nil {
 -		if !sm.chain.IsCurrent() {
 -			sm.startSync()
@@ -49,14 +75,14 @@ index 1dee98a1..ab5ba50e 100644
 +			sm.noSyncPeerSamples = 0
 +			return
  		}
-+		sm.handleNoSyncPeer()
++		sm.handleNoSyncPeer(sm.chain.IsCurrent())
  		return
  	}
 +	sm.noSyncPeerSamples = 0
  
  	// If the stall timeout has not elapsed, exit early.
  	if time.Since(sm.lastProgressTime) <= maxStallDuration {
-@@ -538,6 +561,56 @@ func (sm *SyncManager) handleStallSample() {
+@@ -538,6 +580,111 @@ func (sm *SyncManager) handleStallSample() {
  	sm.updateSyncPeer(disconnectSyncPeer)
  }
  
@@ -71,14 +97,43 @@ index 1dee98a1..ab5ba50e 100644
 +// behind it (e.g. nodes stranded on the far side of a hardfork) can
 +// never make progress: startSync only considers connected peers, and
 +// nothing ever rotates the useless ones out (#301).
-+func (sm *SyncManager) handleNoSyncPeer() {
++//
++// Rotation only runs while the chain is not current. A node at a
++// fresh tip with no sync peer is the normal steady state, not the
++// wedge: its outbound peers' advertised heights lag the tip by
++// construction (LastBlock is set at handshake and only advances on
++// announcements), so rotating there would churn healthy connections
++// for no possible gain — no peer can serve a block that has not been
++// mined yet. The wedge is a node that is behind and stranded, and
++// that state always comes with a stale tip. The streak is reset, not
++// merely paused, so the grace period restarts when the node actually
++// becomes stranded.
++//
++// Rotation also stands down while any connected peer has announced a
++// block we do not have. Such an announcement is proof that reachable
++// work exists, whatever the advertised heights say: startSync picks
++// one random candidate per sample, so a viable candidate can take
++// several samples to be picked, and the inv path fetches
++// announcements directly while there is no sync peer. Rotating in
++// that window could churn the very peer set that is about to
++// un-wedge the node.
++func (sm *SyncManager) handleNoSyncPeer(isCurrent bool) {
++	if isCurrent {
++		sm.noSyncPeerSamples = 0
++		return
++	}
++
 +	sm.noSyncPeerSamples++
 +	if sm.noSyncPeerSamples < noSyncPeerRotateSamples {
 +		return
 +	}
 +
++	if sm.anyPeerAnnouncedUnknownBlock() {
++		return
++	}
++
 +	best := sm.chain.BestSnapshot()
-+	victim := sm.pickStaleOutboundPeer(best.Height)
++	victim := sm.pickStaleOutboundPeer(best.Height, &best.Hash)
 +	if victim == nil {
 +		return
 +	}
@@ -91,16 +146,42 @@ index 1dee98a1..ab5ba50e 100644
 +	victim.Disconnect()
 +}
 +
++// anyPeerAnnouncedUnknownBlock reports whether any connected peer's
++// last announced block is one we do not have — proof that reachable
++// work exists, whatever the peers' advertised heights say.
++func (sm *SyncManager) anyPeerAnnouncedUnknownBlock() bool {
++	for peer := range sm.peerStates {
++		announced := peer.LastAnnouncedBlock()
++		if announced == nil {
++			continue
++		}
++		if have, _ := sm.chain.HaveBlock(announced); !have {
++			return true
++		}
++	}
++	return false
++}
++
 +// pickStaleOutboundPeer returns the outbound peer advertising the
 +// lowest height strictly below bestHeight, or nil if there is none.
 +// Peers at our height are never selected: they may simply be waiting
 +// for the same next block we are. Inbound peers are never selected:
 +// disconnecting one frees no outbound slot for the connection manager
 +// to refill.
-+func (sm *SyncManager) pickStaleOutboundPeer(bestHeight int32) *peerpkg.Peer {
++//
++// LastBlock is only a lower bound on a peer's real height: it is set
++// at the version handshake and advances when the peer announces or
++// serves blocks, so it can lag a peer that quietly holds our tip. A
++// peer whose last announced block is our current tip provably holds
++// that tip whatever its LastBlock says, so it is never selected.
++func (sm *SyncManager) pickStaleOutboundPeer(bestHeight int32, bestHash *chainhash.Hash) *peerpkg.Peer {
 +	var victim *peerpkg.Peer
 +	for peer := range sm.peerStates {
 +		if peer.Inbound() || peer.LastBlock() >= bestHeight {
++			continue
++		}
++		if announced := peer.LastAnnouncedBlock(); announced != nil &&
++			announced.IsEqual(bestHash) {
 +			continue
 +		}
 +		if victim == nil || peer.LastBlock() < victim.LastBlock() {
@@ -114,10 +195,10 @@ index 1dee98a1..ab5ba50e 100644
  // stalled sync peer. If the peer has stalled and its reported height is greater
  // than our own best height, we will disconnect it. Otherwise, we will keep the
 diff --git a/node/netsync/manager_test.go b/node/netsync/manager_test.go
-index 72a7e91c..1eba8cb8 100644
+index 72a7e91c..84458152 100644
 --- a/node/netsync/manager_test.go
 +++ b/node/netsync/manager_test.go
-@@ -234,6 +234,74 @@ func TestInvGateWithoutSyncPeer(t *testing.T) {
+@@ -234,6 +234,157 @@ func TestInvGateWithoutSyncPeer(t *testing.T) {
  	}
  }
  
@@ -146,16 +227,29 @@ index 72a7e91c..1eba8cb8 100644
 +		return p
 +	}
 +
++	tipHash := &chainhash.Hash{0x0a}
++	otherHash := &chainhash.Hash{0x0b}
++
 +	low := mkPeer(false, "10.0.0.1:44108", 2)
++	low.UpdateLastAnnouncedBlock(otherHash)
 +	mkPeer(false, "10.0.0.2:44108", 5)
 +	mkPeer(true, "10.0.0.3:44108", 1)
 +
-+	assert.Equal(t, low, sm.pickStaleOutboundPeer(10),
++	// A peer advertising a low height whose last announced block is
++	// our tip provably holds the tip — LastBlock is only a lower
++	// bound — so it must never be rotated, even though it advertises
++	// the lowest height of all.
++	quiet := mkPeer(false, "10.0.0.4:44108", 1)
++	quiet.UpdateLastAnnouncedBlock(tipHash)
++
++	assert.Equal(t, low, sm.pickStaleOutboundPeer(10, tipHash),
 +		"the lowest strictly-behind outbound peer must be picked")
-+	assert.Nil(t, sm.pickStaleOutboundPeer(2),
++	assert.Nil(t, sm.pickStaleOutboundPeer(2, tipHash),
 +		"a peer at our height must never be rotated")
-+	assert.Nil(t, sm.pickStaleOutboundPeer(0),
++	assert.Nil(t, sm.pickStaleOutboundPeer(0, tipHash),
 +		"no peer can be below genesis height")
++	assert.Equal(t, quiet, sm.pickStaleOutboundPeer(10, otherHash),
++		"the announced-tip exemption must follow the actual tip hash")
 +}
 +
 +// TestHandleStallSampleNoSyncPeer pins the stall-sample accounting for
@@ -187,6 +281,76 @@ index 72a7e91c..1eba8cb8 100644
 +	assert.Equal(t, 0, sm.noSyncPeerSamples,
 +		"having a sync peer must reset the streak")
 +	assert.True(t, p.Connected())
++}
++
++// TestHandleNoSyncPeerAtTip pins that the no-candidate rotation never
++// runs while the chain believes it is current: at a fresh tip, having
++// no sync peer is the normal steady state and the outbound peers'
++// advertised heights lag the tip by construction, so there is nothing
++// to rotate for. The streak is reset, not merely paused, so the grace
++// period restarts when the node actually becomes stranded. The
++// genesis-only test chain is never current, so the current case is
++// posed by passing the flag explicitly — the same way
++// TestPickStaleOutboundPeer poses the tip height.
++func TestHandleNoSyncPeerAtTip(t *testing.T) {
++	sm := newTestSyncManager(t, &chaincfg.RegressionNetParams)
++	require.False(t, sm.chain.IsCurrent())
++
++	p, _ := connectedTestPeer(t, sm.chainParams, false)
++	sm.handleNewPeerMsg(p)
++	require.Nil(t, sm.syncPeer)
++
++	sm.noSyncPeerSamples = noSyncPeerRotateSamples + 5
++	sm.handleNoSyncPeer(true)
++	assert.Equal(t, 0, sm.noSyncPeerSamples,
++		"a current chain must reset the no-candidate streak")
++	assert.True(t, p.Connected(),
++		"no peer may be rotated while the chain is current")
++
++	// Not current: the streak counts again from zero.
++	sm.handleNoSyncPeer(false)
++	assert.Equal(t, 1, sm.noSyncPeerSamples)
++}
++
++// TestAnyPeerAnnouncedUnknownBlock pins the rotation stand-down
++// signal: a connected peer that announced a block we do not have is
++// proof of reachable work, so rotation must not churn the peer set
++// while selection retries are still working through the candidates.
++func TestAnyPeerAnnouncedUnknownBlock(t *testing.T) {
++	sm := newTestSyncManager(t, &chaincfg.RegressionNetParams)
++	assert.False(t, sm.anyPeerAnnouncedUnknownBlock(),
++		"no peers connected")
++
++	p, _ := connectedTestPeer(t, sm.chainParams, false)
++	sm.handleNewPeerMsg(p)
++	assert.False(t, sm.anyPeerAnnouncedUnknownBlock(),
++		"peer has announced nothing")
++
++	tip := sm.chain.BestSnapshot().Hash
++	p.UpdateLastAnnouncedBlock(&tip)
++	assert.False(t, sm.anyPeerAnnouncedUnknownBlock(),
++		"the announced block is our own tip")
++
++	unknown := chainhash.Hash{0x07}
++	p.UpdateLastAnnouncedBlock(&unknown)
++	assert.True(t, sm.anyPeerAnnouncedUnknownBlock(),
++		"the announced block is one we do not have")
++}
++
++// TestStartSyncPromotesHeightClaimWhenNotCurrent pins that the at-tip
++// promotion guard does not weaken syncing on a version-height claim
++// while the chain is not current (IBD / stranded): a lone outbound
++// candidate advertising a height above ours is promoted on that claim
++// alone, exactly as before the guard.
++func TestStartSyncPromotesHeightClaimWhenNotCurrent(t *testing.T) {
++	sm := newTestSyncManager(t, &chaincfg.RegressionNetParams)
++	require.False(t, sm.chain.IsCurrent())
++
++	p, _ := connectedTestPeer(t, sm.chainParams, false)
++	p.UpdateLastBlockHeight(5)
++	sm.handleNewPeerMsg(p)
++	require.Equal(t, p, sm.syncPeer,
++		"a height claim must still promote while the chain is not current")
 +}
 +
  // TestIsSyncCandidate pins the services a peer must advertise to be a sync candidate. Regtest gets no localhost
