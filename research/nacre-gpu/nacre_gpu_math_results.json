@@ -1,0 +1,31 @@
+{
+  "seed": 20261007,
+  "cases": 100,
+  "ranks": [
+    64,
+    128
+  ],
+  "K": [
+    1,
+    31,
+    64,
+    257,
+    1024
+  ],
+  "checks_per_case": [
+    "A noising",
+    "B noising",
+    "A correction",
+    "B correction",
+    "full integer recovery",
+    "A int8 range",
+    "B int8 range"
+  ],
+  "distribution_cases": [
+    "random sparse indices",
+    "concentrated shared-memory contention pattern"
+  ],
+  "cuda_compiled": false,
+  "cuda_executed": false,
+  "scope": "CPU mathematical equivalence only"
+}

@@ -1,0 +1,18 @@
+{
+  "proposal_version": "0.2",
+  "date": "2026-10-07",
+  "upstream_repository": "https://github.com/pearl-research-labs/pearl",
+  "upstream_commit": "2f8b770cac8f8b74be05c1fc51c2baeb76ce0701",
+  "gpu_algorithm": "Fused sparse noise preparation and signed shared-memory correction",
+  "cpu_math_cases_passed": 100,
+  "cpu_mechanism_checks_passed": 15,
+  "cuda_compiled": false,
+  "cuda_executed": false,
+  "upstream_integrated": false,
+  "production_ready": false,
+  "hashes": {
+    "nacre_gpu.cu": "8cffe60df4ff373d85345d4db1d4d1987c20027c4bf39172c57f91d6046642ea",
+    "test_nacre_gpu_math.py": "d5a8541dcc4cabc6e6bb43b3e2875ffb7e9effda5a353f330dd1bed01d75503a",
+    "nacre_reference.py": "b20bcb3b72a89a5783c9d46bdad85a249e2101c872f8d3069d97e28fc1a6d638"
+  }
+}

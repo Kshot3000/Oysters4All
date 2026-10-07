@@ -1,0 +1,126 @@
+{
+  "seed": 20261007,
+  "scope": "synthetic CPU mechanism experiments; no GPU benchmark",
+  "scheduler": {
+    "fixed_profile": {
+      "batches": 10000,
+      "median_added_ms": 0,
+      "p99_added_percent": 0.0,
+      "deadline_miss_percent": 0.0,
+      "work_retained_percent": 0.0,
+      "serial_capacity_percent": 100.0,
+      "actual_budget_overruns": 0
+    },
+    "shape_only_proxy": {
+      "batches": 10000,
+      "median_added_ms": 1.0114592979059687,
+      "p99_added_percent": 14.369992736490882,
+      "deadline_miss_percent": 29.72,
+      "work_retained_percent": 99.99999999999972,
+      "serial_capacity_percent": 95.93147961902349,
+      "actual_budget_overruns": 0
+    },
+    "nacre_2pct": {
+      "batches": 10000,
+      "median_added_ms": 0.2822628409901569,
+      "p99_added_percent": 1.9088948680111957,
+      "deadline_miss_percent": 0.0,
+      "work_retained_percent": 45.93814730724811,
+      "serial_capacity_percent": 98.83984782080846,
+      "actual_budget_overruns": 72
+    },
+    "nacre_5pct": {
+      "batches": 10000,
+      "median_added_ms": 0.5944543286467339,
+      "p99_added_percent": 4.413719697557046,
+      "deadline_miss_percent": 0.0,
+      "work_retained_percent": 67.07206858425609,
+      "serial_capacity_percent": 97.68306549575328,
+      "actual_budget_overruns": 35
+    },
+    "nacre_10pct": {
+      "batches": 10000,
+      "median_added_ms": 0.7232535495516521,
+      "p99_added_percent": 7.946768974949228,
+      "deadline_miss_percent": 0.0,
+      "work_retained_percent": 71.1794904700104,
+      "serial_capacity_percent": 97.37222590037655,
+      "actual_budget_overruns": 26
+    }
+  },
+  "sensitivity": {
+    "1.0": {
+      "batches": 10000,
+      "median_added_ms": 0.5944543286467339,
+      "p99_added_percent": 4.413719697557046,
+      "deadline_miss_percent": 0.0,
+      "work_retained_percent": 67.07206858425609,
+      "serial_capacity_percent": 97.68306549575328,
+      "actual_budget_overruns": 35
+    },
+    "0.75": {
+      "batches": 10000,
+      "median_added_ms": 0.7240860671403981,
+      "p99_added_percent": 5.729088324843087,
+      "deadline_miss_percent": 0.02,
+      "work_retained_percent": 72.64671163095502,
+      "serial_capacity_percent": 97.33863894257576,
+      "actual_budget_overruns": 2101
+    },
+    "0.5": {
+      "batches": 10000,
+      "median_added_ms": 0.8430243065861757,
+      "p99_added_percent": 8.328401379712739,
+      "deadline_miss_percent": 6.98,
+      "work_retained_percent": 78.02272894574295,
+      "serial_capacity_percent": 96.98872381166707,
+      "actual_budget_overruns": 4340
+    }
+  },
+  "tests": {
+    "passed_count": 15,
+    "cases": [
+      "job binding: every field changes ID",
+      "length prefixes separate ambiguous concatenations",
+      "hash domains are distinct",
+      "duplicate receipt rejected",
+      "overlapping token range rejected",
+      "insufficient budget rejected",
+      "token cap enforced",
+      "wrong job rejected",
+      "negative fee rejected",
+      "tampered authenticated receipt rejected (test MAC)",
+      "conservation, refund, and terminal state",
+      "500 exact low-rank noise recovery identities",
+      "correct matrix passes field check",
+      "known corrupted matrix has observed escapes below 2%",
+      "known challenge permits adaptive forgery (negative control)"
+    ],
+    "freivalds_toy_prime": 101,
+    "freivalds_trials": 10000,
+    "freivalds_false_accepts": 95
+  },
+  "audit_detection": {
+    "0.001": {
+      "16": 0.015880558184360072,
+      "64": 0.06202503617415456,
+      "256": 0.22595718113949192,
+      "300": 0.25929296784390077,
+      "600": 0.4513530925145033
+    },
+    "0.01": {
+      "16": 0.14854222890512447,
+      "64": 0.474403512474438,
+      "256": 0.9236850160934063,
+      "300": 0.9509591059287142,
+      "600": 0.997594990708689
+    },
+    "0.05": {
+      "16": 0.5598733313482347,
+      "64": 0.962475860788884,
+      "256": 0.999998017364154,
+      "300": 0.9999997924696652,
+      "600": 0.9999999999999569
+    }
+  }
+}

@@ -37,6 +37,12 @@ and linked from the [hub](https://kshot3000.github.io/Oysters4All/).
 | `guides/running-pearld.md` | ✅ done | Running a Pearl node: prebuilt installer vs source build, first sync, networks + ports, enabling RPC, connectivity, Oyster wallet, mining hookup — all facts verified against upstream docs |
 | `pages/psbt/` | ✅ built | Taproot PSBT signing workbench — create/inspect/sign/combine/finalize BIP-174 PSBTs with exact BIP-341 sighashes (keypath + scriptpath); crypto vendored from the audited sign core, 39 tests / 158 assertions |
 
+## Research
+
+| Proposal | Status | Description |
+|---|---|---|
+| [`research/nacre-gpu/`](research/nacre-gpu/) | 📐 proposal v0.2 | **Pearl Nacre GPU** — an independent proposal for Pearl's LLM mining (cuPOW): a fused sparse preparation kernel for the noising stage (CUDA prototype included, CPU math verified 100/100 in-repo), a budget-aware mining selector that protects LLM serving latency, and typed service receipts. No consensus change. GPU compile/run validation is still pending — no speedup is claimed. Cover note: [`PROPOSAL.md`](research/nacre-gpu/PROPOSAL.md) |
+
 ## How the 24/7 builder loop works
 
 1. The builder wakes up on a recurring schedule and checks the state of every
