@@ -1,0 +1,136 @@
+diff --git a/node/database/ffldb/corrupt_metadata_test.go b/node/database/ffldb/corrupt_metadata_test.go
+new file mode 100644
+index 00000000..69e4b742
+--- /dev/null
++++ b/node/database/ffldb/corrupt_metadata_test.go
+@@ -0,0 +1,94 @@
++// Copyright (c) 2025-2026 The Pearl Research Labs
++// Use of this source code is governed by an ISC
++// license that can be found in the LICENSE file.
++
++package ffldb
++
++import (
++	"path/filepath"
++	"testing"
++
++	"github.com/pearl-research-labs/pearl/node/database"
++	"github.com/syndtr/goleveldb/leveldb"
++)
++
++// TestDeserializeWriteRowShort ensures a stored write-cursor row that is
++// shorter than the serialized 12-byte form is reported as corruption
++// instead of panicking the deserializer (which runs on every database
++// open via reconcileDB).
++func TestDeserializeWriteRowShort(t *testing.T) {
++	for _, n := range []int{0, 1, 7, 8, 11} {
++		// Copy into an exact-length slice: values returned by the
++		// metadata store have cap == len, unlike a sub-slice of the
++		// serializer's array, whose spare capacity would mask the
++		// out-of-range reads.
++		row := make([]byte, n)
++		copy(row, serializeWriteRow(3, 42))
++		_, _, err := deserializeWriteRow(row)
++		if err == nil {
++			t.Errorf("len %d: expected corruption error, got nil", n)
++			continue
++		}
++		dbErr, ok := err.(database.Error)
++		if !ok || dbErr.ErrorCode != database.ErrCorruption {
++			t.Errorf("len %d: expected ErrCorruption, got %v", n, err)
++		}
++	}
++
++	// A well-formed row still round-trips, and a full-length row with a
++	// bad checksum still reports corruption.
++	fileNum, offset, err := deserializeWriteRow(serializeWriteRow(3, 42))
++	if err != nil || fileNum != 3 || offset != 42 {
++		t.Errorf("valid row: got (%d, %d, %v)", fileNum, offset, err)
++	}
++	bad := serializeWriteRow(3, 42)
++	bad[0] ^= 0xff
++	if _, _, err := deserializeWriteRow(bad); err == nil {
++		t.Error("bad checksum: expected corruption error, got nil")
++	}
++}
++
++// TestCreateBucketCorruptBucketID corrupts the stored current-bucket-ID
++// value in the metadata database and ensures creating a bucket reports
++// corruption instead of panicking in nextBucketID.
++func TestCreateBucketCorruptBucketID(t *testing.T) {
++	dbPath := t.TempDir()
++	idb, err := openDB(dbPath, blockDataNet, true, defaultFlushSecs)
++	if err != nil {
++		t.Fatalf("openDB create: %v", err)
++	}
++	if err := idb.Close(); err != nil {
++		t.Fatalf("close: %v", err)
++	}
++
++	// Truncate the stored bucket ID to two bytes, simulating a torn or
++	// corrupt metadata write.
++	ldb, err := leveldb.OpenFile(filepath.Join(dbPath, metadataDbName), nil)
++	if err != nil {
++		t.Fatalf("open metadata: %v", err)
++	}
++	if err := ldb.Put(curBucketIDKeyName, []byte{0x00, 0x02}, nil); err != nil {
++		t.Fatalf("corrupt bucket id: %v", err)
++	}
++	if err := ldb.Close(); err != nil {
++		t.Fatalf("close metadata: %v", err)
++	}
++
++	idb, err = openDB(dbPath, blockDataNet, false, defaultFlushSecs)
++	if err != nil {
++		t.Fatalf("openDB reopen: %v", err)
++	}
++	defer idb.Close()
++
++	err = idb.Update(func(tx database.Tx) error {
++		_, err := tx.Metadata().CreateBucket([]byte("corrupt-id-test"))
++		return err
++	})
++	if err == nil {
++		t.Fatal("expected corruption error, got nil")
++	}
++	dbErr, ok := err.(database.Error)
++	if !ok || dbErr.ErrorCode != database.ErrCorruption {
++		t.Fatalf("expected ErrCorruption, got %v", err)
++	}
++}
+diff --git a/node/database/ffldb/db.go b/node/database/ffldb/db.go
+index d0e4d1c5..85a1735b 100644
+--- a/node/database/ffldb/db.go
++++ b/node/database/ffldb/db.go
+@@ -1105,6 +1105,11 @@ func (tx *transaction) deleteKey(key []byte, notifyIterators bool) {
+ func (tx *transaction) nextBucketID() ([4]byte, error) {
+ 	// Load the currently highest used bucket ID.
+ 	curIDBytes := tx.fetchKey(curBucketIDKeyName)
++	if len(curIDBytes) != 4 {
++		str := fmt.Sprintf("corrupt current bucket ID in metadata - "+
++			"got %d bytes, want 4", len(curIDBytes))
++		return [4]byte{}, makeDbErr(database.ErrCorruption, str, nil)
++	}
+ 	curBucketNum := binary.BigEndian.Uint32(curIDBytes)
+ 
+ 	// Increment and update the current bucket ID and return it.
+diff --git a/node/database/ffldb/reconcile.go b/node/database/ffldb/reconcile.go
+index f410b96e..276ea176 100644
+--- a/node/database/ffldb/reconcile.go
++++ b/node/database/ffldb/reconcile.go
+@@ -31,6 +31,15 @@ func serializeWriteRow(curBlockFileNum, curFileOffset uint32) []byte {
+ // deserializeWriteRow deserializes the write cursor location stored in the
+ // metadata.  Returns ErrCorruption if the checksum of the entry doesn't match.
+ func deserializeWriteRow(writeRow []byte) (uint32, uint32, error) {
++	// Ensure the row is long enough to hold the file number, offset, and
++	// checksum before slicing it below.  A shorter row is corrupt
++	// metadata, not a reason to panic while opening the database.
++	if len(writeRow) < 12 {
++		str := fmt.Sprintf("metadata for write cursor is too short - "+
++			"got %d bytes, want 12", len(writeRow))
++		return 0, 0, makeDbErr(database.ErrCorruption, str, nil)
++	}
++
+ 	// Ensure the checksum matches.  The checksum is at the end.
+ 	gotChecksum := crc32.Checksum(writeRow[:8], castagnoli)
+ 	wantChecksumBytes := writeRow[8:12]
