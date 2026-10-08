@@ -37,3 +37,24 @@ rebase). Bugbot comments on #411-#413 re-checked this run: summary
 only, Low Risk, no findings (contrast #385/#388, whose findings
 were already fixed at their tips). No showcase digest, no X post —
 one narrowing fix is below the newsworthy gate.
+
+## Follow-up (Pearl run ~13:13 CDT, 2026-10-08) — a ninth handler, found by Bugbot
+
+Cursor Bugbot's review of PR #415 (against the tip, 13509127)
+flagged listreceivedbyaddress as still wrapping. Verified against
+the branch tip: REAL. listReceivedByAddress never appeared in the
+cast-site inventory above because it narrows through a local —
+`minConf := *cmd.MinConf`, then `int32(minConf)` inside the
+endHeight arithmetic — so the `int32(*cmd.…)` grep that built the
+"9 sites / only casts" claim never saw it, and the claim above is
+corrected here: the handler set is nine, not eight. Defect shape:
+minconf 2^32+1 silently became 1 (endHeight = tip); 2^31 wrapped
+negative through the int32 endHeight computation.
+
+Fix pushed to #415's branch as 0a5993ff: validate with
+checkedConfCount before any wallet dereference (top of the
+handler), arithmetic now uses the checked int32 directly. The
+handler is covered in TestHandlersRejectOutOfRangeConfCounts —
+own RED: 2^32+1 / 2^31 / -1 all reached the wallet unchecked
+(nil-wallet seam); GREEN after, full legacyrpc suite + race clean,
+gofmt/vet clean. Bugbot answered inline on the PR with the commit.

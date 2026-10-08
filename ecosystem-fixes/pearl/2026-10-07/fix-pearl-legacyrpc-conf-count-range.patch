@@ -1,5 +1,5 @@
 diff --git a/wallet/rpc/legacyrpc/methods.go b/wallet/rpc/legacyrpc/methods.go
-index 5d4e38d8..e752e843 100644
+index 5d4e38d8..d0ed0075 100644
 --- a/wallet/rpc/legacyrpc/methods.go
 +++ b/wallet/rpc/legacyrpc/methods.go
 @@ -11,6 +11,7 @@ import (
@@ -138,7 +138,33 @@ index 5d4e38d8..e752e843 100644
  	)
  	if err != nil {
  		return nil, err
-@@ -1307,7 +1355,16 @@ func listUnspent(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
+@@ -1099,6 +1147,11 @@ func listReceivedByAccount(icmd interface{}, w *wallet.Wallet) (interface{}, err
+ func listReceivedByAddress(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
+ 	cmd := icmd.(*btcjson.ListReceivedByAddressCmd)
+ 
++	minConf, err := checkedConfCount("minconf", *cmd.MinConf)
++	if err != nil {
++		return nil, err
++	}
++
+ 	// Intermediate data for each address.
+ 	type AddrData struct {
+ 		// Total amount received.
+@@ -1126,12 +1179,11 @@ func listReceivedByAddress(icmd interface{}, w *wallet.Wallet) (interface{}, err
+ 		allAddrData[address] = AddrData{}
+ 	}
+ 
+-	minConf := *cmd.MinConf
+ 	var endHeight int32
+ 	if minConf == 0 {
+ 		endHeight = -1
+ 	} else {
+-		endHeight = syncBlock.Height - int32(minConf) + 1
++		endHeight = syncBlock.Height - minConf + 1
+ 	}
+ 	err = wallet.UnstableAPI(w).RangeTransactions(0, endHeight, func(details []wtxmgr.TxDetails) (bool, error) {
+ 		confirmations := confirms(details[0].Block.Height, syncBlock.Height)
+@@ -1307,7 +1359,16 @@ func listUnspent(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
  		}
  	}
  
@@ -156,7 +182,7 @@ index 5d4e38d8..e752e843 100644
  }
  
  // lockUnspent handles the lockunspent command.
-@@ -1426,6 +1483,11 @@ func sendFrom(icmd interface{}, w *wallet.Wallet, chainClient *chain.RPCClient)
+@@ -1426,6 +1487,11 @@ func sendFrom(icmd interface{}, w *wallet.Wallet, chainClient *chain.RPCClient)
  		}
  	}
  
@@ -168,7 +194,7 @@ index 5d4e38d8..e752e843 100644
  	account, err := w.AccountNumber(
  		waddrmgr.KeyScopeBIP0086, cmd.FromAccount,
  	)
-@@ -1437,10 +1499,6 @@ func sendFrom(icmd interface{}, w *wallet.Wallet, chainClient *chain.RPCClient)
+@@ -1437,10 +1503,6 @@ func sendFrom(icmd interface{}, w *wallet.Wallet, chainClient *chain.RPCClient)
  	if cmd.Amount < 0 {
  		return nil, ErrNeedPositiveAmount
  	}
@@ -179,7 +205,7 @@ index 5d4e38d8..e752e843 100644
  	amt, err := btcutil.NewAmount(cmd.Amount)
  	if err != nil {
  		return nil, err
-@@ -1476,15 +1534,14 @@ func sendMany(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
+@@ -1476,15 +1538,14 @@ func sendMany(icmd interface{}, w *wallet.Wallet) (interface{}, error) {
  		}
  	}
  
@@ -201,10 +227,10 @@ index 5d4e38d8..e752e843 100644
  	// Recreate address/amount pairs, using dcrutil.Amount.
 diff --git a/wallet/rpc/legacyrpc/methods_minconf_test.go b/wallet/rpc/legacyrpc/methods_minconf_test.go
 new file mode 100644
-index 00000000..64583b97
+index 00000000..6fb2456d
 --- /dev/null
 +++ b/wallet/rpc/legacyrpc/methods_minconf_test.go
-@@ -0,0 +1,146 @@
+@@ -0,0 +1,154 @@
 +// Copyright (c) 2026 The Pearl Research Labs
 +// Use of this source code is governed by an ISC
 +// license that can be found in the LICENSE file.
@@ -271,6 +297,14 @@ index 00000000..64583b97
 +			return listReceivedByAccount(
 +				&btcjson.ListReceivedByAccountCmd{
 +					MinConf: intPtr(minConf),
++				}, nil)
++		}},
++		{"listreceivedbyaddress", func(minConf int) (interface{}, error) {
++			includeEmpty := false
++			return listReceivedByAddress(
++				&btcjson.ListReceivedByAddressCmd{
++					MinConf:      intPtr(minConf),
++					IncludeEmpty: &includeEmpty,
 +				}, nil)
 +		}},
 +		{"listunspent", func(minConf int) (interface{}, error) {
