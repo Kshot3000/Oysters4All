@@ -1,0 +1,164 @@
+diff --git a/wallet/waddrmgr/db.go b/wallet/waddrmgr/db.go
+index b54796a2..d878073f 100644
+--- a/wallet/waddrmgr/db.go
++++ b/wallet/waddrmgr/db.go
+@@ -413,6 +413,10 @@ func fetchManagerVersion(ns walletdb.ReadBucket) (uint32, error) {
+ 		str := "required version number not stored in database"
+ 		return 0, managerError(ErrDatabase, str, nil)
+ 	}
++	if len(verBytes) != 4 {
++		str := "malformed version number stored in database"
++		return 0, managerError(ErrDatabase, str, nil)
++	}
+ 	version := binary.LittleEndian.Uint32(verBytes)
+ 	return version, nil
+ }
+@@ -2409,8 +2413,10 @@ func fetchBirthdayBlockVerification(ns walletdb.ReadBucket) bool {
+ 	verifiedValue := bucket.Get(birthdayBlockVerifiedName)
+ 
+ 	// If there is no verification status, we can assume it has not been
+-	// verified yet.
+-	if verifiedValue == nil {
++	// verified yet. A stored value that is too short to hold the uint16
++	// written by putBirthdayBlockVerification is malformed; fail safe
++	// the same way rather than panicking or claiming verification.
++	if len(verifiedValue) != 2 {
+ 		return false
+ 	}
+ 
+diff --git a/wallet/waddrmgr/db_scalar_test.go b/wallet/waddrmgr/db_scalar_test.go
+new file mode 100644
+index 00000000..7e960d32
+--- /dev/null
++++ b/wallet/waddrmgr/db_scalar_test.go
+@@ -0,0 +1,130 @@
++// Copyright (c) 2025-2026 The Pearl Research Labs
++// Use of this source code is governed by an ISC
++// license that can be found in the LICENSE file.
++
++package waddrmgr
++
++import (
++	"fmt"
++	"testing"
++
++	"github.com/pearl-research-labs/pearl/wallet/walletdb"
++)
++
++// TestFetchManagerVersionTruncated stores version values shorter than the
++// 4 bytes the format requires and ensures fetchManagerVersion reports the
++// corruption as an error instead of panicking. Every neighbouring scalar
++// fetch in this file (watching-only flag, last account, birthday, synced-to)
++// already length-checks its value; the version fetch only nil-checked.
++func TestFetchManagerVersionTruncated(t *testing.T) {
++	t.Parallel()
++
++	teardown, db, _ := setupManager(t)
++	defer teardown()
++
++	for _, size := range []int{1, 2, 3} {
++		size := size
++		err := walletdb.Update(db, func(tx walletdb.ReadWriteTx) error {
++			ns := tx.ReadWriteBucket(waddrmgrNamespaceKey)
++			mainBucket := ns.NestedReadWriteBucket(mainBucketName)
++			return mainBucket.Put(mgrVersionName, make([]byte, size))
++		})
++		if err != nil {
++			t.Fatalf("unable to store %d-byte version value: %v",
++				size, err)
++		}
++
++		err = walletdb.View(db, func(tx walletdb.ReadTx) error {
++			ns := tx.ReadBucket(waddrmgrNamespaceKey)
++			if _, err := fetchManagerVersion(ns); err == nil {
++				return fmt.Errorf("expected error for %d-byte "+
++					"version value, got nil", size)
++			}
++			return nil
++		})
++		if err != nil {
++			t.Fatal(err)
++		}
++	}
++
++	// A well-formed version must still round-trip.
++	err := walletdb.Update(db, func(tx walletdb.ReadWriteTx) error {
++		ns := tx.ReadWriteBucket(waddrmgrNamespaceKey)
++		return putManagerVersion(ns, 7)
++	})
++	if err != nil {
++		t.Fatalf("unable to store well-formed version: %v", err)
++	}
++	err = walletdb.View(db, func(tx walletdb.ReadTx) error {
++		ns := tx.ReadBucket(waddrmgrNamespaceKey)
++		version, err := fetchManagerVersion(ns)
++		if err != nil {
++			return fmt.Errorf("unexpected error for well-formed "+
++				"version: %v", err)
++		}
++		if version != 7 {
++			return fmt.Errorf("version mismatch: got %d, want 7",
++				version)
++		}
++		return nil
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++}
++
++// TestFetchBirthdayBlockVerificationTruncated stores a 1-byte verification
++// value — too short for the stored uint16 — and ensures the fetch reports
++// "not verified" instead of panicking. A missing value already means not
++// verified; a malformed one must fail safe the same way, never crash wallet
++// startup and never claim the birthday block was verified.
++func TestFetchBirthdayBlockVerificationTruncated(t *testing.T) {
++	t.Parallel()
++
++	teardown, db, _ := setupManager(t)
++	defer teardown()
++
++	err := walletdb.Update(db, func(tx walletdb.ReadWriteTx) error {
++		ns := tx.ReadWriteBucket(waddrmgrNamespaceKey)
++		syncBucket := ns.NestedReadWriteBucket(syncBucketName)
++		return syncBucket.Put(birthdayBlockVerifiedName, []byte{0x01})
++	})
++	if err != nil {
++		t.Fatalf("unable to store truncated verification value: %v", err)
++	}
++
++	err = walletdb.View(db, func(tx walletdb.ReadTx) error {
++		ns := tx.ReadBucket(waddrmgrNamespaceKey)
++		if fetchBirthdayBlockVerification(ns) {
++			return fmt.Errorf("expected truncated verification " +
++				"value to report not verified")
++		}
++		return nil
++	})
++	if err != nil {
++		t.Fatal(err)
++	}
++
++	// Well-formed values must still round-trip both ways.
++	for _, want := range []bool{true, false} {
++		want := want
++		err := walletdb.Update(db, func(tx walletdb.ReadWriteTx) error {
++			ns := tx.ReadWriteBucket(waddrmgrNamespaceKey)
++			return putBirthdayBlockVerification(ns, want)
++		})
++		if err != nil {
++			t.Fatalf("unable to store verification=%v: %v", want, err)
++		}
++		err = walletdb.View(db, func(tx walletdb.ReadTx) error {
++			ns := tx.ReadBucket(waddrmgrNamespaceKey)
++			if got := fetchBirthdayBlockVerification(ns); got != want {
++				return fmt.Errorf("verification mismatch: got "+
++					"%v, want %v", got, want)
++			}
++			return nil
++		})
++		if err != nil {
++			t.Fatal(err)
++		}
++	}
++}
