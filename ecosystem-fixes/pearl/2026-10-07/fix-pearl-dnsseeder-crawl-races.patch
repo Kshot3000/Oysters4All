@@ -1,0 +1,155 @@
+diff --git a/dnsseeder/crawler.go b/dnsseeder/crawler.go
+index 90d97657..9e333cc7 100644
+--- a/dnsseeder/crawler.go
++++ b/dnsseeder/crawler.go
+@@ -112,7 +112,13 @@ func crawlIP(s *dnsseeder, r *result) ([]*wire.NetAddress, *crawlError) {
+ 			errors.New("no verack received within 30s")}
+ 	}
+ 
+-	if len(s.theList) > s.maxSize {
++	// theList is mutated under s.mtx by processResult/auditNodes on the
++	// seeder goroutine; reading it here without the lock races with those
++	// writes (and can fatal with concurrent map read/write).
++	s.mtx.RLock()
++	full := len(s.theList) > s.maxSize
++	s.mtx.RUnlock()
++	if full {
+ 		p.Disconnect()
+ 		p.WaitForDisconnect()
+ 		return nil, nil
+diff --git a/dnsseeder/race_test.go b/dnsseeder/race_test.go
+new file mode 100644
+index 00000000..bce6ff8f
+--- /dev/null
++++ b/dnsseeder/race_test.go
+@@ -0,0 +1,102 @@
++package main
++
++import (
++	"net"
++	"net/http/httptest"
++	"strconv"
++	"sync"
++	"testing"
++	"time"
++
++	"github.com/pearl-research-labs/pearl/node/chaincfg"
++	"github.com/pearl-research-labs/pearl/node/wire"
++)
++
++// TestCrawlStateRace drives startCrawlers (which marks nodes crawl-active)
++// concurrently with the HTTP node-details handler (which renders a node's
++// crawl state). Both sides used to run under s.mtx.RLock — a read lock does
++// not exclude other read-lock holders, so the handler read nd.crawlActive /
++// nd.crawlStart while startCrawlers wrote them: a genuine data race.
++// Run with: go test -race -run TestCrawlStateRace ./dnsseeder/
++func TestCrawlStateRace(t *testing.T) {
++	params := chaincfg.MainNetParams
++	s := &dnsseeder{
++		name:        "racetest",
++		chainParams: &params,
++		port:        44112,
++		maxSize:     100000,
++		maxStart:    make([]uint32, maxStatusTypes),
++		delay:       make([]int64, maxStatusTypes),
++	}
++	for i := range s.maxStart {
++		s.maxStart[i] = 100000
++		// Negative delay: every node is always due for a crawl, so
++		// startCrawlers keeps writing crawl state on every pass even
++		// though processResult stamps lastTry on failure.
++		s.delay[i] = -1_000_000_000
++	}
++	s.theList = make(map[string]*node)
++
++	const nNodes = 200
++	keys := make([]string, 0, nNodes)
++	for i := 0; i < nNodes; i++ {
++		// 127.0.0.0/8 is loopback; port 1 refuses instantly, so crawlers
++		// fail fast at dial and report back without any real peer.
++		ip := net.IPv4(127, 0, byte(i>>8), byte(i+1))
++		na := wire.NewNetAddressIPPort(ip, s.port, 1)
++		na.Timestamp = time.Now()
++		key := net.JoinHostPort(na.IP.String(), strconv.Itoa(int(na.Port)))
++		s.theList[key] = &node{na: na, status: statusRG}
++		keys = append(keys, key)
++	}
++	s.counts.NdStatus = make([]uint32, maxStatusTypes)
++	s.counts.NdStarts = make([]uint32, maxStatusTypes)
++	s.counts.DNSCounts = make([]uint32, maxDNSTypes)
++
++	oldSeeders := config.seeders
++	config.seeders = map[string]*dnsseeder{s.name: s}
++	defer func() { config.seeders = oldSeeders }()
++
++	results := make(chan *result, nNodes*4)
++
++	stop := make(chan struct{})
++	var readers sync.WaitGroup
++	for r := 0; r < 4; r++ {
++		readers.Add(1)
++		go func(r int) {
++			defer readers.Done()
++			for i := 0; ; i++ {
++				select {
++				case <-stop:
++					return
++				default:
++				}
++				key := keys[(r+i)%len(keys)]
++				req := httptest.NewRequest("GET",
++					"/node?s="+s.name+"&nd="+key, nil)
++				nodeHandler(httptest.NewRecorder(), req)
++			}
++		}(r)
++	}
++
++	// Writer side: repeatedly start crawlers and fold their (failed)
++	// results back, which clears crawlActive so the next pass writes
++	// the crawl state again.
++	for pass := 0; pass < 30; pass++ {
++		s.startCrawlers(results)
++		for {
++			drained := true
++			select {
++			case res := <-results:
++				s.processResult(res)
++				drained = false
++			default:
++			}
++			if drained {
++				break
++			}
++		}
++	}
++	close(stop)
++	readers.Wait()
++}
+diff --git a/dnsseeder/seeder.go b/dnsseeder/seeder.go
+index 44d00c3d..fbb392c9 100644
+--- a/dnsseeder/seeder.go
++++ b/dnsseeder/seeder.go
+@@ -177,8 +177,12 @@ func (s *dnsseeder) runSeeder(done <-chan struct{}, wg *sync.WaitGroup) {
+ // goroutines if there are spare goroutine slots available
+ func (s *dnsseeder) startCrawlers(resultsChan chan *result) {
+ 
+-	s.mtx.RLock()
+-	defer s.mtx.RUnlock()
++	// This must be the write lock, not RLock: the scan below mutates
++	// nd.crawlActive and nd.crawlStart, and RLock does not exclude other
++	// RLock holders — the HTTP status handlers read those same fields
++	// under RLock, so the two raced.
++	s.mtx.Lock()
++	defer s.mtx.Unlock()
+ 
+ 	tcount := uint32(len(s.theList))
+ 	if tcount == 0 {
+@@ -223,7 +227,7 @@ func (s *dnsseeder) startCrawlers(resultsChan chan *result) {
+ 	// for other work
+ 	go updateNodeCounts(s, tcount, started, totals)
+ 
+-	// returns and read lock released
++	// returns and write lock released
+ }
+ 
+ // processResult will add new nodes to the list and update the status of the crawled node
