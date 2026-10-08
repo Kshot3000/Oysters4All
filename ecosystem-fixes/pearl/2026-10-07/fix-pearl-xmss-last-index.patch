@@ -1,0 +1,132 @@
+From ff81677f90eccc6fb1f005a860afb89458679a59 Mon Sep 17 00:00:00 2001
+From: Kshot3000 <kshot9000@gmail.com>
+Date: Thu, 8 Oct 2026 04:21:26 +0000
+Subject: [PATCH] fix(xmss): don't wipe the secret key before signing its last
+ signature
+
+xmss_core_sign wiped the key as soon as idx reached the last valid
+index, before the signature was computed: the signature embedded the
+wiped 0xFFFFFFFF index and its WOTS/auth path was computed from the
+zeroed sk_seed/sk_prf/pub_root/pub_seed (pointers into the same
+buffer). Signing at msg_uid=31 returned success with a signature no
+verifier accepts.
+
+Defer the wipe for the last valid index until after the signature is
+complete; idx > max and the height-64 case still wipe and return -2
+immediately. Adds a Go regression test (uid 30 control, uid 31 index
+bytes + verification, uid 32 rejected). Fixes #389.
+---
+ xmss/external/xmss_core.c   | 31 +++++++++++++++++++-----
+ xmss/xmss_lastindex_test.go | 47 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 72 insertions(+), 6 deletions(-)
+ create mode 100644 xmss/xmss_lastindex_test.go
+
+diff --git a/xmss/external/xmss_core.c b/xmss/external/xmss_core.c
+index f3476f0e..5d0ea11c 100644
+--- a/xmss/external/xmss_core.c
++++ b/xmss/external/xmss_core.c
+@@ -175,17 +175,28 @@ int xmss_core_sign(const xmss_params *params,
+      * to be on the safe side (there is no index value left to indicate that the 
+      * key is finished, hence external handling would be necessary)
+      */ 
+-    if (idx >= ((1ULL << params->full_height) - 1)) {
++    /* Whether this is the last usable index. The key is wiped when it is
++     * exhausted, but only once no signature is computed from it anymore:
++     * for idx == max a signature is still produced below, so the wipe of
++     * that case is deferred to the end of this function. Wiping here
++     * would destroy the key material the signature is computed from and
++     * corrupt the index copied into the signature. */
++    const int is_last = (idx == ((1ULL << params->full_height) - 1));
++    if (idx > ((1ULL << params->full_height) - 1)) {
+         // Delete secret key here. We only do this in memory, production code
+         // has to make sure that this happens on disk.
+         memset(sk, 0xFF, params->index_bytes);
+         memset(sk + params->index_bytes, 0, (params->sk_bytes - params->index_bytes));
+-        if (idx > ((1ULL << params->full_height) - 1))
+-            return -2; // We already used all one-time keys
+-        if ((params->full_height == 64) && (idx == ((1ULL << params->full_height) - 1))) 
+-                return -2; // We already used all one-time keys
++        return -2; // We already used all one-time keys
+     }
+-    
++    if ((params->full_height == 64) && is_last) {
++        // Delete secret key here. We only do this in memory, production code
++        // has to make sure that this happens on disk.
++        memset(sk, 0xFF, params->index_bytes);
++        memset(sk + params->index_bytes, 0, (params->sk_bytes - params->index_bytes));
++        return -2; // We already used all one-time keys
++    }
++
+     memcpy(sm, sk, params->index_bytes);
+ 
+     /*************************************************************************
+@@ -225,5 +236,13 @@ int xmss_core_sign(const xmss_params *params,
+         sm += params->tree_height*params->n;
+     }
+ 
++    if (is_last) {
++        // This was the last possible signature: delete the secret key.
++        // We only do this in memory, production code has to make sure
++        // that this happens on disk.
++        memset(sk, 0xFF, params->index_bytes);
++        memset(sk + params->index_bytes, 0, (params->sk_bytes - params->index_bytes));
++    }
++
+     return 0;
+ }
+diff --git a/xmss/xmss_lastindex_test.go b/xmss/xmss_lastindex_test.go
+new file mode 100644
+index 00000000..cd11d5ba
+--- /dev/null
++++ b/xmss/xmss_lastindex_test.go
+@@ -0,0 +1,47 @@
++//go:build xmss
++
++package xmss
++
++import (
++	"testing"
++
++	"github.com/stretchr/testify/require"
++)
++
++// Regression test for the last-index signing bug: with
++// XMSS-SHAKE256_5_256 the documented range is 0 <= msgUID < 32, so
++// msgUID 31 (the last one-time key) must produce a signature that
++// verifies and that embeds index 31, not an exhausted-key marker.
++func TestSignLastValidIndexVerifies(t *testing.T) {
++	var privSeed [PrivateSeedLen]byte
++	var pubSeed [PublicSeedLen]byte
++	for i := range privSeed {
++		privSeed[i] = byte(i)
++	}
++	for i := range pubSeed {
++		pubSeed[i] = byte(0xA0 + i)
++	}
++
++	pk, sk, err := Keygen(privSeed, pubSeed)
++	require.NoError(t, err)
++
++	var msg [MsgLen]byte
++	copy(msg[:], "last-index-regression")
++
++	// Control: the second-to-last index signs and verifies.
++	sig30, err := Sign(30, sk, msg)
++	require.NoError(t, err)
++	require.Equal(t, []byte{0, 0, 0, 30}, sig30[:4])
++	require.True(t, Verify(pk, msg, sig30), "uid=30 should verify")
++
++	// The last valid index must also sign and verify.
++	sig31, err := Sign(31, sk, msg)
++	require.NoError(t, err)
++	require.Equal(t, []byte{0, 0, 0, 31}, sig31[:4],
++		"signature must embed index 31, not the wiped 0xFFFFFFFF marker")
++	require.True(t, Verify(pk, msg, sig31), "uid=31 should verify")
++
++	// Out of range is rejected.
++	_, err = Sign(32, sk, msg)
++	require.Error(t, err)
++}
+-- 
+2.43.0
+
