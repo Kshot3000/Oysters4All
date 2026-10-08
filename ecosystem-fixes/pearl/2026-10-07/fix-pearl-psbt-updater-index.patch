@@ -1,0 +1,284 @@
+diff --git a/node/btcutil/psbt/finalizer.go b/node/btcutil/psbt/finalizer.go
+index 66b701cf..0c910082 100644
+--- a/node/btcutil/psbt/finalizer.go
++++ b/node/btcutil/psbt/finalizer.go
+@@ -76,6 +76,10 @@ func isFinalizable(p *Packet, inIndex int) bool {
+ // returning true with no error if it succeeds, OR if the input has already
+ // been finalized.
+ func MaybeFinalize(p *Packet, inIndex int) (bool, error) {
++	if inIndex < 0 || inIndex >= len(p.Inputs) {
++		return false, ErrInvalidPsbtFormat
++	}
++
+ 	if isFinalized(p, inIndex) {
+ 		return true, nil
+ 	}
+@@ -112,6 +116,10 @@ func MaybeFinalizeAll(p *Packet) error {
+ // are left intact as they may be needed for validation (?).  If there is any
+ // invalid or incomplete data, an error is returned.
+ func Finalize(p *Packet, inIndex int) error {
++	if inIndex < 0 || inIndex >= len(p.Inputs) {
++		return ErrInvalidPsbtFormat
++	}
++
+ 	pInput := p.Inputs[inIndex]
+ 	if pInput.WitnessUtxo == nil {
+ 		return fmt.Errorf("non-witness UTXO is not supported: %w", ErrInvalidPsbtFormat)
+diff --git a/node/btcutil/psbt/signer.go b/node/btcutil/psbt/signer.go
+index bffc66db..d9cee49d 100644
+--- a/node/btcutil/psbt/signer.go
++++ b/node/btcutil/psbt/signer.go
+@@ -46,6 +46,10 @@ const (
+ func (u *Updater) Sign(inIndex int, sig []byte, pubKey []byte,
+ 	redeemScript []byte, witnessScript []byte) (SignOutcome, error) {
+ 
++	if inIndex < 0 || inIndex >= len(u.Upsbt.Inputs) {
++		return SignInvalid, ErrInvalidPsbtFormat
++	}
++
+ 	if isFinalized(u.Upsbt, inIndex) {
+ 		return SignFinalized, nil
+ 	}
+diff --git a/node/btcutil/psbt/updater.go b/node/btcutil/psbt/updater.go
+index 49730d90..67fd7649 100644
+--- a/node/btcutil/psbt/updater.go
++++ b/node/btcutil/psbt/updater.go
+@@ -41,7 +41,7 @@ func NewUpdater(p *Packet) (*Updater, error) {
+ // source of the corresponding prevOut), and the input index. If addition of
+ // this key-value pair to the Psbt fails, an error is returned.
+ func (u *Updater) AddInNonWitnessUtxo(tx *wire.MsgTx, inIndex int) error {
+-	if inIndex > len(u.Upsbt.Inputs)-1 {
++	if inIndex < 0 || inIndex > len(u.Upsbt.Inputs)-1 {
+ 		return ErrInvalidPrevOutNonWitnessTransaction
+ 	}
+ 
+@@ -60,7 +60,7 @@ func (u *Updater) AddInNonWitnessUtxo(tx *wire.MsgTx, inIndex int) error {
+ // the output information is sufficient, and the input index. If addition of
+ // this key-value pair to the Psbt fails, an error is returned.
+ func (u *Updater) AddInWitnessUtxo(txout *wire.TxOut, inIndex int) error {
+-	if inIndex > len(u.Upsbt.Inputs)-1 {
++	if inIndex < 0 || inIndex > len(u.Upsbt.Inputs)-1 {
+ 		return ErrInvalidPsbtFormat
+ 	}
+ 
+@@ -93,6 +93,10 @@ func (u *Updater) addPartialSignature(inIndex int, sig []byte,
+ 		return ErrInvalidPsbtFormat
+ 	}
+ 
++	if inIndex < 0 || inIndex >= len(u.Upsbt.Inputs) {
++		return ErrInvalidPsbtFormat
++	}
++
+ 	pInput := u.Upsbt.Inputs[inIndex]
+ 
+ 	// First check; don't add duplicates.
+@@ -232,6 +236,10 @@ func (u *Updater) addPartialSignature(inIndex int, sig []byte,
+ func (u *Updater) AddInSighashType(sighashType txscript.SigHashType,
+ 	inIndex int) error {
+ 
++	if inIndex < 0 || inIndex >= len(u.Upsbt.Inputs) {
++		return ErrInvalidPsbtFormat
++	}
++
+ 	u.Upsbt.Inputs[inIndex].SighashType = sighashType
+ 
+ 	if err := u.Upsbt.SanityCheck(); err != nil {
+@@ -247,6 +255,10 @@ func (u *Updater) AddInSighashType(sighashType txscript.SigHashType,
+ func (u *Updater) AddInRedeemScript(redeemScript []byte,
+ 	inIndex int) error {
+ 
++	if inIndex < 0 || inIndex >= len(u.Upsbt.Inputs) {
++		return ErrInvalidPsbtFormat
++	}
++
+ 	u.Upsbt.Inputs[inIndex].RedeemScript = redeemScript
+ 
+ 	if err := u.Upsbt.SanityCheck(); err != nil {
+@@ -263,6 +275,10 @@ func (u *Updater) AddInRedeemScript(redeemScript []byte,
+ func (u *Updater) AddInWitnessScript(witnessScript []byte,
+ 	inIndex int) error {
+ 
++	if inIndex < 0 || inIndex >= len(u.Upsbt.Inputs) {
++		return ErrInvalidPsbtFormat
++	}
++
+ 	u.Upsbt.Inputs[inIndex].WitnessScript = witnessScript
+ 
+ 	if err := u.Upsbt.SanityCheck(); err != nil {
+@@ -292,6 +308,10 @@ func (u *Updater) AddInBip32Derivation(masterKeyFingerprint uint32,
+ 		return ErrInvalidPsbtFormat
+ 	}
+ 
++	if inIndex < 0 || inIndex >= len(u.Upsbt.Inputs) {
++		return ErrInvalidPsbtFormat
++	}
++
+ 	// Don't allow duplicate keys
+ 	for _, x := range u.Upsbt.Inputs[inIndex].Bip32Derivation {
+ 		if bytes.Equal(x.PubKey, bip32Derivation.PubKey) {
+@@ -330,6 +350,10 @@ func (u *Updater) AddOutBip32Derivation(masterKeyFingerprint uint32,
+ 		return ErrInvalidPsbtFormat
+ 	}
+ 
++	if outIndex < 0 || outIndex >= len(u.Upsbt.Outputs) {
++		return ErrInvalidPsbtFormat
++	}
++
+ 	// Don't allow duplicate keys
+ 	for _, x := range u.Upsbt.Outputs[outIndex].Bip32Derivation {
+ 		if bytes.Equal(x.PubKey, bip32Derivation.PubKey) {
+@@ -353,6 +377,10 @@ func (u *Updater) AddOutBip32Derivation(masterKeyFingerprint uint32,
+ func (u *Updater) AddOutRedeemScript(redeemScript []byte,
+ 	outIndex int) error {
+ 
++	if outIndex < 0 || outIndex >= len(u.Upsbt.Outputs) {
++		return ErrInvalidPsbtFormat
++	}
++
+ 	u.Upsbt.Outputs[outIndex].RedeemScript = redeemScript
+ 
+ 	if err := u.Upsbt.SanityCheck(); err != nil {
+@@ -367,6 +395,10 @@ func (u *Updater) AddOutRedeemScript(redeemScript []byte,
+ func (u *Updater) AddOutWitnessScript(witnessScript []byte,
+ 	outIndex int) error {
+ 
++	if outIndex < 0 || outIndex >= len(u.Upsbt.Outputs) {
++		return ErrInvalidPsbtFormat
++	}
++
+ 	u.Upsbt.Outputs[outIndex].WitnessScript = witnessScript
+ 
+ 	if err := u.Upsbt.SanityCheck(); err != nil {
+diff --git a/node/btcutil/psbt/updater_index_test.go b/node/btcutil/psbt/updater_index_test.go
+new file mode 100644
+index 00000000..d3499499
+--- /dev/null
++++ b/node/btcutil/psbt/updater_index_test.go
+@@ -0,0 +1,127 @@
++// Copyright (c) 2025-2026 The Pearl Research Labs
++// Use of this source code is governed by an ISC
++// license that can be found in the LICENSE file.
++
++package psbt
++
++import (
++	"bytes"
++	"encoding/hex"
++	"fmt"
++	"testing"
++
++	"github.com/pearl-research-labs/pearl/node/txscript"
++	"github.com/pearl-research-labs/pearl/node/wire"
++	"github.com/stretchr/testify/require"
++)
++
++// callErr runs f and converts a panic into an error so a single
++// out-of-range index reports as a test failure for that entry point
++// instead of aborting the whole table.
++func callErr(f func() error) (err error) {
++	defer func() {
++		if r := recover(); r != nil {
++			err = fmt.Errorf("panic: %v", r)
++		}
++	}()
++	return f()
++}
++
++// TestUpdaterOutOfRangeIndex ensures every public PSBT entry point
++// that takes an input or output index rejects an out-of-range index
++// (negative, or past the last entry) with an error instead of
++// panicking. Two of the Updater methods already carried a guard for
++// the past-the-end case, which pins the intended contract; the guard
++// missed negative indexes, and the sibling methods had no guard at
++// all.
++func TestUpdaterOutOfRangeIndex(t *testing.T) {
++	raw, err := hex.DecodeString(validPsbtHex[1])
++	require.NoError(t, err)
++
++	newUpdater := func(t *testing.T) (*Packet, *Updater) {
++		p, err := NewFromRawBytes(bytes.NewReader(raw), false)
++		require.NoError(t, err)
++		u, err := NewUpdater(p)
++		require.NoError(t, err)
++		return p, u
++	}
++
++	p, _ := newUpdater(t)
++	numIn := len(p.Inputs)
++	numOut := len(p.Outputs)
++	require.Greater(t, numIn, 0)
++	require.Greater(t, numOut, 0)
++
++	pubKey, err := hex.DecodeString(CUTestPubkeyData["pub1"])
++	require.NoError(t, err)
++	path := CUTestPathData["dpath1"]
++
++	sig, err := hex.DecodeString("3044022074018ad4180097b873323c0015720b3684cc8123891048e7dbcd9b55ad679c99022073d369b740e3eb53dcefa33823c8070514ca55a7dd9544f157c167913261118c01")
++	require.NoError(t, err)
++	signPub, err := hex.DecodeString("029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f")
++	require.NoError(t, err)
++
++	for _, idx := range []int{-1, numIn, numIn + 100} {
++		_, u := newUpdater(t)
++		calls := map[string]func() error{
++			"AddInNonWitnessUtxo": func() error {
++				return u.AddInNonWitnessUtxo(wire.NewMsgTx(2), idx)
++			},
++			"AddInWitnessUtxo": func() error {
++				return u.AddInWitnessUtxo(&wire.TxOut{}, idx)
++			},
++			"AddInSighashType": func() error {
++				return u.AddInSighashType(txscript.SigHashAll, idx)
++			},
++			"AddInRedeemScript": func() error {
++				return u.AddInRedeemScript([]byte{0x51}, idx)
++			},
++			"AddInWitnessScript": func() error {
++				return u.AddInWitnessScript([]byte{0x51}, idx)
++			},
++			"AddInBip32Derivation": func() error {
++				return u.AddInBip32Derivation(0, path, pubKey, idx)
++			},
++			"Sign": func() error {
++				_, err := u.Sign(idx, sig, signPub, nil, nil)
++				return err
++			},
++			"MaybeFinalize": func() error {
++				p, _ := newUpdater(t)
++				_, err := MaybeFinalize(p, idx)
++				return err
++			},
++			"Finalize": func() error {
++				p, _ := newUpdater(t)
++				return Finalize(p, idx)
++			},
++		}
++		for name, call := range calls {
++			err := callErr(call)
++			require.Error(t, err, "%s(%d) must error, not panic or succeed", name, idx)
++			require.NotContains(t, err.Error(), "panic:",
++				"%s(%d) panicked: %v", name, idx, err)
++		}
++	}
++
++	for _, idx := range []int{-1, numOut, numOut + 100} {
++		_, u := newUpdater(t)
++		calls := map[string]func() error{
++			"AddOutBip32Derivation": func() error {
++				return u.AddOutBip32Derivation(0, path, pubKey, idx)
++			},
++			"AddOutRedeemScript": func() error {
++				return u.AddOutRedeemScript([]byte{0x51}, idx)
++			},
++			"AddOutWitnessScript": func() error {
++				return u.AddOutWitnessScript([]byte{0x51}, idx)
++			},
++		}
++		for name, call := range calls {
++			err := callErr(call)
++			require.Error(t, err, "%s(%d) must error, not panic or succeed", name, idx)
++			require.NotContains(t, err.Error(), "panic:",
++				"%s(%d) panicked: %v", name, idx, err)
++		}
++	}
++}
