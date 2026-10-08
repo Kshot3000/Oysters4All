@@ -1,0 +1,144 @@
+diff --git a/node/btcjson/unmarshal_assert_test.go b/node/btcjson/unmarshal_assert_test.go
+new file mode 100644
+index 00000000..4a0b77a0
+--- /dev/null
++++ b/node/btcjson/unmarshal_assert_test.go
+@@ -0,0 +1,99 @@
++package btcjson_test
++
++import (
++	"encoding/json"
++	"testing"
++
++	"github.com/pearl-research-labs/pearl/node/btcjson"
++)
++
++// Malformed scriptPubKey objects must produce an error, not a panic: the
++// address field used to be extracted with an unchecked type assertion, and
++// this unmarshaller runs while the server parses an importmulti request,
++// before any handler dispatch.
++func TestScriptPubKeyUnmarshalMalformed(t *testing.T) {
++	malformed := []string{
++		`{"address":123}`,
++		`{"address":null}`,
++		`{"address":["x"]}`,
++		`{}`,
++	}
++	for _, payload := range malformed {
++		var spk btcjson.ScriptPubKey
++		if err := json.Unmarshal([]byte(payload), &spk); err == nil {
++			t.Errorf("payload %s: expected error, got value %#v",
++				payload, spk.Value)
++		}
++	}
++
++	// The full command path must also error, not panic.
++	_, err := btcjson.UnmarshalCmd(&btcjson.Request{
++		Method: "importmulti",
++		Params: []json.RawMessage{
++			json.RawMessage(`[{"scriptPubKey":{"address":123},"timestamp":0}]`),
++		},
++	})
++	if err == nil {
++		t.Error("importmulti with numeric address: expected error, got nil")
++	}
++}
++
++// Well-formed scriptPubKey values keep parsing exactly as before.
++func TestScriptPubKeyUnmarshalValid(t *testing.T) {
++	var spk btcjson.ScriptPubKey
++	if err := json.Unmarshal([]byte(`{"address":"prl1pabc"}`), &spk); err != nil {
++		t.Fatalf("address object: %v", err)
++	}
++	addr, ok := spk.Value.(btcjson.ScriptPubKeyAddress)
++	if !ok || addr.Address != "prl1pabc" {
++		t.Errorf("address object: got %#v", spk.Value)
++	}
++
++	var raw btcjson.ScriptPubKey
++	if err := json.Unmarshal([]byte(`"76a91400"`), &raw); err != nil {
++		t.Fatalf("string form: %v", err)
++	}
++	if raw.Value != "76a91400" {
++		t.Errorf("string form: got %#v", raw.Value)
++	}
++}
++
++// Malformed scanning objects must produce an error, not a panic: duration
++// and progress used to be extracted with unchecked type assertions, and
++// this unmarshaller runs in RPC clients parsing a getwalletinfo response.
++func TestScanningOrFalseUnmarshalMalformed(t *testing.T) {
++	malformed := []string{
++		`{"duration":"x","progress":0.5}`,
++		`{"duration":3,"progress":"x"}`,
++		`{"progress":0.5}`,
++		`{"duration":3}`,
++		`{}`,
++	}
++	for _, payload := range malformed {
++		var sof btcjson.ScanningOrFalse
++		if err := json.Unmarshal([]byte(payload), &sof); err == nil {
++			t.Errorf("payload %s: expected error, got value %#v",
++				payload, sof.Value)
++		}
++	}
++}
++
++// Well-formed scanning values keep parsing exactly as before.
++func TestScanningOrFalseUnmarshalValid(t *testing.T) {
++	var b btcjson.ScanningOrFalse
++	if err := json.Unmarshal([]byte(`false`), &b); err != nil {
++		t.Fatalf("bool form: %v", err)
++	}
++	if b.Value != false {
++		t.Errorf("bool form: got %#v", b.Value)
++	}
++
++	var p btcjson.ScanningOrFalse
++	if err := json.Unmarshal([]byte(`{"duration":3,"progress":0.5}`), &p); err != nil {
++		t.Fatalf("progress form: %v", err)
++	}
++	prog, ok := p.Value.(btcjson.ScanProgress)
++	if !ok || prog.Duration != 3 || prog.Progress != 0.5 {
++		t.Errorf("progress form: got %#v", p.Value)
++	}
++}
+diff --git a/node/btcjson/walletsvrcmds.go b/node/btcjson/walletsvrcmds.go
+index 1fd8b309..895518e4 100644
+--- a/node/btcjson/walletsvrcmds.go
++++ b/node/btcjson/walletsvrcmds.go
+@@ -872,7 +872,12 @@ func (s *ScriptPubKey) UnmarshalJSON(data []byte) error {
+ 	case string:
+ 		s.Value = v
+ 	case map[string]interface{}:
+-		s.Value = ScriptPubKeyAddress{Address: v["address"].(string)}
++		address, ok := v["address"].(string)
++		if !ok {
++			return fmt.Errorf("invalid scriptPubKey address: %v",
++				v["address"])
++		}
++		s.Value = ScriptPubKeyAddress{Address: address}
+ 	default:
+ 		return fmt.Errorf("invalid scriptPubKey value: %v", unmarshalled)
+ 	}
+diff --git a/node/btcjson/walletsvrresults.go b/node/btcjson/walletsvrresults.go
+index 44462abf..bd91f8b1 100644
+--- a/node/btcjson/walletsvrresults.go
++++ b/node/btcjson/walletsvrresults.go
+@@ -182,9 +182,14 @@ func (h *ScanningOrFalse) UnmarshalJSON(data []byte) error {
+ 	case bool:
+ 		h.Value = v
+ 	case map[string]interface{}:
++		duration, ok1 := v["duration"].(float64)
++		progress, ok2 := v["progress"].(float64)
++		if !ok1 || !ok2 {
++			return fmt.Errorf("invalid scanning value: %v", unmarshalled)
++		}
+ 		h.Value = ScanProgress{
+-			Duration: int(v["duration"].(float64)),
+-			Progress: v["progress"].(float64),
++			Duration: int(duration),
++			Progress: progress,
+ 		}
+ 	default:
+ 		return fmt.Errorf("invalid scanning value: %v", unmarshalled)
