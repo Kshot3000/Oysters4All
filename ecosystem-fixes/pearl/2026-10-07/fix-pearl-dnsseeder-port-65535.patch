@@ -1,0 +1,83 @@
+From d97e8343b3bc995b56dac6f62509baecfad8b312 Mon Sep 17 00:00:00 2001
+From: Kshot3000 <kshot9000@gmail.com>
+Date: Thu, 8 Oct 2026 00:17:16 +0000
+Subject: [PATCH] fix(dnsseeder): accept port 65535 in addNa
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+addNa rejected any address with Port >= maxPort (65535), but 65535 is
+a valid TCP port — it is the largest value a uint16 port can hold —
+and the seeder's own getNonStdIP already encodes it (TestGetNonStdIP
+covers port 65535). A node announcing port 65535 could therefore
+never enter theList and was silently dropped.
+
+Change the upper guard from >= to > so the boundary port is admitted
+while port 0 stays rejected. Adds TestAddNaPortBoundaries covering
+ports 1, 44112, 65534, 65535 (accepted) and 0 (rejected); the new
+test fails on the old guard for 65535 only.
+---
+ dnsseeder/seeder.go      |  2 +-
+ dnsseeder/seeder_test.go | 36 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 37 insertions(+), 1 deletion(-)
+
+diff --git a/dnsseeder/seeder.go b/dnsseeder/seeder.go
+index 44d00c3d..2a0ec32d 100644
+--- a/dnsseeder/seeder.go
++++ b/dnsseeder/seeder.go
+@@ -357,7 +357,7 @@ func (s *dnsseeder) addNa(nNa *wire.NetAddress) bool {
+ 	if _, dup := s.theList[k]; dup == true {
+ 		return false
+ 	}
+-	if nNa.Port <= minPort || nNa.Port >= maxPort {
++	if nNa.Port <= minPort || nNa.Port > maxPort {
+ 		return false
+ 	}
+ 
+diff --git a/dnsseeder/seeder_test.go b/dnsseeder/seeder_test.go
+index ea5dfdb3..5b6e73b9 100644
+--- a/dnsseeder/seeder_test.go
++++ b/dnsseeder/seeder_test.go
+@@ -92,3 +92,39 @@ func TestAddnNa(t *testing.T) {
+ /*
+ 
+  */
++
++func TestAddNaPortBoundaries(t *testing.T) {
++	// 65535 is a valid TCP port (it is the largest uint16 port) and
++	// getNonStdIP already encodes it (see TestGetNonStdIP), so addNa
++	// must accept a node announcing it. Port 0 is not usable and must
++	// stay rejected.
++	var td = []struct {
++		ip   string
++		port int
++		want bool
++	}{
++		{"10.0.0.1", 1, true},
++		{"10.0.0.2", 44112, true},
++		{"10.0.0.3", 65534, true},
++		{"10.0.0.4", 65535, true},
++		{"10.0.0.5", 0, false},
++	}
++
++	s := &dnsseeder{
++		port:    44112,
++		pver:    1234,
++		maxSize: 100,
++	}
++	s.theList = make(map[string]*node)
++
++	for _, atest := range td {
++		tcpAddr := &net.TCPAddr{
++			IP:   net.ParseIP(atest.ip),
++			Port: atest.port,
++		}
++		na := wire.NewNetAddress(tcpAddr, 0)
++		if got := s.addNa(na); got != atest.want {
++			t.Errorf("addNa(%s:%d) = %v, want %v", atest.ip, atest.port, got, atest.want)
++		}
++	}
++}
+-- 
+2.43.0
+
