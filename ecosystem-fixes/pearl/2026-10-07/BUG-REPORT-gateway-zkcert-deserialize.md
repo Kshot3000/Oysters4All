@@ -15,3 +15,19 @@
 - Own RED (stub `pearl_mining`/`bitcoinutils` harness in /tmp, real gateway parsing code): 4 malformed cases accepted pre-fix.
 - GREEN post-fix: all malformed cases raise ValueError, including hand-crafted blobs bypassing the constructor and oversized declared lengths with all bytes present (matching Go); valid v1/v2/v3 certs round-trip byte-for-byte; trailing bytes still tolerated (stream semantics).
 - Environment limit, disclosed in the PR: `pearl_mining` bindings and pytest are not installable in this container, so the repo pytest suite could not be run here; the new `tests/test_zk_certificate.py` is included for CI, `py_compile` clean, ruff line-length (100) respected.
+
+## Follow-up (Pearl run ~03:13 CDT, 2026-10-08) — header_hash, same PR
+The Python hunter's final report flagged the field this PR's construction-side
+validation missed: `header_hash` is a numpy `V32` field in both wire layouts,
+and `__post_init__` never checked it. Own-verified with a stubbed-deps harness
+against the real file (pearl_mining not installable here): a 5-byte hash
+serialized zero-padded, a 40-byte hash truncated, ZK_DENSE + ZK_MOE — the wire
+cert silently committed to a different header. Fix pushed to this PR's branch
+as 01239bf0: construction raises ValueError unless exactly 32 bytes; new
+`TestHeaderHashSizeValidation` covers all 3 versions; both in-tree producers
+always yield 32B, so no behaviour change for existing callers. Patch file
+regenerated three-dot post-commit (294 lines). Same hunter's other candidates
+were NOT shipped: bits_to_target exponent/sign divergence (already checked and
+rejected 2026-10-07 — canonical pearld bits, fail-closed; hunter's only path
+is a spoofed node endpoint) and short-txid merkle roots (same trusted-local-
+node-only reachability).
