@@ -46,7 +46,18 @@ repro. Master unchanged at 2f8b770c.
   miner/pearl-gateway/pearl_gateway/*.py subpackage (coordinator, vllm
   miner, job tracker), proxy Go plugins beyond the JSON-RPC cache, spv/,
   apps/ TS, coredns-dnsseed plugin.
-- Hunter (node RPC/btcjson): still out at record time.
+- Hunter (node RPC/btcjson): CLEAN verdict (delivered after the initial
+  record) — all 156 registered handlers audited (every type assertion is
+  comma-ok or preceded by a kind check; the paramsIsValid length guard
+  precedes all params[N] indexing), every `%`-format verb in
+  rpcserver.go/rpcwebsocket.go inventoried with no second instance of the
+  #398 producer/consumer mismatch class (sole in-tree consumer of formatted
+  RPC numbers is the fixed filterPeers). Two passed-over observations
+  documented as non-bugs (help-render panics need standard-library
+  invariant breaks; float->int param conversions saturate safely).
+  Caveat checked: the hunter read the stale 3fe2267 checkout, but the
+  3fe2267→2f8b770 diff touches no rpcserver/rpcwebsocket/btcjson files,
+  so the verdict holds at master.
 
 ## Remaining leads
 - dnsseeder getNonStdIP v6 collision — design decision for maintainers
