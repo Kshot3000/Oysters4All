@@ -42,12 +42,14 @@ State re-verified this run: master unchanged at 2f8b770,
 Kyle's open upstream PRs now 45 (newest #416), #347 still 0
 comments, #336 OPEN/MERGEABLE/BLOCKED (no rebase needed),
 in-dev #369/#311/#310/#366/#349/#330/#189/#221/#414 + issue
-#303 + pips (4 open) all still OPEN — nothing landed. Caveat
-recorded: `gh pr list --json headRefOid` and the search API
-returned head OIDs that do NOT match the pulls API (e.g. #415
-listed c760aa2d vs pulls-API head 0a5993ff, which the commits
-API confirms); trust pulls-API head.sha, never the list/search
-OID, when verifying a branch tip. Bugbot/Copilot note: #415's
+#303 + pips (4 open) all still OPEN — nothing landed.
+Correction (same day, after the run's original state-check
+batch landed): an earlier draft of this record claimed
+`gh pr list` head OIDs disagreed with the pulls API — that was
+wrong; the mismatched values came from an interleaved
+background output that was not this run's query. The run's own
+batch and a pulls-API recheck agree exactly (#415 0a5993ff,
+#412 c26c6ee8, #413 a0ab6fc4, #411 aacc048d). Bugbot note: #415's
 sole comment via pr view is the Cursor summary; its only
 inline finding remains the known listreceivedbyaddress one,
 already fixed at tip 0a5993ff and answered. Both Kyle repos
