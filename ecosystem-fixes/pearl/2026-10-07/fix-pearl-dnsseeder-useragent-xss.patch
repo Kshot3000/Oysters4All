@@ -1,0 +1,160 @@
+diff --git a/dnsseeder/http.go b/dnsseeder/http.go
+index 281cd621..6225f50b 100644
+--- a/dnsseeder/http.go
++++ b/dnsseeder/http.go
+@@ -3,9 +3,9 @@ package main
+ import (
+ 	"fmt"
+ 	"html"
++	"html/template"
+ 	"log"
+ 	"net/http"
+-	"text/template"
+ 	"time"
+ )
+ 
+@@ -186,8 +186,11 @@ func statusNGHandler(w http.ResponseWriter, r *http.Request) {
+ }
+ 
+ type webstatus struct {
+-	Key    string
+-	Value  string
++	Key string
++	// Value carries the summary cell's intentional <b> markup, so it is
++	// template.HTML; generateWebStatus escapes every dynamic string it
++	// interpolates (above all the peer-controlled UserAgent) first.
++	Value  template.HTML
+ 	Seeder string
+ }
+ 
+@@ -277,24 +280,24 @@ func generateWebStatus(s *dnsseeder, status uint32) (ws []webstatus) {
+ 		case statusRG:
+ 			valueStr = fmt.Sprintf("<b>Fail Count:</b> %v <b>DNS Type:</b> %s",
+ 				v.connectFails,
+-				v.dns2str())
++				html.EscapeString(v.dns2str()))
+ 		case statusCG:
+ 			valueStr = fmt.Sprintf("<b>Remote Version:</b> %v%s <b>Last Block:</b> %v <b>DNS Type:</b> %s",
+ 				v.version,
+-				v.strVersion,
++				html.EscapeString(v.strVersion),
+ 				v.lastBlock,
+-				v.dns2str())
++				html.EscapeString(v.dns2str()))
+ 
+ 		case statusWG:
+ 			valueStr = fmt.Sprintf("<b>Last Try:</b> %s ago <b>Last Status:</b> %s\n",
+ 				time.Since(v.lastTry).String(),
+-				v.statusStr)
++				html.EscapeString(v.statusStr))
+ 
+ 		case statusNG:
+ 			valueStr = fmt.Sprintf("<b>Fail Count:</b> %v <b>Last Try:</b> %s ago <b>Last Status:</b> %s\n",
+ 				v.connectFails,
+ 				time.Since(v.lastTry).String(),
+-				v.statusStr)
++				html.EscapeString(v.statusStr))
+ 
+ 		default:
+ 			valueStr = ""
+@@ -302,7 +305,7 @@ func generateWebStatus(s *dnsseeder, status uint32) (ws []webstatus) {
+ 
+ 		ows := webstatus{
+ 			Key:    k,
+-			Value:  valueStr,
++			Value:  template.HTML(valueStr),
+ 			Seeder: s.name,
+ 		}
+ 		ws = append(ws, ows)
+diff --git a/dnsseeder/http_useragent_test.go b/dnsseeder/http_useragent_test.go
+new file mode 100644
+index 00000000..2f4a147d
+--- /dev/null
++++ b/dnsseeder/http_useragent_test.go
+@@ -0,0 +1,86 @@
++package main
++
++import (
++	"net"
++	"net/http/httptest"
++	"net/url"
++	"strings"
++	"testing"
++	"time"
++
++	"github.com/pearl-research-labs/pearl/node/wire"
++)
++
++// A crawled peer controls its version-message UserAgent: wire only
++// length-checks it (MaxUserAgentLen). The seeder stores it verbatim
++// (crawler OnVersion -> processResult) and the web status pages render
++// it. It must never reach a browser unescaped.
++const userAgentPayload = `<script>alert(1)</script>`
++
++func setupUserAgentSeeder(t *testing.T) string {
++	t.Helper()
++
++	key := "1.2.3.4:44108"
++	nd := &node{
++		na: wire.NewNetAddress(&net.TCPAddr{
++			IP:   net.ParseIP("1.2.3.4"),
++			Port: 44108,
++		}, 0),
++		nonstdIP:   net.ParseIP("1.2.3.4"),
++		strVersion: userAgentPayload,
++		version:    70001,
++		lastBlock:  123,
++		status:     statusCG,
++	}
++	s := &dnsseeder{
++		name:    "testnet",
++		theList: map[string]*node{key: nd},
++	}
++
++	oldSeeders := config.seeders
++	oldUptime := config.uptime
++	config.seeders = map[string]*dnsseeder{"testnet": s}
++	config.uptime = time.Now()
++	t.Cleanup(func() {
++		config.seeders = oldSeeders
++		config.uptime = oldUptime
++	})
++	return key
++}
++
++func TestStatusHandlerEscapesPeerUserAgent(t *testing.T) {
++	setupUserAgentSeeder(t)
++
++	req := httptest.NewRequest("GET", "/statusCG?s=testnet", nil)
++	rec := httptest.NewRecorder()
++	statusCGHandler(rec, req)
++	body := rec.Body.String()
++
++	if strings.Contains(body, userAgentPayload) {
++		t.Fatalf("status page renders peer UserAgent unescaped (stored XSS):\n%s", body)
++	}
++	if !strings.Contains(body, "&lt;script&gt;alert(1)&lt;/script&gt;") {
++		t.Errorf("status page does not contain the escaped UserAgent:\n%s", body)
++	}
++	// The summary cell's own markup is intentional and must survive.
++	if !strings.Contains(body, "<b>Remote Version:</b>") {
++		t.Errorf("status page lost its intentional summary markup:\n%s", body)
++	}
++}
++
++func TestNodeHandlerEscapesPeerUserAgent(t *testing.T) {
++	key := setupUserAgentSeeder(t)
++
++	req := httptest.NewRequest("GET",
++		"/node?s=testnet&nd="+url.QueryEscape(key), nil)
++	rec := httptest.NewRecorder()
++	nodeHandler(rec, req)
++	body := rec.Body.String()
++
++	if strings.Contains(body, userAgentPayload) {
++		t.Fatalf("node page renders peer UserAgent unescaped (stored XSS):\n%s", body)
++	}
++	if !strings.Contains(body, "&lt;script&gt;alert(1)&lt;/script&gt;") {
++		t.Errorf("node page does not contain the escaped UserAgent:\n%s", body)
++	}
++}
