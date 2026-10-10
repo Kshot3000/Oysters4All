@@ -5951,13 +5951,11 @@ zoo`.split("\n");
   async function fetchUtxos(blockbookBase, address) {
     const list = await bbFetch(blockbookBase, `/api/v2/utxo/${address}`);
     if (!Array.isArray(list)) throw new Error("unexpected utxo response");
-    return list.map((u) => ({
-      txid: u.txid,
-      vout: u.vout,
-      value: Number(u.value),
-      // grains (satoshis field)
-      confirmations: u.confirmations ?? 0
-    })).filter((u) => u.value > 0 && /^[0-9a-f]{64}$/i.test(u.txid));
+    return list.map((u) => {
+      const value = Number(u.value);
+      if (!Number.isSafeInteger(value)) throw new Error("UTXO value too large to handle exactly");
+      return { txid: u.txid, vout: u.vout, value, confirmations: u.confirmations ?? 0 };
+    }).filter((u) => u.value > 0 && /^[0-9a-f]{64}$/i.test(u.txid));
   }
   async function fetchFeeRateGrainsPerVByte(blockbookBase, blocks = 2) {
     const r = await bbFetch(blockbookBase, `/api/v2/estimatefee/${blocks}`);
@@ -5993,6 +5991,11 @@ zoo`.split("\n");
   }
   function buildCommitTx({ network, fundingInputs, commitProgram, commitValue, changeProgram, feeRate }) {
     if (!Array.isArray(fundingInputs) || fundingInputs.length === 0) throw new Error("no funding inputs");
+    for (const i of fundingInputs) {
+      if (!/^[0-9a-f]{64}$/i.test(i.txid || "")) throw new Error("bad funding input txid");
+      if (!Number.isSafeInteger(i.vout) || i.vout < 0) throw new Error("bad funding input vout");
+      if (!Number.isSafeInteger(i.value) || i.value <= 0) throw new Error("bad funding input value");
+    }
     const rate = Math.max(1, Math.ceil(Number(feeRate)));
     const inSum = fundingInputs.reduce((n, i) => n + i.value, 0);
     let fee = keypathTxVBytes(fundingInputs.length, 2) * rate;

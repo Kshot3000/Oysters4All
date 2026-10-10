@@ -163,9 +163,11 @@
     var parts = $("r-utxo").value.trim().split(":");
     if (parts.length !== 3) throw new Error("UTXO must look like txid:vout:value");
     if (!/^[0-9a-f]{64}$/i.test(parts[0])) throw new Error("bad txid");
-    var vout = parseInt(parts[1], 10), value = parseInt(parts[2], 10);
-    if (!Number.isInteger(vout) || vout < 0) throw new Error("bad vout");
-    if (!Number.isInteger(value) || value <= 0) throw new Error("bad value");
+    if (!/^\d+$/.test(parts[1])) throw new Error("bad vout");
+    if (!/^\d+$/.test(parts[2])) throw new Error("bad value");
+    var vout = Number(parts[1]), value = Number(parts[2]);
+    if (!Number.isSafeInteger(vout) || vout < 0) throw new Error("bad vout");
+    if (!Number.isSafeInteger(value) || value <= 0) throw new Error("bad value");
     return { txid: parts[0].toLowerCase(), vout: vout, value: value };
   }
   $("r-commit").addEventListener("click", function () {

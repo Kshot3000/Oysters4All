@@ -182,3 +182,16 @@ test("app.js grain formatter is BigInt-exact (pool float-format class)", async (
   assert.ok(src.includes("100000000n"), "BigInt-exact grain formatter present");
   assert.ok(src.includes("/^-?\\d+$/"), "integer-grain gate present");
 });
+
+test("commit: malformed pasted UTXO refused at paste time (NaN / rounded oversize)", () => {
+  setVal("utxo-paste", "44".repeat(32) + ":abc:xyz");
+  getEl("utxo-paste").fire("change");
+  assert.equal(getEl("commit-error").hidden, false);
+  assert.ok(getEl("commit-error").textContent.includes("bad vout"), "err: " + getEl("commit-error").textContent);
+  setVal("utxo-paste", "44".repeat(32) + ":0:9007199254740993");
+  getEl("utxo-paste").fire("change");
+  assert.equal(getEl("commit-error").hidden, false);
+  assert.ok(getEl("commit-error").textContent.includes("bad value"), "err: " + getEl("commit-error").textContent);
+  // the good UTXO pasted in the main flow is untouched — build stays enabled
+  assert.equal(getEl("build-commit").disabled, false);
+});

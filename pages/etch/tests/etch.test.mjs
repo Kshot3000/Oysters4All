@@ -271,3 +271,15 @@ test("app.js grain formatter is BigInt-exact (pool float-format class)", async (
   assert.ok(src.includes("100000000n"), "BigInt-exact grain formatter present");
   assert.ok(src.includes("/^-?\\d+$/"), "integer-grain gate present");
 });
+
+test("buildCommitTx refuses malformed funding inputs up front (no NaN/rounded fee math)", () => {
+  const prog = addressToProgram(OWNER, net);
+  const base = { network: net, commitProgram: prog, commitValue: 100000, changeProgram: prog, feeRate: 5 };
+  const good = fakeFunding(1000000);
+  assert.throws(() => buildCommitTx({ ...base, fundingInputs: [{ ...good, vout: NaN }] }), /bad funding input vout/);
+  assert.throws(() => buildCommitTx({ ...base, fundingInputs: [{ ...good, vout: -1 }] }), /bad funding input vout/);
+  assert.throws(() => buildCommitTx({ ...base, fundingInputs: [{ ...good, value: NaN }] }), /bad funding input value/);
+  assert.throws(() => buildCommitTx({ ...base, fundingInputs: [{ ...good, value: 9007199254740992 }] }), /bad funding input value/);
+  assert.throws(() => buildCommitTx({ ...base, fundingInputs: [{ ...good, value: 0 }] }), /bad funding input value/);
+  assert.throws(() => buildCommitTx({ ...base, fundingInputs: [{ ...good, txid: "zz" }] }), /bad funding input txid/);
+});

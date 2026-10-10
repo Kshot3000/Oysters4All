@@ -164,7 +164,11 @@
     return text.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => {
       const [txid, vout, value] = l.split(":");
       if (!/^[0-9a-f]{64}$/i.test(txid || "")) throw new Error("bad txid: " + l);
-      return { txid: txid.toLowerCase(), vout: parseInt(vout, 10), value: parseInt(value, 10) };
+      const voutN = Number(vout);
+      if (!/^\d+$/.test(vout || "") || !Number.isSafeInteger(voutN)) throw new Error("bad vout (must be a non-negative integer): " + l);
+      const valueN = Number(value);
+      if (!/^\d+$/.test(value || "") || !Number.isSafeInteger(valueN) || valueN <= 0) throw new Error("bad value (must be a positive integer number of grains): " + l);
+      return { txid: txid.toLowerCase(), vout: voutN, value: valueN };
     });
   }
   function renderUtxos() {

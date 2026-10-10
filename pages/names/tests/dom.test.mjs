@@ -226,3 +226,18 @@ test("app.js grain formatter is BigInt-exact (pool float-format class)", async (
   assert.ok(src.includes("100000000n"), "BigInt-exact grain formatter present");
   assert.ok(src.includes("/^-?\\d+$/"), "integer-grain gate present");
 });
+
+test("register: malformed pasted UTXO refused at parse time (garbage suffix / rounded oversize)", () => {
+  setVal("r-utxo", "44".repeat(32) + ":0:100000abc");
+  click("r-commit");
+  assert.equal(getEl("r-bc-err").hidden, false);
+  assert.ok(getEl("r-bc-err").textContent.includes("bad value"), "err: " + getEl("r-bc-err").textContent);
+  setVal("r-utxo", "44".repeat(32) + ":0:9007199254740993");
+  click("r-commit");
+  assert.equal(getEl("r-bc-err").hidden, false);
+  assert.ok(getEl("r-bc-err").textContent.includes("bad value"), "err: " + getEl("r-bc-err").textContent);
+  setVal("r-utxo", "44".repeat(32) + ":1xyz:1000000");
+  click("r-commit");
+  assert.equal(getEl("r-bc-err").hidden, false);
+  assert.ok(getEl("r-bc-err").textContent.includes("bad vout"), "err: " + getEl("r-bc-err").textContent);
+});

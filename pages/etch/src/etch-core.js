@@ -177,6 +177,14 @@ export function planInscription({ network, internalXOnly, ops, ownerAddress, fee
  *  Returns { txid, hex, fee, change } — change < dust is donated to fees. */
 export function buildCommitTx({ network, fundingInputs, commitProgram, commitValue, changeProgram, feeRate }) {
   if (!Array.isArray(fundingInputs) || fundingInputs.length === 0) throw new Error("no funding inputs");
+  // Validate funding inputs HERE, before any fee/change math: a NaN or
+  // rounded value otherwise poisons inSum silently and only surfaces as a
+  // context-free sighash refusal after a tx was half-built.
+  for (const i of fundingInputs) {
+    if (!/^[0-9a-f]{64}$/i.test(i.txid || "")) throw new Error("bad funding input txid");
+    if (!Number.isSafeInteger(i.vout) || i.vout < 0) throw new Error("bad funding input vout");
+    if (!Number.isSafeInteger(i.value) || i.value <= 0) throw new Error("bad funding input value");
+  }
   const rate = Math.max(1, Math.ceil(Number(feeRate)));
   const inSum = fundingInputs.reduce((n, i) => n + i.value, 0);
   let fee = keypathTxVBytes(fundingInputs.length, 2) * rate;
