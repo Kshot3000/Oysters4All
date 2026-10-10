@@ -286,6 +286,13 @@ $("btnFeeEst").addEventListener("click", async () => {
   } catch (e) { alert("Fee estimate failed: " + e.message); }
 });
 function selectedUtxos() { return S.utxos.filter((u) => u.selected); }
+// The tx builders take Number values: refuse amounts past MAX_SAFE_INTEGER
+// instead of letting Number() silently round them (a lost or invented grain).
+function safeGrains(g, what) {
+  const v = Number(g);
+  if (!Number.isSafeInteger(v)) throw new Error(`${what} is too large to handle exactly (over ${P.fmtPRL(9007199254740991n)} PRL).`);
+  return v;
+}
 function buildPlan() {
   // Returns {outputs, feeGrains, changeGrains, vbytes, totalIn} or throws.
   const sel = selectedUtxos();
@@ -298,7 +305,7 @@ function buildPlan() {
     const grains = P.parsePRL(r.prl);
     if (grains <= 0n) throw new Error("Recipient amounts must be > 0.");
     if (grains < BigInt(P.DUST_GRAIN)) throw new Error(`Output ${P.fmtPRL(grains)} PRL is dust (< ${P.DUST_GRAIN} grains).`);
-    outs.push({ program: d.program, value: Number(grains), address: addr });
+    outs.push({ program: d.program, value: safeGrains(grains, "Recipient amount"), address: addr });
   }
   if (!outs.length) throw new Error("Add at least one recipient with an address and amount.");
   const feeRate = Math.max(1, Number($("feeRate").value) || 10);
@@ -319,7 +326,7 @@ function buildPlan() {
       $("changeAddr").value = changeAddr;
     }
     const d = P.decodeBech32m(changeAddr, net().hrp);
-    changeOut = { program: d.program, value: Number(pick.change), address: changeAddr };
+    changeOut = { program: d.program, value: safeGrains(pick.change, "Change amount"), address: changeAddr };
   }
   const outputs = changeOut ? [...outs, changeOut] : outs;
   const vbytes = P.keypathTxVBytes(pick.selected.length, outputs.length);

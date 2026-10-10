@@ -20,7 +20,7 @@ import {
 
 import {
   SIGHASH_DEFAULT, SIGHASH_SINGLE_ANYONECANPAY,
-  fmtPRL, parsePRL,
+  fmtPRL, parsePRL, grainsToNumber,
   decodeRawTx, describeSpk,
   buildKeypathTxEx, verifySignedTx,
   selectCoins, parseUtxoList,
@@ -233,5 +233,65 @@ test("signature results escape r.reason before innerHTML", () => {
   assert.match(app, /function esc\(s\)/);
   assert.ok(app.includes("${esc(r.reason)}"), "reason escaped");
   assert.ok(!app.includes("— ${r.reason}"), "no raw reason interpolation remains");
-  assert.ok(html.includes('app.js?v=5'), "cache key bumped");
+  assert.ok(html.includes('app.js?v=6'), "cache key bumped");
+});
+
+// --------------------------------------- exact-amount guards (2026-10-10)
+// Regression pins: every BigInt grain amount that becomes a Number must
+// refuse past MAX_SAFE_INTEGER instead of silently rounding —
+// Number(9007199254740993n) === 9007199254740992 (a lost grain).
+test("grainsToNumber is exact at MAX_SAFE and refuses past it", () => {
+  assert.equal(grainsToNumber(9007199254740991n), Number.MAX_SAFE_INTEGER);
+  assert.equal(grainsToNumber(parsePRL("1.5")), 150_000_000);
+  assert.throws(() => grainsToNumber(parsePRL("90071992.54740993")), /too large to handle exactly/);
+});
+
+test("fetchUtxos refuses an unsafe backend value, keeps exact ones", async () => {
+  const core = await import("../src/sign-core.js");
+  const realFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => ({
+      ok: true,
+      json: async () => [{ txid: "aa".repeat(32), vout: 0, value: "9007199254740993", confirmations: 3 }],
+    });
+    await assert.rejects(() => core.fetchUtxos("http://127.0.0.1:9", "prl1pabc"), /too large to handle exactly/);
+    globalThis.fetch = async () => ({
+      ok: true,
+      json: async () => [{ txid: "aa".repeat(32), vout: 1, value: "120000000", confirmations: 3 }],
+    });
+    const list = await core.fetchUtxos("http://127.0.0.1:9", "prl1pabc");
+    assert.equal(list[0].value, 120_000_000);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("verifySignedTx reports an out-of-range output as a range problem, not a bad signature", () => {
+  const w0 = walletFromMnemonic(MNEMONIC, NETWORKS.mainnet, 0, 0);
+  const spk0 = p2trScriptPubKey(tweakKeypath(w0.internalXOnly).tweakedX);
+  const u32 = (n) => { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, n, true); return b; };
+  const u64 = (big) => { const b = new Uint8Array(8); new DataView(b.buffer).setBigUint64(0, big, true); return b; };
+  const parts = [];
+  const push = (...bs) => { for (const b of bs) parts.push(...b); };
+  push(u32(1), new Uint8Array([0, 1])); // version + segwit marker/flag
+  push(new Uint8Array([1])); // 1 input
+  push(new Uint8Array(32).fill(0xaa), u32(0), new Uint8Array([0]), u32(0xffffffff));
+  push(new Uint8Array([1])); // 1 output of 9007199254740993 grains (> MAX_SAFE)
+  push(u64(9007199254740993n), new Uint8Array([34]), spk0);
+  push(new Uint8Array([1, 64]), new Uint8Array(64).fill(7)); // witness: dummy 64-byte sig
+  push(u32(0));
+  const res = verifySignedTx(NETWORKS.mainnet, bytesToHex(Uint8Array.from(parts)), [{ value: 100_000_000, spk: spk0 }]);
+  assert.equal(res[0].ok, false);
+  assert.match(res[0].reason, /too large to handle exactly/);
+});
+
+test("app.js buildPlan guards recipient and change amounts with safeGrains", () => {
+  const app = readFileSync(new URL("../app.js", import.meta.url), "utf8");
+  const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  assert.ok(app.includes("function safeGrains(g, what)"), "safeGrains helper defined");
+  assert.ok(app.includes('safeGrains(grains, "Recipient amount")'), "recipient amount guarded");
+  assert.ok(app.includes('safeGrains(pick.change, "Change amount")'), "change amount guarded");
+  assert.ok(!app.includes("value: Number(grains)"), "no unguarded recipient conversion remains");
+  assert.ok(!app.includes("value: Number(pick.change)"), "no unguarded change conversion remains");
+  assert.ok(html.includes('pearl-sign.bundle.js?v=4'), "bundle cache key bumped");
 });

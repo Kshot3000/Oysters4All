@@ -49,6 +49,7 @@ var PearlSign = (() => {
     fetchTxStatus: () => fetchTxStatus,
     fetchUtxos: () => fetchUtxos,
     fmtPRL: () => fmtPRL,
+    grainsToNumber: () => grainsToNumber,
     hexToBytes: () => hexToBytes,
     keypathSigDigestEx: () => keypathSigDigestEx,
     keypathTxVBytes: () => keypathTxVBytes,
@@ -6195,6 +6196,13 @@ zoo`.split("\n");
     const frac = (a % BigInt(GRAIN_PER_PRL)).toString().padStart(8, "0").replace(/0+$/, "");
     return (neg ? "-" : "") + whole.toString() + (frac ? "." + frac : "");
   }
+  function grainsToNumber(grains, what = "amount") {
+    const v = Number(grains);
+    if (!Number.isSafeInteger(v)) {
+      throw new Error(`${what} is too large to handle exactly (over ${fmtPRL(BigInt(Number.MAX_SAFE_INTEGER))} PRL)`);
+    }
+    return v;
+  }
   function parsePRL(s) {
     if (typeof s !== "string") throw new Error("amount must be a string");
     const m = s.trim().match(/^(\d+)(?:\.(\d{1,8}))?$/);
@@ -6375,7 +6383,7 @@ zoo`.split("\n");
         const digest = keypathSigDigestEx(
           network,
           prevouts.map((p, k) => ({ txid: dec.inputs[k].txid, vout: dec.inputs[k].vout, value: p.value, spk: p.spk })),
-          dec.outputs.map((o) => ({ program: describeSpk(o.spk, network).program ?? new Uint8Array(32), value: Number(o.value) })),
+          dec.outputs.map((o) => ({ program: describeSpk(o.spk, network).program ?? new Uint8Array(32), value: grainsToNumber(o.value, "output value") })),
           dec.inputs[i].sequence,
           i,
           hashType
@@ -6462,7 +6470,7 @@ zoo`.split("\n");
     if (!res.ok) throw new Error(`blockbook ${res.status} on /api/v2/utxo`);
     const list = await res.json();
     if (!Array.isArray(list)) throw new Error("unexpected utxo response");
-    return list.map((u) => ({ txid: u.txid, vout: u.vout, value: Number(u.value), confirmations: u.confirmations ?? 0 })).filter((u) => u.value > 0 && /^[0-9a-f]{64}$/i.test(u.txid || ""));
+    return list.map((u) => ({ txid: u.txid, vout: u.vout, value: grainsToNumber(BigInt(u.value), "UTXO value"), confirmations: u.confirmations ?? 0 })).filter((u) => u.value > 0 && /^[0-9a-f]{64}$/i.test(u.txid || ""));
   }
   async function fetchFeeRate(blockbookBase, blocks = 2) {
     const base = blockbookBase.replace(/\/$/, "");

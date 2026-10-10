@@ -37,6 +37,17 @@ export function fmtPRL(grains) {
   return (neg ? "-" : "") + whole.toString() + (frac ? "." + frac : "");
 }
 
+/** Convert an exact BigInt grain amount to the Number form the tx builders
+ *  use, refusing anything past MAX_SAFE_INTEGER instead of silently rounding
+ *  (Number(9007199254740993n) === 9007199254740992 — a lost grain). */
+export function grainsToNumber(grains, what = "amount") {
+  const v = Number(grains);
+  if (!Number.isSafeInteger(v)) {
+    throw new Error(`${what} is too large to handle exactly (over ${fmtPRL(BigInt(Number.MAX_SAFE_INTEGER))} PRL)`);
+  }
+  return v;
+}
+
 /** Parse a PRL amount string into grains (BigInt). Throws on bad input. */
 export function parsePRL(s) {
   if (typeof s !== "string") throw new Error("amount must be a string");
@@ -230,7 +241,7 @@ export function verifySignedTx(network, signedHex, prevouts) {
       const digest = keypathSigDigestEx(
         network,
         prevouts.map((p, k) => ({ txid: dec.inputs[k].txid, vout: dec.inputs[k].vout, value: p.value, spk: p.spk })),
-        dec.outputs.map((o) => ({ program: describeSpk(o.spk, network).program ?? new Uint8Array(32), value: Number(o.value) })),
+        dec.outputs.map((o) => ({ program: describeSpk(o.spk, network).program ?? new Uint8Array(32), value: grainsToNumber(o.value, "output value") })),
         dec.inputs[i].sequence,
         i,
         hashType
@@ -330,7 +341,7 @@ export async function fetchUtxos(blockbookBase, address) {
   const list = await res.json();
   if (!Array.isArray(list)) throw new Error("unexpected utxo response");
   return list
-    .map((u) => ({ txid: u.txid, vout: u.vout, value: Number(u.value), confirmations: u.confirmations ?? 0 }))
+    .map((u) => ({ txid: u.txid, vout: u.vout, value: grainsToNumber(BigInt(u.value), "UTXO value"), confirmations: u.confirmations ?? 0 }))
     .filter((u) => u.value > 0 && /^[0-9a-f]{64}$/i.test(u.txid || ""));
 }
 
