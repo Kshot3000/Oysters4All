@@ -411,3 +411,10 @@ test("isLongTerm boundary: 365d is short, 365d+1s is long", () => {
   assert.equal(R.isLongTerm(a, a + 365 * 86400 + 1), true);
   assert.equal(R.unixToDate(0), "1970-01-01");
 });
+
+test("disposalsCSV: formula guard keeps negative gain/loss numeric", () => {
+  const csv = R.disposalsCSV({ disposals: [{ acquiredUnix: 0, disposedUnix: 0, label: "=2+2", grains: 100n, proceedsCents: 100n, basisCents: 50n, gainCents: -25n, longTerm: false, txid: "ab" }] });
+  const row = csv.split("\n")[1];
+  assert.ok(row.includes("'=2+2"), "label formula cell prefixed");
+  assert.ok(row.includes(",-0.25,"), "plain negative amount untouched");
+});

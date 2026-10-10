@@ -449,9 +449,20 @@ export function verifyBallotElection({ proposal, ballots, optionCount = null }) 
 
 /** CSV export of a tally. */
 export function tallyCsv(tally) {
+  // CSV-escape every cell (a choice label may contain commas/quotes) and
+  // apply the spreadsheet formula-injection guard (CWE-1236): a cell whose
+  // text begins (after optional spaces) with =, +, -, @, | or % is executed
+  // as a formula when the CSV is opened in Excel/Sheets — quoting alone
+  // does NOT prevent it, so prefix such cells with an apostrophe. Plain
+  // numbers are data, not formulas, and pass untouched.
+  const cell = (v) => {
+    let s = String(v ?? "");
+    if (!/^-?\d+(\.\d+)?$/.test(s) && /^\s*[=+\-@|%]/.test(s)) s = "'" + s;
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
   const rows = ["voter,choice,weightGrains,ballotHash"];
   for (const a of tally.accepted) {
-    rows.push(`${a.voter},${a.choice},${a.weightGrains.toString()},${a.ballotHash}`);
+    rows.push([a.voter, a.choice, a.weightGrains.toString(), a.ballotHash].map(cell).join(","));
   }
   return rows.join("\n");
 }

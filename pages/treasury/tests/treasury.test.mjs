@@ -289,3 +289,12 @@ test("audit export formats JSON and CSV", () => {
   assert.ok(c.startsWith("seq,ts,kind,actor,detail,prev,hash\n"));
   assert.ok(c.includes('"with, ""quotes"""'), "CSV quotes escaped");
 });
+
+test("audit CSV: spreadsheet formula-injection guard (CWE-1236)", () => {
+  const log = [];
+  T.auditAppend(log, { kind: "note", actor: "=2+2", detail: "@SUM(1+1)" });
+  const c = T.exportAuditCSV(log);
+  assert.ok(c.includes("'=2+2"), "actor formula cell prefixed");
+  assert.ok(c.includes("'@SUM(1+1)"), "detail formula cell prefixed");
+  assert.ok(!/,=2\+2/.test(c), "no raw formula cell");
+});

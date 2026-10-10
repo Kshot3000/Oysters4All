@@ -389,3 +389,10 @@ test("units: parsePRL round-trip", () => {
   assert.equal(fmtPRL(250000000n), "2.5");
   assert.throws(() => parsePRL("1.123456789"), /invalid PRL amount/);
 });
+
+test("settleCsv: invalid-row formula-injection guard (CWE-1236)", () => {
+  const csv = settleCsv({ descriptor: { descriptor: "d" }, noSale: true, resultHash: "ab", ranked: [], derivation: [{ valid: false, excludeReason: "=2+2", address: "@evil", bidGrains: null, revealOrder: 1 }] });
+  assert.ok(csv.includes("'@evil"), "attacker address cell prefixed");
+  assert.ok(csv.includes("'=2+2"), "attacker note cell prefixed");
+  assert.ok(!/,@evil/.test(csv) && !/,=2\+2/.test(csv), "no raw formula cell");
+});

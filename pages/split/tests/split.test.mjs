@@ -312,3 +312,10 @@ test("ledger load tolerates corrupt storage", () => {
   const store = { getItem: () => "not json{", setItem: () => {} };
   assert.deepEqual(S.loadLedger(store), { tabs: [] });
 });
+
+test("ledgerToCsv: spreadsheet formula-injection guard (CWE-1236)", () => {
+  const csv = S.ledgerToCsv({ tabs: [{ tabName: "=2+2", fingerprint: "ff", members: [{ name: "@evil", address: "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d" }], balances: [{ grains: "-100" }] }] });
+  assert.ok(csv.includes("\"'=2+2\""), "tab name formula cell prefixed");
+  assert.ok(csv.includes("\"'@evil\""), "member name formula cell prefixed");
+  assert.ok(csv.includes("\"-100\""), "plain negative balance untouched");
+});

@@ -5912,7 +5912,11 @@ zoo`.split("\n");
     );
   }
   function invoiceToCSV(inv, descriptorObj, receiptObj = null) {
-    const q = (s) => `"${String(s).replace(/"/g, '""')}"`;
+    const q = (s) => {
+      let v = String(s);
+      if (!/^-?\d+(\.\d+)?$/.test(v) && /^\s*[=+\-@|%]/.test(v)) v = "'" + v;
+      return `"${v.replace(/"/g, '""')}"`;
+    };
     const lines = ["section,key,value"];
     lines.push(`invoice,invoicee,${q(inv.invoicee)}`);
     lines.push(`invoice,payerLabel,${q(inv.payerLabel || "")}`);

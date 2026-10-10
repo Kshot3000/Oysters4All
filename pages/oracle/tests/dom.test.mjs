@@ -263,7 +263,7 @@ test("tabs switch + footer attribution", () => {
   assert.ok(!tabSections.find((s) => s.id === "tab-feed").classList.contains("active"), "feed tab inactive");
   assert.ok(html.includes("@kshot9000"), "footer carries @kshot9000");
   assert.ok(html.includes(PRL_ADDR), "footer carries the PRL address character-for-character");
-  assert.ok(html.includes("signal-beacon") || html.includes("pearl-oracle.bundle.js?v=1"), "wired bundle");
+  assert.ok(html.includes("signal-beacon") || html.includes("pearl-oracle.bundle.js?v=2"), "wired bundle");
 });
 
 test("honest limits panel always present", () => {

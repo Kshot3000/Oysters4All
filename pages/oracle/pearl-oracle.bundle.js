@@ -6061,7 +6061,8 @@ zoo`.split("\n");
     return JSON.stringify(Array.isArray(rows) ? rows : [], null, 2);
   }
   var csvCell = (v) => {
-    const s = String(v ?? "");
+    let s = String(v ?? "");
+    if (!/^-?\d+(\.\d+)?$/.test(s) && /^\s*[=+\-@|%]/.test(s)) s = "'" + s;
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   function feedToCSV(rows) {

@@ -425,3 +425,10 @@ test("ledger CSV helpers escape and line up", () => {
   const scsv = Q.spendsToCSV([{ at: "2026-09-30T00:00:00Z", vault: "v", txid: "a".repeat(64), inputs: 2, outputsGrains: 1, feeGrains: 2, slots: [0, 2] }]);
   assert.match(scsv, /"0\+2"/);
 });
+
+test("ledger CSV: spreadsheet formula-injection guard (CWE-1236)", () => {
+  const v = mkVault(2, 3);
+  const csv = Q.vaultToCSV([{ name: "=2+2", network: v.network, m: v.m, n: v.n, address: v.address, fingerprint: v.fingerprint, internalKeyMode: v.internalKeyMode }]);
+  assert.ok(csv.includes("\"'=2+2\""), "vault name formula cell prefixed");
+  assert.ok(!csv.includes("\"=2+2\""), "no raw formula cell");
+});

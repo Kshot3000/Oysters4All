@@ -5184,7 +5184,8 @@ zoo`.split("\n");
     };
   }
   var csvCell = (v) => {
-    const s = String(v);
+    let s = String(v);
+    if (!/^-?\d+(\.\d+)?$/.test(s) && /^\s*[=+\-@|%]/.test(s)) s = "'" + s;
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   function disposalsCSV(report) {

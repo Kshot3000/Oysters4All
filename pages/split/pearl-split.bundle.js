@@ -6694,7 +6694,11 @@ zoo`.split("\n");
         ]);
       });
     }
-    const q = (s) => `"${String(s).replace(/"/g, '""')}"`;
+    const q = (s) => {
+      let v = String(s);
+      if (!/^-?\d+(\.\d+)?$/.test(v) && /^\s*[=+\-@|%]/.test(v)) v = "'" + v;
+      return `"${v.replace(/"/g, '""')}"`;
+    };
     return rows.map((r) => r.map(q).join(",")).join("\n") + "\n";
   }
   return __toCommonJS(index_exports);

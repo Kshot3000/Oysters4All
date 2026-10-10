@@ -234,3 +234,11 @@ test("invoiceToCSV / JSON export carry invoice + descriptor + receipt", () => {
   assert.equal(json.descriptor, d.descriptor);
   assert.equal(json.receipt.receipt, r.receipt);
 });
+
+test("invoiceToCSV: spreadsheet formula-injection guard (CWE-1236)", () => {
+  const inv = FIXTURE();
+  inv.invoicee = "=2+2+cmd|'/C calc'!A0";
+  const csv = R.invoiceToCSV(inv, R.buildDescriptor(inv), null);
+  assert.ok(csv.includes("\"'=2+2"), "formula cell apostrophe-prefixed inside quotes");
+  assert.ok(!csv.includes("\"=2+2"), "no raw formula cell");
+});

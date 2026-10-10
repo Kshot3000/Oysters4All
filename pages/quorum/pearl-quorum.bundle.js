@@ -7243,17 +7243,22 @@ zoo`.split("\n");
     }
     return { txid, hex, vBytes, feeGrains: bundle.feeGrains, slots: collected.slots };
   }
+  var csvQ = (c) => {
+    let v = String(c ?? "");
+    if (!/^-?\d+(\.\d+)?$/.test(v) && /^\s*[=+\-@|%]/.test(v)) v = "'" + v;
+    return `"${v.replace(/"/g, '""')}"`;
+  };
   function vaultToCSV(vaults) {
     const rows = [["name", "network", "m", "n", "address", "fingerprint", "internal_key_mode"]];
     for (const v of vaults || []) rows.push([v.name, v.network, v.m, v.n, v.address, v.fingerprint, v.internalKeyMode]);
-    return rows.map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+    return rows.map((r) => r.map(csvQ).join(",")).join("\n");
   }
   function spendsToCSV(spends) {
     const rows = [["at", "vault", "txid", "inputs", "outputs_grains", "fee_grains", "slots"]];
     for (const s of spends || []) {
       rows.push([s.at, s.vault, s.txid, s.inputs, s.outputsGrains, s.feeGrains, (s.slots || []).join("+")]);
     }
-    return rows.map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+    return rows.map((r) => r.map(csvQ).join(",")).join("\n");
   }
   return __toCommonJS(index_exports);
 })();

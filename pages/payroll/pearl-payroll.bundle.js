@@ -6278,7 +6278,8 @@ zoo`.split("\n");
     ].join("\n") + "\n";
   }
   function csvCell(s) {
-    const v = String(s ?? "");
+    let v = String(s ?? "");
+    if (!/^-?\d+(\.\d+)?$/.test(v) && /^\s*[=+\-@|%]/.test(v)) v = "'" + v;
     return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
   }
   function rosterToCsv(payees) {

@@ -379,3 +379,11 @@ test("nextChainDefaults: genesis, then chain continuation", () => {
   assert.equal(d.prev, attestationId(canonicalAttestation(rows[1])));
   assert.equal(d.seq, "2");
 });
+
+test("CSV export: spreadsheet formula-injection guard (CWE-1236)", () => {
+  const rows = chain(1);
+  rows[0].source = "=2+2+cmd|'/C calc'!A0";
+  const line = feedToCSV(rows).split("\n")[1];
+  assert.ok(line.includes("'=2+2"), "formula cell apostrophe-prefixed");
+  assert.ok(!/,=2\+2/.test(line), "no raw formula cell");
+});

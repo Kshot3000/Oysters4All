@@ -390,7 +390,16 @@ export function ledgerToCsv(ledger) {
         g.toString(), fmtPRL(g), g > 0n ? "creditor" : g < 0n ? "debtor" : "even"]);
     });
   }
-  const q = (s) => `"${String(s).replace(/"/g, '""')}"`;
+  // Spreadsheet formula-injection guard (CWE-1236): a cell whose text begins
+  // (after optional spaces) with =, +, -, @, | or % is executed as a formula
+  // when the CSV is opened in Excel/Sheets — quoting does NOT prevent it.
+  // Prefix such cells with an apostrophe so they open as text. Plain numbers
+  // (including negative net balances) are data and pass untouched.
+  const q = (s) => {
+    let v = String(s);
+    if (!/^-?\d+(\.\d+)?$/.test(v) && /^\s*[=+\-@|%]/.test(v)) v = "'" + v;
+    return `"${v.replace(/"/g, '""')}"`;
+  };
   return rows.map((r) => r.map(q).join(",")).join("\n") + "\n";
 }
 

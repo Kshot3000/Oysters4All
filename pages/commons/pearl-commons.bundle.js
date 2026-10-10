@@ -5350,7 +5350,9 @@ zoo`.split("\n");
     });
   }
   function csv(s) {
-    return `"${String(s).replace(/"/g, '""')}"`;
+    let v = String(s);
+    if (!/^-?\d+(\.\d+)?$/.test(v) && /^\s*[=+\-@|%]/.test(v)) v = "'" + v;
+    return `"${v.replace(/"/g, '""')}"`;
   }
   function download(name, text, type) {
     const a = document.createElement("a");

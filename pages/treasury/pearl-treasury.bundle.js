@@ -7189,7 +7189,8 @@ zoo`.split("\n");
     return { ok: true, entries: arr.length, head: prev };
   }
   function csvCell(s) {
-    const t = String(s ?? "");
+    let t = String(s ?? "");
+    if (!/^-?\d+(\.\d+)?$/.test(t) && /^\s*[=+\-@|%]/.test(t)) t = "'" + t;
     return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
   }
   function exportAuditJSON(log) {

@@ -437,7 +437,15 @@ function renderResults() {
   });
 }
 
-function csv(s) { return `"${String(s).replace(/"/g, '""')}"`; }
+// Spreadsheet formula-injection guard (CWE-1236): a cell whose text begins
+// (after optional spaces) with =, +, -, @, | or % is executed as a formula
+// when the CSV is opened in Excel/Sheets — quoting does NOT prevent it.
+// Prefix such cells with an apostrophe; plain numbers pass untouched.
+function csv(s) {
+  let v = String(s);
+  if (!/^-?\d+(\.\d+)?$/.test(v) && /^\s*[=+\-@|%]/.test(v)) v = "'" + v;
+  return `"${v.replace(/"/g, '""')}"`;
+}
 
 function download(name, text, type) {
   const a = document.createElement("a");

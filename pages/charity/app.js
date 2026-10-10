@@ -324,7 +324,15 @@
 
   const ledgerCSV = () => {
     const rows = receiptsFor(campaign.fingerprint);
-    const q = (s) => `"${String(s).replace(/"/g, '""')}"`;
+    // Spreadsheet formula-injection guard (CWE-1236): a cell whose text
+    // begins (after optional spaces) with =, +, -, @, | or % is executed
+    // as a formula in Excel/Sheets — quoting does NOT prevent it. Prefix
+    // such cells with an apostrophe; plain numbers pass untouched.
+    const q = (s) => {
+      let v = String(s);
+      if (!/^-?\d+(\.\d+)?$/.test(v) && /^\s*[=+\-@|%]/.test(v)) v = "'" + v;
+      return `"${v.replace(/"/g, '""')}"`;
+    };
     return ["donor,amountPRL,amountGrains,txid,blockHeight,recordedAt,hash",
       ...rows.map((r) => [q(r.donor), q(r.amountPRL), r.amountGrains, q(r.txid), r.blockHeight === null ? "" : r.blockHeight, q(r.recordedAt), q(r.hash)].join(","))].join("\n");
   };

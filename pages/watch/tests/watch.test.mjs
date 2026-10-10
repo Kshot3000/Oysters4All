@@ -376,3 +376,10 @@ test("defaultWatchState carries the network blockbook default", () => {
   assert.equal(defaultWatchState(N).blockbook, N.blockbook);
   assert.equal(defaultWatchState(TN).blockbook, "");
 });
+
+test("eventsToCSV: spreadsheet formula-injection guard (CWE-1236)", () => {
+  const csv = eventsToCSV([{ id: "ev-9", ts: 1700000000000, ruleId: "r1", ruleLabel: "=2+2", kind: "incoming", address: A1, txid: TX1, grains: "100", confirmations: 3, message: "@SUM(1+1)" }]);
+  const line = csv.split("\n")[1];
+  assert.ok(line.includes("\"'=2+2\""), "rule label formula cell prefixed");
+  assert.ok(line.includes("\"'@SUM(1+1)\""), "message formula cell prefixed");
+});

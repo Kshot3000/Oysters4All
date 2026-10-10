@@ -693,10 +693,21 @@ export function finalizeSpend(bundle, sigBundles, opts = {}) {
 
 /* ---------------- history ledger (localStorage-backed; pure helpers here) ---------------- */
 
+// Spreadsheet formula-injection guard (CWE-1236): a cell whose text begins
+// (after optional spaces) with =, +, -, @, | or % is executed as a formula
+// when the CSV is opened in Excel/Sheets — quoting does NOT prevent it.
+// Prefix such cells with an apostrophe so they open as text. Plain numbers
+// (including negative amounts) are data, not formulas, and pass untouched.
+const csvQ = (c) => {
+  let v = String(c ?? "");
+  if (!/^-?\d+(\.\d+)?$/.test(v) && /^\s*[=+\-@|%]/.test(v)) v = "'" + v;
+  return `"${v.replace(/"/g, '""')}"`;
+};
+
 export function vaultToCSV(vaults) {
   const rows = [["name", "network", "m", "n", "address", "fingerprint", "internal_key_mode"]];
   for (const v of vaults || []) rows.push([v.name, v.network, v.m, v.n, v.address, v.fingerprint, v.internalKeyMode]);
-  return rows.map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+  return rows.map((r) => r.map(csvQ).join(",")).join("\n");
 }
 
 export function spendsToCSV(spends) {
@@ -704,5 +715,5 @@ export function spendsToCSV(spends) {
   for (const s of spends || []) {
     rows.push([s.at, s.vault, s.txid, s.inputs, s.outputsGrains, s.feeGrains, (s.slots || []).join("+")]);
   }
-  return rows.map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+  return rows.map((r) => r.map(csvQ).join(",")).join("\n");
 }

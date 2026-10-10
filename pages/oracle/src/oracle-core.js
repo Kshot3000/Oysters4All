@@ -430,7 +430,13 @@ export function feedToJSON(rows) {
 }
 
 const csvCell = (v) => {
-  const s = String(v ?? "");
+  let s = String(v ?? "");
+  // Spreadsheet formula-injection guard (CWE-1236): a cell whose text begins
+  // (after optional spaces) with =, +, -, @, | or % is executed as a formula
+  // when the CSV is opened in Excel/Sheets — quoting does NOT prevent it.
+  // Prefix such cells with an apostrophe so they open as text. Plain numbers
+  // (including negative amounts) are data, not formulas, and pass untouched.
+  if (!/^-?\d+(\.\d+)?$/.test(s) && /^\s*[=+\-@|%]/.test(s)) s = "'" + s;
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 

@@ -5106,8 +5106,12 @@ SHA-256(result): ${resultHash}`,
     }
     for (const row of result.derivation) {
       if (row.valid) continue;
-      const note = (row.excludeReason || row.check).replace(/,/g, ";");
-      lines.push(`-,${row.address},${row.bidGrains == null ? "" : row.bidGrains.toString()},,${row.revealOrder == null ? "" : row.revealOrder},no,${note}`);
+      const guard = (v) => {
+        const s = String(v ?? "");
+        return !/^-?\d+(\.\d+)?$/.test(s) && /^\s*[=+\-@|%]/.test(s) ? "'" + s : s;
+      };
+      const note = guard((row.excludeReason || row.check).replace(/,/g, ";"));
+      lines.push(`-,${guard(row.address)},${row.bidGrains == null ? "" : row.bidGrains.toString()},,${row.revealOrder == null ? "" : row.revealOrder},no,${note}`);
     }
     return lines.join("\n") + "\n";
   }

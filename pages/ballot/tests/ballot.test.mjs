@@ -271,3 +271,11 @@ test("fetchTipHeight / fetchAddressBalanceGrains with a stub fetcher", async () 
   const bad = async () => ({ ok: false, status: 500, text: async () => "x" });
   await assert.rejects(() => fetchTipHeight(bad, "https://x"), /blockbook 500/);
 });
+
+test("tallyCsv: spreadsheet formula-injection guard (CWE-1236)", () => {
+  const csv = tallyCsv({ accepted: [{ voter: PIN_VOTER, choice: "=2+2", weightGrains: 5n, ballotHash: PIN_BALLOT_HASH }] });
+  const line = csv.split("\n")[1];
+  assert.ok(line.includes(",'=2+2,"), "choice formula cell prefixed");
+  const csv2 = tallyCsv({ accepted: [{ voter: PIN_VOTER, choice: 'a,"b"', weightGrains: 5n, ballotHash: PIN_BALLOT_HASH }] });
+  assert.ok(csv2.split("\n")[1].includes('"a,""b"""'), "choice with comma/quotes now CSV-escaped");
+});

@@ -6108,9 +6108,14 @@ zoo`.split("\n");
     return { descriptor: fakeDescriptor, tally, result: resultRecord(tally) };
   }
   function tallyCsv(tally) {
+    const cell = (v) => {
+      let s = String(v ?? "");
+      if (!/^-?\d+(\.\d+)?$/.test(s) && /^\s*[=+\-@|%]/.test(s)) s = "'" + s;
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
     const rows = ["voter,choice,weightGrains,ballotHash"];
     for (const a of tally.accepted) {
-      rows.push(`${a.voter},${a.choice},${a.weightGrains.toString()},${a.ballotHash}`);
+      rows.push([a.voter, a.choice, a.weightGrains.toString(), a.ballotHash].map(cell).join(","));
     }
     return rows.join("\n");
   }

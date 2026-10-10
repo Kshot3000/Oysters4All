@@ -488,3 +488,12 @@ test("newMnemonic produces 12 words that parse", () => {
   const s = parsePayrollSecret(mn, N);
   assert.match(s.address, /^prl1/);
 });
+
+test("CSV export: spreadsheet formula-injection guard (CWE-1236)", () => {
+  const csv = rosterToCsv([{ address: "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d", amount: 150000000n, label: "=2+2+cmd|'/C calc'!A0" }]);
+  const row = csv.split("\n")[1];
+  assert.ok(row.includes("'=2+2"), "formula cell apostrophe-prefixed");
+  assert.ok(!/,=2\+2/.test(row), "no raw formula cell");
+  const neg = rosterToCsv([{ address: "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d", amount: 100n, label: "ok" }]);
+  assert.ok(!neg.includes("'"), "ordinary rows untouched");
+});

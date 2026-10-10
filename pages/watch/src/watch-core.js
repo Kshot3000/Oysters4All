@@ -393,7 +393,16 @@ export function evaluateRules({ snapshots, prev, rules, newTxDetails, txDetails,
 /* ---------------- event log / export ---------------- */
 
 export function eventsToCSV(events) {
-  const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  // Spreadsheet formula-injection guard (CWE-1236): a cell whose text begins
+  // (after optional spaces) with =, +, -, @, | or % is executed as a formula
+  // when the CSV is opened in Excel/Sheets — quoting does NOT prevent it.
+  // Prefix such cells with an apostrophe so they open as text. Plain numbers
+  // (including negative amounts) are data, not formulas, and pass untouched.
+  const q = (v) => {
+    let s = String(v ?? "");
+    if (!/^-?\d+(\.\d+)?$/.test(s) && /^\s*[=+\-@|%]/.test(s)) s = "'" + s;
+    return `"${s.replace(/"/g, '""')}"`;
+  };
   const rows = ["ts_utc,kind,rule_id,rule_label,address,txid,grains,confirmations,message"];
   for (const e of events) {
     rows.push([
