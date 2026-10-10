@@ -114,12 +114,21 @@ function upsertPair(pairs, key, value) {
 }
 const ceilDiv = (a, b) => (a + b - 1n) / b;
 
-/** Default randomness: crypto.getRandomValues. Overridable for tests. */
+/**
+ * Default randomness for BIP-78 insertion positions: WebCrypto only.
+ * The draw decides where the receiver's inputs/outputs land in the
+ * proposal — predictable positions leak which entries are the receiver's
+ * and defeat the payjoin privacy this desk exists for. There is NO
+ * Math.random fallback: without a CSPRNG this refuses loudly rather
+ * than quietly shipping predictable positions. Overridable for tests.
+ */
 export function defaultRng() {
+  const grv = (globalThis.crypto || {}).getRandomValues;
+  if (typeof grv !== "function") {
+    fail("no-csprng", "WebCrypto getRandomValues is unavailable — refusing to pick BIP-78 insertion positions with predictable randomness");
+  }
   const b = new Uint32Array(1);
-  (globalThis.crypto || {}).getRandomValues
-    ? globalThis.crypto.getRandomValues(b)
-    : b.fill((Math.random() * 4294967296) >>> 0);
+  grv.call(globalThis.crypto, b);
   return b[0] / 4294967296;
 }
 

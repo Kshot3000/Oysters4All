@@ -548,3 +548,38 @@ describe("network surface (honest labeling)", () => {
     refused(() => P.summarizePsbt("not-base64!!"), "bad-psbt");
   });
 });
+
+describe("defaultRng (BIP-78 insertion-position privacy)", () => {
+  it("draws from WebCrypto when available, returning [0, 1)", () => {
+    const saved = globalThis.crypto;
+    let calls = 0;
+    Object.defineProperty(globalThis, "crypto", { configurable: true, value: {
+      getRandomValues: (b) => { calls++; b[0] = 0x80000000; return b; },
+    } });
+    try {
+      const v = P.defaultRng();
+      assert.equal(calls, 1);
+      assert.equal(v, 0.5);
+    } finally {
+      Object.defineProperty(globalThis, "crypto", { configurable: true, value: saved });
+    }
+  });
+  it("no WebCrypto -> no-csprng REFUSED, never a Math.random fallback", () => {
+    const saved = globalThis.crypto;
+    Object.defineProperty(globalThis, "crypto", { configurable: true, value: undefined });
+    try {
+      refused(() => P.defaultRng(), "no-csprng");
+    } finally {
+      Object.defineProperty(globalThis, "crypto", { configurable: true, value: saved });
+    }
+  });
+  it("crypto present but getRandomValues missing -> no-csprng REFUSED", () => {
+    const saved = globalThis.crypto;
+    Object.defineProperty(globalThis, "crypto", { configurable: true, value: {} });
+    try {
+      refused(() => P.defaultRng(), "no-csprng");
+    } finally {
+      Object.defineProperty(globalThis, "crypto", { configurable: true, value: saved });
+    }
+  });
+});
