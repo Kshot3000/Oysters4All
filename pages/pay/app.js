@@ -168,6 +168,10 @@ function grainsFor(cur, amountStr) {
    * truncated "1.2.3", accepted "10abc", and rounded sub-grain amounts
    * instead of rejecting them — the result is baked into invoices and
    * payment buttons, so a misparse charges the wrong amount. */
+  /* A negative amount is well-formed input with a bad value, not a
+   * parse failure: refuse it with the same message as zero (and as the
+   * USD branch above) instead of leaking the parser's raw error. */
+  if (/^-(?:\d|\.\d)/.test(String(amountStr).trim())) throw new Error("Enter an amount greater than zero.");
   const grains = parsePRLToGrains(amountStr);
   if (grains <= 0) throw new Error("Enter an amount greater than zero.");
   const usdNote = rate.usd ? "≈ " + formatUSD(grainsToUsd(String(grains), rate.usd)) : "";

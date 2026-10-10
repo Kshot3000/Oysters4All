@@ -341,12 +341,14 @@ if (existsSync(launcherIns)) {
   ok("parsePRLToGrains rejects non-strings", ns);
   const appSrc = readFileSync(resolvePath(payDir, "app.js"), "utf8");
   ok("app.js grainsFor uses the exact parser", appSrc.includes("parsePRLToGrains(amountStr)"));
+  ok("app.js grainsFor refuses negatives with the greater-than-zero message",
+    appSrc.includes('/^-(?:\\d|\\.\\d)/') && appSrc.includes('throw new Error("Enter an amount greater than zero.")'));
   ok("app.js has no float amount parse left",
     !appSrc.includes("parseFloat(amountStr)") && !appSrc.includes("Math.round(a * 100_000_000)"));
   const idxHtml = readFileSync(resolvePath(payDir, "index.html"), "utf8");
   const invHtml = readFileSync(resolvePath(payDir, "invoice.html"), "utf8");
-  ok("index.html bundle+app cache keys at ?v=2",
-    idxHtml.includes("pearl-pay-core.bundle.js?v=2") && idxHtml.includes('src="app.js?v=2"'));
+  ok("index.html bundle cache key at ?v=2, app cache key at ?v=3",
+    idxHtml.includes("pearl-pay-core.bundle.js?v=2") && idxHtml.includes('src="app.js?v=3"'));
   ok("invoice.html bundle cache key at ?v=2", invHtml.includes("pearl-pay-core.bundle.js?v=2"));
 }
 
