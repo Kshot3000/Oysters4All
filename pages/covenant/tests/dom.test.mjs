@@ -309,3 +309,15 @@ test("app.js grain formatter is BigInt-exact (pool float-format class)", async (
   assert.ok(src.includes("100000000n"), "BigInt-exact grain formatter present");
   assert.ok(src.includes("/^-?\\d+$/"), "integer-grain gate present");
 });
+
+test("vault refuses inexact UTXO values (float-parser round-up class)", () => {
+  const balBefore = $("vault-balance").textContent;
+  $("m-txid").value = "cd".repeat(32);
+  $("m-vout").value = "1";
+  // >8 decimals: a float parser silently rounded this to 12345679 grains
+  $("m-value").value = "0.123456789";
+  $("add-utxo").click();
+  assert.equal($("vault-error").hidden, false, "inexact UTXO value must error");
+  assert.match($("vault-error").textContent, /positive number/, $("vault-error").textContent);
+  assert.equal($("vault-balance").textContent, balBefore, "no UTXO may be added from an inexact value");
+});

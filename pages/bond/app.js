@@ -13,9 +13,16 @@
     return (grains / GRAIN).toLocaleString("en-US", { maximumFractionDigits: 8 });
   }
   function parsePRL(s) {
-    const v = Number(String(s).trim());
-    if (!Number.isFinite(v) || v <= 0) throw new Error("enter a positive PRL amount");
-    return Math.round(v * GRAIN);
+    // Exact parser: a float round-trip silently rounds sub-grain and
+    // >8-decimal inputs (0.123456789 -> 12345679 grains) and overflows past
+    // the safe-integer range unchecked. Parse the decimal string with
+    // BigInt instead, like the core parser; refuse anything inexact.
+    const m = String(s).trim().match(/^(\d+)(?:\.(\d{1,8}))?$/);
+    if (!m) throw new Error("enter a positive PRL amount");
+    const g = BigInt(m[1]) * BigInt(GRAIN) + BigInt((m[2] || "").padEnd(8, "0"));
+    if (g <= 0n) throw new Error("enter a positive PRL amount");
+    if (g > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("amount out of range");
+    return Number(g);
   }
   function parseFee(s) {
     const v = Number(String(s).trim());

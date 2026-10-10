@@ -352,3 +352,12 @@ test("app.js grain formatter is BigInt-exact (pool float-format class)", async (
   assert.ok(src.includes("100000000n"), "BigInt-exact grain formatter present");
   assert.ok(src.includes("/^-?\\d+$/"), "integer-grain gate present");
 });
+
+test("spend refuses inexact seller amounts (float-parser round-up class)", () => {
+  // >8 decimals: a float parser silently rounded this to 112345679 grains
+  $("pay-seller-amt").value = "1.123456789";
+  $("build-plan").click();
+  assert.equal($("spend-error").hidden, false, "inexact seller amount must error");
+  assert.match($("spend-error").textContent, /positive number/, $("spend-error").textContent);
+  assert.equal($("plan-card").hidden, true, "no plan may be built from an inexact amount");
+});

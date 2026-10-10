@@ -300,6 +300,29 @@ test("index.html carries attribution, honest limits, and cache keys", () => {
   assert.match(html, /prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d/, "donation address, character-for-character");
   assert.match(html, /honest-limits|Honest limits/i, "honest limits panel");
   assert.match(html, /pearl-bond\.bundle\.js\?v=2/, "bundle cache key");
-  assert.match(html, /app\.js\?v=2/, "app cache key");
+  assert.match(html, /app\.js\?v=3/, "app cache key");
   assert.match(html, /styles\.css\?v=5/, "css cache key");
+});
+
+test("forge refuses inexact PRL amounts (float-parser round-up class)", async () => {
+  const { $ } = bootApp();
+  const net = B.NETWORKS.mainnet;
+  const sellerMn = B.newMnemonic();
+  $("t-rate").value = "5";
+  $("t-freq").value = "2";
+  $("t-periods").value = "4";
+  $("t-issue").value = "200000";
+  $("t-network").value = "mainnet";
+  $("t-holder").value = sellerMn;
+  void net;
+  // >8 decimals: a float parser silently rounded this to 12345679 grains
+  $("t-face").value = "0.123456789";
+  $("t-forge").click();
+  await tick();
+  assert.match($("t-err").textContent, /positive PRL amount/, "inexact face refused: " + $("t-err").textContent);
+  // sub-grain: a float parser silently returned 0 grains
+  $("t-face").value = "0.000000001";
+  $("t-forge").click();
+  await tick();
+  assert.match($("t-err").textContent, /positive PRL amount/, "sub-grain face refused: " + $("t-err").textContent);
 });

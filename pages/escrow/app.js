@@ -286,11 +286,16 @@
   }
 
   const prlToGrains = (s) => {
-    const v = Number(String(s).trim());
-    if (!Number.isFinite(v) || v <= 0) throw new Error("amount must be a positive number");
-    const g = Math.round(v * E.GRAIN_PER_PRL);
-    if (!Number.isSafeInteger(g) || g < 546) throw new Error("amount below dust (546 grains)");
-    return g;
+    // Exact parser: a float round-trip silently rounds sub-grain and
+    // >8-decimal inputs (0.123456789 -> 12345679 grains). Parse the decimal
+    // string with BigInt instead, like the core parser; refuse inexact input.
+    const m = String(s).trim().match(/^(\d+)(?:\.(\d{1,8}))?$/);
+    if (!m) throw new Error("amount must be a positive number");
+    const g = BigInt(m[1]) * BigInt(E.GRAIN_PER_PRL) + BigInt((m[2] || "").padEnd(8, "0"));
+    if (g <= 0n) throw new Error("amount must be a positive number");
+    if (g > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("amount out of range");
+    if (g < 546n) throw new Error("amount below dust (546 grains)");
+    return Number(g);
   };
 
   $("build-plan").addEventListener("click", () => {
