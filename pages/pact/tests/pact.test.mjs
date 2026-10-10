@@ -244,4 +244,9 @@ test("payout math helpers", () => {
   assert.equal(P.prlToGrains("1.5"), 150000000);
   assert.equal(P.grainsToPRL(150000000), "1.5");
   assert.throws(() => P.prlToGrains("abc"), /PACT REFUSED/);
+  // Exact-range regression: past MAX_SAFE_INTEGER grains the old
+  // Number(grains) silently dropped grains (…001 came back …000).
+  assert.equal(P.prlToGrains("90071992.54740991"), 9007199254740991);
+  assert.throws(() => P.prlToGrains("90071992.54740992"), /out of range/);
+  assert.throws(() => P.prlToGrains("100000000.00000001"), /out of range/);
 });

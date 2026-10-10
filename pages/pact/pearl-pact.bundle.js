@@ -6888,7 +6888,9 @@ zoo`.split("\n");
     const t = String(s || "").trim();
     if (!/^\d+(\.\d{1,8})?$/.test(t)) refuse(`"${s}" is not a PRL amount`);
     const [w, f = ""] = t.split(".");
-    return Number(BigInt(w) * BigInt(GRAIN_PER_PRL) + BigInt((f + "00000000").slice(0, 8)));
+    const grains = BigInt(w) * BigInt(GRAIN_PER_PRL) + BigInt((f + "00000000").slice(0, 8));
+    if (grains > BigInt(Number.MAX_SAFE_INTEGER)) refuse(`"${s}" is out of range`);
+    return Number(grains);
   }
 
   // src/index.js

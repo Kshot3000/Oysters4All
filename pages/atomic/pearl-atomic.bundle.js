@@ -6540,6 +6540,7 @@ zoo`.split("\n");
     }
     if (grains < BigInt(DUST_GRAIN)) throw new Error(`amount below dust (${DUST_GRAIN} grains)`);
     if (grains > 2100000000n * 100000000n) throw new Error("amount exceeds max PRL supply");
+    if (grains > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("amount out of range");
     return Number(grains);
   }
   return __toCommonJS(index_exports);

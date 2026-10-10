@@ -1018,5 +1018,10 @@ export function prlToGrains(s) {
   const t = String(s || "").trim();
   if (!/^\d+(\.\d{1,8})?$/.test(t)) refuse(`"${s}" is not a PRL amount`);
   const [w, f = ""] = t.split(".");
-  return Number(BigInt(w) * BigInt(GRAIN_PER_PRL) + BigInt((f + "00000000").slice(0, 8)));
+  const grains = BigInt(w) * BigInt(GRAIN_PER_PRL) + BigInt((f + "00000000").slice(0, 8));
+  // Number(grains) is exact only up to MAX_SAFE_INTEGER: refuse the
+  // inexact band instead of silently dropping grains (100000000.00000001
+  // PRL came back as 10000000000000000 grains, −1). Fleet standard.
+  if (grains > BigInt(Number.MAX_SAFE_INTEGER)) refuse(`"${s}" is out of range`);
+  return Number(grains);
 }

@@ -297,6 +297,11 @@ test("fmtPRL / parsePRLtoGrains", () => {
   assert.equal(parsePRLtoGrains("546 grains"), 546);
   assert.throws(() => parsePRLtoGrains("0.00000545"), /dust/);
   assert.throws(() => parsePRLtoGrains("abc"), /amount must look like/);
+  // Exact-range regression: past MAX_SAFE_INTEGER grains the old
+  // Number(grains) silently dropped grains (…001 came back …000).
+  assert.equal(parsePRLtoGrains("90071992.54740991"), 9007199254740991);
+  assert.throws(() => parsePRLtoGrains("90071992.54740992"), /out of range/);
+  assert.throws(() => parsePRLtoGrains("100000000.00000001"), /out of range/);
 });
 
 test("partyKeyFromInput + addressToProgram gates", () => {

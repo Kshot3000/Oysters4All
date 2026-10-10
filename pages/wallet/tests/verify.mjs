@@ -206,8 +206,18 @@ const testnet = W.NETWORKS.testnet;
 /* 9. amount formatting */
 {
   ok("fmtPRL trims", W.fmtPRL(100000000) === "1" && W.fmtPRL(150000000) === "1.5");
-  ok("prlToGrains", W.prlToGrains("0.00000001") === 1 && W.prlToGrains(2.5) === 250000000);
+  ok("prlToGrains", W.prlToGrains("0.00000001") === 1 && W.prlToGrains("2.5") === 250000000);
   throws("prlToGrains rejects junk", () => W.prlToGrains("abc"), "bad amount");
+  // Exact-parser regressions: the old float parse rounded these instead
+  // of refusing (sub-grain inputs, hex/exponent forms, unsafe range).
+  throws("prlToGrains rejects 9dp", () => W.prlToGrains("0.123456789"), "bad amount");
+  throws("prlToGrains rejects sub-grain .5", () => W.prlToGrains("1.000000005"), "bad amount");
+  throws("prlToGrains rejects 0.1 grain", () => W.prlToGrains("0.000000001"), "bad amount");
+  throws("prlToGrains rejects hex", () => W.prlToGrains("0x10"), "bad amount");
+  throws("prlToGrains rejects exponent", () => W.prlToGrains("1e3"), "bad amount");
+  throws("prlToGrains rejects negative", () => W.prlToGrains("-5"), "bad amount");
+  ok("prlToGrains max safe exact", W.prlToGrains("90071992.54740991") === 9007199254740991);
+  throws("prlToGrains rejects unsafe range", () => W.prlToGrains("90071992.54740992"), "bad amount");
   ok("fmtFiat", W.fmtFiat(2, 100000000, "USD") === "$2.00");
 }
 

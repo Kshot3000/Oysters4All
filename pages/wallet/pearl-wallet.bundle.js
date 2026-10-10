@@ -5976,9 +5976,12 @@ zoo`.split("\n");
     return Number(grains) / GRAIN_PER_PRL;
   }
   function prlToGrains(prl) {
-    const n = Number(prl);
-    if (!Number.isFinite(n) || n < 0) throw new Error("bad amount");
-    return Math.round(n * GRAIN_PER_PRL);
+    if (typeof prl !== "string") throw new Error("bad amount");
+    const m = /^(\d+)(?:\.(\d{1,8}))?$/.exec(prl.trim());
+    if (!m) throw new Error("bad amount");
+    const grains = BigInt(m[1]) * BigInt(GRAIN_PER_PRL) + (m[2] ? BigInt(m[2].padEnd(8, "0")) : 0n);
+    if (grains > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("bad amount");
+    return Number(grains);
   }
   function fmtPRL(grains, { trim = true } = {}) {
     const s = (Number(grains) / GRAIN_PER_PRL).toFixed(8);

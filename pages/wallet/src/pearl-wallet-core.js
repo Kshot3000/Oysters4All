@@ -199,9 +199,21 @@ export function grainsToPRL(grains) {
 }
 
 export function prlToGrains(prl) {
-  const n = Number(prl);
-  if (!Number.isFinite(n) || n < 0) throw new Error("bad amount");
-  return Math.round(n * GRAIN_PER_PRL);
+  // Exact parser (fleet standard): the old float parse
+  // (Math.round(Number(x) * 1e8)) silently rounded sub-grain inputs —
+  // "0.123456789" became 12345679 grains (+1 invented), "1.000000005"
+  // became 100000001, "0.000000001" became 0 — and Number() accepted
+  // forms no amount field should: "0x10" parsed as 16 PRL and "1e3" as
+  // 1000 PRL. This value feeds buildSendTx, so a misparse is a
+  // wrong-amount send, not a display glitch. Parse the decimal string
+  // in BigInt and refuse anything inexact or past the safe-integer
+  // range.
+  if (typeof prl !== "string") throw new Error("bad amount");
+  const m = /^(\d+)(?:\.(\d{1,8}))?$/.exec(prl.trim());
+  if (!m) throw new Error("bad amount");
+  const grains = BigInt(m[1]) * BigInt(GRAIN_PER_PRL) + (m[2] ? BigInt(m[2].padEnd(8, "0")) : 0n);
+  if (grains > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("bad amount");
+  return Number(grains);
 }
 
 export function fmtPRL(grains, { trim = true } = {}) {

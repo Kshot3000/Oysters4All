@@ -589,5 +589,10 @@ export function parsePRLtoGrains(s) {
   }
   if (grains < BigInt(DUST_GRAIN)) throw new Error(`amount below dust (${DUST_GRAIN} grains)`);
   if (grains > 2100000000n * 100000000n) throw new Error("amount exceeds max PRL supply");
+  // Number(grains) is exact only up to MAX_SAFE_INTEGER, and the supply
+  // cap (2.1e17 grains) sits far above it: refuse the inexact band
+  // instead of silently dropping grains (100000000.00000001 PRL came
+  // back as 10000000000000000 grains, −1). Fleet-standard range check.
+  if (grains > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("amount out of range");
   return Number(grains);
 }
