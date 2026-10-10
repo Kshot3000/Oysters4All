@@ -293,7 +293,7 @@
     d.vin.forEach((inp, i) => {
       const row = document.createElement("div");
       row.className = "wifrow";
-      row.innerHTML = `<div class="who">input #${i} · spends ${inp.txid ? esc(inp.txid.slice(0, 20)) + "…" : "?"}:${inp.vout ?? "?"} · seq 0x${inp.sequence.toString(16).padStart(8, "0")} · ${(inp.addresses[0] || "unknown address").slice(0, 30)}</div>
+      row.innerHTML = `<div class="who">input #${i} · spends ${inp.txid ? esc(inp.txid.slice(0, 20)) + "…" : "?"}:${inp.vout ?? "?"} · seq 0x${inp.sequence.toString(16).padStart(8, "0")} · ${esc((inp.addresses[0] || "unknown address").slice(0, 30))}</div>
         <label>WIF for input #${i} <input type="password" data-rbf-wif="${i}" spellcheck="false" autocomplete="off"></label>
         <div class="hint">in-memory only</div>`;
       wrap.appendChild(row);

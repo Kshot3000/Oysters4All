@@ -394,3 +394,21 @@ test("verify: unreachable backend -> loud refusal", async () => {
   assert.ok(has("vf-result", "backend unreachable"), "unreachable refusal missing");
   sandbox.fetch = realFetch;
 });
+
+test("rbf: backend/pasted input address is HTML-escaped in the WIF row (regression)", async () => {
+  // vin addresses pass through diagnoseTx verbatim from the Blockbook
+  // response (or pasted JSON). The RBF row renders them via innerHTML on
+  // the same page that collects WIF private keys — a crafted address like
+  // <svg onload=…> (22 chars, inside the 30-char slice) must arrive escaped.
+  const tx = JSON.parse(JSON.stringify(parentTx));
+  tx.txid = "ab".repeat(32);
+  tx.vin[0].addresses = ["<svg onload=alert(1)>"];
+  $("dg-json").value = JSON.stringify(tx);
+  $("dg-go-offline").click();
+  await settle();
+  const wifEl = document.querySelector('[data-rbf-wif="0"]');
+  assert.ok(wifEl, "RBF wif row missing for crafted tx");
+  const rowHtml = wifEl._owner.innerHTML;
+  assert.ok(!rowHtml.includes("<svg onload"), "raw payload reached innerHTML: " + rowHtml.slice(0, 300));
+  assert.ok(rowHtml.includes("&lt;svg onload"), "escaped payload missing: " + rowHtml.slice(0, 300));
+});
