@@ -15,6 +15,7 @@ import {
   taptree2, verifyControlBlock,
   scriptPathSigDigestEx, signForXOnly, verifySchnorrSig,
   combineReleaseSigs, buildScriptPathSpend, planSpend, spendVBytes,
+  serviceFeeGrainsFor, SERVICE_FEE_BPS, SERVICE_FEE_ADDRESS,
   addressToProgram,
   bytesToHex, hexToBytes, schnorr, sha256, dblSha, convertBits,
   encodeBech32m, decodeBech32m, p2trScriptPubKey, txidLE,
@@ -343,6 +344,97 @@ test("planSpend: fee math, dust folding, insufficient funds", () => {
     () => planSpend({ ...base, inputValue: 200000, payments: [{ program: KEYS[1], value: 100 }] }),
     /dust/,
   );
+});
+
+test("serviceFeeGrainsFor: disclosed 1% on mainnet releases, waived otherwise", () => {
+  assert.equal(SERVICE_FEE_BPS, 100);
+  assert.equal(SERVICE_FEE_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
+  // exact 1% of the amount released to the seller
+  assert.equal(serviceFeeGrainsFor(4 * GRAIN_PER_PRL, net), 4_000_000);
+  // floors, never rounds up
+  assert.equal(serviceFeeGrainsFor(100001, net), 1000);
+  // below the dust floor the fee is waived, not rounded up to dust
+  assert.equal(serviceFeeGrainsFor(50000, net), 0); // 1% = 500 < 546
+  assert.equal(serviceFeeGrainsFor(54600, net), DUST_GRAIN); // 1% = 546 exactly
+  // testnet releases pay no service fee
+  assert.equal(serviceFeeGrainsFor(4 * GRAIN_PER_PRL, NETWORKS.testnet), 0);
+  // bad amounts refused
+  assert.throws(() => serviceFeeGrainsFor(0, net), /bad releasedGrains/);
+  assert.throws(() => serviceFeeGrainsFor(-5, net), /bad releasedGrains/);
+  assert.throws(() => serviceFeeGrainsFor(1.5, net), /bad releasedGrains/);
+});
+
+test("planSpend with service fee: fee output joins the plan, change absorbs it", () => {
+  const feeProg = addressToProgram(SERVICE_FEE_ADDRESS, net);
+  const sellerAmt = 4 * GRAIN_PER_PRL;
+  const fee = serviceFeeGrainsFor(sellerAmt, net);
+  const plan = planSpend({
+    inputValue: 5 * GRAIN_PER_PRL,
+    payments: [{ program: KEYS[1], value: sellerAmt }],
+    feeRateGrainsPerVByte: 5,
+    scriptLen: 105, controlLen: 65, stackLens: [64, 0, 64],
+    serviceFeeGrains: fee, serviceFeeProgram: feeProg,
+  });
+  assert.equal(plan.serviceFeeGrains, fee);
+  assert.equal(plan.outputs.length, 3); // seller + service fee + change
+  assert.equal(plan.outputs[0].value, sellerAmt);
+  assert.equal(plan.outputs[1].value, fee);
+  assert.equal(bytesToHex(plan.outputs[1].program), bytesToHex(feeProg));
+  assert.equal(plan.outputs[1].serviceFee, true);
+  assert.ok(plan.outputs[2].change);
+  const sum = plan.outputs.reduce((a, o) => a + o.value, 0);
+  assert.equal(sum + plan.fee, 5 * GRAIN_PER_PRL, "conservation incl. service fee");
+  // invalid fees refused before any planning
+  const base = {
+    inputValue: 200000, payments: [{ program: KEYS[1], value: 100000 }],
+    feeRateGrainsPerVByte: 10, scriptLen: 105, controlLen: 65, stackLens: [64, 0, 64],
+  };
+  assert.throws(() => planSpend({ ...base, serviceFeeGrains: 100, serviceFeeProgram: feeProg }), /bad service fee/);
+  assert.throws(() => planSpend({ ...base, serviceFeeGrains: 1000, serviceFeeProgram: null }), /32 bytes/);
+  assert.throws(() => planSpend({ ...base, serviceFeeGrains: -5, serviceFeeProgram: feeProg }), /bad service fee/);
+  // default (no fee args) is byte-identical to the pre-fee planner
+  const plain = planSpend({ ...base, inputValue: 200000 });
+  assert.equal(plain.serviceFeeGrains, 0);
+  assert.equal(plain.outputs.length, 2);
+  assert.ok(plain.outputs.every((o) => !o.serviceFee));
+});
+
+test("release flow with service fee: signers approve the fee output via the digest", () => {
+  const rel = buildReleaseScript(KEYS[0], KEYS[1], KEYS[2]);
+  const ref = buildRefundScript(KEYS[0], 130000);
+  const tree = taptree2(net, numsInternalKeyEscrow(rel, ref), rel, ref);
+  const fundValue = 5 * GRAIN_PER_PRL;
+  const input = { txid: "ab".repeat(32), vout: 0, value: fundValue, spk: tree.spk };
+  const sellerAmt = 4 * GRAIN_PER_PRL;
+  const fee = serviceFeeGrainsFor(sellerAmt, net);
+  const plan = planSpend({
+    inputValue: fundValue,
+    payments: [{ program: KEYS[1], value: sellerAmt }],
+    feeRateGrainsPerVByte: 5,
+    scriptLen: rel.length, controlLen: 65, stackLens: [64, 0, 64],
+    serviceFeeGrains: fee, serviceFeeProgram: addressToProgram(SERVICE_FEE_ADDRESS, net),
+  });
+  plan.outputs.find((o) => o.change).program = KEYS[0];
+  const digest = scriptPathSigDigestEx(net, input, plan.outputs, rel, {});
+  const stack = combineReleaseSigs(
+    [{ keyIndex: 0, sig: signForXOnly(PRIVS[0], digest) }, { keyIndex: 2, sig: signForXOnly(PRIVS[2], digest) }],
+    digest, KEYS,
+  );
+  const spend = buildScriptPathSpend(net, input, plan.outputs, rel, tree.controlBlocks[0], stack, {});
+  assert.equal(spend.digest, bytesToHex(digest));
+  assert.equal(spend.vBytes, plan.vBytes);
+  const outs = parseOutputs(spend.hex);
+  assert.equal(outs.length, 3);
+  assert.equal(outs[0].value, sellerAmt); // seller receives the exact agreed amount
+  assert.equal(outs[1].value, fee); // disclosed service fee output
+  assert.equal(bytesToHex(outs[1].spk), bytesToHex(p2trScriptPubKey(addressToProgram(SERVICE_FEE_ADDRESS, net))));
+  assert.equal(outs[0].value + outs[1].value + outs[2].value + plan.fee, fundValue);
+  // the fee cannot be skimmed after signing: dropping it changes the digest
+  // and both signatures stop verifying
+  const skimmed = plan.outputs.filter((o) => !o.serviceFee);
+  const skimDigest = scriptPathSigDigestEx(net, input, skimmed, rel, {});
+  assert.notEqual(bytesToHex(skimDigest), bytesToHex(digest));
+  assert.equal(verifySchnorrSig(stack[2], skimDigest, KEYS[0]), false);
 });
 
 test("partyKeyFromInput: hex and mnemonic inputs", () => {

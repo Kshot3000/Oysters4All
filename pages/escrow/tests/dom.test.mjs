@@ -281,6 +281,12 @@ test("spend: release plan -> two local signatures -> assembled tx", () => {
   assert.equal($("spend-error").hidden, true, "no plan error: " + $("spend-error").textContent);
   assert.equal($("plan-card").hidden, false);
   assert.equal($("plan-digest").textContent.length, 64);
+  // disclosed service fee: mainnet release of 4 PRL shows the 1% fee as
+  // its own plan output (to the operator address) before anyone signs
+  assert.ok($("plan-outputs").innerHTML.includes("service fee (1%)"), "fee line in plan outputs: " + $("plan-outputs").innerHTML);
+  assert.ok($("plan-outputs").innerHTML.includes("prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d"), "fee pays the operator address");
+  assert.ok($("plan-fee").textContent.includes("service fee"), "fee summary line: " + $("plan-fee").textContent);
+  assert.ok(html.includes("Service fee (disclosed)"), "fee disclosed in the release form before planning");
 
   // sign both slots with the buyer + arbiter mnemonics via the UI buttons
   const slots = $("sig-slots").querySelectorAll(".sig-slot");

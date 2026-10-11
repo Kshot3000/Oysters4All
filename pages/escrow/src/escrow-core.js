@@ -367,13 +367,53 @@ export function spendVBytes({ nOut, scriptLen, controlLen, stackLens }) {
   return Math.ceil((base * 3 + (base + 2 + wit)) / 4);
 }
 
+/* ---------------- service fee (disclosed, release-only) ----------------
+ * Pearl Escrow charges a 1% service fee on MAINNET releases, computed on
+ * the amount released to the seller and paid as its own output in the
+ * release transaction, to the operator address published in every Escrow
+ * page footer (the same address shown there for donations). The fee is
+ * part of the plan BEFORE anyone signs: the release digest commits to
+ * every output, so both required signers see and approve the exact fee
+ * output — it cannot be added or altered after signing. The fee is
+ * quoted in the spend form and shown as its own line in the plan before
+ * signing — never hidden. Refunds pay no service fee (the refund path
+ * never calls planSpend), testnet releases pay none, and a fee that
+ * would fall below the 546-grain dust floor is waived rather than
+ * rounded up. */
+export const SERVICE_FEE_BPS = 100; // 1%
+export const SERVICE_FEE_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+
+/** Service fee in grains for a release paying releasedGrains to the
+ *  seller on network (0 when the fee does not apply: non-mainnet
+ *  network, or 1% below the dust floor). */
+export function serviceFeeGrainsFor(releasedGrains, network) {
+  const released = Number(releasedGrains);
+  if (!Number.isSafeInteger(released) || released <= 0) throw new Error("bad releasedGrains");
+  if (!network || network.hrp !== "prl") return 0;
+  const fee = Number((BigInt(released) * BigInt(SERVICE_FEE_BPS)) / 10000n);
+  return fee >= DUST_GRAIN ? fee : 0;
+}
+
 /** Plan a spend: pick outputs, compute fee from the real witness size, and
- *  fold dust change into the fee. Throws on insufficient funds. */
-export function planSpend({ inputValue, payments, feeRateGrainsPerVByte, scriptLen, controlLen, stackLens }) {
+ *  fold dust change into the fee. Throws on insufficient funds.
+ *  serviceFeeGrains / serviceFeeProgram (optional): the disclosed release
+ *  service fee (see serviceFeeGrainsFor) — when > 0 it is appended as its
+ *  own output after the payments (flagged `serviceFee: true`) and counted
+ *  in the payment sum, so the buyer's change absorbs it and every signer
+ *  approves it via the output-committing digest. */
+export function planSpend({ inputValue, payments, feeRateGrainsPerVByte, scriptLen, controlLen, stackLens, serviceFeeGrains = 0, serviceFeeProgram = null }) {
   if (!Number.isSafeInteger(inputValue) || inputValue <= 0) throw new Error("bad input value");
   if (!Array.isArray(payments) || payments.length === 0) throw new Error("need at least one payment");
+  const serviceFee = Number(serviceFeeGrains);
+  if (!Number.isSafeInteger(serviceFee) || serviceFee < 0 ||
+      (serviceFee > 0 && serviceFee < DUST_GRAIN))
+    throw new Error("bad service fee");
+  if (serviceFee > 0 && (!(serviceFeeProgram instanceof Uint8Array) || serviceFeeProgram.length !== 32))
+    throw new Error("service fee program must be 32 bytes");
+  const allPayments = payments.map((p) => ({ program: p.program, value: p.value }));
+  if (serviceFee > 0) allPayments.push({ program: serviceFeeProgram, value: serviceFee, serviceFee: true });
   let paySum = 0;
-  for (const p of payments) {
+  for (const p of allPayments) {
     if (!(p.program instanceof Uint8Array) || p.program.length !== 32) throw new Error("payment program must be 32 bytes");
     if (!Number.isSafeInteger(p.value) || p.value < DUST_GRAIN) throw new Error(`payment below dust (${DUST_GRAIN} grains)`);
     paySum += p.value;
@@ -383,20 +423,20 @@ export function planSpend({ inputValue, payments, feeRateGrainsPerVByte, scriptL
   const feeFor = (nOut) => Math.ceil(vbytes(nOut) * feeRateGrainsPerVByte);
   const need = (f) => paySum + f;
   // Try with a change output first.
-  let fee = feeFor(payments.length + 1);
+  let fee = feeFor(allPayments.length + 1);
   let change = inputValue - need(fee);
-  let outputs = payments.map((p) => ({ program: p.program, value: p.value }));
+  let outputs = allPayments;
   if (change >= DUST_GRAIN) {
     outputs.push({ program: null, value: change, change: true });
   } else {
     // No change output: re-estimate the smaller tx, fold any dust remainder in.
-    fee = feeFor(payments.length);
+    fee = feeFor(allPayments.length);
     change = inputValue - need(fee);
     if (change < 0) throw new Error(`insufficient funds: need ${need(fee)} grains, have ${inputValue}`);
     if (change > 0) { fee += change; change = 0; }
   }
   if (change < 0) throw new Error(`insufficient funds: need ${need(fee)} grains, have ${inputValue}`);
-  return { outputs, fee, vBytes: vbytes(outputs.length), change };
+  return { outputs, fee, vBytes: vbytes(outputs.length), change, serviceFeeGrains: serviceFee };
 }
 
 /** Human-readable script disassembly (for the contract review screen). */

@@ -50,17 +50,34 @@ keypath spending. See `src/escrow-core.js` for the construction and
 Keys and mnemonics live in memory only — they are never persisted, never
 sent anywhere, and signing never touches the network.
 
+## Service fee (disclosed)
+
+Mainnet **releases** pay a 1% service fee on the amount released to the
+seller, as its own output in the release transaction, to the operator
+address in the page footer (the same address shown there for donations).
+The fee is part of the spending plan *before* anyone signs, and the
+release signature digest commits to every output — so both required
+signers see and approve the exact fee output, and it cannot be added or
+altered after signing (the test suite proves a post-signing skim breaks
+both signatures). The spend form discloses the fee up front and the plan
+shows it as its own line. **Refunds pay no service fee**, testnet
+releases pay none, and a fee that would fall below the 546-grain dust
+floor is waived rather than rounded up.
+
 ## Verification
 
-- `tests/escrow.test.mjs` — 18/18: exact script bytes, script-number
+- `tests/escrow.test.mjs` — 21/21: exact script bytes, script-number
   vectors, Taproot address/control-block derivation, leaf-order
   independence, sighash byte-equality with the audited Pearl Sign
   `buildRevealTx` digest, odd-Y BIP-340 signing, full 2-of-3 release flow,
   quorum/wrong-signature rejection, CLTV refund flow, fee/dust handling,
-  `spendVBytes` weight match, NUMS internal-key independence.
-- `tests/dom.test.mjs` — 6/6: page boots against the real bundle, all UI
+  `spendVBytes` weight match, NUMS internal-key independence, service-fee
+  exactness/waivers/validation, and a fee-bearing release flow whose
+  signatures provably commit to the fee output.
+- `tests/dom.test.mjs` — 8/8: page boots against the real bundle, all UI
   element ids resolve, full wizard (parties → contract → release plan →
-  two local signatures → assembled tx), refund blocked while timelocked,
+  two local signatures → assembled tx) with the service fee shown in the
+  plan before signing, refund blocked while timelocked,
   tampered signature refused at assembly.
 - No real-browser pass was possible on the builder VM (no Chromium
   available); compensated with the committed-bundle DOM harness above.

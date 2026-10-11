@@ -314,11 +314,18 @@
         const sellerAmt = prlToGrains($("pay-seller-amt").value);
         const buyerProg = E.addressToProgram($("pay-buyer-addr").value, S.network);
         const feeRate = Number($("fee-rate").value);
+        // Disclosed service fee: 1% of the seller amount on mainnet,
+        // waived on testnet and below the dust floor (see escrow-core).
+        // It joins the plan before signing, so both signers approve the
+        // exact fee output via the output-committing digest.
+        const serviceFee = E.serviceFeeGrainsFor(sellerAmt, S.network);
+        const serviceFeeProgram = serviceFee > 0 ? E.addressToProgram(E.SERVICE_FEE_ADDRESS, S.network) : null;
         plan = E.planSpend({
           inputValue: S.utxo.value,
           payments: [{ program: sellerProg, value: sellerAmt }],
           feeRateGrainsPerVByte: feeRate,
           scriptLen: releaseScript.length, controlLen: 65, stackLens: [64, 0, 64],
+          serviceFeeGrains: serviceFee, serviceFeeProgram,
         });
         const ch = plan.outputs.find((o) => o.change);
         if (ch) ch.program = buyerProg; // no change output when dust was folded into the fee
@@ -348,8 +355,10 @@
 
       $("plan-digest").textContent = S.plan.digest;
       $("plan-outputs").innerHTML = outputs.map((o) =>
-        `<div>${o.change ? "↩ change" : "→"} <code>${E.encodeBech32m(S.network.hrp, 1, o.program)}</code> — ${fmtPRL(o.value)}</div>`).join("");
-      $("plan-fee").textContent = `${fmtPRL(plan.fee)} (${plan.vBytes} vB)`;
+        `<div>${o.serviceFee ? "⚙ service fee (1%)" : o.change ? "↩ change" : "→"} <code>${E.encodeBech32m(S.network.hrp, 1, o.program)}</code> — ${fmtPRL(o.value)}</div>`).join("");
+      $("plan-fee").textContent = plan.serviceFeeGrains > 0
+        ? `${fmtPRL(plan.fee)} network (${plan.vBytes} vB) + ${fmtPRL(plan.serviceFeeGrains)} service fee (1%, included in outputs above)`
+        : `${fmtPRL(plan.fee)} (${plan.vBytes} vB)`;
       renderSigSlots();
       $("plan-card").hidden = false;
     } catch (e) { err("spend-error", e.message); }
