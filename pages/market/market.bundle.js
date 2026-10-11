@@ -28,6 +28,8 @@ var PearlMarket = (() => {
     MAX_SAFE_PRICE_GRAINS: () => MAX_SAFE_PRICE_GRAINS,
     Matching: () => matching_exports,
     NETWORKS: () => NETWORKS,
+    PLATFORM_FEE_ADDRESS: () => PLATFORM_FEE_ADDRESS,
+    PLATFORM_FEE_BPS: () => PLATFORM_FEE_BPS,
     PRLS: () => PRLS,
     SIGHASH_ANYONECANPAY: () => SIGHASH_ANYONECANPAY,
     SIGHASH_DEFAULT: () => SIGHASH_DEFAULT,
@@ -85,6 +87,7 @@ var PearlMarket = (() => {
     parseOutpoint: () => parseOutpoint,
     parsePRL: () => parsePRL,
     planTransferLot: () => planTransferLot,
+    platformFeeGrainsFor: () => platformFeeGrainsFor,
     revealTxVBytes: () => revealTxVBytes,
     saveBoard: () => saveBoard,
     saveSettings: () => saveSettings,
@@ -6243,6 +6246,15 @@ zoo`.split("\n");
   var LISTING_VERSION = 1;
   var LISTING_SEQUENCE = 4294967295;
   var MAX_SAFE_PRICE_GRAINS = Number.MAX_SAFE_INTEGER;
+  var PLATFORM_FEE_BPS = 100;
+  var PLATFORM_FEE_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+  function platformFeeGrainsFor(priceGrains, network) {
+    const price = Number(priceGrains);
+    if (!Number.isSafeInteger(price) || price <= 0) throw new Error("bad priceGrains");
+    if (!network || network.hrp !== "prl") return 0;
+    const fee = Number(BigInt(price) * BigInt(PLATFORM_FEE_BPS) / 10000n);
+    return fee >= DUST_GRAIN ? fee : 0;
+  }
   function fmtPRL(grains) {
     const g = typeof grains === "bigint" ? grains : BigInt(grains);
     const neg = g < 0n;
@@ -6427,10 +6439,15 @@ zoo`.split("\n");
     full.push(...u32le(0));
     return { txid, hex: bytesToHex(Uint8Array.from(full)) };
   }
-  function selectFillCoins({ buyerUtxos, priceGrains, feeRate }) {
+  function selectFillCoins({ buyerUtxos, priceGrains, feeRate, platformFeeGrains = 0 }) {
     const price = Number(priceGrains);
     if (!Number.isSafeInteger(price) || price <= 0) throw new Error("bad priceGrains");
     if (!(feeRate > 0) || !Number.isFinite(feeRate)) throw new Error("bad fee rate");
+    const platformFee = Number(platformFeeGrains);
+    if (!Number.isSafeInteger(platformFee) || platformFee < 0 || platformFee > 0 && platformFee < DUST_GRAIN)
+      throw new Error("bad platform fee");
+    const target = price + platformFee;
+    const nBase = platformFee > 0 ? 3 : 2;
     const sorted = [...buyerUtxos || []].filter((u) => Number.isSafeInteger(u.value) && u.value > 0 && /^[0-9a-f]{64}$/i.test(u.txid || "")).sort((a, b) => b.value - a.value);
     if (!sorted.length) throw new Error("buyer has no PRL UTXOs");
     const picked = [];
@@ -6438,23 +6455,23 @@ zoo`.split("\n");
     for (const u of sorted) {
       picked.push(u);
       total += u.value;
-      const fee3 = Math.ceil(fillTxVBytes(picked.length, 3) * feeRate);
-      if (total < price + fee3) continue;
-      const change = total - price - fee3;
+      const feeChange = Math.ceil(fillTxVBytes(picked.length, nBase + 1) * feeRate);
+      if (total < target + feeChange) continue;
+      const change = total - target - feeChange;
       if (change === 0) {
-        const fee22 = Math.ceil(fillTxVBytes(picked.length, 2) * feeRate);
-        return { inputs: picked, feeGrains: fee22, changeGrains: 0, totalIn: total, nOut: 2 };
+        const feeNoChange2 = Math.ceil(fillTxVBytes(picked.length, nBase) * feeRate);
+        return { inputs: picked, feeGrains: feeNoChange2, changeGrains: 0, totalIn: total, nOut: nBase, platformFeeGrains: platformFee };
       }
       if (change >= DUST_GRAIN)
-        return { inputs: picked, feeGrains: fee3, changeGrains: change, totalIn: total, nOut: 3 };
-      const fee2 = Math.ceil(fillTxVBytes(picked.length, 2) * feeRate);
-      const fee = total - price;
-      if (fee < fee2) throw new Error("fee math error");
-      return { inputs: picked, feeGrains: fee, changeGrains: 0, totalIn: total, nOut: 2 };
+        return { inputs: picked, feeGrains: feeChange, changeGrains: change, totalIn: total, nOut: nBase + 1, platformFeeGrains: platformFee };
+      const feeNoChange = Math.ceil(fillTxVBytes(picked.length, nBase) * feeRate);
+      const fee = total - target;
+      if (fee < feeNoChange) throw new Error("fee math error");
+      return { inputs: picked, feeGrains: fee, changeGrains: 0, totalIn: total, nOut: nBase, platformFeeGrains: platformFee };
     }
-    const fee1 = Math.ceil(fillTxVBytes(sorted.length, 2) * feeRate);
+    const fee1 = Math.ceil(fillTxVBytes(sorted.length, nBase) * feeRate);
     throw new Error(
-      `insufficient buyer funds: need ${fmtPRL(price + fee1)} PRL (price + fee), have ${fmtPRL(total)} PRL`
+      `insufficient buyer funds: need ${fmtPRL(target + fee1)} PRL (price + platform fee + network fee), have ${fmtPRL(total)} PRL`
     );
   }
   function buildFillTx({ network, listing, buyerUtxos, buyerAddress, feeRate }) {
@@ -6466,7 +6483,8 @@ zoo`.split("\n");
     const lotValue = listing.lotValue;
     const sellerProg = decodeBech32m(listing.seller, network.hrp).program;
     const buyerProg = decodeBech32m(String(buyerAddress), network.hrp).program;
-    const sel = selectFillCoins({ buyerUtxos, priceGrains: price, feeRate });
+    const platformFee = platformFeeGrainsFor(price, network);
+    const sel = selectFillCoins({ buyerUtxos, priceGrains: price, feeRate, platformFeeGrains: platformFee });
     const byOutpoint = new Map((buyerUtxos || []).map((u) => [`${u.txid}:${u.vout}`, u]));
     const inputs = [{ txid: listing.lotTxid, vout: listing.lotVout, sequence: LISTING_SEQUENCE }];
     const digestInputs = [{
@@ -6493,6 +6511,8 @@ zoo`.split("\n");
       { program: buyerProg, value: lotValue }
       // [1] the lot moves to the buyer
     ];
+    if (platformFee > 0)
+      outputs.push({ program: decodeBech32m(PLATFORM_FEE_ADDRESS, "prl").program, value: platformFee });
     if (sel.changeGrains > 0) outputs.push({ program: buyerProg, value: sel.changeGrains });
     const digestInputsClean = digestInputs.map(({ _key, ...r }) => r);
     const witnesses = [[hexToBytes(listing.sig + "83")]];
@@ -6507,6 +6527,7 @@ zoo`.split("\n");
       hex,
       feeGrains: sel.feeGrains,
       changeGrains: sel.changeGrains,
+      platformFeeGrains: platformFee,
       priceGrains: price,
       lotValue,
       nIn: inputs.length,

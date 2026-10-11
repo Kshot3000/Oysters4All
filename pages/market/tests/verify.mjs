@@ -25,6 +25,7 @@ import {
   SIGHASH_DEFAULT, SIGHASH_SINGLE_ANYONECANPAY,
   makeListing, signListing, verifyListing, listingTemplateParts,
   fillTxVBytes, selectFillCoins, buildFillTx,
+  PLATFORM_FEE_BPS, PLATFORM_FEE_ADDRESS, platformFeeGrainsFor,
   encodeListing, decodeListing,
   selectCoinsSimple, planTransferLot,
   idxGetTokens, idxGetTransferLots, idxGetUtxos,
@@ -158,9 +159,24 @@ function signedListing(over = {}) {
   ok("fill-builds", !!fill.txid && /^[0-9a-f]{64}$/.test(fill.txid));
   ok("fill-fee-positive", fill.feeGrains > 0);
   ok("fill-change-nonnegative", fill.changeGrains >= 0);
-  // fee math: inputs == outputs + fee
+  // platform fee: disclosed 1% of price on mainnet, its own output to the
+  // operator address published in the Bazaar footer; seller price untouched
+  ok("platform-fee-bps", PLATFORM_FEE_BPS === 100);
+  ok("platform-fee-address", PLATFORM_FEE_ADDRESS === "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
+  ok("platform-fee-1pct-of-price", fill.platformFeeGrains === 2_500_000, `got ${fill.platformFeeGrains}`);
+  ok("platform-fee-fn-matches", platformFeeGrainsFor(250_000_000, NW) === 2_500_000);
+  ok("platform-fee-testnet-waived", platformFeeGrainsFor(250_000_000, NETWORKS.testnet) === 0);
+  ok("platform-fee-subdust-waived", platformFeeGrainsFor(50_000, NW) === 0); // 1% = 500 < 546 dust
+  throws("platform-fee-bad-price", () => platformFeeGrainsFor(0, NW));
+  throws("select-rejects-subdust-platform-fee", () => selectFillCoins({
+    buyerUtxos, priceGrains: 250_000_000, feeRate: 5, platformFeeGrains: 100,
+  }));
+  throws("select-rejects-negative-platform-fee", () => selectFillCoins({
+    buyerUtxos, priceGrains: 250_000_000, feeRate: 5, platformFeeGrains: -5,
+  }));
+  // fee math: inputs == outputs + network fee (outputs include platform fee)
   const totalIn = 546 + 400_000_000;
-  const totalOut = 250_000_000 + 546 + fill.changeGrains;
+  const totalOut = 250_000_000 + 546 + fill.platformFeeGrains + fill.changeGrains;
   ok("fill-conservation", totalIn - totalOut === fill.feeGrains, `${totalIn - totalOut} vs ${fill.feeGrains}`);
   ok("fill-vbytes-sane", fillTxVBytes(1, fill.nOut) >= 100 && fillTxVBytes(1, fill.nOut) < 1000);
 
@@ -171,9 +187,11 @@ function signedListing(over = {}) {
     { txid: l.lotTxid, vout: 0, value: 546, spk: lotSpk },
     { txid: "11".repeat(32), vout: 0, value: 400_000_000, spk: p2trScriptPubKey(buyerProg) },
   ];
+  const platformProg = decodeBech32m(PLATFORM_FEE_ADDRESS, "prl").program;
   const dOutputs = [
     { program: sellerProg, value: 250_000_000 },
     { program: buyerProg, value: 546 },
+    { program: platformProg, value: 2_500_000 },
     ...(fill.changeGrains > 0 ? [{ program: buyerProg, value: fill.changeGrains }] : []),
   ];
   // parse witness of buyer input from the serialized tx: find the 64B sig.
@@ -223,6 +241,29 @@ function signedListing(over = {}) {
     priceGrains: 250_000_000, feeRate: 5,
   });
   ok("fill-dust-change-folds-to-fee", dustCh.nOut === 2 && dustCh.changeGrains === 0);
+  // dust change with a platform fee: base outputs are 3 (seller+lot+fee)
+  const dustPf = selectFillCoins({
+    buyerUtxos: [{ txid: "77".repeat(32), vout: 0, value: 250_000_000 + 2_500_000 + Math.ceil(fillTxVBytes(1, 4) * 5) + 100 }],
+    priceGrains: 250_000_000, feeRate: 5, platformFeeGrains: 2_500_000,
+  });
+  ok("fill-dust-change-with-platform-fee", dustPf.nOut === 3 && dustPf.changeGrains === 0 && dustPf.platformFeeGrains === 2_500_000);
+  // testnet fill carries no platform fee output at all
+  const TN = NETWORKS.testnet;
+  const tSeller = walletFromMnemonic(newMnemonic(), TN);
+  const tBuyer = walletFromMnemonic(newMnemonic(), TN);
+  const tSpkHex = bytesToHex(p2trScriptPubKey(tweakKeypath(tSeller.internalXOnly).tweakedX));
+  const tListing = signListing(makeListing({
+    tick: "prls", amt: "100000",
+    lotTxid: "ab".repeat(32), lotVout: 0, lotValue: 546, lotSpkHex: tSpkHex,
+    priceGrains: "250000000", seller: tSeller.address,
+    expiry: Date.now() + 86400000,
+  }), tSeller, TN);
+  const tFill = buildFillTx({
+    network: TN, listing: tListing, buyerAddress: tBuyer.address, feeRate: 5,
+    buyerUtxos: [{ txid: "88".repeat(32), vout: 0, value: 400_000_000, priv: tBuyer.priv, internalXOnly: tBuyer.internalXOnly }],
+  });
+  ok("fill-testnet-no-platform-fee", tFill.platformFeeGrains === 0 &&
+    (400_000_546 - (250_000_000 + 546 + tFill.changeGrains)) === tFill.feeGrains);
 }
 
 /* ============ 4. matching engine ============ */

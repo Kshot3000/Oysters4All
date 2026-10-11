@@ -567,7 +567,7 @@
         <button class="btn btn-ghost" id="fill-estimate" type="button">Estimate fee</button>
         <button class="btn btn-primary" id="fill-go" type="button" disabled>Sign &amp; broadcast</button>
       </div>
-      <p class="hint muted small" style="margin-top:0.75rem">You pay the network fee. The lot UTXO moves to your address; the indexer credits the tokens to you on confirmation.</p>`;
+      <p class="hint muted small" style="margin-top:0.75rem">You pay the network fee, plus a <strong>1% platform fee</strong> on mainnet fills — charged on top of the price as its own output to the Bazaar operator address shown in this page's footer (waived on testnet, and waived when 1% would fall below the 546-grain dust floor). The seller always receives the exact listed price. The lot UTXO moves to your address; the indexer credits the tokens to you on confirmation.</p>`;
 
     let quote = null;
     $("#fill-estimate", m).addEventListener("click", async () => {
@@ -580,15 +580,17 @@
         const rate = await M.fetchFeeRateGrainsPerVByte(settings.blockbookBase);
         const withKeys = utxos.map((u) => ({ ...u, priv: w.priv, internalXOnly: w.internalXOnly }));
         quote = { withKeys, rate, wallet: w, buyerAddress };
-        const sel = M.selectFillCoins({ buyerUtxos: withKeys, priceGrains: ask.priceGrains, feeRate: rate });
+        const platformFee = M.platformFeeGrainsFor(ask.priceGrains, network());
+        const sel = M.selectFillCoins({ buyerUtxos: withKeys, priceGrains: ask.priceGrains, feeRate: rate, platformFeeGrains: platformFee });
         quote.sel = sel;
         $("#fill-quote", m).innerHTML = `
           <div class="review-box"><dl class="kv">
             <dt>Price</dt><dd>${esc(M.fmtPRL(ask.priceGrains))} PRL</dd>
-            <dt>Est. fee (buyer pays)</dt><dd>${esc(M.fmtPRL(sel.feeGrains))} PRL</dd>
+            <dt>Platform fee (1%, buyer pays)</dt><dd>${esc(M.fmtPRL(sel.platformFeeGrains))} PRL</dd>
+            <dt>Est. network fee (buyer pays)</dt><dd>${esc(M.fmtPRL(sel.feeGrains))} PRL</dd>
             <dt>Inputs</dt><dd>${sel.inputs.length} (+ 1 lot input)</dd>
             <dt>Change</dt><dd>${esc(M.fmtPRL(sel.changeGrains))} PRL</dd>
-            <dt>Total from you</dt><dd class="total">${esc(M.fmtPRL(BigInt(ask.priceGrains) + BigInt(sel.feeGrains)))} PRL</dd>
+            <dt>Total from you</dt><dd class="total">${esc(M.fmtPRL(BigInt(ask.priceGrains) + BigInt(sel.platformFeeGrains) + BigInt(sel.feeGrains)))} PRL</dd>
           </dl></div>`;
         $("#fill-go", m).disabled = false;
       } catch (e) { toast("Estimate failed: " + e.message); }

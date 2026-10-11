@@ -26,6 +26,19 @@ balances. The marketplace is an application layer over these lots.
 3. **Settle.** The lot UTXO changes hands on Pearl. The Pearlscriptions indexer
    sees the move and credits the token balance to the buyer.
 
+## Platform fee (disclosed)
+
+Mainnet fills carry a **1% platform fee, paid by the buyer on top of the
+listing price**, as its own output in the fill transaction to the Bazaar
+operator address published in every page footer
+(`prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d` — the
+same address shown there for donations). The fee is quoted as its own line in
+the fill dialog before signing; the seller always receives the exact listed
+price (the seller's 0x83 presignature commits only to output 0, so the
+buyer-added fee output cannot alter the seller's terms). Testnet fills carry
+no platform fee, and the fee is waived when 1% of the price would fall below
+the 546-grain dust floor instead of being rounded up.
+
 ## The 0x83 signature model
 
 - The seller presigns **before** any buyer exists: `ANYONECANPAY` means the
@@ -64,7 +77,7 @@ pages/market/
                     fills, multi-level sweep, self-trade prevention, expiry
   lib/            vendored noble/* dependencies (file-safe bundling)
   tests/
-    verify.mjs      99 core assertions (protocol, crypto, engine, board)
+    verify.mjs      115 core assertions (protocol, crypto, engine, board)
     smoke.mjs       50 headless UI assertions (jsdom, real pages+bundle)
     loader.mjs      test loader
   README.md       this file
@@ -92,7 +105,7 @@ hex keys are never stored, never leave the page, and are wiped on reload.
 ```bash
 cd pages/market
 node build.mjs                                   # rebuild market.bundle.js
-node --no-warnings --loader ./tests/loader.mjs ./tests/verify.mjs   # 99 core tests
+node --no-warnings --loader ./tests/loader.mjs ./tests/verify.mjs   # 115 core tests
 node --no-warnings tests/smoke.mjs              # 50 headless UI tests (jsdom)
 ```
 

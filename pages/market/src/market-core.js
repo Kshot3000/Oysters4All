@@ -58,6 +58,29 @@ export const LISTING_VERSION = 1;
 export const LISTING_SEQUENCE = 0xffffffff;
 export const MAX_SAFE_PRICE_GRAINS = Number.MAX_SAFE_INTEGER;
 
+/* ---------------- platform fee (disclosed, buyer-paid) ----------------
+ * Pearl Bazaar charges a 1% platform fee on MAINNET fills, paid by the buyer
+ * on top of the listing price as its own output in the fill transaction, to
+ * the operator address published in every Bazaar page footer (the same
+ * address shown there for donations). The seller's 0x83 presignature commits
+ * only to output[0] (price -> seller), so the buyer-added fee output cannot
+ * invalidate it, and the seller always receives the exact listed price.
+ * The fee is quoted in the fill dialog before signing — never hidden.
+ * Testnet fills carry no platform fee, and a fee that would fall below the
+ * 546-grain dust floor is waived rather than rounded up. */
+export const PLATFORM_FEE_BPS = 100; // 1%
+export const PLATFORM_FEE_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+
+/** Platform fee in grains for a fill at priceGrains on network (0 when the
+ *  fee does not apply: non-mainnet network, or 1% below the dust floor). */
+export function platformFeeGrainsFor(priceGrains, network) {
+  const price = Number(priceGrains);
+  if (!Number.isSafeInteger(price) || price <= 0) throw new Error("bad priceGrains");
+  if (!network || network.hrp !== "prl") return 0;
+  const fee = Number((BigInt(price) * BigInt(PLATFORM_FEE_BPS)) / 10000n);
+  return fee >= DUST_GRAIN ? fee : 0;
+}
+
 /* ---------------- formatting helpers ---------------- */
 
 export function fmtPRL(grains) {
@@ -267,13 +290,21 @@ function serializeTxWithWitnesses(network, inputs, outputs, witnesses) {
   return { txid, hex: bytesToHex(Uint8Array.from(full)) };
 }
 
-/** Pick buyer PRL UTXOs to cover the listing price + fee (buyer pays fees).
- *  buyerUtxos: [{txid, vout, value}] (value grains, number). The lot input's
- *  own value cancels against the lot output, so selection targets the price. */
-export function selectFillCoins({ buyerUtxos, priceGrains, feeRate }) {
+/** Pick buyer PRL UTXOs to cover the listing price + platform fee + network
+ *  fee (the buyer pays both fees). buyerUtxos: [{txid, vout, value}] (value
+ *  grains, number). The lot input's own value cancels against the lot output,
+ *  so selection targets price + platformFeeGrains. platformFeeGrains is the
+ *  disclosed 1% Bazaar fee (see platformFeeGrainsFor); 0 = no fee output. */
+export function selectFillCoins({ buyerUtxos, priceGrains, feeRate, platformFeeGrains = 0 }) {
   const price = Number(priceGrains);
   if (!Number.isSafeInteger(price) || price <= 0) throw new Error("bad priceGrains");
   if (!(feeRate > 0) || !Number.isFinite(feeRate)) throw new Error("bad fee rate");
+  const platformFee = Number(platformFeeGrains);
+  if (!Number.isSafeInteger(platformFee) || platformFee < 0 ||
+      (platformFee > 0 && platformFee < DUST_GRAIN))
+    throw new Error("bad platform fee");
+  const target = price + platformFee;
+  const nBase = platformFee > 0 ? 3 : 2; // seller + lot (+ platform fee)
   const sorted = [...(buyerUtxos || [])]
     .filter((u) => Number.isSafeInteger(u.value) && u.value > 0 && /^[0-9a-f]{64}$/i.test(u.txid || ""))
     .sort((a, b) => b.value - a.value);
@@ -283,24 +314,24 @@ export function selectFillCoins({ buyerUtxos, priceGrains, feeRate }) {
   for (const u of sorted) {
     picked.push(u);
     total += u.value;
-    const fee3 = Math.ceil(fillTxVBytes(picked.length, 3) * feeRate);
-    if (total < price + fee3) continue;
-    const change = total - price - fee3;
+    const feeChange = Math.ceil(fillTxVBytes(picked.length, nBase + 1) * feeRate);
+    if (total < target + feeChange) continue;
+    const change = total - target - feeChange;
     if (change === 0) {
-      const fee2 = Math.ceil(fillTxVBytes(picked.length, 2) * feeRate);
-      return { inputs: picked, feeGrains: fee2, changeGrains: 0, totalIn: total, nOut: 2 };
+      const feeNoChange = Math.ceil(fillTxVBytes(picked.length, nBase) * feeRate);
+      return { inputs: picked, feeGrains: feeNoChange, changeGrains: 0, totalIn: total, nOut: nBase, platformFeeGrains: platformFee };
     }
     if (change >= DUST_GRAIN)
-      return { inputs: picked, feeGrains: fee3, changeGrains: change, totalIn: total, nOut: 3 };
-    // dust change: drop the change output, fee absorbs it
-    const fee2 = Math.ceil(fillTxVBytes(picked.length, 2) * feeRate);
-    const fee = total - price;
-    if (fee < fee2) throw new Error("fee math error");
-    return { inputs: picked, feeGrains: fee, changeGrains: 0, totalIn: total, nOut: 2 };
+      return { inputs: picked, feeGrains: feeChange, changeGrains: change, totalIn: total, nOut: nBase + 1, platformFeeGrains: platformFee };
+    // dust change: drop the change output, network fee absorbs it
+    const feeNoChange = Math.ceil(fillTxVBytes(picked.length, nBase) * feeRate);
+    const fee = total - target;
+    if (fee < feeNoChange) throw new Error("fee math error");
+    return { inputs: picked, feeGrains: fee, changeGrains: 0, totalIn: total, nOut: nBase, platformFeeGrains: platformFee };
   }
-  const fee1 = Math.ceil(fillTxVBytes(sorted.length, 2) * feeRate);
+  const fee1 = Math.ceil(fillTxVBytes(sorted.length, nBase) * feeRate);
   throw new Error(
-    `insufficient buyer funds: need ${fmtPRL(price + fee1)} PRL (price + fee), have ${fmtPRL(total)} PRL`
+    `insufficient buyer funds: need ${fmtPRL(target + fee1)} PRL (price + platform fee + network fee), have ${fmtPRL(total)} PRL`
   );
 }
 
@@ -309,7 +340,9 @@ export function selectFillCoins({ buyerUtxos, priceGrains, feeRate }) {
  *  buyerUtxos: [{txid, vout, value, priv, internalXOnly}] — buyer PRL coins.
  *  The lot input carries the seller's 0x83 presignature as a 65-byte witness
  *  element (sig || 0x83); buyer inputs are signed SIGHASH_DEFAULT.
- *  Returns { txid, hex, feeGrains, changeGrains, priceGrains, lotValue, nIn, nOut }. */
+ *  Returns { txid, hex, feeGrains, changeGrains, platformFeeGrains,
+ *  priceGrains, lotValue, nIn, nOut }. feeGrains is the NETWORK fee;
+ *  platformFeeGrains is the disclosed 1% Bazaar fee output (mainnet only). */
 export function buildFillTx({ network, listing, buyerUtxos, buyerAddress, feeRate }) {
   const v = verifyListing(listing, network);
   if (!v.ok) throw new Error("cannot fill: invalid listing (" + v.reason + ")");
@@ -320,7 +353,8 @@ export function buildFillTx({ network, listing, buyerUtxos, buyerAddress, feeRat
   const sellerProg = decodeBech32m(listing.seller, network.hrp).program;
   const buyerProg = decodeBech32m(String(buyerAddress), network.hrp).program;
 
-  const sel = selectFillCoins({ buyerUtxos, priceGrains: price, feeRate });
+  const platformFee = platformFeeGrainsFor(price, network);
+  const sel = selectFillCoins({ buyerUtxos, priceGrains: price, feeRate, platformFeeGrains: platformFee });
   const byOutpoint = new Map((buyerUtxos || []).map((u) => [`${u.txid}:${u.vout}`, u]));
 
   const inputs = [{ txid: listing.lotTxid, vout: listing.lotVout, sequence: LISTING_SEQUENCE }];
@@ -343,6 +377,8 @@ export function buildFillTx({ network, listing, buyerUtxos, buyerAddress, feeRat
     { program: sellerProg, value: price },      // [0] must equal the listing template
     { program: buyerProg, value: lotValue },   // [1] the lot moves to the buyer
   ];
+  if (platformFee > 0) // [2] disclosed 1% platform fee -> operator (see header)
+    outputs.push({ program: decodeBech32m(PLATFORM_FEE_ADDRESS, "prl").program, value: platformFee });
   if (sel.changeGrains > 0) outputs.push({ program: buyerProg, value: sel.changeGrains });
 
   const digestInputsClean = digestInputs.map(({ _key, ...r }) => r);
@@ -356,6 +392,7 @@ export function buildFillTx({ network, listing, buyerUtxos, buyerAddress, feeRat
   const { txid, hex } = serializeTxWithWitnesses(network, inputs, outputs, witnesses);
   return {
     txid, hex, feeGrains: sel.feeGrains, changeGrains: sel.changeGrains,
+    platformFeeGrains: platformFee,
     priceGrains: price, lotValue, nIn: inputs.length, nOut: outputs.length,
   };
 }
