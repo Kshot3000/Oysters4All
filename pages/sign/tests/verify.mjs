@@ -165,6 +165,11 @@ test("coin selection covers target + exact fee, dust goes to fee", () => {
   const tiny = selectCoins([{ txid: "dd".repeat(32), vout: 0, value: 50_000_000 + 1540 + 100 }], 50_000_000n, 10, 1);
   assert.equal(tiny.change, 0n);
   assert.throws(() => selectCoins(utxos, 200_000_000n, 10, 1), /insufficient funds/);
+  // bad fee rates refused: a negative rate returned a negative fee and a
+  // change larger than the funds available; NaN died as a raw BigInt error
+  for (const badRate of [-5, 0, NaN, Infinity]) {
+    assert.throws(() => selectCoins(utxos, 50_000_000n, badRate, 1), /bad fee rate/);
+  }
 });
 
 test("PRL amount parse/format round-trip", () => {
@@ -314,5 +319,5 @@ test("app.js buildPlan guards recipient and change amounts with safeGrains", () 
   assert.ok(app.includes('safeGrains(pick.change, "Change amount")'), "change amount guarded");
   assert.ok(!app.includes("value: Number(grains)"), "no unguarded recipient conversion remains");
   assert.ok(!app.includes("value: Number(pick.change)"), "no unguarded change conversion remains");
-  assert.ok(html.includes('pearl-sign.bundle.js?v=5'), "bundle cache key bumped");
+  assert.ok(html.includes('pearl-sign.bundle.js?v=6'), "bundle cache key bumped");
 });

@@ -329,6 +329,15 @@ test("buildRefundTx: post-timeout builds a locktime=timeout tx paying the deposi
   assert.match(r.txid, /^[0-9a-f]{64}$/);
   assert.equal(r.payment, Number(g.stakeDealerGrains) - r.fee);
   assert.ok(r.payment >= DUST_GRAIN);
+  // bad fee rates refused: a negative rate used to sign a refund paying
+  // MORE than the stake (its sibling builders already guarded the rate)
+  for (const badRate of [-5, 0, NaN]) {
+    assert.throws(() => buildRefundTx({
+      network: net, gameParams: g, depositor: "dealer", funding,
+      depositorAddress: depAddr, privHex: bytesToHex(dealer.priv),
+      feeRateGrainsPerVByte: badRate, tipHeight: 51007,
+    }), /bad fee rate/);
+  }
 });
 
 /* ---------------- practice + verifier ---------------- */

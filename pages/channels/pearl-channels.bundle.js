@@ -6377,6 +6377,7 @@ zoo`.split("\n");
     return results;
   }
   function selectCoins(utxos, targetGrains, feeRateGrainsPerVByte, nOut) {
+    if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) throw new Error("bad fee rate");
     const target = BigInt(targetGrains);
     const sorted = [...utxos].sort((a, b) => Number(BigInt(b.value) - BigInt(a.value)));
     const selected = [];

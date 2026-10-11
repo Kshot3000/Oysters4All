@@ -241,6 +241,19 @@ test("planReclaim: refuses before the deadline", () => {
   });
   assert.equal(ok.outputs.length, 1);
   assert.ok(ok.feeGrains > 0);
+  // bad fee rates refused: a negative rate used to plan (and, via
+  // buildReclaimTx, SIGN) a reclaim worth more than the bounty UTXO —
+  // the app passes Number(feerate field) straight into these planners
+  for (const badRate of [-5, 0, NaN, Infinity]) {
+    assert.throws(() => planReclaim({
+      network: MAINNET, bounty: b, utxo, destAddr: POSTER_ADDR,
+      feeRateGrainsPerVByte: badRate, currentHeight: 900000,
+    }), /bad fee rate/);
+    assert.throws(() => buildReclaimTx({
+      network: MAINNET, bounty: b, utxo, posterPrivHex: POSTER_PRIV,
+      destAddr: POSTER_ADDR, feeRateGrainsPerVByte: badRate, currentHeight: 900123,
+    }), /bad fee rate/);
+  }
 });
 
 test("buildReclaimTx: locktime wire check + key guard", () => {

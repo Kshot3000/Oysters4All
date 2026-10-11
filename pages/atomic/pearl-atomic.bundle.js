@@ -6330,6 +6330,12 @@ zoo`.split("\n");
     if (!(destProgram instanceof Uint8Array) || destProgram.length !== 32) {
       throw new Error("claim destination must be a 32-byte P2TR program");
     }
+    if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) {
+      throw new Error("ATOMIC REFUSED: bad fee rate (must be a positive number of grains/vB)");
+    }
+    if (!Number.isSafeInteger(input?.value) || input.value <= 0) {
+      throw new Error("ATOMIC REFUSED: bad input value (must be a positive whole number of grains)");
+    }
     const vB = spendVBytes({ nOut: 1, scriptLen: contract.claimScript.length, controlLen: 65, stackLens: [64, 32] });
     const fee = Math.ceil(vB * feeRateGrainsPerVByte);
     const payVal = input.value - fee;
@@ -6357,6 +6363,12 @@ zoo`.split("\n");
     }
     if (!(destProgram instanceof Uint8Array) || destProgram.length !== 32) {
       throw new Error("refund destination must be a 32-byte P2TR program");
+    }
+    if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) {
+      throw new Error("ATOMIC REFUSED: bad fee rate (must be a positive number of grains/vB)");
+    }
+    if (!Number.isSafeInteger(input?.value) || input.value <= 0) {
+      throw new Error("ATOMIC REFUSED: bad input value (must be a positive whole number of grains)");
     }
     const vB = spendVBytes({ nOut: 1, scriptLen: contract.refundScript.length, controlLen: 65, stackLens: [64] });
     const fee = Math.ceil(vB * feeRateGrainsPerVByte);

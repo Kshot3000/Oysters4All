@@ -547,6 +547,7 @@ export function planReclaim({ network, bounty, utxo, destAddr, feeRateGrainsPerV
   if (!/^[0-9a-f]{64}$/i.test(utxo?.txid || "")) throw new Error("bad utxo txid");
   if (!Number.isInteger(utxo?.vout) || utxo.vout < 0) throw new Error("bad utxo vout");
   if (!Number.isSafeInteger(utxo?.value) || utxo.value <= 0) throw new Error("bad utxo value");
+  if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) throw new Error("bad fee rate");
   const destProgram = addressToProgram(destAddr, network);
   const vBytes = spendVBytes({ nOut: 1, scriptLen: hexToBytes(bounty.reclaimScriptHex).length, controlLen: CONTROL_LEN, stackLens: [64] });
   const fee = Math.ceil(vBytes * feeRateGrainsPerVByte);

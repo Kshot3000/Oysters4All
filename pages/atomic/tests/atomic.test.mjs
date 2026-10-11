@@ -214,6 +214,14 @@ test("claim flow: plan -> sign -> assemble -> digest cross-check", () => {
     input: { txid: "ab".repeat(32), vout: 0, value: 600, spk: c.tree.spk },
     preimageHex: bytesToHex(preimage), destProgram: dest, feeRateGrainsPerVByte: 20,
   }), /insufficient funds/);
+  // bad fee rates refused: a negative rate used to plan an output worth
+  // MORE than the input (fee < 0), and NaN poisoned the plan's fee/output
+  for (const badRate of [-5, 0, NaN, Infinity]) {
+    assert.throws(() => planClaim({
+      network: net, contract: c, input,
+      preimageHex: bytesToHex(preimage), destProgram: dest, feeRateGrainsPerVByte: badRate,
+    }), /bad fee rate/);
+  }
 });
 
 test("refund flow: plan -> sign -> assemble; timelock enforced", () => {
@@ -243,6 +251,13 @@ test("refund flow: plan -> sign -> assemble; timelock enforced", () => {
   // wrong-key signature refused
   const badSig = signForXOnly(PRIVS[0], digest);
   assert.throws(() => assembleRefund(net, plan, bytesToHex(badSig), KEYS[1]), /does not verify/);
+  // bad fee rates refused (negative rate planned an output > the input)
+  for (const badRate of [-5, 0, NaN, Infinity]) {
+    assert.throws(() => planRefund({
+      network: net, contract: c, input, destProgram: dest,
+      feeRateGrainsPerVByte: badRate, chainHeight: TIMEOUT,
+    }), /bad fee rate/);
+  }
 });
 
 test("unsigned bundle round-trip + tamper refusal", () => {

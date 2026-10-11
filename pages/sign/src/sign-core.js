@@ -261,6 +261,7 @@ export function verifySignedTx(network, signedHex, prevouts) {
  *  Returns {selected, fee, change} or throws if funds insufficient.
  *  change is omitted (null) when it would be dust — added to fee instead. */
 export function selectCoins(utxos, targetGrains, feeRateGrainsPerVByte, nOut) {
+  if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) throw new Error("bad fee rate");
   const target = BigInt(targetGrains);
   const sorted = [...utxos].sort((a, b) => Number(BigInt(b.value) - BigInt(a.value)));
   const selected = [];

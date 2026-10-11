@@ -6809,7 +6809,9 @@ zoo`.split("\n");
     if (key !== expectX) throw new Error("this key is not the depositor's key \u2014 refusing");
     const refundScript = hexToBytes(escrow.refundScriptHex);
     const vBytes = refundSpendVBytes({ refundScriptLen: refundScript.length, controlLen: 65 });
-    const fee = BigInt(Math.ceil(vBytes * Number(feeRateGrainsPerVByte)));
+    const rate = Number(feeRateGrainsPerVByte);
+    if (!Number.isFinite(rate) || rate <= 0) throw new Error("bad fee rate");
+    const fee = BigInt(Math.ceil(vBytes * rate));
     const payment = stake - fee;
     if (payment < BigInt(DUST_GRAIN)) {
       throw new Error(`refund uneconomic: ${stake} grains in, ${fee}-grain fee leaves < dust (${DUST_GRAIN})`);
