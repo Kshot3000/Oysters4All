@@ -5386,12 +5386,16 @@ zoo`.split("\n");
       throw new Error("locktime must be a uint32");
     const txInputs = [], txOutputs = [], inMaps = [], outMaps = [];
     const inputInfo = [];
+    const seenOutpoints = /* @__PURE__ */ new Set();
     let totalIn = 0n, totalOut = 0n;
     inputs.forEach((inp, i) => {
       const label = `input ${i}`;
       if (!/^[0-9a-fA-F]{64}$/.test(inp.txid || "")) throw new Error(`${label}: bad txid (64 hex chars)`);
       const vout = inp.vout;
       if (!Number.isInteger(vout) || vout < 0 || vout > 4294967295) throw new Error(`${label}: bad vout`);
+      const outpointKey = `${String(inp.txid).toLowerCase()}:${vout}`;
+      if (seenOutpoints.has(outpointKey)) throw new Error(`${label}: duplicate input outpoint ${outpointKey} \u2014 an outpoint can only be spent once`);
+      seenOutpoints.add(outpointKey);
       const amount = BigInt(inp.amount);
       if (amount <= 0n || amount > 0xffffffffffffffffn) throw new Error(`${label}: bad amount`);
       if (!/^[0-9a-fA-F]{64}$/.test(inp.internalKey || "")) throw new Error(`${label}: internal key must be 32-byte x-only hex`);
@@ -5895,6 +5899,12 @@ zoo`.split("\n");
   function describePsbt(psbt) {
     const tx = psbt.unsignedTx;
     const issues = [];
+    const seenPrevouts = /* @__PURE__ */ new Set();
+    tx.inputs.forEach((u, i) => {
+      const k = `${u.txid}:${u.vout}`;
+      if (seenPrevouts.has(k)) issues.push(`input ${i}: duplicate prevout ${k} \u2014 the same outpoint is spent more than once; this PSBT can never finalize into a valid transaction`);
+      seenPrevouts.add(k);
+    });
     const g = {};
     for (const p of psbt.globalPairs) {
       const k = bytesToHex(p.key);

@@ -403,6 +403,12 @@ export function planQuorumSpend({ vault, inputs, payments, feeRateGrainsPerVByte
   const rate = Number(feeRateGrainsPerVByte);
   if (!Number.isFinite(rate) || rate <= 0) throw new Error("fee rate must be positive");
   const ins = inputs.map((u) => assertVaultInput(vault, u));
+  const seenOutpoints = new Set();
+  for (const u of ins) {
+    const k = `${u.txid}:${u.vout}`;
+    if (seenOutpoints.has(k)) throw new Error(`duplicate input ${k} — an outpoint can only be spent once`);
+    seenOutpoints.add(k);
+  }
   const outs = payments.map((p, i) => {
     let program;
     try {

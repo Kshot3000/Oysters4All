@@ -518,3 +518,69 @@ test("launch UI parses the campaign deadline strictly (parseInt truncation class
   assert.ok(app.includes("deadline must be a whole block height"), "strict deadline gate present");
   assert.ok(html.includes('app.js?v=3'), "cache key bumped");
 });
+
+/* ---------- duplicate outpoints (2026-10-11 census, third layer) ---------- */
+
+test("release bundle: two pledges funded by the SAME outpoint refused", () => {
+  const campaign = mkCampaign();
+  const same = { txid: "ab".repeat(32), vout: 1, value: 600_000_000 };
+  assert.throws(() => buildReleaseBundle({
+    network: net, campaign, recipientAddr: RECIP_ADDR, feeRateGrainsPerVByte: 2,
+    pledges: [
+      { pledge: mkPledge(backerX), utxo: same },
+      { pledge: mkPledge(bytesToHex(backer2.internalXOnly)), utxo: same },
+    ],
+  }), /duplicate utxo .* — an outpoint can only fund the release once/);
+  // control: same txid, DIFFERENT vout still builds
+  const ok = buildReleaseBundle({
+    network: net, campaign, recipientAddr: RECIP_ADDR, feeRateGrainsPerVByte: 2,
+    pledges: [
+      { pledge: mkPledge(backerX), utxo: same },
+      { pledge: mkPledge(bytesToHex(backer2.internalXOnly)), utxo: { ...same, vout: 2 } },
+    ],
+  });
+  assert.equal(ok.inputs.length, 2);
+});
+
+test("release bundle import: crafted duplicate-outpoint bundle refused even with self-consistent digests", () => {
+  const campaign = mkCampaign();
+  const bundle = buildReleaseBundle({
+    network: net, campaign, pledges: fundedPledges(2),
+    recipientAddr: RECIP_ADDR, feeRateGrainsPerVByte: 2,
+  });
+  const crafted = JSON.parse(JSON.stringify(bundle));
+  crafted.inputs[1] = { ...crafted.inputs[0] };
+  // Recompute fee math + digests over the duplicated list, exactly as
+  // parseReleaseBundle re-derives them — digest consistency must NOT save it.
+  const plan = planRelease({ inputValues: crafted.inputs.map((x) => x.value), feeRateGrainsPerVByte: 2 });
+  crafted.outputs[0].value = plan.payment;
+  crafted.feeGrains = plan.fee; crafted.vBytes = plan.vBytes;
+  const releaseScript = buildReleaseScript(hexToBytes(campaign.recipientXOnlyHex), hexToBytes(campaign.creatorXOnlyHex));
+  const dInputs = crafted.inputs.map((x) => ({
+    txid: x.txid, vout: x.vout, value: x.value,
+    spk: hexToBytes(pledgeFromDescriptor(x.pledge, net).pledge.spkHex),
+  }));
+  const dOutputs = [{ program: parseRecipientAddress(crafted.outputs[0].address, net).xonly, value: crafted.outputs[0].value }];
+  crafted.digests = dInputs.map((_, i) => bytesToHex(batchScriptPathSigDigest(net, dInputs, dOutputs, releaseScript, { sequence: 0xffffffff, locktime: 0, inputIdx: i })));
+  crafted.partialSigs = [];
+  assert.throws(() => parseReleaseBundle(JSON.stringify(crafted), net), /duplicate outpoint/);
+});
+
+test("buildReleaseSpend: duplicated input refused at the raw builder", () => {
+  const campaign = mkCampaign();
+  const bundle = buildReleaseBundle({
+    network: net, campaign, pledges: fundedPledges(1),
+    recipientAddr: RECIP_ADDR, feeRateGrainsPerVByte: 2,
+  });
+  const parsed = parseReleaseBundle(JSON.stringify(bundle), net);
+  const inputs = parsed.inputs.map((x) => ({
+    txid: x.txid, vout: x.vout, value: x.value,
+    spk: hexToBytes(pledgeFromDescriptor(x.pledge, net).pledge.spkHex),
+    controlBlock: hexToBytes(x.controlBlock),
+  }));
+  const releaseScript = buildReleaseScript(hexToBytes(campaign.recipientXOnlyHex), hexToBytes(campaign.creatorXOnlyHex));
+  const dup = [inputs[0], inputs[0]];
+  const stacks = dup.map(() => [new Uint8Array(64), new Uint8Array(64), releaseScript, inputs[0].controlBlock]);
+  const outputs = parsed.outputs.map((o) => ({ program: parseRecipientAddress(o.address, net).xonly, value: o.value }));
+  assert.throws(() => buildReleaseSpend(net, dup, outputs, stacks), /duplicate outpoint .* — an outpoint can only be spent once/);
+});

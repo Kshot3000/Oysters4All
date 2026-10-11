@@ -232,3 +232,21 @@ test("tapTweak / control block parity", () => {
   // determinism
   assert.deepEqual(C.tapTweak(internal, null).Q, k1.Q);
 });
+
+test("createPsbt: duplicate input outpoint refused (2026-10-11 census)", () => {
+  const good = C.exampleSpec();
+  const dup = { ...good, inputs: [good.inputs[0], { ...good.inputs[1], txid: good.inputs[0].txid, vout: good.inputs[0].vout }] };
+  assert.throws(() => C.createPsbt(dup), /duplicate input outpoint .* — an outpoint can only be spent once/);
+  // control: distinct outpoints still build
+  assert.ok(C.createPsbt(good).base64.length > 0);
+});
+
+test("describePsbt: a foreign PSBT spending one outpoint twice is flagged", () => {
+  const ex = C.createPsbt(C.exampleSpec());
+  const p = C.parsePsbt(Uint8Array.from(atob(ex.base64), (c) => c.charCodeAt(0)));
+  const fake = { ...p, unsignedTx: { ...p.unsignedTx, inputs: [p.unsignedTx.inputs[0], p.unsignedTx.inputs[0]] } };
+  const d = C.describePsbt(fake);
+  assert.ok(d.issues.some((s) => /duplicate prevout/.test(s)), "duplicate prevout flagged");
+  const clean = C.describePsbt(p);
+  assert.ok(!clean.issues.some((s) => /duplicate prevout/.test(s)), "clean PSBT not flagged");
+});

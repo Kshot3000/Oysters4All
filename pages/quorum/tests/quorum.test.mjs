@@ -432,3 +432,27 @@ test("ledger CSV: spreadsheet formula-injection guard (CWE-1236)", () => {
   assert.ok(csv.includes("\"'=2+2\""), "vault name formula cell prefixed");
   assert.ok(!csv.includes("\"=2+2\""), "no raw formula cell");
 });
+
+/* ---------- duplicate outpoints (2026-10-11 census, third layer) ---------- */
+
+test("planQuorumSpend: the same UTXO listed twice refused — no phantom change", () => {
+  const v = mkVault(2, 3);
+  const u = { txid: "aa".repeat(32), vout: 0, value: 100_000_000, spkHex: v.spkHex };
+  assert.throws(
+    () => Q.planQuorumSpend({ vault: v, inputs: [u, u], payments: [{ address: destAddr("dup"), grains: 50_000_000 }], feeRateGrainsPerVByte: 1 }),
+    /duplicate input .* — an outpoint can only be spent once/);
+  // control: same txid, DIFFERENT vout still plans
+  const plan = Q.planQuorumSpend({ vault: v, inputs: [u, { ...u, vout: 1 }], payments: [{ address: destAddr("dup"), grains: 50_000_000 }], feeRateGrainsPerVByte: 1 });
+  assert.equal(plan.inputs.length, 2);
+});
+
+test("importUnsignedBundle: crafted duplicate-input bundle refused at re-planning", () => {
+  const v = mkVault(2, 3);
+  const u1 = { txid: "aa".repeat(32), vout: 0, value: 100_000_000, spkHex: v.spkHex };
+  const u2 = { txid: "bb".repeat(32), vout: 0, value: 100_000_000, spkHex: v.spkHex };
+  const plan = Q.planQuorumSpend({ vault: v, inputs: [u1, u2], payments: [{ address: destAddr("imp"), grains: 50_000_000 }], feeRateGrainsPerVByte: 1 });
+  const text = Q.exportUnsignedBundle(plan);
+  const b = JSON.parse(text.slice(Q.QUORUM_BUNDLE_KIND.length));
+  b.inputs[1] = { ...b.inputs[0] };
+  assert.throws(() => Q.importUnsignedBundle(Q.QUORUM_BUNDLE_KIND + JSON.stringify(b)), /duplicate input/);
+});

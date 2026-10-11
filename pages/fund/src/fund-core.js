@@ -521,11 +521,15 @@ export function buildReleaseBundle({ network, campaign, pledges, recipientAddr, 
   });
   const outputs = [{ program: rec.xonly, value: plan.payment }];
   const releaseScript = buildReleaseScript(hexToBytes(campaign.recipientXOnlyHex), hexToBytes(campaign.creatorXOnlyHex));
+  const seenOutpoints = new Set();
   const inputs = pledges.map((p, i) => {
     const u = p.utxo || {};
     if (!/^[0-9a-f]{64}$/i.test(u.txid || "")) throw new Error(`pledge ${i}: bad utxo txid`);
     if (!Number.isInteger(u.vout) || u.vout < 0) throw new Error(`pledge ${i}: bad utxo vout`);
     if (!Number.isSafeInteger(u.value) || u.value <= 0) throw new Error(`pledge ${i}: bad utxo value`);
+    const outpointKey = `${String(u.txid).toLowerCase()}:${u.vout}`;
+    if (seenOutpoints.has(outpointKey)) throw new Error(`pledge ${i}: duplicate utxo ${outpointKey} — an outpoint can only fund the release once`);
+    seenOutpoints.add(outpointKey);
     // The pledge's own scripts must match the campaign — a pledge from a
     // different campaign can never enter this bundle.
     if (p.pledge.releaseScriptHex !== bytesToHex(releaseScript)) {
@@ -587,12 +591,16 @@ export function parseReleaseBundle(json, network) {
   if (bytesToHex(outProgram) !== campaign.recipientXOnlyHex) throw new Error("bundle: output is not the campaign recipient");
   if (!Number.isSafeInteger(out.value) || out.value < DUST_GRAIN) throw new Error("bundle: bad output value");
   const releaseScript = buildReleaseScript(hexToBytes(campaign.recipientXOnlyHex), hexToBytes(campaign.creatorXOnlyHex));
+  const seenBundleOutpoints = new Set();
   const inputs = b.inputs.map((x, i) => {
     const { pledge } = pledgeFromDescriptor(x.pledge, network);
     if (pledge.releaseScriptHex !== bytesToHex(releaseScript)) throw new Error(`bundle: input ${i} pledge is not from this campaign`);
     if (!/^[0-9a-f]{64}$/.test(x.txid || "")) throw new Error(`bundle: input ${i} bad txid`);
     if (!Number.isInteger(x.vout) || x.vout < 0) throw new Error(`bundle: input ${i} bad vout`);
     if (!Number.isSafeInteger(x.value) || x.value <= 0) throw new Error(`bundle: input ${i} bad value`);
+    const outpointKey = `${x.txid}:${x.vout}`;
+    if (seenBundleOutpoints.has(outpointKey)) throw new Error(`bundle: input ${i} duplicate outpoint ${outpointKey} — an outpoint can only fund the release once`);
+    seenBundleOutpoints.add(outpointKey);
     const cb = hexToBytes(String(x.controlBlock || ""));
     if (cb.length !== 65 || (cb[0] & 0xfe) !== TAPLEAF_VERSION) throw new Error(`bundle: input ${i} bad control block`);
     if (!verifyFundControlBlock(hexToBytes(pledge.internalKeyHex), releaseScript, cb, hexToBytes(pledge.tweakedHex))) {
@@ -754,11 +762,15 @@ export function buildReleaseSpend(network, inputs, outputs, stacks, { sequence =
   const n = inputs.length;
   if (n === 0 || n > MAX_RELEASE_INPUTS) throw new Error("bad input count");
   if (stacks.length !== n) throw new Error("stacks must align with inputs");
-  for (const x of inputs) {
+  const seenSpendOutpoints = new Set();
+  for (const [i, x] of inputs.entries()) {
     if (!/^[0-9a-f]{64}$/i.test(x.txid || "")) throw new Error("bad input txid");
     if (!Number.isInteger(x.vout) || x.vout < 0) throw new Error("bad input vout");
     if (!Number.isSafeInteger(x.value) || x.value <= 0) throw new Error("bad input value");
     if (!(x.spk instanceof Uint8Array) || x.spk.length === 0) throw new Error("bad input spk");
+    const outpointKey = `${String(x.txid).toLowerCase()}:${x.vout}`;
+    if (seenSpendOutpoints.has(outpointKey)) throw new Error(`input ${i}: duplicate outpoint ${outpointKey} — an outpoint can only be spent once`);
+    seenSpendOutpoints.add(outpointKey);
   }
   for (const o of outputs) {
     if (!(o.program instanceof Uint8Array) || o.program.length !== 32) throw new Error("output program must be 32 bytes");
