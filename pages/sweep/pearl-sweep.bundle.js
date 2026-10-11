@@ -4902,6 +4902,7 @@ zoo`.split("\n");
     return [255, ...u64le(n)];
   }
   function u32le(n) {
+    if (!Number.isInteger(n) || n < 0 || n > 4294967295) throw new Error("u32 out of range");
     return [n & 255, n >>> 8 & 255, n >>> 16 & 255, n >>> 24 & 255];
   }
   function u64le(n) {
@@ -4981,6 +4982,13 @@ zoo`.split("\n");
     const whole = a / BigInt(GRAIN_PER_PRL);
     const frac = (a % BigInt(GRAIN_PER_PRL)).toString().padStart(8, "0").replace(/0+$/, "");
     return (neg ? "-" : "") + whole.toString() + (frac ? "." + frac : "");
+  }
+  function grainsToNumber(grains, what = "amount") {
+    const v = Number(grains);
+    if (!Number.isSafeInteger(v)) {
+      throw new Error(`${what} is too large to handle exactly (over ${fmtPRL(BigInt(Number.MAX_SAFE_INTEGER))} PRL)`);
+    }
+    return v;
   }
   var Reader = class {
     constructor(bytes) {
@@ -5154,7 +5162,7 @@ zoo`.split("\n");
         const digest = keypathSigDigestEx(
           network,
           prevouts.map((p, k) => ({ txid: dec.inputs[k].txid, vout: dec.inputs[k].vout, value: p.value, spk: p.spk })),
-          dec.outputs.map((o) => ({ program: describeSpk(o.spk, network).program ?? new Uint8Array(32), value: Number(o.value) })),
+          dec.outputs.map((o) => ({ program: describeSpk(o.spk, network).program ?? new Uint8Array(32), value: grainsToNumber(o.value, "output value") })),
           dec.inputs[i].sequence,
           i,
           hashType

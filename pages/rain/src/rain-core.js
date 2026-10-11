@@ -176,7 +176,11 @@ export function parseManualUtxos(text, network = NETWORKS.mainnet) {
         address = encodeBech32m(network.hrp, 1, dec.program);
       } catch { throw new Error(`bad address on utxo line: "${line.slice(0, 48)}…"`); }
     }
-    out.push({ txid: m[1].toLowerCase(), vout: Number(m[2]), value: Number(value), confirmations: 0, address });
+    const vout = Number(m[2]);
+    if (!Number.isSafeInteger(vout) || vout < 0 || vout > 0xffffffff) {
+      throw new Error(`bad utxo vout on line: "${line.slice(0, 48)}…"`);
+    }
+    out.push({ txid: m[1].toLowerCase(), vout, value: Number(value), confirmations: 0, address });
   }
   return out;
 }

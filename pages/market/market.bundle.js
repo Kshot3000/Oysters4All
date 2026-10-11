@@ -5792,6 +5792,7 @@ zoo`.split("\n");
     return [255, ...u64le(n)];
   }
   function u32le(n) {
+    if (!Number.isInteger(n) || n < 0 || n > 4294967295) throw new Error("u32 out of range");
     return [n & 255, n >>> 8 & 255, n >>> 16 & 255, n >>> 24 & 255];
   }
   function u64le(n) {

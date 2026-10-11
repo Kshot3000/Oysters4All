@@ -5734,6 +5734,7 @@ zoo`.split("\n");
     return [255, ...u64le(n)];
   }
   function u32le(n) {
+    if (!Number.isInteger(n) || n < 0 || n > 4294967295) throw new Error("u32 out of range");
     return [n & 255, n >>> 8 & 255, n >>> 16 & 255, n >>> 24 & 255];
   }
   function u64le(n) {
@@ -5815,13 +5816,11 @@ zoo`.split("\n");
   async function fetchUtxos(blockbookBase, address) {
     const list = await bbFetch(blockbookBase, `/api/v2/utxo/${address}`);
     if (!Array.isArray(list)) throw new Error("unexpected utxo response");
-    return list.map((u) => ({
-      txid: u.txid,
-      vout: u.vout,
-      value: Number(u.value),
-      // grains (satoshis field)
-      confirmations: u.confirmations ?? 0
-    })).filter((u) => u.value > 0 && /^[0-9a-f]{64}$/i.test(u.txid));
+    return list.map((u) => {
+      const value = Number(u.value);
+      if (!Number.isSafeInteger(value)) throw new Error("UTXO value too large to handle exactly");
+      return { txid: u.txid, vout: u.vout, value, confirmations: u.confirmations ?? 0 };
+    }).filter((u) => u.value > 0 && /^[0-9a-f]{64}$/i.test(u.txid));
   }
   async function fetchFeeRateGrainsPerVByte(blockbookBase, blocks = 2) {
     const r = await bbFetch(blockbookBase, `/api/v2/estimatefee/${blocks}`);
@@ -5860,6 +5859,13 @@ zoo`.split("\n");
     const whole = a / BigInt(GRAIN_PER_PRL);
     const frac = (a % BigInt(GRAIN_PER_PRL)).toString().padStart(8, "0").replace(/0+$/, "");
     return (neg ? "-" : "") + whole.toString() + (frac ? "." + frac : "");
+  }
+  function grainsToNumber(grains, what = "amount") {
+    const v = Number(grains);
+    if (!Number.isSafeInteger(v)) {
+      throw new Error(`${what} is too large to handle exactly (over ${fmtPRL(BigInt(Number.MAX_SAFE_INTEGER))} PRL)`);
+    }
+    return v;
   }
   function parsePRL(s) {
     if (typeof s !== "string") throw new Error("amount must be a string");
@@ -6041,7 +6047,7 @@ zoo`.split("\n");
         const digest = keypathSigDigestEx(
           network,
           prevouts.map((p, k) => ({ txid: dec.inputs[k].txid, vout: dec.inputs[k].vout, value: p.value, spk: p.spk })),
-          dec.outputs.map((o) => ({ program: describeSpk(o.spk, network).program ?? new Uint8Array(32), value: Number(o.value) })),
+          dec.outputs.map((o) => ({ program: describeSpk(o.spk, network).program ?? new Uint8Array(32), value: grainsToNumber(o.value, "output value") })),
           dec.inputs[i].sequence,
           i,
           hashType
@@ -6090,7 +6096,9 @@ zoo`.split("\n");
       }
       const value = Number(grains);
       if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`bad UTXO value: ${line}`);
-      out.push({ txid: m[1].toLowerCase(), vout: Number(m[2]), value, confirmations: 0, spk });
+      const vout = Number(m[2]);
+      if (!Number.isSafeInteger(vout) || vout < 0 || vout > 4294967295) throw new Error(`bad UTXO vout: ${line}`);
+      out.push({ txid: m[1].toLowerCase(), vout, value, confirmations: 0, spk });
     }
     return out;
   }

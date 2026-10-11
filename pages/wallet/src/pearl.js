@@ -161,7 +161,10 @@ function varint(n) {
   return [0xff, ...u64le(n)];
 }
 function u16le(n) { return [n & 0xff, (n >> 8) & 0xff]; }
-function u32le(n) { return [n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff]; }
+function u32le(n) {
+  if (!Number.isInteger(n) || n < 0 || n > 0xffffffff) throw new Error("u32 out of range");
+  return [n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff];
+}
 function u64le(n) {
   // n up to 2^53 safe
   const lo = n % 0x100000000;

@@ -134,6 +134,8 @@ test("parseManualUtxos keeps addresses for the belong-check", () => {
   assert.equal(u[1].address, null);
   assert.doesNotThrow(() => assertUtxosBelong(u, f.address));
   assert.throws(() => parseManualUtxos(`${"aa".repeat(32)}:0 250000000 notanaddress`, NETWORKS.mainnet), /bad address/);
+  assert.throws(() => parseManualUtxos(`${"aa".repeat(32)}:4294967296 250000000`, NETWORKS.mainnet), /bad utxo vout/);
+  assert.throws(() => parseManualUtxos(`${"aa".repeat(32)}:9007199254740993 250000000`, NETWORKS.mainnet), /bad utxo vout/);
   assert.throws(() => parseManualUtxos("garbage line", NETWORKS.mainnet), /bad utxo line/);
   assert.throws(() => parseManualUtxos("", NETWORKS.mainnet), /at least one UTXO/);
 });

@@ -436,6 +436,16 @@ function signedListing(over = {}) {
   }
 }
 
+/* ============ 7c. fill builder refuses a wrapped vout ============ */
+{
+  const l = signedListing();
+  throws("fill-refuses-oversized-vout", () => buildFillTx({
+    network: NW, listing: l,
+    buyerUtxos: [{ txid: "11".repeat(32), vout: 4294967297, value: 400_000_000, priv: buyer.priv, internalXOnly: buyer.internalXOnly }],
+    buyerAddress: buyer.address, feeRate: 5,
+  }));
+}
+
 /* ============ 8. board / settings / demo ============ */
 {
   saveBoard({ v: 1, listings: [], bids: [], trades: [], seq: 1 });

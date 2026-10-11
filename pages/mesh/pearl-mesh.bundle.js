@@ -5715,6 +5715,13 @@ zoo`.split("\n");
     const frac = (a % BigInt(GRAIN_PER_PRL)).toString().padStart(8, "0").replace(/0+$/, "");
     return (neg ? "-" : "") + whole.toString() + (frac ? "." + frac : "");
   }
+  function grainsToNumber(grains, what = "amount") {
+    const v = Number(grains);
+    if (!Number.isSafeInteger(v)) {
+      throw new Error(`${what} is too large to handle exactly (over ${fmtPRL(BigInt(Number.MAX_SAFE_INTEGER))} PRL)`);
+    }
+    return v;
+  }
   function parsePRL(s) {
     if (typeof s !== "string") throw new Error("amount must be a string");
     const m = s.trim().match(/^(\d+)(?:\.(\d{1,8}))?$/);
@@ -5734,7 +5741,7 @@ zoo`.split("\n");
     if (!res.ok) throw new Error(`blockbook ${res.status} on /api/v2/utxo`);
     const list = await res.json();
     if (!Array.isArray(list)) throw new Error("unexpected utxo response");
-    return list.map((u) => ({ txid: u.txid, vout: u.vout, value: Number(u.value), confirmations: u.confirmations ?? 0 })).filter((u) => u.value > 0 && /^[0-9a-f]{64}$/i.test(u.txid || ""));
+    return list.map((u) => ({ txid: u.txid, vout: u.vout, value: grainsToNumber(BigInt(u.value), "UTXO value"), confirmations: u.confirmations ?? 0 })).filter((u) => u.value > 0 && /^[0-9a-f]{64}$/i.test(u.txid || ""));
   }
   function parseUtxoList(text, network = null) {
     const out = [];
@@ -5750,7 +5757,9 @@ zoo`.split("\n");
       }
       const value = Number(grains);
       if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`bad UTXO value: ${line}`);
-      out.push({ txid: m[1].toLowerCase(), vout: Number(m[2]), value, confirmations: 0, spk });
+      const vout = Number(m[2]);
+      if (!Number.isSafeInteger(vout) || vout < 0 || vout > 4294967295) throw new Error(`bad UTXO vout: ${line}`);
+      out.push({ txid: m[1].toLowerCase(), vout, value, confirmations: 0, spk });
     }
     return out;
   }

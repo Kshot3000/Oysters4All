@@ -302,7 +302,7 @@ test("forge rejects silently-misparsed custom amounts and impossible dates", () 
   assert.ok(src.includes("E.parsePRLToGrains($(\"total\").value)"), "total uses exact parser");
   assert.ok(src.includes("E.parsePRLToGrains(m[4])"), "custom amounts use exact parser");
   assert.ok(!/parseFloat\([^)]*\)\s*\*\s*E\.GRAIN_PER_PRL/.test(src), "no float money parse remains");
-  assert.ok(html.includes("pearl-vesting.bundle.js?v=3"), "bundle cache pin");
+  assert.ok(html.includes("pearl-vesting.bundle.js?v=4"), "bundle cache pin");
   assert.ok(html.includes("app.js?v=4"), "app cache pin");
   assert.deepEqual(errors, [], "console errors: " + errors.join(" | "));
 });

@@ -135,6 +135,13 @@ const testnet = W.NETWORKS.testnet;
   ok("txid is 64 hex", /^[0-9a-f]{64}$/.test(built.txid), built.txid);
   ok("fee matches estimate", built.feeGrains === 1540, String(built.feeGrains));
   ok("change correct", built.changeGrains === 250000 - 100000 - 1540, String(built.changeGrains));
+  throws("oversized vout refused, not wrapped to vout 1", () => W.buildSendTx({
+    inputs: [{ txid: fakeTxid, vout: 4294967297, value: 250000, priv: sender.priv, internalXOnly: sender.internalXOnly }],
+    recipientProgram: W.validateAddress(recipient.address, mainnet).program,
+    amountGrains: 100000,
+    changeTweakedX: change.tweakedX,
+    feeRate: 10,
+  }), "u32 out of range");
   // minimal wire parse
   const raw = Buffer.from(built.hex, "hex");
   let o = 0;

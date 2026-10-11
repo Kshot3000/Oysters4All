@@ -14,7 +14,7 @@ import {
   NETWORKS, GRAIN_PER_PRL, DUST_GRAIN,
   encodeBech32m, decodeBech32m, bytesToHex, hexToBytes,
   tweakKeypath, tweakPrivKeypath, p2trScriptPubKey,
-  keypathTxVBytes,
+  keypathTxVBytes, u32le,
   newMnemonic, walletFromMnemonic, walletFromWIF, walletToWIF,
 } from "../src/crypto.js";
 
@@ -188,6 +188,27 @@ test("UTXO list parsing", () => {
   assert.throws(() => parseUtxoList("nope"), /bad UTXO line/);
 });
 
+test("UTXO vout must be a uint32 — never wrapped or rounded", () => {
+  // u32le is the serializer every builder funnels vouts through: it must
+  // refuse out-of-range values instead of wrapping them via >>> coercion.
+  assert.deepEqual(u32le(0), [0, 0, 0, 0]);
+  assert.deepEqual(u32le(4294967295), [255, 255, 255, 255]);
+  assert.throws(() => u32le(4294967296), /u32 out of range/);
+  assert.throws(() => u32le(-1), /u32 out of range/);
+  assert.throws(() => u32le(1.5), /u32 out of range/);
+  // The pasted-list parser validates its vout field like its value field.
+  assert.throws(() => parseUtxoList("aa".repeat(32) + ":4294967296 100000000"), /bad UTXO vout/);
+  assert.throws(() => parseUtxoList("aa".repeat(32) + ":9007199254740993 100000000"), /bad UTXO vout/);
+  assert.equal(parseUtxoList("aa".repeat(32) + ":4294967295 100000000")[0].vout, 4294967295);
+  // And a signed build refuses an oversized vout instead of spending vout 1.
+  const w0 = walletFromMnemonic(MNEMONIC, NETWORKS.mainnet, 0, 0);
+  const w5 = walletFromMnemonic(MNEMONIC, NETWORKS.mainnet, 0, 5);
+  const spk0 = p2trScriptPubKey(tweakKeypath(w0.internalXOnly).tweakedX);
+  assert.throws(() => buildKeypathTxEx(NETWORKS.mainnet,
+    [{ txid: "aa".repeat(32), vout: 4294967297, value: 100_000_000, spk: spk0, priv: w0.priv, internalXOnly: w0.internalXOnly }],
+    [{ program: decodeBech32m(w5.address, "prl").program, value: 99_000_000 }], SIGHASH_DEFAULT), /u32 out of range/);
+});
+
 test("describeSpk identifies P2TR and recovers the address", () => {
   const w = walletFromMnemonic(MNEMONIC, NETWORKS.mainnet, 0, 0);
   const spk = p2trScriptPubKey(tweakKeypath(w.internalXOnly).tweakedX);
@@ -293,5 +314,5 @@ test("app.js buildPlan guards recipient and change amounts with safeGrains", () 
   assert.ok(app.includes('safeGrains(pick.change, "Change amount")'), "change amount guarded");
   assert.ok(!app.includes("value: Number(grains)"), "no unguarded recipient conversion remains");
   assert.ok(!app.includes("value: Number(pick.change)"), "no unguarded change conversion remains");
-  assert.ok(html.includes('pearl-sign.bundle.js?v=4'), "bundle cache key bumped");
+  assert.ok(html.includes('pearl-sign.bundle.js?v=5'), "bundle cache key bumped");
 });

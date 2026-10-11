@@ -413,7 +413,9 @@
     if (!m) throw new Error("UTXO: use the form txid:vout");
     const value = Number($("s-utxo-value").value.trim());
     if (!Number.isSafeInteger(value) || value <= 0) throw new Error("UTXO value must be a positive integer (grains)");
-    return { txid: m[1].toLowerCase(), vout: parseInt(m[2], 10), value };
+    const vout = Number(m[2]);
+    if (!Number.isSafeInteger(vout) || vout < 0 || vout > 0xffffffff) throw new Error("UTXO vout must be a uint32");
+    return { txid: m[1].toLowerCase(), vout, value };
   }
 
   $("s-buildround").addEventListener("click", () => {

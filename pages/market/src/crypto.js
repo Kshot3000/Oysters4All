@@ -234,7 +234,10 @@ export function varint(n) {
   if (n <= 0xffffffff) return [0xfe, ...u32le(n)];
   return [0xff, ...u64le(n)];
 }
-export function u32le(n) { return [n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff]; }
+export function u32le(n) {
+  if (!Number.isInteger(n) || n < 0 || n > 0xffffffff) throw new Error("u32 out of range");
+  return [n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff];
+}
 export function u64le(n) {
   const lo = n % 0x100000000;
   const hi = Math.floor(n / 0x100000000);

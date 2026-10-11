@@ -5762,6 +5762,7 @@ zoo`.split("\n");
     return [255, ...u64le(n)];
   }
   function u32le(n) {
+    if (!Number.isInteger(n) || n < 0 || n > 4294967295) throw new Error("u32 out of range");
     return [n & 255, n >>> 8 & 255, n >>> 16 & 255, n >>> 24 & 255];
   }
   function u64le(n) {
@@ -5794,13 +5795,11 @@ zoo`.split("\n");
   async function fetchUtxos(blockbookBase, address) {
     const list = await bbFetch(blockbookBase, `/api/v2/utxo/${address}`);
     if (!Array.isArray(list)) throw new Error("unexpected utxo response");
-    return list.map((u) => ({
-      txid: u.txid,
-      vout: u.vout,
-      value: Number(u.value),
-      // grains (satoshis field)
-      confirmations: u.confirmations ?? 0
-    })).filter((u) => u.value > 0 && /^[0-9a-f]{64}$/i.test(u.txid));
+    return list.map((u) => {
+      const value = Number(u.value);
+      if (!Number.isSafeInteger(value)) throw new Error("UTXO value too large to handle exactly");
+      return { txid: u.txid, vout: u.vout, value, confirmations: u.confirmations ?? 0 };
+    }).filter((u) => u.value > 0 && /^[0-9a-f]{64}$/i.test(u.txid));
   }
   async function fetchFeeRateGrainsPerVByte(blockbookBase, blocks = 2) {
     const r = await bbFetch(blockbookBase, `/api/v2/estimatefee/${blocks}`);

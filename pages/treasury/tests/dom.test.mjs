@@ -262,6 +262,21 @@ test("proposals: bad payee refused", () => {
   assert.ok($("p-err").textContent.length > 0, "payee error shown");
 });
 
+test("sign: oversized vout refused with the uint32 message", async () => {
+  const { $, document, store } = bootApp();
+  const vid = registerDetVault($, store);
+  document.querySelector('#steps button[data-step="proposals"]').click();
+  const pid = createProposalDom($, vid);
+  document.querySelector('#steps button[data-step="sign"]').click();
+  $("s-proposal").value = pid;
+  $("s-utxo").value = `${"ab".repeat(32)}:4294967296`;
+  $("s-utxo-value").value = "250000000";
+  $("s-feerate").value = "5";
+  $("s-buildround").click();
+  await tick();
+  assert.match($("s-err").textContent, /uint32/, "oversized vout loudly refused");
+});
+
 test("sign: wrong key refused, two cosigners reach quorum", async () => {
   const { $, document, store } = bootApp();
   const vid = registerDetVault($, store);

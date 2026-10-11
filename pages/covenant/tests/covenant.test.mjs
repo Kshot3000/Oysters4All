@@ -155,6 +155,13 @@ test("buildSigningRound: fee math, dust refusal, change to vault", () => {
   assert.throws(() => buildSigningRound(covenant, net, {
     utxo, payments: [{ address: "bc1qxyz", valueGrains: 1000 }], feeRateGrainsPerVByte: 10,
   }), /missing separator|HRP|P2TR|bech32/i);
+  // Oversized vout: a u32 on the wire — the digest serializer must refuse
+  // it instead of wrapping 4294967297 to vout 1 (parseRound re-verifies
+  // with the same serializer, so a wrapped digest would pass tamper checks).
+  assert.throws(() => buildSigningRound(covenant, net, {
+    utxo: { ...utxo, vout: 4294967297 },
+    payments: [{ address: destAddr, valueGrains: 1 * GRAIN_PER_PRL }], feeRateGrainsPerVByte: 10,
+  }), /u32 out of range/);
 });
 
 test("sign -> import -> quorum -> finalize produces a valid single-input spend", () => {

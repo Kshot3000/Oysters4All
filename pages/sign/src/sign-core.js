@@ -380,7 +380,9 @@ export function parseUtxoList(text, network = null) {
     }
     const value = Number(grains);
     if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`bad UTXO value: ${line}`);
-    out.push({ txid: m[1].toLowerCase(), vout: Number(m[2]), value, confirmations: 0, spk });
+    const vout = Number(m[2]);
+    if (!Number.isSafeInteger(vout) || vout < 0 || vout > 0xffffffff) throw new Error(`bad UTXO vout: ${line}`);
+    out.push({ txid: m[1].toLowerCase(), vout, value, confirmations: 0, spk });
   }
   return out;
 }
