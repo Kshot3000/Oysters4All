@@ -6148,10 +6148,14 @@ zoo`.split("\n");
     if (dec.version !== 1) throw new Error("recipient must be a Pearl v1 (Taproot) address");
     const rate = Math.ceil(Number(feeRateGrainsPerVByte));
     if (!Number.isFinite(rate) || rate <= 0) throw new Error("fee rate must be a positive number");
+    const seenUtxoOutpoints = /* @__PURE__ */ new Set();
     for (const u of utxos) {
       if (!/^[0-9a-f]{64}$/i.test(u.txid || "")) throw new Error("bad utxo txid");
       if (!Number.isInteger(u.vout) || u.vout < 0) throw new Error("bad utxo vout");
       if (!Number.isSafeInteger(u.value) || u.value <= 0) throw new Error("bad utxo value");
+      const outpointKey = `${u.txid.toLowerCase()}:${u.vout}`;
+      if (seenUtxoOutpoints.has(outpointKey)) throw new Error(`duplicate utxo ${outpointKey} \u2014 an outpoint can only be spent once`);
+      seenUtxoOutpoints.add(outpointKey);
     }
     const total = utxos.reduce((a, u) => a + BigInt(u.value), 0n);
     const fee = BigInt(keypathTxVBytes(utxos.length, 1)) * BigInt(rate);

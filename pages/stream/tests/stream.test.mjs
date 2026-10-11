@@ -211,6 +211,33 @@ test("batch claim full cycle: 3 ticks -> one sweep, sigs verify, hex parses", ()
   assert.equal(lock, ticks[2].lock);
 });
 
+test("batch claim refuses a duplicated outpoint at plan and build time", () => {
+  const { ticks } = planTestStream({ tickCount: 3 });
+  const inputs = syntheticInputs(ticks, [50_000_000, 60_000_000, 70_000_000]);
+  const dup = [inputs[0], { ...inputs[0] }];
+  const dest = hexToBytes(B.xonly);
+  // the planner sums every entry, so a duplicated tick UTXO would credit
+  // its value twice and the sweep would pay out money that does not exist
+  assert.throws(() => planBatchClaim({
+    inputs: dup.map((x) => ({ txid: x.txid, vout: x.vout, value: x.value, spk: x.tick.spk })),
+    scriptLens: [40, 40], controlLens: [33, 33], feeRateGrainsPerVByte: 10,
+  }), /duplicate outpoint/);
+  assert.throws(() => buildBatchClaimTx({
+    network: net, inputs: dup, role: "claim",
+    signerPriv: hexToBytes(B.priv), destinationProgram: dest,
+    feeRateGrainsPerVByte: 10,
+  }), /duplicate outpoint/);
+  // same txid, different vout is a distinct outpoint and still builds
+  const distinct = [inputs[0], { ...inputs[1], txid: inputs[0].txid }];
+  const built = buildBatchClaimTx({
+    network: net, inputs: distinct, role: "claim",
+    signerPriv: hexToBytes(B.priv), destinationProgram: dest,
+    feeRateGrainsPerVByte: 10,
+  });
+  assert.equal(built.inputCount, 2);
+  assert.equal(built.inputSum, 110_000_000);
+});
+
 test("independent sighash cross-check: node:crypto sha256 recomputation", () => {
   // Recompute each input's BIP-341 digest from scratch with node:crypto
   // (NOT the noble sha256 the core uses) and byte-compare with the core.

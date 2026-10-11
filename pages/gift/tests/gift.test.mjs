@@ -105,6 +105,12 @@ test("planSweep: exact fee math, canonicalization, refusals", () => {
   assert.throws(() => planSweep({ utxos: dust, recipient: VEC.account0, feeRateGrainsPerVByte: 5, network: NETWORKS.mainnet }), /dust/);
   // absurd fee rate eats the balance -> dust refusal too
   assert.throws(() => planSweep({ utxos, recipient: VEC.account0, feeRateGrainsPerVByte: 1000000, network: NETWORKS.mainnet }), /dust/);
+  // a duplicated line would be summed twice, crediting a sweep amount
+  // backed by half the real balance — refused at plan time
+  assert.throws(() => planSweep({ utxos: [utxos[0], { ...utxos[0] }], recipient: VEC.account0, feeRateGrainsPerVByte: 5, network: NETWORKS.mainnet }), /duplicate utxo/);
+  // same txid, different vout is a distinct outpoint and still plans
+  const distinct = planSweep({ utxos: [utxos[0], { ...utxos[0], vout: 7 }], recipient: VEC.account0, feeRateGrainsPerVByte: 5, network: NETWORKS.mainnet });
+  assert.equal(distinct.total, 200_000_000n);
 });
 
 test("buildSweepTx: full sign -> verify cycle, tamper detected", () => {

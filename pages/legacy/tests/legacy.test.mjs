@@ -439,6 +439,12 @@ test("owner refresh: same address, fresh clock, multi-input, exact fee", () => {
     ownerPrivHex: K[0].priv, feeRateGrainsPerVByte: 5,
   });
   assert.ok(early.txid);
+  // a duplicated vault UTXO would be summed twice and spent twice — the
+  // refresh output would claim money that does not exist; refused
+  assert.throws(() => buildOwnerRefresh(net, vault, {
+    utxos: [utxos[0], { ...utxos[0] }],
+    ownerPrivHex: K[0].priv, feeRateGrainsPerVByte: 5,
+  }), /duplicate outpoint/);
 });
 
 test("vaultUtxoStatus classifier", () => {

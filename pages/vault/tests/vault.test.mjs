@@ -304,6 +304,12 @@ test("planSpend refuses shortfall, dust outputs, bad addresses", () => {
     recipients: [{ address: d.address, grains: 999999n }],
     feeRateGrainsPerVByte: 10,
   };
+  // a duplicated selected UTXO would be summed twice, inflating the
+  // plan's change with money that does not exist — refused
+  assert.throws(() => planSpend({
+    ...base,
+    selectedUtxos: [utxo(TXA, 0, 1000000n), utxo(TXA, 0, 1000000n)],
+  }), /duplicate UTXO/);
   assert.throws(() => planSpend(base), /shortfall/);
   assert.throws(() => planSpend({ ...base, recipients: [{ address: d.address, grains: 100n }] }), /dust/);
   assert.throws(() => planSpend({ ...base, recipients: [{ address: "junk", grains: 999999n }] }), /VAULT REFUSED/);

@@ -583,6 +583,12 @@ export function buildMultiScriptPathSpend(network, spends, outputs, opts = {}) {
     const s = p2trScriptPubKey(o.program);
     outs.push(...u64le(o.value), ...varint(s.length), ...s);
   }
+  const seenSpendOutpoints = new Set();
+  for (let i = 0; i < spends.length; i++) {
+    const k = `${String(spends[i].input?.txid || "").toLowerCase()}:${spends[i].input?.vout}`;
+    if (seenSpendOutpoints.has(k)) throw new Error(`spend ${i}: duplicate outpoint ${k} — an outpoint can only be spent once`);
+    seenSpendOutpoints.add(k);
+  }
   const digests = spends.map((sp, i) => {
     if (!(sp.leafScript instanceof Uint8Array) || sp.leafScript.length === 0) throw new Error(`spend ${i}: bad leaf script`);
     if (!(sp.controlBlock instanceof Uint8Array) || (sp.controlBlock.length !== 33 && sp.controlBlock.length !== 65)) {
@@ -727,10 +733,14 @@ export function buildOwnerRefresh(network, vault, {
   const vaultSpk = hexToBytes(vault.spkHex);
   const warnings = [];
   let totalIn = 0;
+  const seenUtxoOutpoints = new Set();
   const spends = utxos.map((u, i) => {
     if (!/^[0-9a-f]{64}$/i.test(u?.txid || "")) throw new Error(`utxo ${i}: bad txid`);
     if (!Number.isInteger(u?.vout) || u.vout < 0) throw new Error(`utxo ${i}: bad vout`);
     if (!Number.isSafeInteger(u?.value) || u.value <= 0) throw new Error(`utxo ${i}: bad value`);
+    const outpointKey = `${u.txid.toLowerCase()}:${u.vout}`;
+    if (seenUtxoOutpoints.has(outpointKey)) throw new Error(`utxo ${i}: duplicate outpoint ${outpointKey} — an outpoint can only be spent once`);
+    seenUtxoOutpoints.add(outpointKey);
     if (u.spkHex) {
       if (String(u.spkHex).trim().toLowerCase() !== vault.spkHex.toLowerCase()) {
         throw new Error(`utxo ${i}: scriptPubKey does not belong to the vault address — refusing`);

@@ -6343,8 +6343,14 @@ zoo`.split("\n");
     if (!Array.isArray(inputs) || inputs.length === 0) throw new Error("inputs required");
     if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) throw new Error("bad fee rate");
     let sum = 0;
+    const seenOutpoints = /* @__PURE__ */ new Set();
     inputs.forEach((x, i) => {
       if (!Number.isSafeInteger(x.value) || x.value <= 0) throw new Error(`input ${i}: bad value`);
+      if (typeof x.txid === "string") {
+        const k = `${x.txid.toLowerCase()}:${x.vout}`;
+        if (seenOutpoints.has(k)) throw new Error(`input ${i}: duplicate outpoint ${k} \u2014 an outpoint can only be spent once`);
+        seenOutpoints.add(k);
+      }
       sum += x.value;
     });
     const vBytes = batchClaimVBytes({ nIn: inputs.length, scriptLens, controlLens });
@@ -6367,6 +6373,12 @@ zoo`.split("\n");
     const n = inputSpecs.length;
     if (leaves.length !== n || controlBlocks.length !== n || sigs.length !== n) {
       throw new Error("inputs, leaves, control blocks and signatures must align");
+    }
+    const seenSpendOutpoints = /* @__PURE__ */ new Set();
+    for (let i = 0; i < n; i++) {
+      const k = `${String(inputSpecs[i].txid || "").toLowerCase()}:${inputSpecs[i].vout}`;
+      if (seenSpendOutpoints.has(k)) throw new Error(`input ${i}: duplicate outpoint ${k} \u2014 an outpoint can only be spent once`);
+      seenSpendOutpoints.add(k);
     }
     const digests = inputSpecs.map((_, i) => {
       if ((controlBlocks[i][0] & 254) !== TAPLEAF_VERSION3) throw new Error(`input ${i}: bad control block version`);

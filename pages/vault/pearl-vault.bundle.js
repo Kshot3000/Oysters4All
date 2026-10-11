@@ -6089,10 +6089,14 @@ zoo`.split("\n");
       value: BigInt(u.value)
     }));
     if (utxos.length === 0) throw new Error("VAULT REFUSED: select at least one vault UTXO");
+    const seenUtxoOutpoints = /* @__PURE__ */ new Set();
     for (const u of utxos) {
       if (!/^[0-9a-f]{64}$/.test(u.txid)) throw new Error("VAULT REFUSED: malformed UTXO txid");
       if (!Number.isInteger(u.vout) || u.vout < 0) throw new Error("VAULT REFUSED: malformed UTXO vout");
       if (u.value <= 0n) throw new Error("VAULT REFUSED: UTXO value must be positive");
+      const outpointKey = `${u.txid}:${u.vout}`;
+      if (seenUtxoOutpoints.has(outpointKey)) throw new Error(`VAULT REFUSED: duplicate UTXO ${outpointKey} \u2014 an outpoint can only be spent once`);
+      seenUtxoOutpoints.add(outpointKey);
     }
     const outs = (recipients || []).map((r) => {
       const address = validateVaultAddress(r.address, network);
@@ -6222,6 +6226,12 @@ zoo`.split("\n");
     if (!network) throw new Error("VAULT REFUSED: unknown network in plan");
     if (plan.descriptorHash !== descriptor.hash) throw new Error("VAULT REFUSED: plan/descriptor mismatch");
     const script = hexToBytes(descriptor.script);
+    const seenBundleOutpoints = /* @__PURE__ */ new Set();
+    for (const u of plan.inputs) {
+      const outpointKey = `${String(u.txid).toLowerCase()}:${u.vout}`;
+      if (seenBundleOutpoints.has(outpointKey)) throw new Error(`VAULT REFUSED: duplicate UTXO ${outpointKey} in plan \u2014 an outpoint can only be spent once`);
+      seenBundleOutpoints.add(outpointKey);
+    }
     const inputs = plan.inputs.map((u) => ({
       txid: u.txid,
       vout: u.vout,

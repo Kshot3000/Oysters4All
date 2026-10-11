@@ -368,8 +368,19 @@ export function planBatchClaim({ inputs, scriptLens, controlLens, feeRateGrainsP
   if (!Array.isArray(inputs) || inputs.length === 0) throw new Error("inputs required");
   if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) throw new Error("bad fee rate");
   let sum = 0;
+  const seenOutpoints = new Set();
   inputs.forEach((x, i) => {
     if (!Number.isSafeInteger(x.value) || x.value <= 0) throw new Error(`input ${i}: bad value`);
+    // A duplicated outpoint would be summed twice here and spent twice in
+    // the sweep — consensus refuses it, but only after the plan (and its
+    // fictional payment) was shown. Refuse it at plan time. Value-only
+    // callers (the app's plan preview) carry no txid and skip this check;
+    // the signing path (buildBatchClaimTx) always carries outpoints.
+    if (typeof x.txid === "string") {
+      const k = `${x.txid.toLowerCase()}:${x.vout}`;
+      if (seenOutpoints.has(k)) throw new Error(`input ${i}: duplicate outpoint ${k} — an outpoint can only be spent once`);
+      seenOutpoints.add(k);
+    }
     sum += x.value;
   });
   const vBytes = batchClaimVBytes({ nIn: inputs.length, scriptLens, controlLens });
@@ -398,6 +409,12 @@ export function buildBatchScriptPathSpend(network, inputSpecs, outputs, leaves, 
   const n = inputSpecs.length;
   if (leaves.length !== n || controlBlocks.length !== n || sigs.length !== n) {
     throw new Error("inputs, leaves, control blocks and signatures must align");
+  }
+  const seenSpendOutpoints = new Set();
+  for (let i = 0; i < n; i++) {
+    const k = `${String(inputSpecs[i].txid || "").toLowerCase()}:${inputSpecs[i].vout}`;
+    if (seenSpendOutpoints.has(k)) throw new Error(`input ${i}: duplicate outpoint ${k} — an outpoint can only be spent once`);
+    seenSpendOutpoints.add(k);
   }
   const digests = inputSpecs.map((_, i) => {
     if ((controlBlocks[i][0] & 0xfe) !== TAPLEAF_VERSION) throw new Error(`input ${i}: bad control block version`);
