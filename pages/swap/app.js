@@ -424,8 +424,15 @@
     hideErr("lock-error");
     try {
       if (!S.swap) throw new Error("load the swap spec first");
-      const btcTip = $("mirror-btc-tip").value.trim() ? parseInt($("mirror-btc-tip").value, 10) : undefined;
-      const pearlTip = $("mirror-pearl-tip").value.trim() ? parseInt($("mirror-pearl-tip").value, 10) : undefined;
+      /* Strict tip parse via the app's own parseHeight (the T1/T2 helper):
+       * bare parseInt truncated "1e6" to a Bitcoin tip of 1 — baking a
+       * long-past refund CLTV into the funded mirror address — plus
+       * "870000.9"/"870000abc" to 870000, and let a negative Pearl tip
+       * inflate the suggested height. Empty still means "no tip". */
+      const btcTipRaw = $("mirror-btc-tip").value.trim();
+      const pearlTipRaw = $("mirror-pearl-tip").value.trim();
+      const btcTip = btcTipRaw ? parseHeight(btcTipRaw, "Bitcoin tip") : undefined;
+      const pearlTip = pearlTipRaw ? parseHeight(pearlTipRaw, "Pearl tip") : undefined;
       const t = E.btcMirrorTemplate(S.swap, {
         btcNetwork: $("mirror-btc-network").value, btcTip, pearlTip,
       });

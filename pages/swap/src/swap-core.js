@@ -958,6 +958,16 @@ export function btcMirrorTemplate(swap, opts = {}) {
   const bobXOnly = hexToBytes(swap.bobXOnly);
   const claimScript = buildClaimScript(secretHash, bobXOnly);
 
+  /* A tip that was supplied but is not a positive safe integer is a
+   * caller bug, not "no tips": silently treating a fractional tip as
+   * absent hides the mistake, and a negative tip would bake a refund
+   * height nobody intended into the funded BTC address's CLTV leaf. */
+  for (const [name, tip] of [["btcTip", opts.btcTip], ["pearlTip", opts.pearlTip]]) {
+    if (tip !== undefined && tip !== null && (!Number.isSafeInteger(tip) || tip <= 0)) {
+      throw new Error(`bad ${name} (need a positive block height)`);
+    }
+  }
+
   let t2Btc = null;
   let conversionNote;
   if (Number.isSafeInteger(opts.btcTip) && Number.isSafeInteger(opts.pearlTip)) {

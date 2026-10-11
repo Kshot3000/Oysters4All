@@ -5908,13 +5908,11 @@ zoo`.split("\n");
   async function fetchUtxos(blockbookBase, address) {
     const list = await bbFetch(blockbookBase, `/api/v2/utxo/${address}`);
     if (!Array.isArray(list)) throw new Error("unexpected utxo response");
-    return list.map((u) => ({
-      txid: u.txid,
-      vout: u.vout,
-      value: Number(u.value),
-      // grains (satoshis field)
-      confirmations: u.confirmations ?? 0
-    })).filter((u) => u.value > 0 && /^[0-9a-f]{64}$/i.test(u.txid));
+    return list.map((u) => {
+      const value = Number(u.value);
+      if (!Number.isSafeInteger(value)) throw new Error("UTXO value too large to handle exactly");
+      return { txid: u.txid, vout: u.vout, value, confirmations: u.confirmations ?? 0 };
+    }).filter((u) => u.value > 0 && /^[0-9a-f]{64}$/i.test(u.txid));
   }
   async function fetchFeeRateGrainsPerVByte(blockbookBase, blocks = 2) {
     const r = await bbFetch(blockbookBase, `/api/v2/estimatefee/${blocks}`);
@@ -6865,6 +6863,11 @@ zoo`.split("\n");
     const secretHash = hexToBytes(swap.secretHashHex);
     const bobXOnly = hexToBytes(swap.bobXOnly);
     const claimScript = buildClaimScript(secretHash, bobXOnly);
+    for (const [name, tip] of [["btcTip", opts.btcTip], ["pearlTip", opts.pearlTip]]) {
+      if (tip !== void 0 && tip !== null && (!Number.isSafeInteger(tip) || tip <= 0)) {
+        throw new Error(`bad ${name} (need a positive block height)`);
+      }
+    }
     let t2Btc = null;
     let conversionNote;
     if (Number.isSafeInteger(opts.btcTip) && Number.isSafeInteger(opts.pearlTip)) {

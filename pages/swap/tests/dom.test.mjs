@@ -326,6 +326,23 @@ test("mirror template: bc1p address + byte-identical claim leaf with tips", () =
   assert.ok($("mirror-note").textContent.includes("does not build or sign Bitcoin transactions"), "honest scope note");
 });
 
+test("mirror template: malformed tip heights are refused with the strict-height message", () => {
+  // bare parseInt truncated "920000.9" to 920000 and "1e6" to 1 — the
+  // handler must refuse via parseHeight instead of baking a wrong CLTV
+  $("mirror-btc-tip").value = "920000.9";
+  $("mirror-pearl-tip").value = "120000";
+  $("mirror-gen-btn").click();
+  assert.ok($("lock-error").textContent.includes("Bitcoin tip must be a positive block height"), "btc tip refusal: " + $("lock-error").textContent);
+  $("mirror-btc-tip").value = "920000";
+  $("mirror-pearl-tip").value = "-5";
+  $("mirror-gen-btn").click();
+  assert.ok($("lock-error").textContent.includes("Pearl tip must be a positive block height"), "pearl tip refusal: " + $("lock-error").textContent);
+  // valid tips still generate the mirror (leave state clean for later tests)
+  $("mirror-pearl-tip").value = "120000";
+  $("mirror-gen-btn").click();
+  assert.ok(/^bc1p/.test($("mirror-address").textContent), "mirror regenerates: " + $("mirror-address").textContent);
+});
+
 test("track: spec loads and the lifecycle summary renders", () => {
   $("track-load-btn").click();
   assert.equal($("track-error").hidden, true, "track spec loads: " + $("track-error").textContent);
@@ -412,8 +429,8 @@ test("amount inputs use the exact core parsers (float-parse class closed)", () =
   assert.ok(src.includes("E.parseBTCToSats(str)"), "parseBTC delegates to the core exact parser");
   assert.ok(!src.includes("Math.round(v * E.GRAIN_PER_PRL)"), "no float PRL parse left");
   assert.ok(!src.includes("Math.round(v * 1e8)"), "no float BTC parse left");
-  assert.ok(html.includes("pearl-swap.bundle.js?v=3"), "bundle cache key bumped");
-  assert.ok(html.includes('src="app.js?v=4"'), "app cache key bumped");
+  assert.ok(html.includes("pearl-swap.bundle.js?v=4"), "bundle cache key bumped");
+  assert.ok(html.includes('src="app.js?v=5"'), "app cache key bumped");
 });
 
 test("app.js grain formatter is BigInt-exact (pool float-format class)", async () => {

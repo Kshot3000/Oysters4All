@@ -453,6 +453,22 @@ test("BTC mirror template: exact scripts, bc1p address, honest notes", () => {
   assert.ok(t2.refundAsm.includes("OP_CHECKLOCKTIMEVERIFY"));
 });
 
+test("BTC mirror template: malformed tips are refused, not silently dropped or baked", () => {
+  const swap = makeSwap();
+  // fractional / negative / NaN / string tips must throw — previously a
+  // fractional tip was silently treated as "no tips" and a negative tip
+  // baked an inflated refund height into the funded address's CLTV leaf
+  assert.throws(() => btcMirrorTemplate(swap, { btcTip: 870000.9, pearlTip: 120000 }), /bad btcTip/);
+  assert.throws(() => btcMirrorTemplate(swap, { btcTip: 870000, pearlTip: -5 }), /bad pearlTip/);
+  assert.throws(() => btcMirrorTemplate(swap, { btcTip: NaN, pearlTip: 120000 }), /bad btcTip/);
+  assert.throws(() => btcMirrorTemplate(swap, { btcTip: "870000", pearlTip: 120000 }), /bad btcTip/);
+  assert.throws(() => btcMirrorTemplate(swap, { btcTip: 0, pearlTip: 120000 }), /bad btcTip/);
+  // a single valid tip (other side omitted) still yields the no-tips form
+  const partial = btcMirrorTemplate(swap, { btcTip: 870000 });
+  assert.equal(partial.suggestedBtcRefundHeight, null);
+  assert.equal(partial.address, null);
+});
+
 test("describeSwap is human-readable", () => {
   const d = describeSwap(makeSwap());
   assert.ok(d.role.includes("Alice"));
