@@ -5759,6 +5759,8 @@ zoo`.split("\n");
       if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`bad UTXO value: ${line}`);
       const vout = Number(m[2]);
       if (!Number.isSafeInteger(vout) || vout < 0 || vout > 4294967295) throw new Error(`bad UTXO vout: ${line}`);
+      const outpoint = `${m[1].toLowerCase()}:${vout}`;
+      if (out.some((u) => `${u.txid}:${u.vout}` === outpoint)) throw new Error(`duplicate UTXO ${outpoint} \u2014 an outpoint can only be listed once`);
       out.push({ txid: m[1].toLowerCase(), vout, value, confirmations: 0, spk });
     }
     return out;

@@ -198,6 +198,12 @@ export function buildTx(inputs, outputs, sequence = 0xffffffff) {
   if (!Array.isArray(inputs) || inputs.length === 0) throw new Error("no inputs");
   if (!Array.isArray(outputs) || outputs.length === 0) throw new Error("no outputs");
   for (const i of inputs) if (!(Number.isInteger(i.vout) && i.vout >= 0)) throw new Error("bad vout");
+  const seenOutpoints = new Set();
+  for (const i of inputs) {
+    const k = `${String(i.txid).toLowerCase()}:${i.vout}`;
+    if (seenOutpoints.has(k)) throw new Error(`duplicate input outpoint ${k} — an outpoint can only be spent once`);
+    seenOutpoints.add(k);
+  }
   for (const o of outputs) {
     if (!(o.xOnlyPub instanceof Uint8Array) || o.xOnlyPub.length !== 32) throw new Error("bad output key");
     if (!Number.isSafeInteger(o.value) || o.value <= 0 || o.value > 2.1e15) throw new Error("bad output value");

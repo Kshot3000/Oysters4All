@@ -319,5 +319,28 @@ test("app.js buildPlan guards recipient and change amounts with safeGrains", () 
   assert.ok(app.includes('safeGrains(pick.change, "Change amount")'), "change amount guarded");
   assert.ok(!app.includes("value: Number(grains)"), "no unguarded recipient conversion remains");
   assert.ok(!app.includes("value: Number(pick.change)"), "no unguarded change conversion remains");
-  assert.ok(html.includes('pearl-sign.bundle.js?v=6'), "bundle cache key bumped");
+  assert.ok(html.includes('pearl-sign.bundle.js?v=7'), "bundle cache key bumped");
+});
+
+
+test("duplicate outpoints refused at parse, selection, and both builders", () => {
+  // A pasted list naming the same outpoint twice used to parse cleanly,
+  // selectCoins then double-counted its value (funding a 1.5 PRL target from
+  // a single 1 PRL coin), and buildKeypathTxEx signed a tx spending the
+  // outpoint twice — verifySignedTx passed every input; only consensus
+  // would have refused. Bond/payjoin already refused dup outpoints; the
+  // shared sign path now does too, at every layer.
+  const line = "aa".repeat(32) + ":0 100000000";
+  assert.throws(() => parseUtxoList(line + "\n" + line), /duplicate UTXO/);
+  const dup = [
+    { txid: "aa".repeat(32), vout: 0, value: 100_000_000 },
+    { txid: "aa".repeat(32), vout: 0, value: 100_000_000 },
+  ];
+  assert.throws(() => selectCoins(dup, 150_000_000n, 10, 1), /duplicate UTXO/);
+  const { inputs, outputs } = fixtureTx(NETWORKS.mainnet);
+  const dupInputs = [inputs[0], inputs[0]];
+  assert.throws(() => buildKeypathTxEx(NETWORKS.mainnet, dupInputs, outputs), /duplicate input outpoint/);
+  return import("../src/crypto.js").then((C) => {
+    assert.throws(() => C.buildKeypathTx(NETWORKS.mainnet, dupInputs.map((i) => ({ ...i, spk: undefined })), outputs), /duplicate input outpoint/);
+  });
 });

@@ -415,3 +415,12 @@ test("verifySignedBundle: markup in a payment's period cannot reach the failure 
   assert.ok(r.failures.some((f) => f.includes("payment 1: bad period")), "safe index-tagged failure: " + r.failures.join(";"));
   assert.ok(![...r.checks, ...r.failures].join(" ").includes("<img"), "no markup in verifier output");
 });
+
+
+test("buildKeypathTxLocktime refuses a duplicate input outpoint", () => {
+  const { inputs, outputs } = fixtureTxParts();
+  assert.throws(
+    () => buildKeypathTxLocktime(NW, [inputs[0], inputs[0]], outputs, { locktime: 0, sequence: FINAL_SEQ }),
+    /duplicate input outpoint/,
+  );
+});

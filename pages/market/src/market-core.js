@@ -406,6 +406,12 @@ export function selectCoinsSimple(utxos, targetGrains, feeRate, baseOuts) {
     .filter((u) => Number.isSafeInteger(u.value) && u.value > 0 && /^[0-9a-f]{64}$/i.test(u.txid || ""))
     .sort((a, b) => b.value - a.value);
   if (!sorted.length) throw new Error("no spendable UTXOs");
+  const seenOutpoints = new Set();
+  for (const u of sorted) {
+    const k = `${String(u.txid).toLowerCase()}:${u.vout}`;
+    if (seenOutpoints.has(k)) throw new Error(`duplicate UTXO ${k} — an outpoint can only be spent once`);
+    seenOutpoints.add(k);
+  }
   const picked = [];
   let total = 0;
   for (const u of sorted) {

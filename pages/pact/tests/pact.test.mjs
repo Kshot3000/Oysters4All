@@ -250,3 +250,21 @@ test("payout math helpers", () => {
   assert.throws(() => P.prlToGrains("90071992.54740992"), /out of range/);
   assert.throws(() => P.prlToGrains("100000000.00000001"), /out of range/);
 });
+
+
+test("funding plan: duplicated outpoints refused (own list and cross-party)", () => {
+  const t = buildTerms();
+  const utxoA = "aa".repeat(32) + ":0:100001000";
+  const utxoB = "bb".repeat(32) + ":1:100001000";
+  // The planner sums each party's whole list, so a duplicated line used to
+  // inflate that party's credited change with money that does not exist.
+  assert.throws(() => P.planFundingTx({
+    networkId: "mainnet", terms: t,
+    aliceUtxoText: utxoA + "\n" + utxoA, bobUtxoText: utxoB, fundingFeeRate: 5,
+  }), /duplicate UTXO/);
+  // The same outpoint listed by BOTH parties would be spent twice in one tx.
+  assert.throws(() => P.planFundingTx({
+    networkId: "mainnet", terms: t,
+    aliceUtxoText: utxoA, bobUtxoText: utxoA, fundingFeeRate: 5,
+  }), /duplicate UTXO/);
+});

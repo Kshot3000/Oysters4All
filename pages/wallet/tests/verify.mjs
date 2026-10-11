@@ -234,5 +234,19 @@ const testnet = W.NETWORKS.testnet;
     "https://blockbook.pearlresearch.ai/tx/" + "a".repeat(64));
 }
 
+/* duplicate outpoints: the same coin listed twice was double-counted by
+ * coin selection, and pearl.js buildTx signed both spends. */
+{
+  const U = (v, i) => ({ txid: "a".repeat(64), vout: i, value: v });
+  throws("selectCoins duplicate UTXO throws", () => W.selectCoins([U(100000, 0), U(100000, 0)], 150000, 10), "duplicate UTXO");
+  const w = W.walletFromMnemonic(MN, mainnet, 0, 0);
+  const w5 = W.walletFromMnemonic(MN, mainnet, 0, 5);
+  const dupIn = [
+    { txid: "aa".repeat(32), vout: 0, value: 100000, priv: w.priv, xOnlyKey: w.internalXOnly },
+    { txid: "aa".repeat(32), vout: 0, value: 100000, priv: w.priv, xOnlyKey: w.internalXOnly },
+  ];
+  throws("pearl.js buildTx duplicate input throws", () => P.buildTx(dupIn, [{ xOnlyPub: w5.internalXOnly, value: 1000 }]), "duplicate input outpoint");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.error("FAILURES:", failures); process.exit(1); }

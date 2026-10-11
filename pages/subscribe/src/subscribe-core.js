@@ -285,6 +285,12 @@ export function buildKeypathTxLocktime(network, inputs, outputs, { locktime = 0,
   if (!Number.isInteger(locktime) || locktime < 0 || locktime > 0xffffffff) throw new Error("bad locktime");
   if (!Number.isInteger(sequence) || sequence < 0 || sequence > 0xffffffff) throw new Error("bad sequence");
   if (!inputs.length || !outputs.length) throw new Error("need inputs and outputs");
+  const seenOutpoints = new Set();
+  for (const i of inputs) {
+    const k = `${String(i.txid).toLowerCase()}:${i.vout}`;
+    if (seenOutpoints.has(k)) throw new Error(`duplicate input outpoint ${k} — an outpoint can only be spent once`);
+    seenOutpoints.add(k);
+  }
   for (const o of outputs) {
     if (!(o.program instanceof Uint8Array) || o.program.length !== 32) throw new Error("bad output program");
     if (!Number.isSafeInteger(o.value) || o.value <= 0) throw new Error("bad output value");

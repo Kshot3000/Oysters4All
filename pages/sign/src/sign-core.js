@@ -167,6 +167,12 @@ export function describeSpk(spk, network) {
  *  Returns {txid, hex}. Witness sigs carry the sighash byte for non-default. */
 export function buildKeypathTxEx(network, inputs, outputs, hashType = SIGHASH_DEFAULT, sequence = 0xffffffff) {
   if (!inputs.length || !outputs.length) throw new Error("need inputs and outputs");
+  const seenOutpoints = new Set();
+  for (const i of inputs) {
+    const k = `${String(i.txid).toLowerCase()}:${i.vout}`;
+    if (seenOutpoints.has(k)) throw new Error(`duplicate input outpoint ${k} — an outpoint can only be spent once`);
+    seenOutpoints.add(k);
+  }
   if (hashType !== SIGHASH_DEFAULT && hashType !== SIGHASH_SINGLE_ANYONECANPAY) throw new Error("unsupported hash_type");
   for (const o of outputs) {
     if (!(o.program instanceof Uint8Array) || o.program.length !== 32) throw new Error("bad output program");
@@ -262,6 +268,12 @@ export function verifySignedTx(network, signedHex, prevouts) {
  *  change is omitted (null) when it would be dust — added to fee instead. */
 export function selectCoins(utxos, targetGrains, feeRateGrainsPerVByte, nOut) {
   if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) throw new Error("bad fee rate");
+  const seenOutpoints = new Set();
+  for (const u of utxos) {
+    const k = `${String(u.txid).toLowerCase()}:${u.vout}`;
+    if (seenOutpoints.has(k)) throw new Error(`duplicate UTXO ${k} — an outpoint can only be spent once`);
+    seenOutpoints.add(k);
+  }
   const target = BigInt(targetGrains);
   const sorted = [...utxos].sort((a, b) => Number(BigInt(b.value) - BigInt(a.value)));
   const selected = [];
@@ -383,6 +395,8 @@ export function parseUtxoList(text, network = null) {
     if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`bad UTXO value: ${line}`);
     const vout = Number(m[2]);
     if (!Number.isSafeInteger(vout) || vout < 0 || vout > 0xffffffff) throw new Error(`bad UTXO vout: ${line}`);
+    const outpoint = `${m[1].toLowerCase()}:${vout}`;
+    if (out.some((u) => `${u.txid}:${u.vout}` === outpoint)) throw new Error(`duplicate UTXO ${outpoint} — an outpoint can only be listed once`);
     out.push({ txid: m[1].toLowerCase(), vout, value, confirmations: 0, spk });
   }
   return out;

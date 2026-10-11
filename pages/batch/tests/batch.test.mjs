@@ -358,3 +358,11 @@ test("buildDescriptor: memo included, totals balance", () => {
   assert.equal(BigInt(descriptor.totals.inputsGrains), BigInt(descriptor.totals.recipientsGrains) + BigInt(descriptor.totals.feeGrains) + BigInt(descriptor.totals.changeGrains));
   assert.match(fingerprint, /^[0-9a-f]{16}$/);
 });
+
+
+test("buildUnsignedTx: duplicate input outpoint refused", () => {
+  // A duplicated outpoint in the unsigned wire would have cosigners sign a
+  // dispatch spending the same coin twice; the shared builders refuse it.
+  const plan = planDispatch({ utxos: TWO_UTXOS, recipients: threeRecipients(), senderProgram: SENDER_PROGRAM, feeRateGrainsPerVByte: 20, network: N });
+  assert.throws(() => buildUnsignedTx(N, [TWO_UTXOS[0], TWO_UTXOS[0]], plan.outputs), /duplicate input outpoint/);
+});

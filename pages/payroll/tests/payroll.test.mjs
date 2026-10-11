@@ -497,3 +497,11 @@ test("CSV export: spreadsheet formula-injection guard (CWE-1236)", () => {
   const neg = rosterToCsv([{ address: "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d", amount: 100n, label: "ok" }]);
   assert.ok(!neg.includes("'"), "ordinary rows untouched");
 });
+
+
+test("buildUnsignedTx: duplicate input outpoint refused", () => {
+  // A duplicated outpoint in the unsigned wire would have cosigners sign a
+  // payroll run spending the same coin twice; the shared builders refuse it.
+  const { us, plan } = settled();
+  assert.throws(() => buildUnsignedTx(N, [us[0], us[0]], plan.outputs), /duplicate input outpoint/);
+});

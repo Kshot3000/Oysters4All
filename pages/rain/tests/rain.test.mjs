@@ -191,3 +191,13 @@ test("buildRainTx: wrong-key signatures do not verify against the funded UTXOs",
   const checks = verifySignedTx(NETWORKS.mainnet, hex, [{ value: 1_000_000_000, spk }]);
   assert.ok(checks.length > 0 && checks.every((c) => !c.ok), "wrong-key sigs must fail verification");
 });
+
+
+test("parseManualUtxos refuses a duplicated outpoint", () => {
+  // The same txid:vout pasted twice was returned twice and double-counted
+  // by the drop planner; every other fleet parser now refuses it too.
+  const line = `${"aa".repeat(32)}:0 250000000`;
+  assert.throws(() => parseManualUtxos(`${line}\n${line}`, NETWORKS.mainnet), /duplicate utxo/);
+  // same txid, different vout is a different outpoint and stays fine
+  assert.equal(parseManualUtxos(`${line}\n${"aa".repeat(32)}:1 250000000`, NETWORKS.mainnet).length, 2);
+});

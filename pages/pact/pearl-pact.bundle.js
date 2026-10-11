@@ -6471,6 +6471,12 @@ zoo`.split("\n");
     const bUtxos = String(bobUtxoText || "").split("\n").map((l) => parseUtxoLine(l, "bob")).filter(Boolean);
     if (!aUtxos.length) refuse("alice has no UTXOs listed");
     if (!bUtxos.length) refuse("bob has no UTXOs listed");
+    const seenOutpoints = /* @__PURE__ */ new Set();
+    for (const u of [...aUtxos, ...bUtxos]) {
+      const k = `${u.txid}:${u.vout}`;
+      if (seenOutpoints.has(k)) refuse(`duplicate UTXO ${k} \u2014 an outpoint can only fund the pact once, whoever lists it`);
+      seenOutpoints.add(k);
+    }
     const fundingProgram = hexToBytes(terms.tweakedX);
     const aliceProg = decodeBech32m(terms.alicePayout, net.hrp).program;
     const bobProg = decodeBech32m(terms.bobPayout, net.hrp).program;

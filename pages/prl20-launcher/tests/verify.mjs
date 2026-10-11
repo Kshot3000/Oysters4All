@@ -316,5 +316,14 @@ if (canParse) {
   ok("app.js fmtPRL is BigInt-exact (pool float-format class)", appSrc.includes("100000000n") && appSrc.includes("/^-?\\d+$/"));
 }
 
+/* duplicate outpoints: buildKeypathTx signed a tx spending the same
+ * outpoint twice; the shared builders now refuse it. */
+{
+  let threw = false;
+  try { buildKeypathTx(mainnet, [commitIn[0], commitIn[0]], [{ program: tweakedX, value: 1000 }]); }
+  catch (e) { threw = /duplicate input outpoint/.test(e.message); }
+  ok("buildKeypathTx duplicate input throws", threw);
+}
+
 console.log(`\n${pass} passed, ${fail} failed${skipped ? `, ${skipped} skipped` : ""}`);
 process.exit(fail ? 1 : 0);

@@ -180,6 +180,10 @@ export function parseManualUtxos(text, network = NETWORKS.mainnet) {
     if (!Number.isSafeInteger(vout) || vout < 0 || vout > 0xffffffff) {
       throw new Error(`bad utxo vout on line: "${line.slice(0, 48)}…"`);
     }
+    const outpoint = `${m[1].toLowerCase()}:${vout}`;
+    if (out.some((u) => `${u.txid}:${u.vout}` === outpoint)) {
+      throw new Error(`duplicate utxo on line: "${line.slice(0, 48)}…" — an outpoint can only be listed once`);
+    }
     out.push({ txid: m[1].toLowerCase(), vout, value: Number(value), confirmations: 0, address });
   }
   return out;

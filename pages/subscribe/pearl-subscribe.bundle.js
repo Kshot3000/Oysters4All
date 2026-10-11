@@ -5976,6 +5976,12 @@ zoo`.split("\n");
   }
   function buildKeypathTxEx(network, inputs, outputs, hashType = SIGHASH_DEFAULT, sequence = 4294967295) {
     if (!inputs.length || !outputs.length) throw new Error("need inputs and outputs");
+    const seenOutpoints = /* @__PURE__ */ new Set();
+    for (const i of inputs) {
+      const k = `${String(i.txid).toLowerCase()}:${i.vout}`;
+      if (seenOutpoints.has(k)) throw new Error(`duplicate input outpoint ${k} \u2014 an outpoint can only be spent once`);
+      seenOutpoints.add(k);
+    }
     if (hashType !== SIGHASH_DEFAULT && hashType !== SIGHASH_SINGLE_ANYONECANPAY) throw new Error("unsupported hash_type");
     for (const o of outputs) {
       if (!(o.program instanceof Uint8Array) || o.program.length !== 32) throw new Error("bad output program");
@@ -6061,6 +6067,13 @@ zoo`.split("\n");
     return results;
   }
   function selectCoins(utxos, targetGrains, feeRateGrainsPerVByte, nOut) {
+    if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) throw new Error("bad fee rate");
+    const seenOutpoints = /* @__PURE__ */ new Set();
+    for (const u of utxos) {
+      const k = `${String(u.txid).toLowerCase()}:${u.vout}`;
+      if (seenOutpoints.has(k)) throw new Error(`duplicate UTXO ${k} \u2014 an outpoint can only be spent once`);
+      seenOutpoints.add(k);
+    }
     const target = BigInt(targetGrains);
     const sorted = [...utxos].sort((a, b) => Number(BigInt(b.value) - BigInt(a.value)));
     const selected = [];
@@ -6098,6 +6111,8 @@ zoo`.split("\n");
       if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`bad UTXO value: ${line}`);
       const vout = Number(m[2]);
       if (!Number.isSafeInteger(vout) || vout < 0 || vout > 4294967295) throw new Error(`bad UTXO vout: ${line}`);
+      const outpoint = `${m[1].toLowerCase()}:${vout}`;
+      if (out.some((u) => `${u.txid}:${u.vout}` === outpoint)) throw new Error(`duplicate UTXO ${outpoint} \u2014 an outpoint can only be listed once`);
       out.push({ txid: m[1].toLowerCase(), vout, value, confirmations: 0, spk });
     }
     return out;
@@ -6304,6 +6319,12 @@ zoo`.split("\n");
     if (!Number.isInteger(locktime) || locktime < 0 || locktime > 4294967295) throw new Error("bad locktime");
     if (!Number.isInteger(sequence) || sequence < 0 || sequence > 4294967295) throw new Error("bad sequence");
     if (!inputs.length || !outputs.length) throw new Error("need inputs and outputs");
+    const seenOutpoints = /* @__PURE__ */ new Set();
+    for (const i of inputs) {
+      const k = `${String(i.txid).toLowerCase()}:${i.vout}`;
+      if (seenOutpoints.has(k)) throw new Error(`duplicate input outpoint ${k} \u2014 an outpoint can only be spent once`);
+      seenOutpoints.add(k);
+    }
     for (const o of outputs) {
       if (!(o.program instanceof Uint8Array) || o.program.length !== 32) throw new Error("bad output program");
       if (!Number.isSafeInteger(o.value) || o.value <= 0) throw new Error("bad output value");

@@ -5951,6 +5951,12 @@ zoo`.split("\n");
   }
   function buildKeypathTxEx(network, inputs, outputs, hashType = SIGHASH_DEFAULT, sequence = 4294967295) {
     if (!inputs.length || !outputs.length) throw new Error("need inputs and outputs");
+    const seenOutpoints = /* @__PURE__ */ new Set();
+    for (const i of inputs) {
+      const k = `${String(i.txid).toLowerCase()}:${i.vout}`;
+      if (seenOutpoints.has(k)) throw new Error(`duplicate input outpoint ${k} \u2014 an outpoint can only be spent once`);
+      seenOutpoints.add(k);
+    }
     if (hashType !== SIGHASH_DEFAULT && hashType !== SIGHASH_SINGLE_ANYONECANPAY) throw new Error("unsupported hash_type");
     for (const o of outputs) {
       if (!(o.program instanceof Uint8Array) || o.program.length !== 32) throw new Error("bad output program");

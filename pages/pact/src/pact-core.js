@@ -592,6 +592,12 @@ export function planFundingTx({ networkId = "mainnet", terms, aliceUtxoText, bob
   const bUtxos = String(bobUtxoText || "").split("\n").map((l) => parseUtxoLine(l, "bob")).filter(Boolean);
   if (!aUtxos.length) refuse("alice has no UTXOs listed");
   if (!bUtxos.length) refuse("bob has no UTXOs listed");
+  const seenOutpoints = new Set();
+  for (const u of [...aUtxos, ...bUtxos]) {
+    const k = `${u.txid}:${u.vout}`;
+    if (seenOutpoints.has(k)) refuse(`duplicate UTXO ${k} — an outpoint can only fund the pact once, whoever lists it`);
+    seenOutpoints.add(k);
+  }
 
   const fundingProgram = hexToBytes(terms.tweakedX);
   const aliceProg = decodeBech32m(terms.alicePayout, net.hrp).program;

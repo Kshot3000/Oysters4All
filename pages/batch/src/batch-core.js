@@ -362,6 +362,12 @@ export function planDispatch({ utxos, recipients, senderProgram, feeRateGrainsPe
  *  unsigned txid = dbl-sha256 of the non-witness serialization). */
 export function buildUnsignedTx(network, inputs, outputs) {
   if (!inputs.length || !outputs.length) throw new Error("need inputs and outputs");
+  const seenOutpoints = new Set();
+  for (const i of inputs) {
+    const k = `${String(i.txid).toLowerCase()}:${i.vout}`;
+    if (seenOutpoints.has(k)) throw new Error(`duplicate input outpoint ${k} — an outpoint can only be spent once`);
+    seenOutpoints.add(k);
+  }
   const core = [...u32le(network.txVersion), ...varint(inputs.length)];
   for (const inp of inputs) core.push(...txidLE(inp.txid), ...u32le(inp.vout), ...varint(0), ...u32le(0xffffffff));
   core.push(...varint(outputs.length));

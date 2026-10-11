@@ -505,5 +505,12 @@ function signedListing(over = {}) {
   ok("plan-reveal-pays-owner", plan.revealTx.hex.includes(bytesToHex(p2trScriptPubKey(tweakKeypath(w.internalXOnly).tweakedX)).slice(2)));
 }
 
+/* duplicate outpoints: the same coin listed twice was double-counted by
+ * coin selection (funding a target from money that exists only once). */
+throws("selectCoinsSimple-duplicate-utxo", () => selectCoinsSimple([
+  { txid: "aa".repeat(32), vout: 0, value: 100000 },
+  { txid: "aa".repeat(32), vout: 0, value: 100000 },
+], 150000, 5, 1));
+
 console.log(`\n${pass} passed, ${fail} failed, ${skipped} skipped`);
 process.exit(fail ? 1 : 0);

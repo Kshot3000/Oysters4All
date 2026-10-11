@@ -3590,6 +3590,12 @@ var PearlWallet = (() => {
     if (!Array.isArray(inputs) || inputs.length === 0) throw new Error("no inputs");
     if (!Array.isArray(outputs) || outputs.length === 0) throw new Error("no outputs");
     for (const i of inputs) if (!(Number.isInteger(i.vout) && i.vout >= 0)) throw new Error("bad vout");
+    const seenOutpoints = /* @__PURE__ */ new Set();
+    for (const i of inputs) {
+      const k = `${String(i.txid).toLowerCase()}:${i.vout}`;
+      if (seenOutpoints.has(k)) throw new Error(`duplicate input outpoint ${k} \u2014 an outpoint can only be spent once`);
+      seenOutpoints.add(k);
+    }
     for (const o of outputs) {
       if (!(o.xOnlyPub instanceof Uint8Array) || o.xOnlyPub.length !== 32) throw new Error("bad output key");
       if (!Number.isSafeInteger(o.value) || o.value <= 0 || o.value > 21e14) throw new Error("bad output value");
@@ -5999,6 +6005,12 @@ zoo`.split("\n");
     if (!(grainsPerVByte > 0) || !Number.isFinite(grainsPerVByte)) throw new Error("bad fee rate");
     const sorted = [...utxos].filter((u) => Number.isSafeInteger(u.value) && u.value > 0).sort((a, b) => b.value - a.value);
     if (!sorted.length) throw new Error("No spendable funds");
+    const seenOutpoints = /* @__PURE__ */ new Set();
+    for (const u of sorted) {
+      const k = `${String(u.txid).toLowerCase()}:${u.vout}`;
+      if (seenOutpoints.has(k)) throw new Error(`duplicate UTXO ${k} \u2014 an outpoint can only be spent once`);
+      seenOutpoints.add(k);
+    }
     const inputs = [];
     let total = 0;
     for (const u of sorted) {
