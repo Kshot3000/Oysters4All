@@ -241,6 +241,34 @@ test("createPsbt: duplicate input outpoint refused (2026-10-11 census)", () => {
   assert.ok(C.createPsbt(good).base64.length > 0);
 });
 
+test("createPsbt: a requested locktime ships with non-final sequences (2026-10-11 census)", () => {
+  // consensus ignores nLockTime when every input sequence is 0xffffffff —
+  // a locktime-bearing PSBT built with final sequences would be spendable
+  // immediately, the opposite of what its creator asked for.
+  const spec = C.exampleSpec(); spec.locktime = 900000;
+  const p = C.parsePsbtBase64(C.createPsbt(spec).base64);
+  assert.equal(p.unsignedTx.locktime, 900000);
+  assert.ok(p.unsignedTx.inputs.every((i) => i.sequence === 0xfffffffe),
+    "locktime PSBT inputs must be non-final so the locktime is enforced");
+  // control: locktime 0 keeps the historical final sequences byte-for-byte
+  const p0 = C.parsePsbtBase64(C.createPsbt(C.exampleSpec()).base64);
+  assert.ok(p0.unsignedTx.inputs.every((i) => i.sequence === 0xffffffff));
+});
+
+test("describePsbt: a foreign PSBT whose locktime can never be enforced is flagged", () => {
+  const spec = C.exampleSpec(); spec.locktime = 900000;
+  const ex = C.createPsbt(spec);
+  const p = C.parsePsbt(Uint8Array.from(atob(ex.base64), (c) => c.charCodeAt(0)));
+  // hand a foreign PSBT the dead combination createPsbt used to emit
+  const fake = { ...p, unsignedTx: { ...p.unsignedTx, inputs: p.unsignedTx.inputs.map((i) => ({ ...i, sequence: 0xffffffff })) } };
+  const d = C.describePsbt(fake);
+  assert.ok(d.issues.some((s) => /locktime .* is not enforced/.test(s)), "dead locktime flagged");
+  // controls: the fixed builder's output and the locktime-0 fixture stay clean
+  assert.ok(!C.describePsbt(p).issues.some((s) => /not enforced/.test(s)), "enforced locktime not flagged");
+  const clean = C.describePsbt(C.parsePsbtBase64(C.createPsbt(C.exampleSpec()).base64));
+  assert.ok(!clean.issues.some((s) => /not enforced/.test(s)), "locktime 0 not flagged");
+});
+
 test("describePsbt: a foreign PSBT spending one outpoint twice is flagged", () => {
   const ex = C.createPsbt(C.exampleSpec());
   const p = C.parsePsbt(Uint8Array.from(atob(ex.base64), (c) => c.charCodeAt(0)));

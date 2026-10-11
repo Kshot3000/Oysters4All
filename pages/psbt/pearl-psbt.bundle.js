@@ -5426,7 +5426,7 @@ zoo`.split("\n");
         });
       }
       inMaps.push(pairs);
-      txInputs.push({ txid: inp.txid.toLowerCase(), vout, sequence: 4294967295 });
+      txInputs.push({ txid: inp.txid.toLowerCase(), vout, sequence: locktime > 0 ? 4294967294 : 4294967295 });
       totalIn += amount;
       inputInfo.push({
         mode: inp.mode,
@@ -5905,6 +5905,9 @@ zoo`.split("\n");
       if (seenPrevouts.has(k)) issues.push(`input ${i}: duplicate prevout ${k} \u2014 the same outpoint is spent more than once; this PSBT can never finalize into a valid transaction`);
       seenPrevouts.add(k);
     });
+    if (tx.locktime > 0 && tx.inputs.length > 0 && tx.inputs.every((u) => u.sequence === 4294967295)) {
+      issues.push(`global: locktime ${tx.locktime} is not enforced \u2014 every input sequence is 0xffffffff (final), and consensus ignores nLockTime when all input sequences are final; any OP_CHECKLOCKTIMEVERIFY leaf in this PSBT also fails for a final-sequence input`);
+    }
     const g = {};
     for (const p of psbt.globalPairs) {
       const k = bytesToHex(p.key);

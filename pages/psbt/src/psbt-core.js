@@ -524,7 +524,12 @@ export function createPsbt({ inputs, outputs, locktime = 0 }) {
       });
     }
     inMaps.push(pairs);
-    txInputs.push({ txid: inp.txid.toLowerCase(), vout, sequence: 0xffffffff });
+    // nLockTime is consensus-ignored when EVERY input sequence is 0xffffffff
+    // (a tx is final regardless of locktime then), and OP_CHECKLOCKTIMEVERIFY
+    // fails outright for a final-sequence input — so a requested locktime must
+    // ship with the fleet's non-final sequence (0xfffffffe, as in swap /
+    // stream / subscribe / bounty), or the locktime silently does nothing.
+    txInputs.push({ txid: inp.txid.toLowerCase(), vout, sequence: locktime > 0 ? 0xfffffffe : 0xffffffff });
     totalIn += amount;
     inputInfo.push({
       mode: inp.mode, internalKeyHex: inp.internalKey.toLowerCase(),
@@ -1016,6 +1021,9 @@ export function describePsbt(psbt) {
     if (seenPrevouts.has(k)) issues.push(`input ${i}: duplicate prevout ${k} — the same outpoint is spent more than once; this PSBT can never finalize into a valid transaction`);
     seenPrevouts.add(k);
   });
+  if (tx.locktime > 0 && tx.inputs.length > 0 && tx.inputs.every((u) => u.sequence === 0xffffffff)) {
+    issues.push(`global: locktime ${tx.locktime} is not enforced — every input sequence is 0xffffffff (final), and consensus ignores nLockTime when all input sequences are final; any OP_CHECKLOCKTIMEVERIFY leaf in this PSBT also fails for a final-sequence input`);
+  }
   const g = {};
   for (const p of psbt.globalPairs) {
     const k = bytesToHex(p.key);
