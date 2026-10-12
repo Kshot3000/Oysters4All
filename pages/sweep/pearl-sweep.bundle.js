@@ -22,6 +22,9 @@ var PearlSweep = (() => {
   var index_exports = {};
   __export(index_exports, {
     BUCKETS: () => BUCKETS,
+    BUILDER_TIP_ADDRESS: () => BUILDER_TIP_ADDRESS,
+    BUILDER_TIP_BPS: () => BUILDER_TIP_BPS,
+    BUILDER_TIP_NAME: () => BUILDER_TIP_NAME,
     DONATE_ADDRESS: () => DONATE_ADDRESS,
     DUST_GRAIN: () => DUST_GRAIN,
     FEE_RATE_SCALE: () => FEE_RATE_SCALE,
@@ -36,6 +39,7 @@ var PearlSweep = (() => {
     WARN_VBYTES: () => WARN_VBYTES,
     broadcastSweepTx: () => broadcastSweepTx,
     buildSweepTx: () => buildSweepTx,
+    builderTipGrainsFor: () => builderTipGrainsFor,
     bytesToHex: () => bytesToHex,
     classifyUtxos: () => classifyUtxos,
     comparePostSweep: () => comparePostSweep,
@@ -5184,6 +5188,17 @@ zoo`.split("\n");
 
   // src/sweep-core.js
   var DONATE_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+  var BUILDER_TIP_BPS = 100;
+  var BUILDER_TIP_ADDRESS = DONATE_ADDRESS;
+  var BUILDER_TIP_NAME = "Builder tip (optional)";
+  function builderTipGrainsFor(totalGrains, network, enabled) {
+    if (enabled !== true) return 0n;
+    if (!network || network.hrp !== "prl") return 0n;
+    const total = BigInt(totalGrains);
+    if (total <= 0n) throw new Error("bad total for builder tip");
+    const tip = total * BigInt(BUILDER_TIP_BPS) / 10000n;
+    return tip >= BigInt(DUST_GRAIN) ? tip : 0n;
+  }
   var FEE_RATE_SCALE = 1000n;
   var INPUT_VBYTES = keypathTxVBytes(2, 1) - keypathTxVBytes(1, 1);
   var OUTPUT_VBYTES = keypathTxVBytes(1, 2) - keypathTxVBytes(1, 1);
@@ -5358,7 +5373,7 @@ zoo`.split("\n");
     all: "Consolidate everything into 1\u2013N outputs"
   };
   function planSweep(opts) {
-    const { classified, strategy, thresholdGrains = 0n, nOutputs = 1, targetProgram, rateMp, network } = opts;
+    const { classified, strategy, thresholdGrains = 0n, nOutputs = 1, targetProgram, rateMp, network, builderTipEnabled = false } = opts;
     const warnings = [];
     if (!STRATEGIES[strategy]) throw new Error("unknown strategy");
     if (!(targetProgram instanceof Uint8Array) || targetProgram.length !== 32) throw new Error("bad target program");
@@ -5390,7 +5405,9 @@ zoo`.split("\n");
     }
     const inputs = [...pool].sort((a, b) => a.value < b.value ? -1 : a.value > b.value ? 1 : 0);
     const total = inputs.reduce((a, u) => a + u.value, 0n);
-    const vBytes = keypathTxVBytes(inputs.length, nOutputs);
+    const builderTip = builderTipGrainsFor(total, network, builderTipEnabled === true);
+    const nTxOutputs = nOutputs + (builderTip > 0n ? 1 : 0);
+    const vBytes = keypathTxVBytes(inputs.length, nTxOutputs);
     const fee = feeForVBytes(vBytes, rateMp);
     if (fee >= total) {
       return {
@@ -5405,7 +5422,21 @@ zoo`.split("\n");
         refusal: `REFUSED \u2014 the fee eats everything. Fee ${formatGrains(fee)} PRL (${vBytes} vB \xD7 ${formatRateMp(rateMp)} grains/vB) \u2265 swept value ${formatGrains(total)} PRL. Consolidating now destroys value; wait for a lower fee rate or leave these UTXOs alone.`
       };
     }
-    const netValue = total - fee;
+    if (builderTip > 0n && fee + builderTip >= total) {
+      return {
+        ok: false,
+        refused: true,
+        inputs,
+        total,
+        fee,
+        builderTip,
+        vBytes,
+        rateMp,
+        warnings,
+        refusal: `REFUSED \u2014 the fee plus the builder tip eat everything. Fee ${formatGrains(fee)} PRL + tip ${formatGrains(builderTip)} PRL \u2265 swept value ${formatGrains(total)} PRL. Leave the tip off or sweep more value.`
+      };
+    }
+    const netValue = total - fee - builderTip;
     const perOutput = netValue / BigInt(nOutputs);
     const feeRemainder = netValue % BigInt(nOutputs);
     const dustFloor = BigInt(DUST_GRAIN);
@@ -5422,11 +5453,24 @@ zoo`.split("\n");
         refusal: `REFUSED \u2014 dust output. After the ${formatGrains(fee)} PRL fee, each of the ${nOutputs} outputs would hold ${perOutput} grains \u2014 below the ${DUST_GRAIN}-grain dust floor. Use fewer outputs or sweep more value.`
       };
     }
+    const targetAddress = encodeBech32m(network.hrp, 1, targetProgram);
     const outputs = Array.from({ length: nOutputs }, (_, i) => ({
       index: i,
       program: targetProgram,
-      value: perOutput
+      value: perOutput,
+      address: targetAddress
     }));
+    if (builderTip > 0n) {
+      const bp = parseSweepAddress(BUILDER_TIP_ADDRESS);
+      if (bp.error || bp.program.length !== 32) throw new Error("builder tip address is not a v1 Taproot address");
+      outputs.push({
+        index: nOutputs,
+        program: bp.program,
+        value: builderTip,
+        address: BUILDER_TIP_ADDRESS,
+        builderTip: true
+      });
+    }
     const netNegative = inputs.filter((u) => u.netNegative);
     if (netNegative.length) {
       warnings.push(
@@ -5454,7 +5498,9 @@ zoo`.split("\n");
       netValue,
       perOutput,
       warnings,
-      targetAddress: encodeBech32m(network.hrp, 1, targetProgram)
+      builderTip,
+      targetOutputs: nOutputs,
+      targetAddress
     };
   }
   function formatRateMp(rateMp) {
@@ -5522,6 +5568,13 @@ zoo`.split("\n");
         internalXOnly: w.internalXOnly
       };
     });
+    const builderProgram = parseSweepAddress(BUILDER_TIP_ADDRESS).program;
+    for (const o of plan.outputs) {
+      if (o.builderTip) {
+        const paysBuilder = o.program instanceof Uint8Array && o.program.length === 32 && o.program.every((b, i) => b === builderProgram[i]);
+        if (!paysBuilder) throw new Error("REFUSED \u2014 an output is flagged as the builder tip but does not pay the builder address.");
+      }
+    }
     const outputs = plan.outputs.map((o) => {
       const value = Number(o.value);
       if (!Number.isSafeInteger(value) || value <= 0) throw new Error("output value out of safe range");
@@ -5536,12 +5589,13 @@ zoo`.split("\n");
     }
     return { txid, hex, checks, kind: k.kind, note: k.note, address: w.address };
   }
-  function comparePostSweep({ preCount, preTotal, fee, postUtxos, targetAddress }) {
+  function comparePostSweep({ preCount, preTotal, fee, postUtxos, targetAddress, builderTip = 0n }) {
     preTotal = BigInt(preTotal);
     fee = BigInt(fee);
+    builderTip = BigInt(builderTip);
     const postCount = postUtxos.length;
     const postTotal = postUtxos.reduce((a, u) => a + BigInt(u.value), 0n);
-    const expected = preTotal - fee;
+    const expected = preTotal - fee - builderTip;
     const lines = [
       { label: "UTXO count", before: String(preCount), after: String(postCount), ok: postCount < preCount },
       { label: "Balance", before: `${formatGrains(preTotal)} PRL`, after: `${formatGrains(postTotal)} PRL`, ok: postTotal === expected },
@@ -5554,13 +5608,14 @@ zoo`.split("\n");
       postCount,
       postTotal,
       expected,
-      verdict: ok ? `CONSOLIDATION VERIFIED \u2014 ${preCount} UTXOs became ${postCount}, balance ${formatGrains(preTotal)} \u2192 ${formatGrains(postTotal)} PRL (fee ${formatGrains(fee)} PRL).` : "NOT VERIFIED \u2014 the re-scan does not match the expected post-sweep state. The consolidation may still be unconfirmed, or the address may have received new funds.",
+      verdict: ok ? `CONSOLIDATION VERIFIED \u2014 ${preCount} UTXOs became ${postCount}, balance ${formatGrains(preTotal)} \u2192 ${formatGrains(postTotal)} PRL (fee ${formatGrains(fee)} PRL${builderTip > 0n ? `, builder tip ${formatGrains(builderTip)} PRL` : ""}).` : "NOT VERIFIED \u2014 the re-scan does not match the expected post-sweep state. The consolidation may still be unconfirmed, or the address may have received new funds.",
       targetAddress
     };
   }
-  function verifyConsolidationTx(txJson, sweptAddress, targetAddress) {
+  function verifyConsolidationTx(txJson, sweptAddress, targetAddress, opts = {}) {
     const swept = String(sweptAddress).toLowerCase();
     const target = String(targetAddress).toLowerCase();
+    const builder = opts.builderAddress ? String(opts.builderAddress).toLowerCase() : null;
     const vin = txJson.vin || [];
     const vout = txJson.vout || [];
     if (!vin.length || !vout.length) {
@@ -5575,14 +5630,18 @@ zoo`.split("\n");
         };
       }
     }
+    let builderTip = 0n;
     for (let i = 0; i < vout.length; i++) {
       const addrs = (vout[i].addresses || []).map((a) => String(a).toLowerCase());
-      if (!addrs.includes(target)) {
-        return {
-          ok: false,
-          refusal: `REFUSED \u2014 output #${i} does not pay the target address. Found: ${(vout[i].addresses || []).join(", ") || "unknown"}. A clean consolidation pays ONLY ${targetAddress}.`
-        };
+      if (addrs.includes(target)) continue;
+      if (builder && addrs.includes(builder)) {
+        builderTip += BigInt(vout[i].value ?? 0);
+        continue;
       }
+      return {
+        ok: false,
+        refusal: `REFUSED \u2014 output #${i} does not pay the target address. Found: ${(vout[i].addresses || []).join(", ") || "unknown"}. A clean consolidation pays ONLY ${targetAddress}${builder ? ` (plus the disclosed builder tip to ${opts.builderAddress})` : ""}.`
+      };
     }
     const inTotal = vin.reduce((a, v) => a + BigInt(v.value ?? 0), 0n);
     const outTotal = vout.reduce((a, v) => a + BigInt(v.value ?? 0), 0n);
@@ -5595,8 +5654,9 @@ zoo`.split("\n");
       inTotal,
       outTotal,
       fee,
+      builderTip,
       confirmations: txJson.confirmations ?? 0,
-      note: "Signature validity is assumed from network acceptance \u2014 Blockbook served this transaction, so consensus already accepted its witnesses."
+      note: "Signature validity is assumed from network acceptance \u2014 Blockbook served this transaction, so consensus already accepted its witnesses." + (builderTip > 0n ? ` This sweep carried the disclosed optional builder tip of ${formatGrains(builderTip)} PRL to the builder address.` : "")
     };
   }
   return __toCommonJS(index_exports);

@@ -55,6 +55,31 @@ export {
 
 export const DONATE_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
 
+/* Optional builder tip (profit mandate, disclosed, opt-in/default-off):
+ * a consolidation spends the owner's OWN funds, signed by the owner
+ * alone, so — like Batch/Payroll/Rain — the tip is never automatic:
+ * the owner explicitly opts in. builderTipGrainsFor() is the single
+ * source; planSweep() appends the tip as its own flagged output BEFORE
+ * signing, and the keypath sighash commits to every output — so it
+ * cannot be added or skimmed after signing. Off = plan identical to
+ * the pre-tip planner. The recipient is the operator address above,
+ * the same address in every Sweep footer. */
+export const BUILDER_TIP_BPS = 100; // 1%
+export const BUILDER_TIP_ADDRESS = DONATE_ADDRESS;
+export const BUILDER_TIP_NAME = "Builder tip (optional)";
+
+/** Builder tip in grains for a sweep totaling totalGrains, on network.
+ *  Returns 0n unless enabled === true, the network is mainnet, and the
+ *  1% floor reaches the dust floor (waived, never rounded up). */
+export function builderTipGrainsFor(totalGrains, network, enabled) {
+  if (enabled !== true) return 0n;
+  if (!network || network.hrp !== "prl") return 0n;
+  const total = BigInt(totalGrains);
+  if (total <= 0n) throw new Error("bad total for builder tip");
+  const tip = (total * BigInt(BUILDER_TIP_BPS)) / 10000n;
+  return tip >= BigInt(DUST_GRAIN) ? tip : 0n;
+}
+
 /* Fee-rate precision: milliGrains per vByte, as BigInt. */
 export const FEE_RATE_SCALE = 1000n;
 
@@ -265,7 +290,7 @@ export const STRATEGIES = {
  *           rateMp, netValue, perOutput, feeRemainder, warnings[] }.
  *  Refusal is LOUD: refused=true with the exact math in `refusal`. */
 export function planSweep(opts) {
-  const { classified, strategy, thresholdGrains = 0n, nOutputs = 1, targetProgram, rateMp, network } = opts;
+  const { classified, strategy, thresholdGrains = 0n, nOutputs = 1, targetProgram, rateMp, network, builderTipEnabled = false } = opts;
   const warnings = [];
   if (!STRATEGIES[strategy]) throw new Error("unknown strategy");
   if (!(targetProgram instanceof Uint8Array) || targetProgram.length !== 32) throw new Error("bad target program");
@@ -297,7 +322,10 @@ export function planSweep(opts) {
 
   const inputs = [...pool].sort((a, b) => (a.value < b.value ? -1 : a.value > b.value ? 1 : 0));
   const total = inputs.reduce((a, u) => a + u.value, 0n);
-  const vBytes = keypathTxVBytes(inputs.length, nOutputs);
+  // Optional builder tip: 1% of the swept total, its own extra output.
+  const builderTip = builderTipGrainsFor(total, network, builderTipEnabled === true);
+  const nTxOutputs = nOutputs + (builderTip > 0n ? 1 : 0);
+  const vBytes = keypathTxVBytes(inputs.length, nTxOutputs);
   const fee = feeForVBytes(vBytes, rateMp);
 
   // Breakeven guard: consolidation must not destroy the value it recovers.
@@ -310,8 +338,17 @@ export function planSweep(opts) {
         `Consolidating now destroys value; wait for a lower fee rate or leave these UTXOs alone.`,
     };
   }
+  if (builderTip > 0n && fee + builderTip >= total) {
+    return {
+      ok: false, refused: true, inputs, total, fee, builderTip, vBytes, rateMp, warnings,
+      refusal:
+        `REFUSED — the fee plus the builder tip eat everything. Fee ${formatGrains(fee)} PRL + ` +
+        `tip ${formatGrains(builderTip)} PRL ≥ swept value ${formatGrains(total)} PRL. ` +
+        `Leave the tip off or sweep more value.`,
+    };
+  }
 
-  const netValue = total - fee;
+  const netValue = total - fee - builderTip;
   const perOutput = netValue / BigInt(nOutputs);
   const feeRemainder = netValue % BigInt(nOutputs); // absorbed into the fee, shown honestly
   const dustFloor = BigInt(DUST_GRAIN);
@@ -325,11 +362,24 @@ export function planSweep(opts) {
     };
   }
 
+  const targetAddress = encodeBech32m(network.hrp, 1, targetProgram);
   const outputs = Array.from({ length: nOutputs }, (_, i) => ({
     index: i,
     program: targetProgram,
     value: perOutput,
+    address: targetAddress,
   }));
+  if (builderTip > 0n) {
+    const bp = parseSweepAddress(BUILDER_TIP_ADDRESS);
+    if (bp.error || bp.program.length !== 32) throw new Error("builder tip address is not a v1 Taproot address");
+    outputs.push({
+      index: nOutputs,
+      program: bp.program,
+      value: builderTip,
+      address: BUILDER_TIP_ADDRESS,
+      builderTip: true,
+    });
+  }
 
   const netNegative = inputs.filter((u) => u.netNegative);
   if (netNegative.length) {
@@ -353,7 +403,8 @@ export function planSweep(opts) {
   return {
     ok: true, refused: false, inputs, outputs, total, fee, feeRemainder,
     vBytes, rateMp, netValue, perOutput, warnings,
-    targetAddress: encodeBech32m(network.hrp, 1, targetProgram),
+    builderTip, targetOutputs: nOutputs,
+    targetAddress,
   };
 }
 
@@ -433,6 +484,16 @@ export function buildSweepTx({ network, sweptAddress, secretText, plan }) {
       priv: w.priv, internalXOnly: w.internalXOnly,
     };
   });
+  // A flagged builder-tip output is a trust claim: it must pay the
+  // builder address exactly, or signing is refused (Batch pattern).
+  const builderProgram = parseSweepAddress(BUILDER_TIP_ADDRESS).program;
+  for (const o of plan.outputs) {
+    if (o.builderTip) {
+      const paysBuilder = o.program instanceof Uint8Array && o.program.length === 32 &&
+        o.program.every((b, i) => b === builderProgram[i]);
+      if (!paysBuilder) throw new Error("REFUSED — an output is flagged as the builder tip but does not pay the builder address.");
+    }
+  }
   const outputs = plan.outputs.map((o) => {
     const value = Number(o.value);
     if (!Number.isSafeInteger(value) || value <= 0) throw new Error("output value out of safe range");
@@ -455,11 +516,11 @@ export function buildSweepTx({ network, sweptAddress, secretText, plan }) {
  *  opts: { preCount, preTotal (BigInt), fee (BigInt), postUtxos, targetAddress }
  *  Returns {ok, lines[]} — ok only when count dropped AND balance is exactly
  *  preTotal − fee. */
-export function comparePostSweep({ preCount, preTotal, fee, postUtxos, targetAddress }) {
-  preTotal = BigInt(preTotal); fee = BigInt(fee);
+export function comparePostSweep({ preCount, preTotal, fee, postUtxos, targetAddress, builderTip = 0n }) {
+  preTotal = BigInt(preTotal); fee = BigInt(fee); builderTip = BigInt(builderTip);
   const postCount = postUtxos.length;
   const postTotal = postUtxos.reduce((a, u) => a + BigInt(u.value), 0n);
-  const expected = preTotal - fee;
+  const expected = preTotal - fee - builderTip;
   const lines = [
     { label: "UTXO count", before: String(preCount), after: String(postCount), ok: postCount < preCount },
     { label: "Balance", before: `${formatGrains(preTotal)} PRL`, after: `${formatGrains(postTotal)} PRL`, ok: postTotal === expected },
@@ -469,7 +530,7 @@ export function comparePostSweep({ preCount, preTotal, fee, postUtxos, targetAdd
   return {
     ok, lines, postCount, postTotal, expected,
     verdict: ok
-      ? `CONSOLIDATION VERIFIED — ${preCount} UTXOs became ${postCount}, balance ${formatGrains(preTotal)} → ${formatGrains(postTotal)} PRL (fee ${formatGrains(fee)} PRL).`
+      ? `CONSOLIDATION VERIFIED — ${preCount} UTXOs became ${postCount}, balance ${formatGrains(preTotal)} → ${formatGrains(postTotal)} PRL (fee ${formatGrains(fee)} PRL${builderTip > 0n ? `, builder tip ${formatGrains(builderTip)} PRL` : ""}).`
       : "NOT VERIFIED — the re-scan does not match the expected post-sweep state. The consolidation may still be unconfirmed, or the address may have received new funds.",
     targetAddress,
   };
@@ -480,9 +541,10 @@ export function comparePostSweep({ preCount, preTotal, fee, postUtxos, targetAdd
  *  targetAddress. Returns {ok, fee, inTotal, outTotal, nIn, nOut, lines[]} or
  *  {ok:false, refusal}. Signature validity is assumed from network acceptance
  *  (stated honestly in the returned note). */
-export function verifyConsolidationTx(txJson, sweptAddress, targetAddress) {
+export function verifyConsolidationTx(txJson, sweptAddress, targetAddress, opts = {}) {
   const swept = String(sweptAddress).toLowerCase();
   const target = String(targetAddress).toLowerCase();
+  const builder = opts.builderAddress ? String(opts.builderAddress).toLowerCase() : null;
   const vin = txJson.vin || [];
   const vout = txJson.vout || [];
   if (!vin.length || !vout.length) {
@@ -497,22 +559,24 @@ export function verifyConsolidationTx(txJson, sweptAddress, targetAddress) {
       };
     }
   }
+  let builderTip = 0n;
   for (let i = 0; i < vout.length; i++) {
     const addrs = (vout[i].addresses || []).map((a) => String(a).toLowerCase());
-    if (!addrs.includes(target)) {
-      return {
-        ok: false,
-        refusal: `REFUSED — output #${i} does not pay the target address. Found: ${(vout[i].addresses || []).join(", ") || "unknown"}. A clean consolidation pays ONLY ${targetAddress}.`,
-      };
-    }
+    if (addrs.includes(target)) continue;
+    if (builder && addrs.includes(builder)) { builderTip += BigInt(vout[i].value ?? 0); continue; }
+    return {
+      ok: false,
+      refusal: `REFUSED — output #${i} does not pay the target address. Found: ${(vout[i].addresses || []).join(", ") || "unknown"}. A clean consolidation pays ONLY ${targetAddress}${builder ? ` (plus the disclosed builder tip to ${opts.builderAddress})` : ""}.`,
+    };
   }
   const inTotal = vin.reduce((a, v) => a + BigInt(v.value ?? 0), 0n);
   const outTotal = vout.reduce((a, v) => a + BigInt(v.value ?? 0), 0n);
   const fee = inTotal - outTotal;
   if (fee < 0n) return { ok: false, refusal: "Impossible transaction: outputs exceed inputs." };
   return {
-    ok: true, nIn: vin.length, nOut: vout.length, inTotal, outTotal, fee,
+    ok: true, nIn: vin.length, nOut: vout.length, inTotal, outTotal, fee, builderTip,
     confirmations: txJson.confirmations ?? 0,
-    note: "Signature validity is assumed from network acceptance — Blockbook served this transaction, so consensus already accepted its witnesses.",
+    note: "Signature validity is assumed from network acceptance — Blockbook served this transaction, so consensus already accepted its witnesses." +
+      (builderTip > 0n ? ` This sweep carried the disclosed optional builder tip of ${formatGrains(builderTip)} PRL to the builder address.` : ""),
   };
 }

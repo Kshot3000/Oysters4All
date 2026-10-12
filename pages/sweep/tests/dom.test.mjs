@@ -319,3 +319,36 @@ test("standalone verifier: clean tx verifies with exact fee; foreign input refus
   assert.match(getEl("sw-sa-out").textContent, /input #0 is not from the swept address/);
   sandbox.fetch = origFetch;
 });
+
+test("builder tip: checkbox off by default; opt-in renders the tip line + output, opt-out restores", async () => {
+  assert.equal(typeof R.builderTipGrainsFor, "function");
+  assert.equal(getEl("sw-tip").checked, false, "tip checkbox unchecked by default");
+  // fresh analyze -> plan with strategy "all" (total 258950 grains at 20 grains/vB)
+  getEl("sw-address").value = ADDR;
+  getEl("sw-analyze").click();
+  for (let i = 0; i < 100 && getEl("sw-dash").hidden; i++) await tick();
+  getEl("sw-to-plan").click();
+  getEl("sw-strat-all").checked = true;
+  getEl("sw-feerate").value = "20";
+  getEl("sw-tip").checked = true;
+  getEl("sw-build-plan").click();
+  await tick();
+  assert.equal(getEl("sw-plan-out").hidden, false, "tipped plan shown");
+  const math = getEl("sw-plan-math").textContent;
+  assert.match(math, /Builder tip:\s+0\.00002589 PRL \(2589 grains\)/);
+  const rows = getEl("sw-plan-out-tbody").children;
+  assert.equal(rows.length, 2, "target output + tip output");
+  assert.ok(rows[1].innerHTML.includes("builder tip"), rows[1].innerHTML);
+  assert.ok(rows[1].innerHTML.includes(R.BUILDER_TIP_ADDRESS), rows[1].innerHTML);
+  const st = sandbox.__sweepTest.state;
+  assert.equal(st.plan.builderTip, 2589n);
+  assert.equal(st.plan.outputs.length, 2);
+  // opting back out restores the untipped plan
+  getEl("sw-tip").checked = false;
+  getEl("sw-build-plan").click();
+  await tick();
+  assert.equal(getEl("sw-plan-out-tbody").children.length, 1, "untipped plan has one output");
+  assert.ok(!getEl("sw-plan-math").textContent.includes("Builder tip:"), "no tip line when off");
+  getEl("sw-strat-all").checked = false;
+  getEl("sw-strat-uneconomic").checked = true;
+});

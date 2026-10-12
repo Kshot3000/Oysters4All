@@ -131,6 +131,12 @@
       <span>Output target <small>(defaults to the analyzed address — or paste a fresh prl1…/tprl1… address)</small></span>
       <input id="sw-target" type="text" class="mono" autocomplete="off" spellcheck="false">
     </label>
+    <label class="field check">
+      <input id="sw-tip" type="checkbox">
+      <span>Optional builder tip — add 1% of the swept total as its own output to the builder
+        <span class="mono">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</span>
+        (off by default; mainnet only; waived when 1% would fall below the 546-grain dust floor — never rounded up)</span>
+    </label>
     <div class="actions">
       <button id="sw-build-plan" class="btn primary" type="button">Build plan</button>
     </div>
@@ -273,6 +279,7 @@
     <ul>
       <li><strong>Your key, your coins.</strong> This page can only spend what the pasted key controls — and it refuses loudly if the key doesn't derive the analyzed address.</li>
       <li><strong>Consolidation is final.</strong> Once broadcast, the sweep cannot be undone. Check the txid, outputs, and fee on the Sign step before you confirm.</li>
+      <li><strong>Builder tip is optional and off by default.</strong> If you tick it in Step 2, 1% of the swept total is added as its own output to the builder address shown there — it is part of the plan before you sign, and the signature commits to it. Testnet sweeps and sub-dust tips are waived, never rounded up.</li>
       <li><strong>Dust is the protocol floor.</strong> Outputs below 546 grains are refused; the breakeven guard refuses any plan whose fee eats the recovered value.</li>
       <li><strong>Thresholds use your fee rate.</strong> "Uneconomic" is computed against the fee rate you set — raise the rate and more UTXOs count as uneconomic.</li>
       <li><strong>Blockbook is a third-party read source.</strong> Balances and fee estimates come from the Blockbook you configure; verify anything surprising independently.</li>
@@ -287,7 +294,7 @@
   <p class="dim">Community-built, not an official pearl-research-labs property. Keys never leave your browser.</p>
 </footer>
 
-<script src="pearl-sweep.bundle.js?v=3"></script>
-<script src="app.js?v=1"></script>
+<script src="pearl-sweep.bundle.js?v=4"></script>
+<script src="app.js?v=2"></script>
 </body>
 </html>

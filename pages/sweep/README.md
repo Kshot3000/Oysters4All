@@ -45,6 +45,23 @@ base58check-decodes the extended key and uses its 32-byte secret directly —
 no new derivation. All value math is grain-exact `BigInt`; fee rates are
 fixed-point milliGrains/vByte.
 
+## Builder tip (optional, disclosed)
+
+Sweep spends your own funds and you are the sole signer, so the tip is
+never automatic: tick the Step 2 checkbox and 1% of the swept total is
+added as its own output to the builder address
+`prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`
+(the same operator address in every Sweep footer), before signing —
+your keypath signature commits to every output, so it cannot be added
+or skimmed afterwards. `builderTipGrainsFor()` in `src/sweep-core.js`
+is the single source: floor(1%) in BigInt, mainnet only, waived when
+1% would fall below the 546-grain dust floor (never rounded up). With
+the box off, the plan is identical to the pre-tip planner. The plan
+shows the tip as its own labeled line and output row before signing,
+a flagged tip output that pays any other address is refused at
+signing, and both verifiers (post-sweep re-scan and the standalone
+consolidation verifier) account for the tip explicitly.
+
 ## Honest limits
 
 - The page can only spend what the pasted key controls; a key/address

@@ -28,7 +28,7 @@
     // step 2
     stratU: $("sw-strat-uneconomic"), stratT: $("sw-strat-threshold"), stratA: $("sw-strat-all"),
     threshold: $("sw-threshold"), noutputs: $("sw-noutputs"), feerate: $("sw-feerate"),
-    estfee: $("sw-estfee"), target: $("sw-target"), buildPlan: $("sw-build-plan"),
+    estfee: $("sw-estfee"), target: $("sw-target"), buildPlan: $("sw-build-plan"), tip: $("sw-tip"),
     refusal: $("sw-refusal"), refusalText: $("sw-refusal-text"),
     planOut: $("sw-plan-out"), planMath: $("sw-plan-math"), planWarnings: $("sw-plan-warnings"),
     planTbody: $("sw-plan-tbody"), planOutTbody: $("sw-plan-out-tbody"),
@@ -207,6 +207,7 @@
       const plan = R.planSweep({
         classified: pool, strategy, thresholdGrains: threshold, nOutputs,
         targetProgram: target.program, rateMp: fr.rateMp, network: S.network,
+        builderTipEnabled: !!(els.tip && els.tip.checked),
       });
       if (plan.refused) {
         els.refusal.hidden = false;
@@ -230,10 +231,11 @@
       classified: kept,
       strategy: "all", // manual refinement of the strategy's selection
       thresholdGrains: 0n,
-      nOutputs: S.plan.outputs.length,
+      nOutputs: S.plan.targetOutputs || S.plan.outputs.filter((o) => !o.builderTip).length,
       targetProgram: S.plan.outputs[0].program,
       rateMp: S.plan.rateMp,
       network: S.network,
+      builderTipEnabled: (S.plan.builderTip || 0n) > 0n,
     });
     if (plan.refused) {
       els.refusal.hidden = false;
@@ -256,8 +258,9 @@
       `Tx size:         ${plan.vBytes} vBytes (${plan.inputs.length} in × ${R.INPUT_VBYTES} + ${plan.outputs.length} out × ${R.OUTPUT_VBYTES} + overhead)\n` +
       `Fee rate:        ${R.formatRateMp(plan.rateMp)} grains/vB\n` +
       `Fee:             ${prlLine(plan.fee)}\n` +
+      ((plan.builderTip || 0n) > 0n ? `Builder tip:     ${prlLine(plan.builderTip)} → ${R.BUILDER_TIP_ADDRESS.slice(0, 20)}… (optional, opted in)\n` : "") +
       `Net recovered:   ${prlLine(plan.netValue)}\n` +
-      `Output${plan.outputs.length === 1 ? "" : "s"}:          ${plan.outputs.length} × ${prlLine(plan.perOutput)} → ${plan.targetAddress.slice(0, 20)}…\n` +
+      `Output${(plan.targetOutputs || plan.outputs.length) === 1 ? "" : "s"}:          ${plan.targetOutputs || plan.outputs.length} × ${prlLine(plan.perOutput)} → ${plan.targetAddress.slice(0, 20)}…\n` +
       (plan.feeRemainder > 0n ? `Split remainder:  ${plan.feeRemainder} grains (absorbed into the fee)\n` : "");
     els.planWarnings.innerHTML = "";
     for (const w of plan.warnings) {
@@ -284,7 +287,7 @@
       const tr = document.createElement("tr");
       tr.innerHTML =
         `<td>${i}</td>` +
-        `<td class="addr">${plan.targetAddress}</td>` +
+        `<td class="addr">${o.address || plan.targetAddress}${o.builderTip ? " (builder tip)" : ""}</td>` +
         `<td class="mono">${R.formatGrains(o.value)} PRL</td>`;
       els.planOutTbody.appendChild(tr);
     });
@@ -435,6 +438,7 @@
       const res = R.comparePostSweep({
         preCount: S.preCount, preTotal: S.preTotal, fee: S.plan.fee,
         postUtxos, targetAddress: S.plan.targetAddress,
+        builderTip: S.plan.builderTip || 0n,
       });
       els.verdict.textContent = res.verdict;
       els.verdict.className = "verdict " + (res.ok ? "good" : "bad");
@@ -467,7 +471,7 @@
     els.saStatus.textContent = "Fetching transaction…";
     try {
       const tx = await R.fetchSweepTx(fetch, base, els.saTxid.value);
-      const res = R.verifyConsolidationTx(tx, swept.address, target.address);
+      const res = R.verifyConsolidationTx(tx, swept.address, target.address, { builderAddress: R.BUILDER_TIP_ADDRESS });
       els.saOut.hidden = false;
       if (!res.ok) {
         els.saOut.textContent = res.refusal;
@@ -476,7 +480,7 @@
         els.saOut.textContent =
           `✓ CLEAN CONSOLIDATION\n` +
           `Inputs:  ${res.nIn} (all from ${swept.address.slice(0, 22)}…)\n` +
-          `Outputs: ${res.nOut} (all to ${target.address.slice(0, 22)}…)\n` +
+          `Outputs: ${res.nOut} (all to ${target.address.slice(0, 22)}…${(res.builderTip || 0n) > 0n ? `, plus builder tip ${prlLine(res.builderTip)}` : ""})\n` +
           `In:      ${prlLine(res.inTotal)}\n` +
           `Out:     ${prlLine(res.outTotal)}\n` +
           `Fee:     ${prlLine(res.fee)}\n` +

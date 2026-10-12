@@ -12,6 +12,8 @@ import {
   summarizeUtxos,
   futureSavingsGrains,
   planSweep,
+  builderTipGrainsFor,
+  BUILDER_TIP_ADDRESS,
   parseSweepKey,
   buildSweepTx,
   comparePostSweep,
@@ -417,4 +419,88 @@ test("broadcastSweepTx: posts text/plain, returns txid, surfaces rejection", asy
   assert.equal(seen.body, "deadbeef");
   const rej = async () => ({ ok: true, status: 200, text: async () => JSON.stringify({ error: "dust" }) });
   await assert.rejects(broadcastSweepTx(rej, "https://x", "00"), /broadcast rejected: dust/);
+});
+
+/* ---------- builder tip (opt-in, disclosed) ---------- */
+
+test("builderTipGrainsFor: 1% floor, mainnet only, opt-in only, sub-dust waived", () => {
+  assert.equal(BUILDER_TIP_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
+  assert.equal(builderTipGrainsFor(258950n, NET, true), 2589n); // floor(1%)
+  assert.equal(builderTipGrainsFor(258950n, NET, false), 0n);
+  assert.equal(builderTipGrainsFor(258950n, NET, undefined), 0n);
+  assert.equal(builderTipGrainsFor(258950n, NETWORKS.testnet, true), 0n);
+  assert.equal(builderTipGrainsFor(8950n, NET, true), 0n); // 89 grains < dust — waived, never rounded up
+  assert.equal(builderTipGrainsFor(54600n, NET, true), 546n); // exactly at the dust floor
+});
+
+test("planSweep builder tip: own flagged output, fee covers it, off = identical plan", () => {
+  const { cs, rateMp } = classifiedFixture();
+  const base = { classified: cs, strategy: "all", nOutputs: 1, targetProgram: PROGRAM, rateMp, network: NET };
+  const off = planSweep(base);
+  const on = planSweep({ ...base, builderTipEnabled: true });
+  const total = cs.reduce((a, u) => a + u.value, 0n); // 258950
+  assert.equal(on.builderTip, 2589n);
+  assert.equal(on.targetOutputs, 1);
+  assert.equal(on.outputs.length, 2);
+  assert.equal(on.outputs[1].builderTip, true);
+  assert.equal(on.outputs[1].value, 2589n);
+  assert.equal(on.outputs[1].address, BUILDER_TIP_ADDRESS);
+  // fee grew by exactly one output's vBytes at the plan rate (20 grains/vB)
+  assert.equal(on.fee - off.fee, 43n * 20n);
+  // conservation: total = target outputs + tip + fee (+ split remainder absorbed in fee)
+  assert.equal(on.netValue, total - on.fee - on.builderTip);
+  assert.equal(on.outputs[0].value, on.perOutput);
+  // off is the pre-tip plan, untouched
+  assert.equal(off.builderTip, 0n);
+  assert.equal(off.outputs.length, 1);
+});
+
+test("buildSweepTx with tip: signed tx carries the tip output exactly; rerouted flag refused", () => {
+  const wif = walletToWIF(hexToBytes(PRIV_HEX), NET);
+  const { cs, rateMp } = classifiedFixture();
+  const plan = planSweep({
+    classified: cs, strategy: "all", nOutputs: 1,
+    targetProgram: PROGRAM, rateMp, network: NET, builderTipEnabled: true,
+  });
+  const signed = buildSweepTx({ network: NET, sweptAddress: ADDR, secretText: wif, plan });
+  assert.ok(signed.checks.every((c) => c.ok));
+  const dec = decodeRawTx(signed.hex);
+  assert.equal(dec.outputs.length, 2);
+  assert.equal(dec.outputs[1].value, 2589n);
+  const builderProgram = parseSweepAddress(BUILDER_TIP_ADDRESS).program;
+  assert.equal(bytesToHex(dec.outputs[1].spk), "5120" + bytesToHex(builderProgram));
+  // a plan whose flagged tip pays someone else is refused at signing
+  const evil = {
+    ...plan,
+    outputs: plan.outputs.map((o) => (o.builderTip ? { ...o, program: PROGRAM } : o)),
+  };
+  assert.throws(
+    () => buildSweepTx({ network: NET, sweptAddress: ADDR, secretText: wif, plan: evil }),
+    /flagged as the builder tip but does not pay the builder address/
+  );
+});
+
+test("comparePostSweep + verifyConsolidationTx account for a tipped sweep", () => {
+  const res = comparePostSweep({
+    preCount: 8, preTotal: 258950n, fee: 10000n, builderTip: 2589n,
+    postUtxos: [{ txid: "b".repeat(64), vout: 0, value: 258950n - 10000n - 2589n }],
+    targetAddress: ADDR,
+  });
+  assert.equal(res.ok, true);
+  assert.match(res.verdict, /builder tip/);
+  const tx = {
+    txid: "c".repeat(64), confirmations: 3,
+    vin: [{ addresses: [ADDR], value: "10000" }],
+    vout: [
+      { addresses: [ADDR], value: "7000" },
+      { addresses: [BUILDER_TIP_ADDRESS], value: "2589" },
+    ],
+  };
+  const withOpt = verifyConsolidationTx(tx, ADDR, ADDR, { builderAddress: BUILDER_TIP_ADDRESS });
+  assert.equal(withOpt.ok, true);
+  assert.equal(withOpt.builderTip, 2589n);
+  assert.equal(withOpt.fee, 411n);
+  const withoutOpt = verifyConsolidationTx(tx, ADDR, ADDR);
+  assert.equal(withoutOpt.ok, false);
+  assert.match(withoutOpt.refusal, /output #1 does not pay the target/);
 });
