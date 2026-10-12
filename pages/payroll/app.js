@@ -30,6 +30,7 @@
     senderAddress: "",
     utxos: [],                 // {txid, vout, value, confirmations, checked}
     autoSelect: true,
+    builderTip: false,         // OPTIONAL 1% builder tip (opt-in, default off)
     plan: null,
     bundle: null,
     fingerprint: "",
@@ -42,6 +43,11 @@
   /* ---------- helpers ---------- */
 
   const net = () => R.NETWORKS[state.network];
+  /* The payees a run actually pays: the roster plus, only when the sender
+   * opted in on the Fund step, the disclosed 1% builder tip as its own
+   * payee. With the box off this is the roster list itself, unchanged. */
+  const runPayees = () => state.roster ? R.applyBuilderTip(state.roster.payees, net(), state.builderTip) : [];
+  const runTotal = () => runPayees().reduce((a, r) => a + r.amount, 0n);
   const shortAddr = (a) => a.length > 22 ? a.slice(0, 14) + "…" + a.slice(-6) : a;
   const shortTxid = (t) => t.slice(0, 10) + "…" + t.slice(-6);
   function showErr(id, msg) { const e = $(id); e.textContent = msg; e.hidden = false; }
@@ -153,6 +159,7 @@
     state.roster = null; state.schedule = null; state.senderAddress = ""; state.utxos = [];
     state.plan = null; state.bundle = null; state.fingerprint = "";
     state.signed = null; state.broadcastTxid = ""; state.editIndex = -1;
+    state.builderTip = false; $("f-tip").checked = false;
     ["r-out", "p-out", "f-out", "r2-out", "s-out", "b-ready"].forEach((id) => { $(id).hidden = true; });
     $("b-send").disabled = true; $("b-confirm").checked = false; $("r2-confirm").checked = false; $("r2-next").disabled = true;
   }
@@ -338,7 +345,7 @@
 
   function selectedUtxos() {
     if (state.autoSelect) {
-      const r = R.autoSelectUtxos(state.utxos, state.roster.total, feeRate(), state.roster.payees.length);
+      const r = R.autoSelectUtxos(state.utxos, runTotal(), feeRate(), runPayees().length);
       return r.selected;
     }
     const sel = state.utxos.filter((u) => u.checked);
@@ -370,14 +377,17 @@
     if (!state.roster) { kv.innerHTML = "<div><dt>Roster</dt><dd>validate the roster first (step 1)</dd></div>"; return; }
     try {
       const sel = selectedUtxos();
+      const effPayees = runPayees();
       const plan = R.planRun({
-        utxos: sel, payees: state.roster.payees,
+        utxos: sel, payees: effPayees,
         senderProgram: R.decodeBech32m(state.senderAddress, net().hrp).program,
         feeRateGrainsPerVByte: feeRate(), network: net(),
       });
       const inSum = sel.reduce((a, u) => a + BigInt(u.value), 0n);
+      const tipPayee = effPayees.find((r) => r.builderTip);
       kv.innerHTML =
         `<div><dt>Payees</dt><dd>${plan.nOut - (plan.changeDropped ? 0 : 1)} → ${R.fmtPRL(plan.sumOut)} PRL</dd></div>` +
+        (tipPayee ? `<div><dt>Builder tip</dt><dd>${R.fmtPRL(tipPayee.amount)} PRL to builder (optional, disclosed) — included in the payees total above</dd></div>` : "") +
         `<div><dt>Inputs selected</dt><dd>${sel.length} UTXO(s) → ${R.fmtPRL(inSum)} PRL</dd></div>` +
         `<div><dt>Fee</dt><dd>${plan.fee} grains (${R.fmtPRL(plan.fee)} PRL) @ ${plan.feeRate} gr/vB × ${plan.vBytes} vB</dd></div>` +
         `<div><dt>Change</dt><dd>${plan.changeDropped ? `dust absorbed into fee (+${plan.changeBump} grains)` : R.fmtPRL(plan.change) + " PRL back to sender"}</dd></div>` +
@@ -434,6 +444,10 @@
     } catch (e) { showErr("f-err", "PASTE REFUSED: " + (e.message || e)); }
   });
   $("f-auto").addEventListener("change", () => { state.autoSelect = $("f-auto").checked; renderUtxos(); });
+  $("f-tip").addEventListener("change", () => {
+    state.builderTip = $("f-tip").checked;
+    if (state.roster && state.utxos.length) renderTotals();
+  });
   $("f-all").addEventListener("click", () => { state.utxos.forEach((u) => { u.checked = true; }); renderUtxos(); });
   $("f-none").addEventListener("click", () => { state.utxos.forEach((u) => { u.checked = false; }); renderUtxos(); });
   $("f-next").addEventListener("click", () => {
@@ -443,7 +457,7 @@
       requireSender();
       const sel = selectedUtxos();
       const plan = R.planRun({
-        utxos: sel, payees: state.roster.payees,
+        utxos: sel, payees: runPayees(),
         senderProgram: R.decodeBech32m(state.senderAddress, net().hrp).program,
         feeRateGrainsPerVByte: feeRate(), network: net(),
       });
@@ -457,6 +471,7 @@
 
   function renderReview() {
     const plan = state.plan, roster = state.roster, sch = state.schedule;
+    const effPayees = runPayees();
     $("r2-refusal").hidden = true; $("r2-out").hidden = true;
     const bal = plan.total - (plan.sumOut + plan.fee + plan.change);
     if (bal !== 0n) {
@@ -469,11 +484,11 @@
       `<div><dt>Network</dt><dd>${net().label} (${net().hrp}1…)</dd></div>` +
       `<div><dt>Run</dt><dd>${escapeHtml(sch.runLabel)} — ${sch.payDate} (${sch.period})</dd></div>` +
       `<div><dt>Inputs</dt><dd>${plan.nIn} UTXO(s) → ${R.fmtPRL(plan.total)} PRL</dd></div>` +
-      `<div><dt>Payees</dt><dd>${roster.payees.length} → ${R.fmtPRL(plan.sumOut)} PRL</dd></div>` +
+      `<div><dt>Payees</dt><dd>${effPayees.length} → ${R.fmtPRL(plan.sumOut)} PRL</dd></div>` +
       `<div><dt>Balance check</dt><dd style="color:var(--go)">inputs = payees + fee + change — exact to the grain</dd></div>`;
-    $("r2-rcount").textContent = `(${roster.payees.length})`;
+    $("r2-rcount").textContent = `(${effPayees.length})`;
     const tb = $("r2-tbody"); tb.innerHTML = "";
-    roster.payees.forEach((r, i) => {
+    effPayees.forEach((r, i) => {
       const tr = document.createElement("tr");
       tr.innerHTML = `<td class="mut">${i + 1}</td><td>${r.label ? escapeHtml(r.label) : '<span class="mut">—</span>'}</td>` +
         `<td class="addr-short" title="${escapeHtml(r.address)}">${escapeHtml(shortAddr(r.address))}</td>` +
@@ -517,7 +532,7 @@
   function buildBundle() {
     const bundle = R.exportUnsignedBundle({
       network: net(), senderAddress: state.senderAddress,
-      payees: state.roster.payees, plan: state.plan, feeRate: state.plan.feeRate,
+      payees: runPayees(), plan: state.plan, feeRate: state.plan.feeRate,
       period: state.schedule.period, payDate: state.schedule.payDate, runLabel: state.schedule.runLabel,
     });
     state.bundle = bundle;
@@ -553,7 +568,15 @@
         $("network").value = state.network;
       }
       state.senderAddress = imp.senderAddress;
-      state.roster = { payees: imp.payees, merged: 0, total: imp.payees.reduce((a, r) => a + r.amount, 0n) };
+      // A bundle carrying the optional builder tip loads with the tip
+      // separated back out of the roster and the Fund-step box ticked, so
+      // re-planning from Fund reproduces the identical run (the tip is
+      // recomputed from the roster total — the same amount, deterministically).
+      const tipPayee = imp.payees.find((p) => p.builderTip);
+      const basePayees = imp.payees.filter((p) => !p.builderTip);
+      state.builderTip = !!tipPayee;
+      $("f-tip").checked = state.builderTip;
+      state.roster = { payees: basePayees, merged: 0, total: basePayees.reduce((a, r) => a + r.amount, 0n) };
       state.plan = imp.plan;
       state.fingerprint = imp.fingerprint;
       state.schedule = { period: imp.period || "custom", customDays: 0, anchor: imp.payDate || "", runLabel: imp.runLabel || "imported run", payDate: imp.payDate || "", dates: imp.payDate ? [{ index: 0, iso: imp.payDate, dow: "" }] : [] };
@@ -568,6 +591,7 @@
       const ok = $("s-import-ok");
       ok.textContent = `Bundle verified & loaded: fingerprint ${imp.fingerprint}, unsigned txid ${state.bundle.unsignedTxid.slice(0, 16)}…, ` +
         `${imp.payees.length} payees, fee ${imp.plan.fee} grains, ${imp.plan.vBytes} vB — all cross-checks passed.` +
+        (tipPayee ? ` Includes the optional builder tip: ${R.fmtPRL(tipPayee.amount)} PRL.` : "") +
         (imp.runLabel ? ` Run: ${imp.runLabel} (${imp.payDate}, ${imp.period}).` : "");
       ok.hidden = false;
     } catch (e) {
@@ -608,7 +632,7 @@
     if (!state.signed) return;
     $("b-txid").textContent = state.signed.txid;
     $("b-runlabel").textContent = state.schedule ? `${state.schedule.runLabel} — ${state.schedule.payDate} (${state.schedule.period})` : "imported run";
-    $("b-nrecip").textContent = String(state.roster.payees.length);
+    $("b-nrecip").textContent = String(runPayees().length);
     $("b-total").textContent = `${R.fmtPRL(state.plan.sumOut)} PRL`;
     $("b-fee").textContent = `${state.plan.fee} grains (${R.fmtPRL(state.plan.fee)} PRL)`;
     $("b-net").textContent = net().label;
@@ -640,7 +664,7 @@
         period: state.schedule ? state.schedule.period : "",
         runLabel: state.schedule ? state.schedule.runLabel : "imported run",
         txid,
-        payees: state.roster.payees.map((p) => ({ address: p.address, label: p.label, grains: p.amount })),
+        payees: runPayees().map((p) => ({ address: p.address, label: p.label, grains: p.amount })),
         feeGrains: state.plan.fee,
         vBytes: state.plan.vBytes,
       });

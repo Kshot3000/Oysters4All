@@ -374,6 +374,23 @@ test("fund: manual empty selection refused, paste path works", async () => {
   await waitFor(() => get("f-tbody").children.length === 3, "utxo rows again");
 });
 
+test("fund: builder tip is off by default and opt-in shows its own labeled line", async () => {
+  assert.equal(get("f-tip").checked, false, "tip checkbox is unchecked by default");
+  assert.ok(!/Builder tip/.test(get("f-totals").textContent), "no tip line in the default totals");
+  get("f-tip").checked = true;
+  get("f-tip").fire("change");
+  await tick();
+  // roster total 1,125,000,546 grains -> 1% tip = 11,250,005 grains = 0.11250005 PRL
+  assert.match(get("f-totals").textContent, /Builder tip/);
+  assert.match(get("f-totals").textContent, /0\.11250005 PRL to builder \(optional, disclosed\)/);
+  assert.match(get("f-totals").textContent, /OK — inputs = payees \+ fee \+ change/, "tipped run still balances");
+  // restore the no-tip state for the review/sign flow below
+  get("f-tip").checked = false;
+  get("f-tip").fire("change");
+  await tick();
+  assert.ok(!/Builder tip/.test(get("f-totals").textContent), "tip line gone after opting back out");
+});
+
 test("review: breakdown, exact fee math, double-confirm gate, bundle", async () => {
   get("f-next").click();
   await tick();
@@ -494,5 +511,5 @@ test("address/txid title attributes are escaped (XSS audit latent queue)", () =>
   const src = fs.readFileSync(resolvePath(dir, "app.js"), "utf8");
   assert.ok(!/title="\$\{(r\.address|u\.txid|r\.txid|state\.senderAddress|e\.address)\}"/.test(src), "no raw title interpolation");
   assert.equal((src.match(/title="\$\{escapeHtml\(/g) || []).length, 7, "all seven titles escaped");
-  assert.ok(html.includes('app.js?v=4'), "cache key bumped");
+  assert.ok(html.includes('app.js?v=5'), "cache key bumped");
 });

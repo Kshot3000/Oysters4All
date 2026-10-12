@@ -64,13 +64,30 @@ table. CSV export per run, full CSV export, and a clear button.
 - Dust rule: below-546-grain lines are refused; dust change is absorbed into
   the fee with the amount disclosed.
 
+## Builder tip (optional, disclosed)
+
+The Fund step offers an **opt-in builder tip**: tick the box and the pay run
+gains one extra payee output — 1% of the run total, to the builder address
+published in the page footer
+(`prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`).
+It is **off by default** — with the box unticked the payee list is
+byte-identical to the pre-tip planner and no tip output exists. Mainnet
+only; when 1% would fall below the 546-grain dust floor the tip is waived,
+never rounded up. The tip is part of the plan before signing (the sender is
+the sole signer and the sighash commits to every output), it is shown as
+its own labeled line in the running totals and on the pay slip, and it
+travels inside the air-gapped unsigned bundle like any other payee, so a
+tampered tip fails the bundle fingerprint check on import. A bundle that
+carries a tip loads with the tip separated back out of the roster and the
+box ticked, so re-planning reproduces the identical run.
+
 ## Build & test
 
 ```bash
 cd files/pages/payroll
 node build.mjs                                   # rebuilds pearl-payroll.bundle.js
-node --no-warnings --loader ./tests/loader.mjs tests/payroll.test.mjs      # 45 core tests
-node --no-warnings --loader ./tests/loader.mjs tests/payroll.dom.test.mjs  # 15 DOM tests
+node --no-warnings --loader ./tests/loader.mjs tests/payroll.test.mjs      # 50 core tests
+node --no-warnings --loader ./tests/loader.mjs tests/payroll.dom.test.mjs  # 16 DOM tests
 ```
 
 Protocol facts reused from the audited Pearl Sign lineage: bech32m `prl1…`/

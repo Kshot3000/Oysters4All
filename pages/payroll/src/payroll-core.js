@@ -276,6 +276,52 @@ export function rosterFromCsv(text, network = NETWORKS.mainnet, opts = {}) {
   return parseRoster(String(text ?? ""), network, opts);
 }
 
+/* ---------------- builder tip (OPTIONAL, disclosed, default OFF) ----------------
+ * Pearl Payroll pays the USER'S OWN roster out of the sender's own funds,
+ * so unlike a venue fee this is never automatic: the sender may OPT IN to
+ * add a builder tip of 1% of the run total, as its own payee output in the
+ * pay-run transaction, to the operator address published in every Payroll
+ * page footer. The checkbox in the Fund step is unchecked by default; with
+ * it off (or on testnet, or when 1% would fall below the 546-grain dust
+ * floor) the payee list is byte-identical to the pre-tip planner — no tip
+ * output exists at all. When on, the tip is just another payee in the plan
+ * BEFORE signing: the sender is the sole signer and the keypath sighash
+ * commits to every output, so the tip cannot be added or altered after
+ * signing, and the unsigned-bundle descriptor carries it like any other
+ * payee (a tampered tip fails the bundle fingerprint check on import). */
+export const BUILDER_TIP_BPS = 100; // 1%
+export const BUILDER_TIP_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+export const BUILDER_TIP_NAME = "Builder tip (optional)";
+
+/** Builder tip in grains for a run paying totalGrains, on network.
+ *  Returns 0n unless enabled === true, the network is mainnet, and the
+ *  1% floor reaches the dust floor (waived, never rounded up). */
+export function builderTipGrainsFor(totalGrains, network, enabled) {
+  if (enabled !== true) return 0n;
+  if (!network || network.hrp !== "prl") return 0n;
+  const total = BigInt(totalGrains);
+  if (total <= 0n) throw new Error("bad total for builder tip");
+  const tip = (total * BigInt(BUILDER_TIP_BPS)) / 10000n;
+  return tip >= BigInt(DUST_GRAIN) ? tip : 0n;
+}
+
+/** Return a payee list with the optional builder tip appended as its own
+ *  payee (or the list unchanged when the tip does not apply). The original
+ *  list is never mutated; applying twice is a no-op. */
+export function applyBuilderTip(payees, network = NETWORKS.mainnet, enabled = false) {
+  if (!Array.isArray(payees) || payees.length === 0) throw new Error("bad payee list for builder tip");
+  if (payees.some((r) => r.builderTip)) return payees;
+  const total = payees.reduce((a, r) => a + BigInt(r.amount), 0n);
+  const tip = builderTipGrainsFor(total, network, enabled);
+  if (tip === 0n) return payees;
+  const dec = decodeBech32m(BUILDER_TIP_ADDRESS, network.hrp);
+  if (dec.version !== 1 || dec.program.length !== 32) throw new Error("builder tip address is not a v1 Taproot address");
+  return [...payees, {
+    address: BUILDER_TIP_ADDRESS, program: dec.program, amount: tip,
+    label: BUILDER_TIP_NAME, builderTip: true,
+  }];
+}
+
 /* ---------------- pay schedule ---------------- */
 
 export const PAY_PERIODS = ["weekly", "biweekly", "monthly", "custom"];
@@ -567,6 +613,7 @@ export function buildDescriptor({ network, senderAddress, payees, plan, feeRate,
       address: r.address,
       amountGrains: r.amount.toString(),
       label: r.label ?? null,
+      ...(r.builderTip ? { builderTip: true } : {}),
     })),
     inputs: plan.inputs.map((u) => ({
       txid: String(u.txid).toLowerCase(),
@@ -641,7 +688,7 @@ export function importUnsignedBundle(bundle) {
     if (amount < BigInt(DUST_GRAIN)) throw new Error(`bundle payee #${i + 1} is below dust — refusing`);
     const label = r.label == null ? null : String(r.label);
     if (label && label.length > MAX_LABEL_LEN) throw new Error(`bundle payee #${i + 1} label too long`);
-    return { address, program: dec.program, amount, label };
+    return { address, program: dec.program, amount, label, ...(r.builderTip ? { builderTip: true } : {}) };
   });
   const inputs = (d.inputs || []).map((u) => {
     if (!/^[0-9a-f]{64}$/i.test(String(u.txid || ""))) throw new Error("bundle input has a bad txid");

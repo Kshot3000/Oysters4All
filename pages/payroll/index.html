@@ -62,6 +62,7 @@
       <li><strong>One sender key per run.</strong> Every input of a pay run must be spendable by the single key you sign with. Multi-key payrolls are not supported — split them.</li>
       <li><strong>Dust is refused, never rounded.</strong> Any payee under 546 grains stops the roster with a loud error. Change under 546 grains is absorbed into the miner fee and disclosed on the review screen — never silently dropped.</li>
       <li><strong>Labels are off-chain bookkeeping.</strong> Payee names ride along in the unsigned bundle and the local history for your records — they never appear on-chain. Pearl transactions carry no memo field.</li>
+      <li><strong>Builder tip is optional.</strong> The Fund step offers an opt-in 1% builder tip, off by default. It is never charged unless you tick the box, it appears as its own labeled payee line in the running totals and on the pay slip before signing, and testnet runs never carry it.</li>
       <li><strong>Blockbook is read-only until the single broadcast POST.</strong> UTXO scans and fee estimates are GET-only against the endpoint you configure. If it is unreachable, the page says so loudly — it never guesses.</li>
       <li><strong>Secrets live in page memory only.</strong> Keys you paste are wiped automatically after signing, and are never written to storage or sent anywhere. History is this browser's localStorage — exportable to CSV, and yours to clear.</li>
       <li><strong>Verify addresses out of band. Start on testnet.</strong></li>
@@ -206,6 +207,9 @@
         <label class="check"><input type="checkbox" id="f-auto" checked> Auto-load: largest-first coin selection</label>
         <button class="btn ghost" id="f-all" type="button">Select all</button>
         <button class="btn ghost" id="f-none" type="button">Select none</button>
+      </div>
+      <div class="rowbtns">
+        <label class="check"><input type="checkbox" id="f-tip"> Optional builder tip — add 1% of this run's total as its own payee output to the builder (<code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>). Off by default. Mainnet only; waived when 1% would fall below the 546-grain dust floor. Shown in the running totals and on the pay slip before you sign — never added after signing.</label>
       </div>
       <div class="tablewrap"><table class="ledger">
         <thead><tr><th></th><th>#</th><th>TXID</th><th>vout</th><th>Value</th><th>Conf</th></tr></thead>
@@ -373,7 +377,7 @@
   </div>
 </footer>
 
-<script src="pearl-payroll.bundle.js?v=5"></script>
-<script src="app.js?v=4"></script>
+<script src="pearl-payroll.bundle.js?v=6"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>

@@ -17,6 +17,7 @@ import {
   buildUnsignedTx, buildDescriptor, exportUnsignedBundle, importUnsignedBundle,
   buildPayrollTx, recordPayrollRun, assertHistoryRecord, runsToCsv,
   perPayeeTotals, canonicalJson, descriptorFingerprint, historyStorageKey,
+  builderTipGrainsFor, applyBuilderTip, BUILDER_TIP_BPS, BUILDER_TIP_ADDRESS, BUILDER_TIP_NAME,
   PAYROLL_MAX_PAYEES, PAYROLL_DESCRIPTOR_KIND, PAYROLL_BUNDLE_KIND,
 } from "../src/index.js";
 
@@ -337,6 +338,64 @@ test("estimateRunFee + runsCovered", () => {
   assert.equal(runsCovered(per * 5n - 1n, 1125000546n, fee), 4);
   assert.equal(runsCovered(0n, 1125000546n, fee), 0);
   assert.throws(() => runsCovered(100n, 0n, 0n), /run cost must be positive/);
+});
+
+/* ---------------- builder tip (optional, disclosed, default OFF) ---------------- */
+
+test("builder tip: default off, testnet and sub-dust waived, 1% exact on mainnet", () => {
+  assert.equal(BUILDER_TIP_BPS, 100);
+  assert.equal(BUILDER_TIP_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
+  assert.equal(builderTipGrainsFor(1125000546n, N, false), 0n);
+  assert.equal(builderTipGrainsFor(1125000546n, N, undefined), 0n);
+  assert.equal(builderTipGrainsFor(1125000546n, N, true), 11250005n, "floor(1% of the sample run total)");
+  assert.equal(builderTipGrainsFor(1125000546n, NETWORKS.testnet, true), 0n);
+  assert.equal(builderTipGrainsFor(10000n, N, true), 0n, "100-grain tip is below dust — waived, never rounded up");
+  assert.equal(builderTipGrainsFor(54600n, N, true), 546n, "tip exactly at dust floor is charged");
+});
+
+test("builder tip: applyBuilderTip is opt-in, non-mutating, idempotent, and plans grain-exact", () => {
+  const payees = PAYEES();
+  const off = applyBuilderTip(payees, N, false);
+  assert.equal(off, payees, "disabled returns the list unchanged");
+  assert.equal(off.length, 3);
+  const tipped = applyBuilderTip(payees, N, true);
+  assert.equal(payees.length, 3, "original list not mutated");
+  assert.equal(tipped.length, 4);
+  assert.equal(tipped[3].address, BUILDER_TIP_ADDRESS);
+  assert.equal(tipped[3].amount, 11250005n, "1% of the 1,125,000,546-grain run total");
+  assert.equal(tipped[3].label, BUILDER_TIP_NAME);
+  assert.equal(tipped[3].builderTip, true);
+  assert.equal(applyBuilderTip(tipped, N, true), tipped, "second application is a no-op");
+  const us = [utxo("a".repeat(64), 0, 800000000), utxo("b".repeat(64), 1, 500000000)];
+  const p = planRun({ utxos: us, payees: tipped, senderProgram: SENDER_PROGRAM(), feeRateGrainsPerVByte: 20, network: N });
+  assert.equal(p.total, p.sumOut + p.fee + p.change);
+  assert.equal(p.sumOut, 1125000546n + 11250005n, "tip counted in the planned sum");
+  const outs = p.outputs.filter((o) => !o.change);
+  assert.equal(outs.length, 4);
+  assert.ok(outs.some((o) => o.address === BUILDER_TIP_ADDRESS && o.value === 11250005));
+});
+
+test("builder tip: bundle round-trips with the tip and signing covers it", () => {
+  const us = [utxo("a".repeat(64), 0, 800000000), utxo("b".repeat(64), 1, 500000000)];
+  const tipped = applyBuilderTip(PAYEES(), N, true);
+  const plan = planRun({ utxos: us, payees: tipped, senderProgram: SENDER_PROGRAM(), feeRateGrainsPerVByte: 20, network: N });
+  const b = exportUnsignedBundle({
+    network: N, senderAddress: SENDER, payees: tipped, plan, feeRate: 20,
+    period: "weekly", payDate: "2026-10-08", runLabel: "tipped run",
+  });
+  assert.equal(b.descriptor.payees.length, 4);
+  assert.equal(b.descriptor.payees[3].builderTip, true);
+  const imp = importUnsignedBundle(JSON.parse(JSON.stringify(b)));
+  assert.equal(imp.payees.length, 4);
+  assert.equal(imp.payees[3].builderTip, true);
+  assert.equal(imp.payees[3].address, BUILDER_TIP_ADDRESS);
+  assert.equal(imp.payees[3].amount, 11250005n);
+  const secret = parsePayrollSecret(HEXKEY, N);
+  const { txid, hex } = buildPayrollTx({ secret, senderAddress: SENDER, utxos: us, plan, network: N });
+  assert.match(txid, /^[0-9a-f]{64}$/);
+  const dec = decodeRawTx(hex);
+  const outSum = dec.outputs.reduce((a, o) => a + o.value, 0n);
+  assert.equal(BigInt(us.reduce((a, u) => a + u.value, 0)), outSum + plan.fee, "signed tx conserves inputs incl. tip");
 });
 
 /* ---------------- descriptor + bundle ---------------- */

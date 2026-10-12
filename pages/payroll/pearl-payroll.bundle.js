@@ -21,6 +21,9 @@ var PearlPayroll = (() => {
   // src/index.js
   var index_exports = {};
   __export(index_exports, {
+    BUILDER_TIP_ADDRESS: () => BUILDER_TIP_ADDRESS,
+    BUILDER_TIP_BPS: () => BUILDER_TIP_BPS,
+    BUILDER_TIP_NAME: () => BUILDER_TIP_NAME,
     DUST_GRAIN: () => DUST_GRAIN,
     GRAIN_PER_PRL: () => GRAIN_PER_PRL,
     MAX_LABEL_LEN: () => MAX_LABEL_LEN,
@@ -32,6 +35,7 @@ var PearlPayroll = (() => {
     PAYROLL_MAX_VBYTES: () => PAYROLL_MAX_VBYTES,
     PAY_PERIODS: () => PAY_PERIODS,
     SIGHASH_DEFAULT: () => SIGHASH_DEFAULT,
+    applyBuilderTip: () => applyBuilderTip,
     assertHistoryRecord: () => assertHistoryRecord,
     assertKeyControlsAddress: () => assertKeyControlsAddress,
     assertUtxos: () => assertUtxos,
@@ -40,6 +44,7 @@ var PearlPayroll = (() => {
     buildDescriptor: () => buildDescriptor,
     buildPayrollTx: () => buildPayrollTx,
     buildUnsignedTx: () => buildUnsignedTx,
+    builderTipGrainsFor: () => builderTipGrainsFor,
     bytesToHex: () => bytesToHex,
     canonicalAddress: () => canonicalAddress,
     canonicalJson: () => canonicalJson,
@@ -6310,6 +6315,33 @@ zoo`.split("\n");
   function rosterFromCsv(text, network = NETWORKS.mainnet, opts = {}) {
     return parseRoster(String(text ?? ""), network, opts);
   }
+  var BUILDER_TIP_BPS = 100;
+  var BUILDER_TIP_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+  var BUILDER_TIP_NAME = "Builder tip (optional)";
+  function builderTipGrainsFor(totalGrains, network, enabled) {
+    if (enabled !== true) return 0n;
+    if (!network || network.hrp !== "prl") return 0n;
+    const total = BigInt(totalGrains);
+    if (total <= 0n) throw new Error("bad total for builder tip");
+    const tip = total * BigInt(BUILDER_TIP_BPS) / 10000n;
+    return tip >= BigInt(DUST_GRAIN) ? tip : 0n;
+  }
+  function applyBuilderTip(payees, network = NETWORKS.mainnet, enabled = false) {
+    if (!Array.isArray(payees) || payees.length === 0) throw new Error("bad payee list for builder tip");
+    if (payees.some((r) => r.builderTip)) return payees;
+    const total = payees.reduce((a, r) => a + BigInt(r.amount), 0n);
+    const tip = builderTipGrainsFor(total, network, enabled);
+    if (tip === 0n) return payees;
+    const dec = decodeBech32m(BUILDER_TIP_ADDRESS, network.hrp);
+    if (dec.version !== 1 || dec.program.length !== 32) throw new Error("builder tip address is not a v1 Taproot address");
+    return [...payees, {
+      address: BUILDER_TIP_ADDRESS,
+      program: dec.program,
+      amount: tip,
+      label: BUILDER_TIP_NAME,
+      builderTip: true
+    }];
+  }
   var PAY_PERIODS = ["weekly", "biweekly", "monthly", "custom"];
   var DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   function parseAnchor(s) {
@@ -6547,7 +6579,8 @@ zoo`.split("\n");
       payees: payees.map((r) => ({
         address: r.address,
         amountGrains: r.amount.toString(),
-        label: r.label ?? null
+        label: r.label ?? null,
+        ...r.builderTip ? { builderTip: true } : {}
       })),
       inputs: plan.inputs.map((u) => ({
         txid: String(u.txid).toLowerCase(),
@@ -6610,7 +6643,7 @@ zoo`.split("\n");
       if (amount < BigInt(DUST_GRAIN)) throw new Error(`bundle payee #${i + 1} is below dust \u2014 refusing`);
       const label = r.label == null ? null : String(r.label);
       if (label && label.length > MAX_LABEL_LEN) throw new Error(`bundle payee #${i + 1} label too long`);
-      return { address, program: dec.program, amount, label };
+      return { address, program: dec.program, amount, label, ...r.builderTip ? { builderTip: true } : {} };
     });
     const inputs = (d.inputs || []).map((u) => {
       if (!/^[0-9a-f]{64}$/i.test(String(u.txid || ""))) throw new Error("bundle input has a bad txid");
