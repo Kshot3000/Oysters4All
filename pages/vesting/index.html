@@ -162,6 +162,7 @@
       <label>Fee rate (grains/vB)
         <input id="claim-feerate" type="number" min="1" step="any" placeholder="auto">
       </label>
+      <label class="check wide"><input id="claim-builder-tip" type="checkbox"> Optional builder tip — add 1% of the claimed amount as its own output to the builder, <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code> (mainnet only; waived when 1% would fall below the 546-grain dust floor). Off by default — the plan shows it as its own line before you sign. Clawback never carries a tip.</label>
     </div>
     <div class="row">
       <button id="claim-plan" class="primary">Plan claim</button>
@@ -243,6 +244,7 @@
       <li>Nothing is locked until the funder actually sends PRL to each tranche address — the schedule is a plan until funded.</li>
       <li>Maturity is read from Blockbook's latest block time (or your clock, labeled when it is). A claim broadcast before maturity will be rejected by the network.</li>
       <li>Locktimes are absolute: a tranche set to unlock on a date unlocks regardless of price or anything else.</li>
+      <li>Claims offer an optional 1% builder tip (off by default, mainnet only, waived below the dust floor): if you tick the box, the tip is its own output in the claim plan before you sign, and the script-path signature commits to it — it cannot be added or skimmed afterward. Clawback never carries a tip.</li>
       <li>Test on testnet first. This is a timelocking tool, not legal or tax advice.</li>
     </ul>
   </section>
@@ -254,7 +256,7 @@
 </footer>
 
 <script src="qrcode.min.js?v=1"></script>
-<script src="pearl-vesting.bundle.js?v=4"></script>
-<script src="app.js?v=4"></script>
+<script src="pearl-vesting.bundle.js?v=5"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>

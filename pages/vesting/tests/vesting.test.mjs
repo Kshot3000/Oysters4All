@@ -9,6 +9,7 @@ import {
   forgeTranche, planSchedule, descriptorFor, parseDescriptor,
   scheduleFromDescriptor, isMature, planClaimSweep, buildClaimTx,
   expectedAddress, parseXOnlyKey, scriptAsm, addressToProgram,
+  builderTipGrainsFor, BUILDER_TIP_ADDRESS, BUILDER_TIP_BPS,
   verifySchnorrSig, signForXOnly, scriptPathSigDigestEx, encodeScriptNum,
   parsePRLToGrains,
   beneficiaryKeyFromInput, beneficiarySignerFor,
@@ -179,6 +180,55 @@ test("planClaimSweep: exact fee math, dust refusal", () => {
   assert.equal(p.payment, 100_000_000 - p.fee);
   assert.ok(p.vBytes > 100 && p.vBytes < 300);
   assert.throws(() => planClaimSweep({ inputValue: 500, feeRateGrainsPerVByte: 10, scriptLen: t.claimScript.length, controlLen: 65 }), /insufficient funds/);
+});
+
+test("builder tip: exactness, waivers, opt-in only", () => {
+  assert.equal(BUILDER_TIP_BPS, 100);
+  assert.equal(BUILDER_TIP_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
+  assert.equal(builderTipGrainsFor(100_000_000, net, true), 1_000_000);
+  assert.equal(builderTipGrainsFor(100_000_000, net, false), 0);
+  assert.equal(builderTipGrainsFor(100_000_000, net, undefined), 0);
+  assert.equal(builderTipGrainsFor(100_000_000, NETWORKS.testnet, true), 0, "testnet waived");
+  assert.equal(builderTipGrainsFor(10_000, net, true), 0, "sub-dust 1% waived, never rounded up");
+  assert.equal(builderTipGrainsFor(54_600, net, true), 546, "exactly dust is charged");
+});
+
+test("builder tip: tipped claim plan + signed tx carry the tip exact; off = pre-tip plan", () => {
+  const t = forgeTranche(net, B.xonly, F.xonly, 1_800_000_000, true);
+  const utxo = { txid: "ab".repeat(32), vout: 0, value: 100_000_000 };
+  const destProgram = hexToBytes(B.xonly);
+  const off = planClaimSweep({ inputValue: 100_000_000, feeRateGrainsPerVByte: 10, scriptLen: t.claimScript.length, controlLen: 65, network: net });
+  assert.equal(off.builderTip, 0);
+  assert.equal(off.payment, 100_000_000 - off.fee);
+  const plan = planClaimSweep({ inputValue: 100_000_000, feeRateGrainsPerVByte: 10, scriptLen: t.claimScript.length, controlLen: 65, network: net, builderTipEnabled: true });
+  assert.equal(plan.builderTip, 1_000_000);
+  assert.equal(plan.payment, 100_000_000 - plan.fee - plan.builderTip);
+  assert.ok(plan.fee > off.fee, "fee computed over the extra tip output");
+  assert.deepEqual([...plan.builderTipProgram], [...addressToProgram(BUILDER_TIP_ADDRESS, net)]);
+  const claim = buildClaimTx({
+    network: net, utxo, tranche: t,
+    leaf: t.claimScript, controlBlock: t.claimControlBlock,
+    signerPriv: hexToBytes(B.priv), destinationProgram: destProgram,
+    feeRateGrainsPerVByte: 10, builderTipEnabled: true,
+  });
+  assert.equal(claim.builderTip, 1_000_000);
+  assert.equal(claim.payment + claim.fee + claim.builderTip, 100_000_000, "conservation");
+  // the sighash commits to BOTH outputs: recomputing the digest over the
+  // payment + tip outputs reproduces the signed digest, and the signature
+  // verifies — dropping the tip would break it
+  const digest = scriptPathSigDigestEx(net,
+    { txid: utxo.txid, vout: 0, value: utxo.value, spk: t.spk },
+    [{ program: destProgram, value: claim.payment }, { program: addressToProgram(BUILDER_TIP_ADDRESS, net), value: 1_000_000 }],
+    t.claimScript, { sequence: 0xfffffffe, locktime: 1_800_000_000 });
+  assert.equal(claim.digestHex, bytesToHex(digest));
+  assert.ok(verifySchnorrSig(hexToBytes(claim.sigHex), digest, hexToBytes(B.xonly)));
+  const untippedDigest = scriptPathSigDigestEx(net,
+    { txid: utxo.txid, vout: 0, value: utxo.value, spk: t.spk },
+    [{ program: destProgram, value: claim.payment }],
+    t.claimScript, { sequence: 0xfffffffe, locktime: 1_800_000_000 });
+  assert.notEqual(claim.digestHex, bytesToHex(untippedDigest), "tip-less digest differs — tip cannot be skimmed post-signing");
+  // tip that would leave the beneficiary below dust refuses, naming the tip
+  assert.throws(() => planClaimSweep({ inputValue: 100_000, feeRateGrainsPerVByte: 600, scriptLen: t.claimScript.length, controlLen: 65, network: net, builderTipEnabled: true }), /builder tip/);
 });
 
 test("buildClaimTx: full sign cycle, nLockTime, sequence, wrong-key refusal", () => {

@@ -412,12 +412,14 @@
       const sweep = E.planClaimSweep({
         inputValue: utxo.value, feeRateGrainsPerVByte: feeRate,
         scriptLen: t.claimScript.length, controlLen: t.claimControlBlock.length,
+        network: S.network, builderTipEnabled: $("claim-builder-tip").checked === true,
       });
-      S.claimPlan = { t, utxo, signerPriv: signer.priv, destProgram, feeRate, sweep, locktime: t.lock };
+      S.claimPlan = { t, utxo, signerPriv: signer.priv, destProgram, feeRate, sweep, locktime: t.lock, builderTipEnabled: $("claim-builder-tip").checked === true };
       reviewDl($("claim-review-dl"), [
         ["Tranche", `#${t.index + 1} · unlock ${fmtDate(t.lock)}`],
         ["Input", `${utxo.txid}:${utxo.vout} · ${grainsToPRL(utxo.value)} PRL`],
         ["Payout", `${grainsToPRL(sweep.payment)} PRL → ${$("claim-dest").value.slice(0, 24)}…`],
+        ...(sweep.builderTip > 0 ? [["Builder tip (optional, 1%)", `${grainsToPRL(sweep.builderTip)} PRL`], ["Builder tip to", E.BUILDER_TIP_ADDRESS]] : []),
         ["Fee", `${sweep.fee} grains (${sweep.vBytes} vB @ ${feeRate} grains/vB)`],
         ["nLockTime", `${t.lock} (${fmtDate(t.lock)})`],
         ["Sequence", "0xfffffffe (non-final, CLTV satisfied)"],
@@ -439,10 +441,12 @@
         leaf: p.t.claimScript, controlBlock: p.t.claimControlBlock,
         signerPriv: p.signerPriv, destinationProgram: p.destProgram,
         feeRateGrainsPerVByte: p.feeRate,
+        builderTipEnabled: p.builderTipEnabled === true,
       });
       S.claimPlan.signed = signed;
       reviewDl($("claim-signed-dl"), [
         ["TXID", signed.txid],
+        ...(signed.builderTip > 0 ? [["Builder tip", `${grainsToPRL(signed.builderTip)} PRL → ${E.BUILDER_TIP_ADDRESS}`]] : []),
         ["Fee paid", `${signed.fee} grains`],
         ["Size", `${signed.vBytes} vB`],
         ["Signature", "verified locally against the leaf key before hex was produced"],

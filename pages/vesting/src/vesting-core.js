@@ -429,27 +429,64 @@ export async function fetchChainTime(blockbookBase) {
   }
 }
 
-/** Exact sweep plan for a single-input, single-output claim: the beneficiary
- *  receives everything minus the exact fee. Throws when the remainder
- *  would be dust (the funder must top the tranche up instead). */
-export function planClaimSweep({ inputValue, feeRateGrainsPerVByte, scriptLen, controlLen }) {
+/* Optional builder tip (profit mandate, disclosed, opt-in/default-off):
+ * a claim spends a matured tranche through the beneficiary's own leaf,
+ * signed by the beneficiary alone, so — like Batch/Payroll/Rain/Sweep/
+ * Gift — the tip is never automatic: the claimant explicitly opts in.
+ * builderTipGrainsFor() is the single source; planClaimSweep() adds the
+ * tip as its own output BEFORE signing, and the script-path sighash
+ * commits to every output — so it cannot be added or skimmed after
+ * signing. Off = plan identical to the pre-tip planner. Offered on the
+ * beneficiary claim flow only: clawback (the funder reclaiming their own
+ * tranche) never carries it in the UI, and the core default is off for
+ * every caller. The recipient is the operator address published in
+ * every Vesting footer. */
+export const BUILDER_TIP_BPS = 100; // 1%
+export const BUILDER_TIP_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+export const BUILDER_TIP_NAME = "Builder tip (optional)";
+
+/** Builder tip in grains for a claim of totalGrains on network.
+ *  Returns 0 unless enabled === true, the network is mainnet, and the
+ *  1% floor reaches the dust floor (waived, never rounded up). Computed
+ *  in BigInt so large claims stay exact; the result fits a safe integer
+ *  whenever the input does. */
+export function builderTipGrainsFor(totalGrains, network, enabled) {
+  if (enabled !== true) return 0;
+  if (!network || network.hrp !== "prl") return 0;
+  if (!Number.isSafeInteger(totalGrains) || totalGrains <= 0) throw new Error("bad total for builder tip");
+  const tip = Number((BigInt(totalGrains) * BigInt(BUILDER_TIP_BPS)) / 10000n);
+  return tip >= DUST_GRAIN ? tip : 0;
+}
+
+/** Exact sweep plan for a single-input claim: the beneficiary receives
+ *  everything minus the exact fee (and minus the optional builder tip,
+ *  when explicitly enabled — the tip is its own second output, so the
+ *  fee is computed over 2 outputs). Throws when the remainder would be
+ *  dust (the funder must top the tranche up instead). */
+export function planClaimSweep({ inputValue, feeRateGrainsPerVByte, scriptLen, controlLen, network = NETWORKS.mainnet, builderTipEnabled = false }) {
   if (!Number.isSafeInteger(inputValue) || inputValue <= 0) throw new Error("bad input value");
   if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) throw new Error("bad fee rate");
-  const vBytes = spendVBytes({ nOut: 1, scriptLen, controlLen, stackLens: [64] });
+  const builderTip = builderTipGrainsFor(inputValue, network, builderTipEnabled === true);
+  const builderTipProgram = builderTip > 0 ? addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet) : null;
+  const vBytes = spendVBytes({ nOut: builderTip > 0 ? 2 : 1, scriptLen, controlLen, stackLens: [64] });
   const fee = Math.ceil(vBytes * feeRateGrainsPerVByte);
-  const payment = inputValue - fee;
+  const payment = inputValue - fee - builderTip;
   if (payment < DUST_GRAIN) {
+    if (builderTip > 0) {
+      throw new Error(`insufficient funds: ${inputValue} grains covers the ${fee}-grain fee and the ${builderTip}-grain builder tip but leaves < dust (${DUST_GRAIN}); top the tranche up or leave the builder tip off`);
+    }
     throw new Error(`insufficient funds: ${inputValue} grains covers the ${fee}-grain fee but leaves < dust (${DUST_GRAIN}); top the tranche up`);
   }
-  return { payment, fee, vBytes };
+  return { payment, fee, vBytes, builderTip, builderTipProgram };
 }
 
 /** Build, sign, and locally re-verify a single-tranche claim (or clawback)
- *  transaction. One UTXO in, ONE sweep output to `destinationProgram`.
+ *  transaction. One UTXO in, ONE sweep output to `destinationProgram`
+ *  (plus the optional builder-tip output when builderTipEnabled is set).
  *  nLockTime = tranche.lock, sequence = 0xfffffffe (non-final so CLTV is
  *  satisfied; RBF still signalled). The returned hex is only produced
  *  after the signature verifies. */
-export function buildClaimTx({ network, utxo, tranche, leaf, controlBlock, signerPriv, destinationProgram, feeRateGrainsPerVByte }) {
+export function buildClaimTx({ network, utxo, tranche, leaf, controlBlock, signerPriv, destinationProgram, feeRateGrainsPerVByte, builderTipEnabled = false }) {
   if (!network || !network.hrp) throw new Error("network required");
   if (!utxo || !/^[0-9a-f]{64}$/i.test(utxo.txid || "")) throw new Error("utxo.txid required");
   if (!Number.isInteger(utxo.vout) || utxo.vout < 0) throw new Error("utxo.vout required");
@@ -469,8 +506,20 @@ export function buildClaimTx({ network, utxo, tranche, leaf, controlBlock, signe
     feeRateGrainsPerVByte,
     scriptLen: leaf.length,
     controlLen: controlBlock.length,
+    network,
+    builderTipEnabled: builderTipEnabled === true,
   });
   const outputs = [{ program: destinationProgram, value: sweep.payment }];
+  if (sweep.builderTip > 0) {
+    // The tip program is derived here from the builder address constant,
+    // never taken from caller data — and asserted against the plan before
+    // it joins the outputs the sighash commits to.
+    const want = addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet);
+    if (!sweep.builderTipProgram || !constEq(sweep.builderTipProgram, want)) {
+      throw new Error("builder tip in the plan does not pay the builder address — refusing to sign");
+    }
+    outputs.push({ program: want, value: sweep.builderTip });
+  }
   const digest = scriptPathSigDigestEx(network, input, outputs, leaf, { sequence: MAX_SEQ_NONFINAL, locktime });
   // The signer must be the key committed in this leaf — a signature from any
   // other key verifies locally yet fails consensus. Parse the leaf shape:
@@ -505,6 +554,7 @@ export function buildClaimTx({ network, utxo, tranche, leaf, controlBlock, signe
   return {
     txid: spend.txid, hex: spend.hex,
     fee: sweep.fee, vBytes: spend.vBytes, payment: sweep.payment,
+    builderTip: sweep.builderTip, builderTipProgram: sweep.builderTipProgram,
     sigHex: bytesToHex(sig), digestHex: bytesToHex(digest),
     locktime, sequence: MAX_SEQ_NONFINAL,
     scriptAsm: scriptAsm(leaf),

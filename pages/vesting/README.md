@@ -38,6 +38,18 @@ broadcast through your own Blockbook endpoint.
 matured tranches through the clawback leaf with their own mnemonic or WIF.
 (Revocable means reclaim *after* maturity — never before.)
 
+## Builder tip (optional, disclosed)
+
+Claiming a tranche is a sole-signer sweep of funds the beneficiary
+controls, so Pearl Vesting offers an **optional 1% builder tip** on the
+Claim step — off by default, never automatic. Tick the box (it names the
+1% and the full builder address) and `builderTipGrainsFor()` computes
+the tip as its own output in the plan, before signing: the script-path
+sighash commits to every output, so the tip cannot be added or skimmed
+after signing, and the plan shows it as its own labeled line. It is
+waived on testnet and when 1% of the claim would fall below the
+546-grain dust floor (never rounded up). Clawback never carries a tip.
+
 ## Honest limits
 
 - A forged schedule is only a plan until the funder actually sends PRL to each
@@ -53,7 +65,7 @@ matured tranches through the clawback leaf with their own mnemonic or WIF.
 ## Verification
 
 - `node --no-warnings --loader ./tests/loader.mjs tests/vesting.test.mjs` —
-  15/15 core tests: locktime shapes, NUMS Taproot trees with independent
+  17/17 core tests: locktime shapes, NUMS Taproot trees with independent
   control-block verification, revocable/non-revocable tranches, linear/custom
   planning, dust and tranche-count constraints, descriptor round trips and
   tampering, exact claim-sweep fee math, full beneficiary claim and funder
@@ -61,7 +73,7 @@ matured tranches through the clawback leaf with their own mnemonic or WIF.
   exact PRL amount parsing (sub-grain and malformed amounts rejected, never
   silently rounded or truncated).
 - `node --no-warnings --loader ./tests/loader.mjs tests/dom.test.mjs` —
-  8/8 DOM integration tests against the real `index.html` + committed bundle:
+  11/11 DOM integration tests against the real `index.html` + committed bundle:
   forge → track → claim error paths, step navigation, footer attribution,
   rejection of misparsed custom amounts and impossible calendar dates.
 

@@ -270,6 +270,23 @@ test("claim: matured tranches listed; UTXO load needs Blockbook (honest error, n
   assert.deepEqual(errors, [], "console errors: " + errors.join(" | "));
 });
 
+test("builder tip: claim checkbox off by default, disclosure in page, bundle API exact", () => {
+  const box = $("claim-builder-tip");
+  assert.ok(box, "tip checkbox present in the claim form");
+  assert.notEqual(box.checked, true, "tip checkbox off by default");
+  assert.ok(html.includes("Optional builder tip — add 1% of the claimed amount"), "disclosure names the 1% in the page");
+  assert.ok(html.includes("Clawback never carries a tip"), "clawback exclusion disclosed in the page");
+  const src = fs.readFileSync(resolvePath(dir, "app.js"), "utf8");
+  assert.ok(src.includes("builderTipEnabled: $(\"claim-builder-tip\").checked === true"), "claim plan wires the checkbox into the core planner");
+  assert.ok(src.includes("Builder tip (optional, 1%)"), "claim review renders the tip as its own line before signing");
+  const V = E();
+  assert.equal(typeof V.builderTipGrainsFor, "function", "bundle exposes the tip API");
+  assert.equal(V.builderTipGrainsFor(100_000_000, V.NETWORKS.mainnet, true), 1_000_000);
+  assert.equal(V.builderTipGrainsFor(100_000_000, V.NETWORKS.mainnet, false), 0);
+  assert.equal(V.BUILDER_TIP_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
+  assert.deepEqual(errors, [], "console errors: " + errors.join(" | "));
+});
+
 test("forge rejects dust tranches honestly", () => {
   $("beneficiary").value = E().walletFromMnemonic(BEN_MNEMONIC, E().NETWORKS.mainnet).address;
   $("funder").value = FUNDER_MNEMONIC;
@@ -302,8 +319,8 @@ test("forge rejects silently-misparsed custom amounts and impossible dates", () 
   assert.ok(src.includes("E.parsePRLToGrains($(\"total\").value)"), "total uses exact parser");
   assert.ok(src.includes("E.parsePRLToGrains(m[4])"), "custom amounts use exact parser");
   assert.ok(!/parseFloat\([^)]*\)\s*\*\s*E\.GRAIN_PER_PRL/.test(src), "no float money parse remains");
-  assert.ok(html.includes("pearl-vesting.bundle.js?v=4"), "bundle cache pin");
-  assert.ok(html.includes("app.js?v=4"), "app cache pin");
+  assert.ok(html.includes("pearl-vesting.bundle.js?v=5"), "bundle cache pin");
+  assert.ok(html.includes("app.js?v=5"), "app cache pin");
   assert.deepEqual(errors, [], "console errors: " + errors.join(" | "));
 });
 
@@ -332,6 +349,6 @@ test("forge rejects silently-truncated tranche counts", () => {
   $("forge").click();
   assert.equal($("forge-err").hidden, false);
   assert.ok(/tranche count/.test($("forge-err").textContent), "error text: " + $("forge-err").textContent);
-  assert.ok(html.includes("app.js?v=4"), "app cache pin");
+  assert.ok(html.includes("app.js?v=5"), "app cache pin");
   assert.deepEqual(errors, [], "console errors: " + errors.join(" | "));
 });
