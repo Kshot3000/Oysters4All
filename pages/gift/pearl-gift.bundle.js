@@ -21,6 +21,10 @@ var PearlGift = (() => {
   // src/index.js
   var index_exports = {};
   __export(index_exports, {
+    BUILDER_TIP_ADDRESS: () => BUILDER_TIP_ADDRESS,
+    BUILDER_TIP_BPS: () => BUILDER_TIP_BPS,
+    BUILDER_TIP_NAME: () => BUILDER_TIP_NAME,
+    DONATE_ADDRESS: () => DONATE_ADDRESS,
     DUST_GRAIN: () => DUST_GRAIN,
     GIFT_ACCOUNT: () => GIFT_ACCOUNT,
     GRAIN_PER_PRL: () => GRAIN_PER_PRL,
@@ -29,6 +33,7 @@ var PearlGift = (() => {
     assertUtxosBelong: () => assertUtxosBelong,
     broadcastTx: () => broadcastTx,
     buildSweepTx: () => buildSweepTx,
+    builderTipGrainsFor: () => builderTipGrainsFor,
     bytesToHex: () => bytesToHex,
     cardPayload: () => cardPayload,
     createGift: () => createGift,
@@ -6070,6 +6075,18 @@ zoo`.split("\n");
 
   // src/gift-core.js
   var GIFT_ACCOUNT = 1e3;
+  var DONATE_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+  var BUILDER_TIP_BPS = 100;
+  var BUILDER_TIP_ADDRESS = DONATE_ADDRESS;
+  var BUILDER_TIP_NAME = "Builder tip (optional)";
+  function builderTipGrainsFor(totalGrains, network, enabled) {
+    if (enabled !== true) return 0n;
+    if (!network || network.hrp !== "prl") return 0n;
+    const total = BigInt(totalGrains);
+    if (total <= 0n) throw new Error("bad total for builder tip");
+    const tip = total * BigInt(BUILDER_TIP_BPS) / 10000n;
+    return tip >= BigInt(DUST_GRAIN) ? tip : 0n;
+  }
   var isHex64 = (s) => /^[0-9a-fA-F]{64}$/.test(s);
   var isWifLike = (s) => /^[1-9A-HJ-NP-Za-km-z]{40,60}$/.test(s);
   function createGift({ mnemonic = null, wif = null, privHex = null, account = GIFT_ACCOUNT, index = 0, network = NETWORKS.mainnet } = {}) {
@@ -6142,7 +6159,7 @@ zoo`.split("\n");
     if (gift.address !== String(obj.address || "")) throw new Error("card payload is inconsistent (address does not match key)");
     return { gift, to: String(obj.to || ""), from: String(obj.from || ""), message: String(obj.message || ""), design: String(obj.design || "abyss") };
   }
-  function planSweep({ utxos, recipient, feeRateGrainsPerVByte, network = NETWORKS.mainnet }) {
+  function planSweep({ utxos, recipient, feeRateGrainsPerVByte, network = NETWORKS.mainnet, builderTipEnabled = false }) {
     if (!Array.isArray(utxos) || utxos.length === 0) throw new Error("no UTXOs to sweep \u2014 the gift card looks empty");
     const dec = decodeBech32m(String(recipient || "").trim(), network.hrp);
     if (dec.version !== 1) throw new Error("recipient must be a Pearl v1 (Taproot) address");
@@ -6158,9 +6175,14 @@ zoo`.split("\n");
       seenUtxoOutpoints.add(outpointKey);
     }
     const total = utxos.reduce((a, u) => a + BigInt(u.value), 0n);
-    const fee = BigInt(keypathTxVBytes(utxos.length, 1)) * BigInt(rate);
-    const amount = total - fee;
+    const builderTip = builderTipGrainsFor(total, network, builderTipEnabled === true);
+    const builderTipDec = builderTip > 0n ? decodeBech32m(BUILDER_TIP_ADDRESS, "prl") : null;
+    const fee = BigInt(keypathTxVBytes(utxos.length, builderTip > 0n ? 2 : 1)) * BigInt(rate);
+    const amount = total - fee - builderTip;
     if (amount < BigInt(DUST_GRAIN)) {
+      if (builderTip > 0n) {
+        throw new Error(`dust: after the fee and the ${fmtPRL(builderTip)} builder tip the sweep pays ${fmtPRL(amount)} \u2014 below the ${fmtPRL(DUST_GRAIN)} dust floor. Load more PRL, lower the fee rate, or leave the builder tip off.`);
+      }
       throw new Error(`dust: after fees the sweep pays ${fmtPRL(amount)} \u2014 below the ${fmtPRL(DUST_GRAIN)} dust floor. Load more PRL or lower the fee rate.`);
     }
     return {
@@ -6170,7 +6192,10 @@ zoo`.split("\n");
       recipient: encodeBech32m(network.hrp, 1, dec.program),
       program: dec.program,
       feeRate: rate,
-      nIn: utxos.length
+      nIn: utxos.length,
+      builderTip,
+      builderTipAddress: builderTip > 0n ? BUILDER_TIP_ADDRESS : null,
+      builderTipProgram: builderTipDec ? builderTipDec.program : null
     };
   }
   function buildSweepTx({ privHex, utxos, plan, network = NETWORKS.mainnet }) {
@@ -6183,6 +6208,15 @@ zoo`.split("\n");
       return { txid: txid2, vout: u.vout, value: u.value, spk, priv: w.priv, internalXOnly: w.internalXOnly };
     });
     const outputs = [{ program: plan.program, value: Number(plan.amount) }];
+    const builderTip = BigInt(plan.builderTip ?? 0n);
+    if (builderTip > 0n) {
+      if (builderTip < BigInt(DUST_GRAIN)) throw new Error("builder tip in the plan is below the dust floor \u2014 refusing to sign");
+      const want = decodeBech32m(BUILDER_TIP_ADDRESS, "prl").program;
+      const got = plan.builderTipProgram;
+      const paysBuilder = got instanceof Uint8Array && got.length === 32 && got.every((b, i) => b === want[i]);
+      if (!paysBuilder) throw new Error("REFUSED \u2014 the plan carries a builder tip that does not pay the builder address.");
+      outputs.push({ program: want, value: Number(builderTip) });
+    }
     const { txid, hex } = buildKeypathTxEx(network, inputs, outputs, SIGHASH_DEFAULT);
     const prevouts = inputs.map((i) => ({ value: i.value, spk: i.spk }));
     const checks = verifySignedTx(network, hex, prevouts);

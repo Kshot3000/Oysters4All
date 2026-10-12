@@ -19,6 +19,20 @@ Live: https://kshot3000.github.io/Oysters4All/pages/gift/
    transaction. Signatures are re-verified locally before the hex is shown;
    only the finished transaction is broadcast.
 
+## Builder tip (optional, disclosed)
+
+Redeeming a gift is a sole-signer sweep of funds the card holder controls,
+so Pearl Gift offers an **optional 1% builder tip** on the Redeem step —
+off by default, never automatic. Tick the box (it names the 1% and the full
+builder address) and `builderTipGrainsFor()` computes the tip as its own
+output in the plan, before signing: the keypath sighash commits to every
+output, so the tip cannot be added or skimmed after signing, and the plan
+shows it as its own labeled line. It is waived on testnet and when 1% of
+the swept total would fall below the 546-grain dust floor (never rounded
+up). With the box off, the plan is identical to the pre-tip planner.
+Recipient: `prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`
+(the same operator address in every Gift footer).
+
 ## Crypto lineage (no new cryptography)
 
 - Keys: `walletFromMnemonic` / `walletFromWIF` / `walletFromPriv` from the
@@ -32,14 +46,18 @@ Live: https://kshot3000.github.io/Oysters4All/pages/gift/
 
 ## Tests
 
-- `tests/gift.test.mjs` — 7/7: gift-account known-answer vectors, WIF/hex
+- `tests/gift.test.mjs` — 9/9: gift-account known-answer vectors, WIF/hex
   round-trips, secret parsing, card-payload export/import + tamper detection,
   exact sweep fee math + dust/invalid-recipient refusals, full
   build → sign → verify cycle, tampered-amount rejection, wrong-key ownership
-  guard.
-- `tests/dom.test.mjs` — 5/5: boots the committed bundle + real `index.html`
+  guard, and the optional builder tip (exactness/waivers, tipped plan +
+  signed conservation with the tip output exact on the wire, rerouted-tip
+  refusal).
+- `tests/dom.test.mjs` — 6/6: boots the committed bundle + real `index.html`
   + `app.js` in a DOM shim and drives create → load → card → redeem, plus
-  hostile-`localStorage` fallback and footer-attribution checks.
+  hostile-`localStorage` fallback, footer-attribution checks, and the builder
+  tip (checkbox unchecked by default, opt-in renders the tip line before
+  signing, signed tx carries the tip output, opt-out restores the plan).
 - Real-browser QA (headless Chromium 152, `file://` + CDP,
   `hidden_files/qa-gift-browser.mjs`): 75/75 checks green — boot/assets/?v=
   keys, step nav, create (fresh + WIF/hex/mnemonic imports, all import error

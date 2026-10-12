@@ -187,6 +187,34 @@ test("flow: redeem -> plan -> sign (manual UTXOs, committed bundle)", () => {
   assert.ok(checks[0].ok, JSON.stringify(checks));
 });
 
+test("builder tip: opt-in renders the tip line pre-signing, signed tx carries it, opt-out restores", () => {
+  const { addr } = sandbox.__gift;
+  // checkbox exists and is off by default (shim leaves .checked unset)
+  assert.notEqual(getEl("builder-tip").checked, true, "tip checkbox off by default");
+  assert.ok(html.includes("Optional builder tip — add 1% of the swept total"), "disclosure names the 1% in the page");
+  // re-plan the same fixture with the tip opted in
+  setVal("utxo-paste", `${"aa".repeat(32)}:0 250000000 ${addr}`);
+  click("redeem-fetch");
+  assert.equal(getEl("redeem-error").hidden, true);
+  setVal("redeem-recipient", "prl1pr6yuq8u2r95wjzzgpdy8cpnncpl7l8zgy6x5q0367pnc53s2famqg7pt74");
+  setVal("fee-rate", "5");
+  getEl("builder-tip").checked = true;
+  click("redeem-plan");
+  assert.equal(getEl("sweep-error").hidden, true, "no plan error: " + getEl("sweep-error").textContent);
+  const summary = getEl("plan-summary").innerHTML;
+  assert.ok(summary.includes("Builder tip (optional, 1%)"), "tip line renders before signing");
+  assert.ok(summary.includes("prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d"), "tip row names the builder address");
+  click("build-sweep");
+  assert.equal(getEl("sweep-error").hidden, true, "no sweep error: " + getEl("sweep-error").textContent);
+  const dec = N.decodeRawTx(getEl("sweep-hex").value);
+  assert.equal(dec.outputs.length, 2, "signed tx carries the tip as its own output");
+  assert.equal(BigInt(dec.outputs[1].value), 2_500_000n, "tip is exactly 1% of 250,000,000 grains");
+  // opting back out restores the untipped plan
+  getEl("builder-tip").checked = false;
+  click("redeem-plan");
+  assert.ok(!getEl("plan-summary").innerHTML.includes("Builder tip"), "opt-out removes the tip line");
+});
+
 test("redeem: bad secrets are rejected with useful errors", () => {
   setVal("redeem-secret", "obviously not a key");
   click("redeem-derive");

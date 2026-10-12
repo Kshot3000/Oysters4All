@@ -271,13 +271,16 @@
         recipient: $("redeem-recipient").value,
         feeRateGrainsPerVByte: $("fee-rate").value,
         network: S.network,
+        builderTipEnabled: $("builder-tip").checked === true,
       });
       const p = S.plan;
       $("plan-summary").innerHTML =
         `<div class="prow"><span>Inputs</span><span>${p.nIn} UTXO${p.nIn === 1 ? "" : "s"} (${fmtPRL(p.total)})</span></div>` +
         `<div class="prow"><span>Fee (${p.feeRate} gr/vB)</span><span>${fmtPRL(p.fee)}</span></div>` +
+        (p.builderTip > 0n ? `<div class="prow"><span>Builder tip (optional, 1%)</span><span>${fmtPRL(p.builderTip)}</span></div>` : "") +
         `<div class="prow total"><span>You receive</span><span>${fmtPRL(p.amount)}</span></div>` +
-        `<div class="prow"><span>To</span><span><code>${esc(p.recipient)}</code></span></div>`;
+        `<div class="prow"><span>To</span><span><code>${esc(p.recipient)}</code></span></div>` +
+        (p.builderTip > 0n ? `<div class="prow"><span>Builder tip to</span><span><code>${esc(p.builderTipAddress)}</code></span></div>` : "");
       $("plan-summary").hidden = false;
       $("build-sweep").disabled = false;
     } catch (e) { err("sweep-error", e.message); }

@@ -9,6 +9,7 @@ import {
   createGift, parseGiftSecret,
   privateQrPayload, cardPayload, parseCardPayload,
   planSweep, buildSweepTx, assertUtxosBelong,
+  builderTipGrainsFor, BUILDER_TIP_ADDRESS, BUILDER_TIP_BPS,
   fmtPRL, decodeRawTx, verifySignedTx,
 } from "../src/gift-core.js";
 import {
@@ -146,6 +147,49 @@ test("buildSweepTx: full sign -> verify cycle, tamper detected", () => {
   })();
   const bad = verifySignedTx(NETWORKS.mainnet, tampered, prevouts);
   assert.ok(bad.some((c) => !c.ok), "tampered amount must fail verification");
+});
+
+test("builder tip: exactness, waivers, opt-in only", () => {
+  assert.equal(BUILDER_TIP_BPS, 100);
+  assert.equal(BUILDER_TIP_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
+  assert.equal(builderTipGrainsFor(350_000_000n, NETWORKS.mainnet, true), 3_500_000n);
+  assert.equal(builderTipGrainsFor(350_000_000n, NETWORKS.mainnet, false), 0n);
+  assert.equal(builderTipGrainsFor(350_000_000n, NETWORKS.mainnet, undefined), 0n);
+  assert.equal(builderTipGrainsFor(350_000_000n, NETWORKS.testnet, true), 0n, "testnet waived");
+  assert.equal(builderTipGrainsFor(10_000n, NETWORKS.mainnet, true), 0n, "sub-dust 1% waived, never rounded up");
+  assert.equal(builderTipGrainsFor(54_600n, NETWORKS.mainnet, true), 546n, "exactly dust is charged");
+});
+
+test("builder tip: tipped plan + signed tx carry the tip exact; off = pre-tip plan", () => {
+  const g = createGift({ mnemonic: MNEMONIC, network: NETWORKS.mainnet });
+  const utxos = [
+    { txid: "aa".repeat(32), vout: 0, value: 250_000_000 },
+    { txid: "bb".repeat(32), vout: 2, value: 100_000_000 },
+  ];
+  const off = planSweep({ utxos, recipient: VEC.account0, feeRateGrainsPerVByte: 7, network: NETWORKS.mainnet });
+  assert.equal(off.builderTip, 0n);
+  assert.equal(off.fee, BigInt(keypathTxVBytes(2, 1)) * 7n);
+  assert.equal(off.amount, off.total - off.fee);
+  const plan = planSweep({ utxos, recipient: VEC.account0, feeRateGrainsPerVByte: 7, network: NETWORKS.mainnet, builderTipEnabled: true });
+  assert.equal(plan.builderTip, 3_500_000n);
+  assert.equal(plan.fee, BigInt(keypathTxVBytes(2, 2)) * 7n, "fee computed over the extra output");
+  assert.equal(plan.amount, plan.total - plan.fee - plan.builderTip);
+  assert.equal(plan.builderTipAddress, BUILDER_TIP_ADDRESS);
+  const { hex } = buildSweepTx({ privHex: g.privHex, utxos, plan, network: NETWORKS.mainnet });
+  const dec = decodeRawTx(hex);
+  assert.equal(dec.outputs.length, 2);
+  assert.equal(dec.outputs[0].value, plan.amount);
+  assert.equal(BigInt(dec.outputs[1].value), 3_500_000n);
+  const want = decodeBech32m(BUILDER_TIP_ADDRESS, "prl");
+  assert.deepEqual([...dec.outputs[1].spk], [...p2trScriptPubKey(want.program)], "tip pays the builder program");
+  // conservation: outputs + fee = total
+  assert.equal(BigInt(dec.outputs[0].value) + BigInt(dec.outputs[1].value) + plan.fee, plan.total);
+  // a rerouted tip program is refused at signing (the flag is a trust claim)
+  const rerouted = { ...plan, builderTipProgram: new Uint8Array(32) };
+  assert.throws(() => buildSweepTx({ privHex: g.privHex, utxos, plan: rerouted, network: NETWORKS.mainnet }), /builder tip/);
+  // a tip that would leave dust for the recipient refuses loudly at plan time
+  const small = [{ txid: "dd".repeat(32), vout: 0, value: 60_000 }];
+  assert.throws(() => planSweep({ utxos: small, recipient: VEC.account0, feeRateGrainsPerVByte: 400, network: NETWORKS.mainnet, builderTipEnabled: true }), /builder tip/);
 });
 
 test("buildSweepTx refuses a key that doesn't own the inputs", () => {
