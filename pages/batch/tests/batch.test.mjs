@@ -15,6 +15,8 @@ import {
   buildUnsignedTx, buildDescriptor, exportUnsignedBundle, importUnsignedBundle,
   buildBatchTx, auditBatchTx, canonicalJson, descriptorFingerprint,
   BATCH_MAX_OUTPUTS, BATCH_DESCRIPTOR_KIND, BATCH_BUNDLE_KIND,
+  builderTipGrainsFor, applyBuilderTip,
+  BUILDER_TIP_BPS, BUILDER_TIP_ADDRESS, BUILDER_TIP_NAME,
 } from "../src/index.js";
 
 const N = NETWORKS.mainnet;
@@ -359,6 +361,76 @@ test("buildDescriptor: memo included, totals balance", () => {
   assert.match(fingerprint, /^[0-9a-f]{16}$/);
 });
 
+
+/* ---------------- builder tip (OPTIONAL, disclosed, default OFF) ---------------- */
+
+test("builderTipGrainsFor: 1% floor exact, waivers never rounded up", () => {
+  assert.equal(BUILDER_TIP_BPS, 100);
+  assert.equal(BUILDER_TIP_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
+  assert.equal(BUILDER_TIP_NAME, "Builder tip (optional)");
+  assert.equal(builderTipGrainsFor(1125000546n, N, true), 11250005n); // floor(1%)
+  assert.equal(builderTipGrainsFor(1125000546n, N, false), 0n); // off by default
+  assert.equal(builderTipGrainsFor(1125000546n, N, undefined), 0n);
+  assert.equal(builderTipGrainsFor(1125000546n, NETWORKS.testnet, true), 0n); // testnet waived
+  assert.equal(builderTipGrainsFor(10000n, N, true), 0n); // 100 grains < dust -> waived
+  assert.equal(builderTipGrainsFor(54600n, N, true), 546n); // exactly at the dust floor -> charged
+  assert.throws(() => builderTipGrainsFor(0n, N, true), /bad total/);
+});
+
+test("applyBuilderTip: appends flagged recipient, non-mutating, idempotent, off = identity", () => {
+  const recipients = threeRecipients(); // 6 PRL total
+  const off = applyBuilderTip(recipients, N, false);
+  assert.equal(off, recipients); // same list — byte-identical plan downstream
+  const tipped = applyBuilderTip(recipients, N, true);
+  assert.equal(recipients.length, 3); // original untouched
+  assert.equal(tipped.length, 4);
+  assert.equal(tipped[3].builderTip, true);
+  assert.equal(tipped[3].address, BUILDER_TIP_ADDRESS);
+  assert.equal(tipped[3].amount, 6000000n); // 1% of 6 PRL
+  assert.equal(tipped[3].program.length, 32);
+  assert.equal(applyBuilderTip(tipped, N, true), tipped); // idempotent
+});
+
+test("applyBuilderTip: tip at the 250-recipient cap refused loudly", () => {
+  const lines = [];
+  for (let i = 0; i < 250; i++) lines.push(`${senderOf((i + 2000).toString(16).padStart(64, "0"))}, 1`);
+  const { recipients } = parseRecipients(lines.join("\n"), N);
+  assert.equal(recipients.length, 250);
+  assert.throws(() => applyBuilderTip(recipients, N, true), /split the batch/);
+});
+
+test("builder tip: tipped plan + bundle round-trip + signed conservation", () => {
+  const tipped = applyBuilderTip(threeRecipients(), N, true);
+  const plan = planDispatch({ utxos: TWO_UTXOS, recipients: tipped, senderProgram: SENDER_PROGRAM, feeRateGrainsPerVByte: 20, network: N });
+  assert.equal(plan.sumOut, 606000000n); // 6 PRL manifest + 0.06 PRL tip
+  assert.equal(plan.nOut, 5); // 3 recipients + tip + change
+  assert.equal(plan.total, plan.sumOut + plan.fee + plan.change);
+  const bundle = exportUnsignedBundle({ network: N, senderAddress: SENDER, recipients: tipped, plan, feeRate: 20 });
+  assert.equal(bundle.descriptor.recipients[3].builderTip, true);
+  assert.equal(bundle.descriptor.recipients[3].address, BUILDER_TIP_ADDRESS);
+  const imp = importUnsignedBundle(JSON.parse(JSON.stringify(bundle)));
+  assert.equal(imp.recipients.length, 4);
+  assert.equal(imp.recipients[3].builderTip, true);
+  assert.equal(imp.recipients[3].amount, 6000000n);
+  assert.equal(imp.plan.sumOut, 606000000n);
+  const secret = parseBatchSecret(HEXKEY, N);
+  const { hex } = buildBatchTx({ secret, senderAddress: SENDER, utxos: TWO_UTXOS, plan, network: N });
+  const dec = decodeRawTx(hex);
+  assert.deepEqual(dec.outputs.map((o) => o.value), [100000000n, 200000000n, 300000000n, 6000000n, plan.change]);
+  // off = byte-identical unsigned wire to the pre-tip planner
+  const plain = planDispatch({ utxos: TWO_UTXOS, recipients: threeRecipients(), senderProgram: SENDER_PROGRAM, feeRateGrainsPerVByte: 20, network: N });
+  const offPlan = planDispatch({ utxos: TWO_UTXOS, recipients: applyBuilderTip(threeRecipients(), N, false), senderProgram: SENDER_PROGRAM, feeRateGrainsPerVByte: 20, network: N });
+  assert.equal(buildUnsignedTx(N, TWO_UTXOS, offPlan.outputs).hex, buildUnsignedTx(N, TWO_UTXOS, plain.outputs).hex);
+});
+
+test("importUnsignedBundle: tip flag on a non-builder address refused", () => {
+  const tipped = applyBuilderTip(threeRecipients(), N, true);
+  const plan = planDispatch({ utxos: TWO_UTXOS, recipients: tipped, senderProgram: SENDER_PROGRAM, feeRateGrainsPerVByte: 20, network: N });
+  const bundle = exportUnsignedBundle({ network: N, senderAddress: SENDER, recipients: tipped, plan, feeRate: 20 });
+  bundle.descriptor.recipients[3].address = A1; // reroute the "tip"
+  bundle.fingerprint = descriptorFingerprint(bundle.descriptor); // self-consistent fingerprint
+  assert.throws(() => importUnsignedBundle(bundle), /flagged as the builder tip/);
+});
 
 test("buildUnsignedTx: duplicate input outpoint refused", () => {
   // A duplicated outpoint in the unsigned wire would have cosigners sign a

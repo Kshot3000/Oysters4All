@@ -24,6 +24,8 @@
     senderAddress: "",
     utxos: [],                 // {txid, vout, value, confirmations, checked}
     autoSelect: true,
+    builderTip: false,         // OPTIONAL 1% builder tip — opt-in, default OFF
+    planRecipients: null,      // recipient list the current plan was built from (manifest + tip when opted in)
     plan: null,
     bundle: null,
     fingerprint: "",
@@ -123,6 +125,8 @@
   function resetWorkflow() {
     wipeKeys(true);
     state.manifest = null; state.senderAddress = ""; state.utxos = [];
+    state.builderTip = false; state.planRecipients = null;
+    const tipBox = $("f-tip"); if (tipBox) tipBox.checked = false;
     state.plan = null; state.bundle = null; state.fingerprint = "";
     state.signed = null; state.broadcastTxid = "";
     stopTracking();
@@ -172,9 +176,23 @@
 
   /* ---------- step 2: freight ---------- */
 
-  function selectedUtxos() {
+  /* The recipient list a plan is built from: the manifest, plus the
+   * OPTIONAL builder tip appended as its own recipient when (and only
+   * when) the sender ticked the Fund-step box. Off = the manifest itself,
+   * byte-identical to the pre-tip planner. */
+  function planRecipients() {
+    return R.applyBuilderTip(state.manifest.recipients, net(), state.builderTip);
+  }
+  function builderTipOf(recips) {
+    const t = recips.find((r) => r.builderTip);
+    return t ? t.amount : 0n;
+  }
+
+  function selectedUtxos(recips) {
+    const list = recips || planRecipients();
+    const total = list.reduce((a, r) => a + BigInt(r.amount), 0n);
     if (state.autoSelect) {
-      const r = R.autoSelectUtxos(state.utxos, state.manifest.total, feeRate(), state.manifest.recipients.length);
+      const r = R.autoSelectUtxos(state.utxos, total, feeRate(), list.length);
       return r.selected;
     }
     const sel = state.utxos.filter((u) => u.checked);
@@ -205,15 +223,18 @@
     hideErr("f-cover-err");
     if (!state.manifest) { kv.innerHTML = "<div><dt>Manifest</dt><dd>validate the manifest first (step 1)</dd></div>"; return; }
     try {
-      const sel = selectedUtxos();
+      const recips = planRecipients();
+      const tip = builderTipOf(recips);
+      const sel = selectedUtxos(recips);
       const plan = R.planDispatch({
-        utxos: sel, recipients: state.manifest.recipients,
+        utxos: sel, recipients: recips,
         senderProgram: R.decodeBech32m(state.senderAddress, net().hrp).program,
         feeRateGrainsPerVByte: feeRate(), network: net(),
       });
       const inSum = sel.reduce((a, u) => a + BigInt(u.value), 0n);
       kv.innerHTML =
         `<div><dt>Recipients</dt><dd>${plan.nOut - (plan.changeDropped ? 0 : 1)} → ${R.fmtPRL(plan.sumOut)} PRL</dd></div>` +
+        (tip > 0n ? `<div><dt>Builder tip</dt><dd>${R.fmtPRL(tip)} PRL → builder (optional, opted in)</dd></div>` : "") +
         `<div><dt>Inputs selected</dt><dd>${sel.length} UTXO(s) → ${R.fmtPRL(inSum)} PRL</dd></div>` +
         `<div><dt>Fee</dt><dd>${plan.fee} grains (${R.fmtPRL(plan.fee)} PRL) @ ${plan.feeRate} gr/vB × ${plan.vBytes} vB</dd></div>` +
         `<div><dt>Change</dt><dd>${plan.changeDropped ? `dust absorbed into fee (+${plan.changeBump} grains)` : R.fmtPRL(plan.change) + " PRL back to sender"}</dd></div>` +
@@ -265,17 +286,24 @@
   $("f-auto").addEventListener("change", () => { state.autoSelect = $("f-auto").checked; renderUtxos(); });
   $("f-all").addEventListener("click", () => { state.utxos.forEach((u) => { u.checked = true; }); renderUtxos(); });
   $("f-none").addEventListener("click", () => { state.utxos.forEach((u) => { u.checked = false; }); renderUtxos(); });
+  $("f-tip").addEventListener("change", () => {
+    state.builderTip = $("f-tip").checked;
+    state.planRecipients = null;
+    if (state.manifest) renderTotals();
+  });
   $("f-next").addEventListener("click", () => {
     if (!state.manifest) { goto("manifest"); return; }
     try {
       requireSender();
-      const sel = selectedUtxos();
+      const recips = planRecipients();
+      const sel = selectedUtxos(recips);
       const plan = R.planDispatch({
-        utxos: sel, recipients: state.manifest.recipients,
+        utxos: sel, recipients: recips,
         senderProgram: R.decodeBech32m(state.senderAddress, net().hrp).program,
         feeRateGrainsPerVByte: feeRate(), network: net(),
       });
       state.plan = plan;
+      state.planRecipients = recips;
       renderReview();
       goto("review");
     } catch (e) { showErr("f-err", "DISPATCH REFUSED: " + (e.message || e)); }
@@ -285,6 +313,8 @@
 
   function renderReview() {
     const plan = state.plan, m = state.manifest;
+    const recips = state.planRecipients || m.recipients;
+    const tip = builderTipOf(recips);
     $("r-refusal").hidden = true; $("r-out").hidden = true;
     const bal = plan.total - (plan.sumOut + plan.fee + plan.change);
     if (bal !== 0n) {
@@ -296,14 +326,15 @@
       `<div><dt>Sender</dt><dd title="${escapeHtml(state.senderAddress)}">${escapeHtml(shortAddr(state.senderAddress))}</dd></div>` +
       `<div><dt>Network</dt><dd>${net().label} (${net().hrp}1…)</dd></div>` +
       `<div><dt>Inputs</dt><dd>${plan.nIn} UTXO(s) → ${R.fmtPRL(plan.total)} PRL</dd></div>` +
-      `<div><dt>Recipients</dt><dd>${m.recipients.length} → ${R.fmtPRL(plan.sumOut)} PRL</dd></div>` +
+      `<div><dt>Recipients</dt><dd>${recips.length} → ${R.fmtPRL(plan.sumOut)} PRL</dd></div>` +
+      (tip > 0n ? `<div><dt>Builder tip</dt><dd>${R.fmtPRL(tip)} PRL → builder (optional, opted in — included above)</dd></div>` : "") +
       `<div><dt>Balance check</dt><dd style="color:var(--go)">inputs = recipients + fee + change — exact to the grain</dd></div>`;
-    $("r-rcount").textContent = `(${m.recipients.length})`;
+    $("r-rcount").textContent = `(${recips.length})`;
     const tb = $("r-tbody"); tb.innerHTML = "";
-    m.recipients.forEach((r, i) => {
+    recips.forEach((r, i) => {
       const tr = document.createElement("tr");
       tr.innerHTML = `<td class="mut">${i + 1}</td><td class="addr-short" title="${escapeHtml(r.address)}">${escapeHtml(shortAddr(r.address))}</td>` +
-        `<td>${R.fmtPRL(r.amount)} <span class="mut">PRL</span></td><td class="mut">${r.memo ? escapeHtml(r.memo) : "—"}</td>`;
+        `<td>${R.fmtPRL(r.amount)} <span class="mut">PRL</span></td><td class="mut">${r.memo ? escapeHtml(r.memo) : (r.builderTip ? escapeHtml(R.BUILDER_TIP_NAME) : "—")}</td>`;
       tb.appendChild(tr);
     });
     $("r-icount").textContent = `(${plan.inputs.length})`;
@@ -343,7 +374,7 @@
   function buildBundle() {
     const bundle = R.exportUnsignedBundle({
       network: net(), senderAddress: state.senderAddress,
-      recipients: state.manifest.recipients, plan: state.plan, feeRate: state.plan.feeRate,
+      recipients: state.planRecipients || state.manifest.recipients, plan: state.plan, feeRate: state.plan.feeRate,
     });
     state.bundle = bundle;
     state.fingerprint = bundle.fingerprint;
@@ -382,10 +413,19 @@
         $("network").value = state.network;
       }
       state.senderAddress = imp.senderAddress;
-      state.manifest = { recipients: imp.recipients, merged: 0, total: imp.recipients.reduce((a, r) => a + r.amount, 0n) };
+      // A flagged builder-tip recipient is separated back out of the
+      // manifest and the Fund-step box restored (Payroll pattern): the
+      // tip is a pure function of the manifest total, so re-planning
+      // from Fund recomputes the identical tip — it can never drift,
+      // double, or be edited into another amount.
+      const roster = imp.recipients.filter((r) => !r.builderTip);
+      state.builderTip = imp.recipients.some((r) => r.builderTip);
+      $("f-tip").checked = state.builderTip;
+      state.manifest = { recipients: roster, merged: 0, total: roster.reduce((a, r) => a + r.amount, 0n) };
+      state.planRecipients = imp.recipients;
       state.plan = imp.plan;
       state.fingerprint = imp.fingerprint;
-      state.bundle = R.exportUnsignedBundle({ network: imp.network, senderAddress: imp.senderAddress, recipients: imp.recipients, plan: imp.plan, feeRate: imp.feeRate });
+      state.bundle = R.exportUnsignedBundle({ network: imp.network, senderAddress: imp.senderAddress, recipients: state.planRecipients, plan: imp.plan, feeRate: imp.feeRate });
       $("s-fp").textContent = imp.fingerprint;
       $("s-unsigned-txid").textContent = state.bundle.unsignedTxid;
       $("s-bundle").value = JSON.stringify(state.bundle, null, 2);
@@ -431,7 +471,7 @@
   $("s-next").addEventListener("click", () => {
     if (!state.signed) return;
     $("b-txid").textContent = state.signed.txid;
-    $("b-nrecip").textContent = String(state.manifest.recipients.length);
+    $("b-nrecip").textContent = String((state.planRecipients || state.manifest.recipients).length);
     $("b-total").textContent = `${R.fmtPRL(state.plan.sumOut)} PRL`;
     $("b-fee").textContent = `${state.plan.fee} grains (${R.fmtPRL(state.plan.fee)} PRL)`;
     $("b-net").textContent = net().label;
@@ -478,7 +518,7 @@
       const res = await fetch(bb.replace(/\/$/, "") + "/api/v2/tx/" + txid);
       if (!res.ok) { $("b-track-msg").textContent = `Not on chain yet (HTTP ${res.status}) — still in mempool or propagating.`; return; }
       const j = await res.json();
-      const audit = R.auditBatchTx(j, { txid, senderAddress: state.senderAddress, recipients: state.manifest.recipients }, net());
+      const audit = R.auditBatchTx(j, { txid, senderAddress: state.senderAddress, recipients: state.planRecipients || state.manifest.recipients }, net());
       $("b-verify-out").hidden = false;
       const v = $("b-verdict");
       v.textContent = audit.verdict;

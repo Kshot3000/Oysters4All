@@ -64,6 +64,7 @@
       <li><strong>The unsigned bundle commits to the final txid.</strong> Under segwit rules the txid covers only the non-witness data, so the bundle's fingerprint and txid survive signing unchanged. Import re-verifies everything and refuses loudly on any mismatch — always pair a bundle with its fingerprint.</li>
       <li><strong>Blockbook is read-only until the single broadcast POST.</strong> UTXO scans, fee estimates and tracking are GET-only against the endpoint you configure. If it is unreachable, the page says so — it never presents guesses as data.</li>
       <li><strong>Secrets stay in this page.</strong> Keys you paste live in page memory only, are wiped automatically after signing, and are never written to storage or sent anywhere. Verify every address and amount out of band — start on testnet.</li>
+      <li><strong>Optional builder tip — off unless you tick it.</strong> The Fund step offers an opt-in tip of 1% of the dispatch total to the builder address in the footer. It is never automatic: unticked, no tip output exists. When ticked it appears as its own labeled recipient before you sign; mainnet only, and waived (never rounded up) when 1% would fall below the dust floor.</li>
     </ul>
   </section>
 
@@ -147,6 +148,9 @@
         <label class="check"><input type="checkbox" id="f-auto" checked> Auto-load: largest-first coin selection</label>
         <button class="btn ghost" id="f-all" type="button">Select all</button>
         <button class="btn ghost" id="f-none" type="button">Select none</button>
+      </div>
+      <div class="rowbtns">
+        <label class="check"><input type="checkbox" id="f-tip"> Add optional builder tip — 1% of the dispatch total to the builder, <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code> (off by default; shown as its own recipient before signing)</label>
       </div>
       <div class="tablewrap"><table class="manifest">
         <thead><tr><th></th><th>#</th><th>TXID</th><th>vout</th><th>Value</th><th>Conf</th></tr></thead>
@@ -323,7 +327,7 @@
   </div>
 </footer>
 
-<script src="pearl-batch.bundle.js?v=3"></script>
-<script src="app.js?v=3"></script>
+<script src="pearl-batch.bundle.js?v=4"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

@@ -26,11 +26,15 @@ var PearlBatch = (() => {
     BATCH_DESCRIPTOR_KIND: () => BATCH_DESCRIPTOR_KIND,
     BATCH_MAX_OUTPUTS: () => BATCH_MAX_OUTPUTS,
     BATCH_MAX_VBYTES: () => BATCH_MAX_VBYTES,
+    BUILDER_TIP_ADDRESS: () => BUILDER_TIP_ADDRESS,
+    BUILDER_TIP_BPS: () => BUILDER_TIP_BPS,
+    BUILDER_TIP_NAME: () => BUILDER_TIP_NAME,
     DUST_GRAIN: () => DUST_GRAIN,
     GRAIN_PER_PRL: () => GRAIN_PER_PRL,
     MAX_MEMO_LEN: () => MAX_MEMO_LEN,
     NETWORKS: () => NETWORKS,
     SIGHASH_DEFAULT: () => SIGHASH_DEFAULT,
+    applyBuilderTip: () => applyBuilderTip,
     assertKeyControlsAddress: () => assertKeyControlsAddress,
     assertUtxos: () => assertUtxos,
     auditBatchTx: () => auditBatchTx,
@@ -39,6 +43,7 @@ var PearlBatch = (() => {
     buildBatchTx: () => buildBatchTx,
     buildDescriptor: () => buildDescriptor,
     buildUnsignedTx: () => buildUnsignedTx,
+    builderTipGrainsFor: () => builderTipGrainsFor,
     bytesToHex: () => bytesToHex,
     canonicalAddress: () => canonicalAddress,
     canonicalJson: () => canonicalJson,
@@ -6281,6 +6286,38 @@ zoo`.split("\n");
       "prl1p5gfau0gepxzjkjyx9t88ewnhujrmpjqgqfh8v9vympjaz94x36jqpepvyt 10 contractor bonus"
     ].join("\n") + "\n";
   }
+  var BUILDER_TIP_BPS = 100;
+  var BUILDER_TIP_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+  var BUILDER_TIP_NAME = "Builder tip (optional)";
+  function builderTipGrainsFor(totalGrains, network, enabled) {
+    if (enabled !== true) return 0n;
+    if (!network || network.hrp !== "prl") return 0n;
+    const total = BigInt(totalGrains);
+    if (total <= 0n) throw new Error("bad total for builder tip");
+    const tip = total * BigInt(BUILDER_TIP_BPS) / 10000n;
+    return tip >= BigInt(DUST_GRAIN) ? tip : 0n;
+  }
+  function applyBuilderTip(recipients, network = NETWORKS.mainnet, enabled = false) {
+    if (!Array.isArray(recipients) || recipients.length === 0) throw new Error("bad recipient list for builder tip");
+    if (recipients.some((r) => r.builderTip)) return recipients;
+    const total = recipients.reduce((a, r) => a + BigInt(r.amount), 0n);
+    const tip = builderTipGrainsFor(total, network, enabled);
+    if (tip === 0n) return recipients;
+    if (recipients.length >= BATCH_MAX_OUTPUTS) {
+      throw new Error(
+        `builder tip would exceed the ${BATCH_MAX_OUTPUTS}-recipient cap \u2014 split the batch or leave the tip off`
+      );
+    }
+    const dec = decodeBech32m(BUILDER_TIP_ADDRESS, network.hrp);
+    if (dec.version !== 1 || dec.program.length !== 32) throw new Error("builder tip address is not a v1 Taproot address");
+    return [...recipients, {
+      address: BUILDER_TIP_ADDRESS,
+      program: dec.program,
+      amount: tip,
+      memo: null,
+      builderTip: true
+    }];
+  }
   function assertUtxos(utxos) {
     if (!Array.isArray(utxos) || utxos.length === 0) throw new Error("no UTXOs \u2014 fetch the sender's UTXOs or paste them first");
     for (const u of utxos) {
@@ -6415,7 +6452,8 @@ zoo`.split("\n");
       recipients: recipients.map((r) => ({
         address: r.address,
         amountGrains: r.amount.toString(),
-        memo: r.memo ?? null
+        memo: r.memo ?? null,
+        ...r.builderTip ? { builderTip: true } : {}
       })),
       inputs: plan.inputs.map((u) => ({
         txid: String(u.txid).toLowerCase(),
@@ -6478,7 +6516,10 @@ zoo`.split("\n");
       if (amount < BigInt(DUST_GRAIN)) throw new Error(`bundle recipient #${i + 1} is below dust \u2014 refusing`);
       const memo = r.memo == null ? null : String(r.memo);
       if (memo && memo.length > MAX_MEMO_LEN) throw new Error(`bundle recipient #${i + 1} memo too long`);
-      return { address, program: dec.program, amount, memo };
+      if (r.builderTip === true && address !== BUILDER_TIP_ADDRESS) {
+        throw new Error(`bundle recipient #${i + 1} is flagged as the builder tip but does not pay the builder address \u2014 refusing`);
+      }
+      return { address, program: dec.program, amount, memo, ...r.builderTip === true ? { builderTip: true } : {} };
     });
     const inputs = (d.inputs || []).map((u) => {
       if (!/^[0-9a-f]{64}$/i.test(String(u.txid || ""))) throw new Error("bundle input has a bad txid");

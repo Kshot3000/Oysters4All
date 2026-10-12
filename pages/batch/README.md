@@ -37,6 +37,24 @@ Five steps — **Recipients → Fund → Review → Sign → Broadcast**:
    tracking polls `/api/v2/tx/:txid`, and the standalone verifier audits any
    txid against any manifest independently.
 
+## Builder tip (optional, disclosed)
+
+The Fund step offers an **opt-in builder tip**: tick the box and the
+dispatch gains one extra recipient output — 1% of the dispatch total, to
+the builder address published in the page footer
+(`prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`).
+It is **off by default** — with the box unticked the recipient list is
+byte-identical to the pre-tip planner and no tip output exists. Mainnet
+only; when 1% would fall below the 546-grain dust floor the tip is
+waived, never rounded up. The sender is the sole signer and the tip
+joins the plan before signing, so the keypath sighash commits to it —
+it cannot be added or skimmed afterwards. It travels inside the
+unsigned bundle as a flagged recipient (a tampered tip fails the
+fingerprint check, and a flag on any other address is refused on
+import); importing a tipped bundle restores the ticked box with the
+tip separated back out of the manifest, so re-planning recomputes the
+identical amount.
+
 ## Honest limits (always on screen)
 
 - No smart contracts on Pearl — one plain P2TR transaction, max 250 recipients.
@@ -51,18 +69,19 @@ Five steps — **Recipients → Fund → Review → Sign → Broadcast**:
 - `node build.mjs` — rebuilds `pearl-batch.bundle.js` (esbuild IIFE,
   `window.PearlBatch`; crypto reuses the audited `../sign` modules — no new cryptography).
 - `node --no-warnings --loader ./tests/loader.mjs tests/batch.test.mjs` —
-  core engine tests (32/32): parsing, dust, duplicates ± merge, fee/change math
-  incl. dust-absorption, bundle round-trip + tamper refusal, signing, audit.
+  core engine tests (38/38): parsing, dust, duplicates ± merge, fee/change math
+  incl. dust-absorption, bundle round-trip + tamper refusal, signing, audit,
+  opt-in builder tip (math/waivers, cap refusal, signed conservation).
 - `node --no-warnings --loader ./tests/loader.mjs tests/batch.dom.test.mjs` —
   DOM integration tests driving the real `pearl-batch.bundle.js` + `app.js`
-  with a stubbed Blockbook (16/16): full 5-step wizard, manual/auto selection,
+  with a stubbed Blockbook (17/17): full 5-step wizard, manual/auto selection,
   bundle export/import, wrong-key refusal, key wipe, broadcast POST, tracking,
-  standalone verifier.
+  standalone verifier, builder-tip opt-in/opt-out.
 - `node ~/workspace/goals/pearl-blockchain-24-7-builder/hidden_files/qa-batch-browser.mjs` —
   headless-Chromium browser QA (file:// + CDP, stubbed Blockbook), 42/42 checks
   green, zero console/page errors.
 
-All JS/CSS references carry `?v=1` cache keys.
+All JS/CSS references carry `?v=` cache keys, bumped on every change.
 
 ## Attribution
 

@@ -423,5 +423,32 @@ test("address/txid title attributes are escaped (XSS audit latent queue)", () =>
   const src = fs.readFileSync(resolvePath(dir, "app.js"), "utf8");
   assert.ok(!/title="\$\{(r\.address|u\.txid|state\.senderAddress|e\.address)\}"/.test(src), "no raw title interpolation");
   assert.equal((src.match(/title="\$\{escapeHtml\(/g) || []).length, 5, "all five titles escaped");
-  assert.ok(html.includes('app.js?v=3'), "cache key bumped");
+  assert.ok(html.includes('app.js?v=4'), "cache key bumped");
+});
+
+test("builder tip: opt-in only — totals + review show it as its own recipient, off removes it", async () => {
+  assert.equal(get("f-tip").checked, false, "tip box unchecked by default");
+  assert.ok(!/Builder tip/.test(get("f-totals").textContent), "no tip line while off");
+  T.goto("freight");
+  get("f-tip").checked = true;
+  get("f-tip").fire("change");
+  await tick();
+  // manifest total is 1,125,000,546 grains -> 1% floor = 11,250,005 grains
+  assert.match(get("f-totals").textContent, /Builder tip/);
+  assert.match(get("f-totals").textContent, /0\.11250005 PRL/);
+  get("f-next").click();
+  await tick();
+  assert.ok(!get("step-review").hidden, "review visible");
+  assert.equal(get("r-tbody").children.length, 4, "tip is its own review row");
+  assert.match(get("r-summary").textContent, /Builder tip/);
+  assert.match(get("r-summary").textContent, /0\.11250005 PRL/);
+  // opting back out restores the pre-tip plan shape
+  T.goto("freight");
+  get("f-tip").checked = false;
+  get("f-tip").fire("change");
+  await tick();
+  assert.ok(!/Builder tip/.test(get("f-totals").textContent), "tip line gone when off");
+  get("f-next").click();
+  await tick();
+  assert.equal(get("r-tbody").children.length, 3, "back to 3 recipient rows");
 });
