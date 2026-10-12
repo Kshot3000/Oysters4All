@@ -20,6 +20,9 @@ var PearlSplit = (() => {
   // src/index.js
   var index_exports = {};
   __export(index_exports, {
+    BUILDER_TIP_ADDRESS: () => BUILDER_TIP_ADDRESS,
+    BUILDER_TIP_BPS: () => BUILDER_TIP_BPS,
+    BUILDER_TIP_NAME: () => BUILDER_TIP_NAME,
     DUST_GRAIN: () => DUST_GRAIN,
     MAX_EXPENSE_DESC_LEN: () => MAX_EXPENSE_DESC_LEN,
     MAX_MEMBERS: () => MAX_MEMBERS,
@@ -28,11 +31,13 @@ var PearlSplit = (() => {
     SPLIT_DESCRIPTOR_KIND: () => SPLIT_DESCRIPTOR_KIND,
     Sign: () => sign_core_exports,
     addExpense: () => addExpense,
+    applyBuilderTip: () => applyBuilderTip,
     applyDustPolicy: () => applyDustPolicy,
     assertKeyControlsAddress: () => assertKeyControlsAddress,
     autoSelectUtxos: () => autoSelectUtxos,
     broadcastViaBlockbook: () => broadcastViaBlockbook,
     buildSettlementTx: () => buildSettlementTx,
+    builderTipGrainsFor: () => builderTipGrainsFor,
     bytesToHex: () => bytesToHex,
     canonicalJson: () => canonicalJson,
     computeBalances: () => computeBalances,
@@ -6400,6 +6405,37 @@ zoo`.split("\n");
   var SPLIT_BUNDLE_KIND = "pearl-split-unsigned:v1:";
   var MAX_EXPENSE_DESC_LEN = 140;
   var MAX_MEMBERS = 100;
+  var BUILDER_TIP_BPS = 100;
+  var BUILDER_TIP_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+  var BUILDER_TIP_NAME = "Builder tip (optional)";
+  function builderTipGrainsFor(totalGrains, network, enabled) {
+    if (enabled !== true) return 0n;
+    if (!network || network.hrp !== "prl") return 0n;
+    const total = BigInt(totalGrains);
+    if (total <= 0n) throw new Error("bad total for builder tip");
+    const tip = total * BigInt(BUILDER_TIP_BPS) / 10000n;
+    return tip >= BigInt(DUST_GRAIN) ? tip : 0n;
+  }
+  function applyBuilderTip(debtorPlan, network = NETWORKS.mainnet, enabled = false) {
+    if (!debtorPlan || !Array.isArray(debtorPlan.recipients)) throw new Error("bad debtor plan");
+    if (debtorPlan.recipients.some((r) => r.builderTip)) return debtorPlan;
+    const total = debtorPlan.recipients.reduce((a, r) => a + BigInt(r.amount), 0n);
+    const tip = builderTipGrainsFor(total, network, enabled);
+    if (tip === 0n) return debtorPlan;
+    const dec = decodeBech32m(BUILDER_TIP_ADDRESS, network.hrp);
+    if (dec.version !== 1 || dec.program.length !== 32) throw new Error("builder tip address is not a v1 Taproot address");
+    return {
+      ...debtorPlan,
+      recipients: [...debtorPlan.recipients, {
+        name: BUILDER_TIP_NAME,
+        address: BUILDER_TIP_ADDRESS,
+        program: dec.program,
+        amount: tip,
+        builderTip: true
+      }],
+      builderTipGrains: tip
+    };
+  }
   function validateMember(name, address, network = NETWORKS.mainnet) {
     const nm = String(name ?? "").trim();
     if (!nm) throw new Error("member name is blank");
@@ -6617,7 +6653,8 @@ zoo`.split("\n");
       recipients: debtorPlan.recipients.map((r) => ({
         name: r.name,
         address: r.address,
-        amountGrains: r.amount.toString()
+        amountGrains: r.amount.toString(),
+        ...r.builderTip ? { builderTip: true } : {}
       })),
       inputs: plan.inputs.map((u) => ({
         txid: String(u.txid).toLowerCase(),
@@ -6671,7 +6708,7 @@ zoo`.split("\n");
       const dec = decodeBech32m(r.address, network.hrp);
       const amount = BigInt(r.amountGrains);
       if (amount < BigInt(DUST_GRAIN)) throw new Error(`bundle recipient #${i + 1} is below dust \u2014 refusing`);
-      return { name: String(r.name ?? ""), address, program: dec.program, amount };
+      return { name: String(r.name ?? ""), address, program: dec.program, amount, ...r.builderTip ? { builderTip: true } : {} };
     });
     const inputs = (d.inputs || []).map((u) => {
       if (!/^[0-9a-f]{64}$/i.test(String(u.txid || ""))) throw new Error("bundle input has a bad txid");

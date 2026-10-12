@@ -291,6 +291,63 @@ test("buildSettlementTx refuses a key that does not control the debtor address",
 
 /* ---------- ledger helpers ---------- */
 
+/* ---------- builder tip (optional, disclosed, default OFF) ---------- */
+
+test("builder tip: default off, testnet and sub-dust waived, 1% exact on mainnet", () => {
+  assert.equal(S.BUILDER_TIP_BPS, 100);
+  assert.equal(S.BUILDER_TIP_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
+  assert.equal(S.builderTipGrainsFor(100000000n, NET, false), 0n);
+  assert.equal(S.builderTipGrainsFor(100000000n, NET, undefined), 0n);
+  assert.equal(S.builderTipGrainsFor(100000000n, NET, true), 1000000n);
+  assert.equal(S.builderTipGrainsFor(100000000n, S.NETWORKS.testnet, true), 0n);
+  assert.equal(S.builderTipGrainsFor(10000n, NET, true), 0n, "100-grain tip is below dust — waived, never rounded up");
+  assert.equal(S.builderTipGrainsFor(54600n, NET, true), 546n, "tip exactly at dust floor is charged");
+});
+
+test("builder tip: applyBuilderTip is opt-in, non-mutating, idempotent, and funds grain-exact", () => {
+  const debtorSecret = S.parseBatchSecret(DEBTOR_PRIV, NET);
+  const plans = S.debtorPlans(
+    [{ from: 0, to: 1, grains: String(G("0.01")) }],
+    [{ name: "Deb", address: debtorSecret.address }, { name: "Cred", address: A[1] }], NET);
+  const off = S.applyBuilderTip(plans[0], NET, false);
+  assert.equal(off, plans[0], "disabled returns the plan unchanged");
+  assert.equal(off.recipients.length, 1);
+  const tipped = S.applyBuilderTip(plans[0], NET, true);
+  assert.equal(plans[0].recipients.length, 1, "original plan not mutated");
+  assert.equal(tipped.recipients.length, 2);
+  assert.equal(tipped.recipients[1].address, S.BUILDER_TIP_ADDRESS);
+  assert.equal(tipped.recipients[1].amount, 10000n, "1% of 0.01 PRL");
+  assert.equal(tipped.recipients[1].builderTip, true);
+  assert.equal(S.applyBuilderTip(tipped, NET, true), tipped, "second application is a no-op");
+  const utxos = [{ txid: "ab".repeat(32), vout: 0, value: Number(G("0.05")), confirmations: 3 }];
+  const plan = S.fundSettlement({ network: NET, debtorPlan: tipped, utxos, feeRateGrainsPerVByte: 2 });
+  assert.equal(plan.total, plan.sumOut + plan.fee + plan.change);
+  assert.equal(plan.sumOut, G("0.01") + 10000n, "tip counted in the funded sum");
+  const outs = plan.outputs.filter((o) => !o.change);
+  assert.equal(outs.length, 2);
+  assert.ok(outs.some((o) => o.address === S.BUILDER_TIP_ADDRESS && o.value === 10000));
+});
+
+test("builder tip: bundle round-trips with the tip and signing covers it", () => {
+  const debtorSecret = S.parseBatchSecret(DEBTOR_PRIV, NET);
+  const plans = S.debtorPlans(
+    [{ from: 0, to: 1, grains: String(G("0.01")) }],
+    [{ name: "Deb", address: debtorSecret.address }, { name: "Cred", address: A[1] }], NET);
+  const tipped = S.applyBuilderTip(plans[0], NET, true);
+  const utxos = [{ txid: "ab".repeat(32), vout: 0, value: Number(G("0.05")), confirmations: 3 }];
+  const plan = S.fundSettlement({ network: NET, debtorPlan: tipped, utxos, feeRateGrainsPerVByte: 2 });
+  const bundle = S.exportSplitBundle({ network: NET, debtorPlan: tipped, tabFingerprint: "aa".repeat(8), plan, feeRate: 2 });
+  const imp = S.importSplitBundle(bundle);
+  assert.equal(imp.recipients.length, 2);
+  assert.equal(imp.recipients[1].builderTip, true);
+  assert.equal(imp.recipients[1].address, S.BUILDER_TIP_ADDRESS);
+  const { txid, hex } = S.buildSettlementTx({ secret: debtorSecret, debtorAddress: debtorSecret.address, utxos, plan, network: NET });
+  assert.match(txid, /^[0-9a-f]{64}$/);
+  const dec = S.decodeRawTx(hex);
+  const outSum = dec.outputs.reduce((a, o) => a + o.value, 0n);
+  assert.equal(BigInt(utxos[0].value), outSum + plan.fee, "signed tx conserves inputs incl. tip");
+});
+
 test("ledger save/load round-trips and CSV exports balances", () => {
   const mem = {};
   const store = { getItem: (k) => mem[k] ?? null, setItem: (k, v) => { mem[k] = v; } };

@@ -267,6 +267,19 @@ test("pay step: fund from pasted UTXOs", () => {
   assert.match(get("pay-r-out").textContent, /CredA: 0.53333334 PRL/);
 });
 
+test("pay step: builder tip is off by default and opt-in adds its own labeled line", () => {
+  // the fund above ran with the box unchecked (the HTML default)
+  assert.equal(get("pay-tip").checked, false, "tip checkbox is unchecked by default");
+  assert.match(get("pay-r-tip").textContent, /none/, "no tip in the default plan");
+  get("pay-tip").checked = true;
+  click("pay-apply");
+  noErr("pay-error");
+  // Deb owes 53333334 grains → 1% tip = 533333 grains = 0.00533333 PRL
+  assert.match(get("pay-r-tip").textContent, /0\.00533333 PRL to builder/);
+  assert.ok(get("pay-r-tip").textContent.includes(P.BUILDER_TIP_ADDRESS), "tip line names the builder address");
+  assert.match(get("pay-r-out").textContent, /CredA: 0.53333334 PRL/, "creditor line unchanged by the tip");
+});
+
 test("pay step: wrong key is refused, right key signs and wipes", () => {
   set("pay-key", "11".repeat(32));
   click("pay-sign");

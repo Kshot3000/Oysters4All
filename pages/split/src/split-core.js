@@ -54,6 +54,55 @@ export const SPLIT_BUNDLE_KIND = "pearl-split-unsigned:v1:";
 export const MAX_EXPENSE_DESC_LEN = 140;
 export const MAX_MEMBERS = 100;
 
+/* ---------------- builder tip (OPTIONAL, disclosed, default OFF) ----------------
+ * Pearl Split settles the USER'S OWN debts, so unlike a venue fee this is
+ * never automatic: a debtor may OPT IN to add a builder tip of 1% of what
+ * they owe, as its own output in their settlement transaction, to the
+ * operator address published in every Split page footer. The checkbox in
+ * the Pay step is unchecked by default; with it off (or on testnet, or
+ * when 1% would fall below the 546-grain dust floor) the plan is
+ * byte-identical to the pre-tip planner — no tip output exists at all.
+ * When on, the tip is just another recipient in the debtor's plan BEFORE
+ * signing: the debtor is the sole signer and the keypath sighash commits
+ * to every output, so the tip cannot be added or altered after signing,
+ * and the unsigned-bundle descriptor carries it like any other recipient
+ * (a tampered tip fails the bundle fingerprint check on import). */
+export const BUILDER_TIP_BPS = 100; // 1%
+export const BUILDER_TIP_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+export const BUILDER_TIP_NAME = "Builder tip (optional)";
+
+/** Builder tip in grains for a debtor owing totalGrains, on network.
+ *  Returns 0n unless enabled === true, the network is mainnet, and the
+ *  1% floor reaches the dust floor (waived, never rounded up). */
+export function builderTipGrainsFor(totalGrains, network, enabled) {
+  if (enabled !== true) return 0n;
+  if (!network || network.hrp !== "prl") return 0n;
+  const total = BigInt(totalGrains);
+  if (total <= 0n) throw new Error("bad total for builder tip");
+  const tip = (total * BigInt(BUILDER_TIP_BPS)) / 10000n;
+  return tip >= BigInt(DUST_GRAIN) ? tip : 0n;
+}
+
+/** Return a debtor plan with the optional builder tip appended as its own
+ *  recipient (or the plan unchanged when the tip does not apply). The
+ *  original plan is never mutated; applying twice is a no-op. */
+export function applyBuilderTip(debtorPlan, network = NETWORKS.mainnet, enabled = false) {
+  if (!debtorPlan || !Array.isArray(debtorPlan.recipients)) throw new Error("bad debtor plan");
+  if (debtorPlan.recipients.some((r) => r.builderTip)) return debtorPlan;
+  const total = debtorPlan.recipients.reduce((a, r) => a + BigInt(r.amount), 0n);
+  const tip = builderTipGrainsFor(total, network, enabled);
+  if (tip === 0n) return debtorPlan;
+  const dec = decodeBech32m(BUILDER_TIP_ADDRESS, network.hrp);
+  if (dec.version !== 1 || dec.program.length !== 32) throw new Error("builder tip address is not a v1 Taproot address");
+  return {
+    ...debtorPlan,
+    recipients: [...debtorPlan.recipients, {
+      name: BUILDER_TIP_NAME, address: BUILDER_TIP_ADDRESS, program: dec.program, amount: tip, builderTip: true,
+    }],
+    builderTipGrains: tip,
+  };
+}
+
 /** Validate one member: non-blank name, real v1 Taproot address on the network.
  *  Throws loudly; returns { name, address, program }. */
 export function validateMember(name, address, network = NETWORKS.mainnet) {
@@ -288,6 +337,7 @@ export function exportSplitBundle({ network, debtorPlan, tabFingerprint, plan, f
     feeRate,
     recipients: debtorPlan.recipients.map((r) => ({
       name: r.name, address: r.address, amountGrains: r.amount.toString(),
+      ...(r.builderTip ? { builderTip: true } : {}),
     })),
     inputs: plan.inputs.map((u) => ({
       txid: String(u.txid).toLowerCase(), vout: u.vout,
@@ -341,7 +391,7 @@ export function importSplitBundle(bundle) {
     const dec = decodeBech32m(r.address, network.hrp);
     const amount = BigInt(r.amountGrains);
     if (amount < BigInt(DUST_GRAIN)) throw new Error(`bundle recipient #${i + 1} is below dust — refusing`);
-    return { name: String(r.name ?? ""), address, program: dec.program, amount };
+    return { name: String(r.name ?? ""), address, program: dec.program, amount, ...(r.builderTip ? { builderTip: true } : {}) };
   });
   const inputs = (d.inputs || []).map((u) => {
     if (!/^[0-9a-f]{64}$/i.test(String(u.txid || ""))) throw new Error("bundle input has a bad txid");

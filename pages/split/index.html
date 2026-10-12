@@ -152,6 +152,7 @@
     <div class="form-grid">
       <label>Debtor <select id="pay-debtor"></select></label>
       <label>Fee rate (grains/vB) <input id="pay-feerate" type="number" min="1" step="any" value="2"></label>
+      <label class="wide"><input type="checkbox" id="pay-tip"> Optional builder tip — add 1% of what this debtor owes as its own output to the builder (<code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>). <span class="hint">Off by default. Mainnet only; waived when 1% would fall below the 546-grain dust floor. Shown in the funding plan before you sign — never added after signing.</span></label>
       <label>Blockbook base URL <span class="hint">GET-only reads.</span>
         <input id="pay-blockbook" autocomplete="off" spellcheck="false" placeholder="https://…"></label>
       <label class="wide">…or paste UTXOs (JSON) <span class="hint">[{"txid":"…","vout":0,"value":grains}]</span>
@@ -167,6 +168,7 @@
       <dl class="kv">
         <div><dt>Inputs</dt><dd id="pay-r-ins"></dd></div>
         <div><dt>To creditors</dt><dd id="pay-r-out"></dd></div>
+        <div><dt>Builder tip</dt><dd id="pay-r-tip">none — tip is off</dd></div>
         <div><dt>Fee</dt><dd id="pay-r-fee"></dd></div>
         <div><dt>Change</dt><dd id="pay-r-change"></dd></div>
       </dl>
@@ -234,6 +236,9 @@
       air-gapped bundle flow for mainnet money.</li>
       <li><strong>Fees move.</strong> The fee rate you set is an estimate of network conditions at signing time;
       a broadcast tx can linger if the mempool is hot.</li>
+      <li><strong>Builder tip is optional.</strong> The Pay step offers an opt-in 1% builder tip, off by default.
+      It is never charged unless you tick the box, it appears as its own labeled output in the funding plan
+      before signing, and testnet settlements never carry it.</li>
     </ul>
   </section>
 </main>
@@ -244,7 +249,7 @@
   <p class="fine">Pearl has no smart contracts — every settlement here is plain Taproot keypath spends, planned grain-exact and signed in your browser.</p>
 </footer>
 
-<script src="pearl-split.bundle.js?v=4"></script>
-<script src="app.js?v=3"></script>
+<script src="pearl-split.bundle.js?v=5"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

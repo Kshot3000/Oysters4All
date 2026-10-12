@@ -57,6 +57,21 @@ Five steps: **Tab → Expenses → Settle → Pay → Ledger**.
 - Keys: pasted secrets live in memory only and are wiped after signing.
   Prefer the air-gapped bundle flow for mainnet money.
 
+## Builder tip (optional, disclosed)
+
+The Pay step offers an **opt-in builder tip**: tick the box and the debtor's
+settlement gains one extra output — 1% of what that debtor owes, to the
+builder address published in the page footer
+(`prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`).
+It is **off by default** — with the box unticked the plan is byte-identical
+to the pre-tip planner and no tip output exists. Mainnet only; when 1%
+would fall below the 546-grain dust floor the tip is waived, never rounded
+up. The tip is part of the plan before signing (the debtor is the sole
+signer and the sighash commits to every output), it is shown as its own
+labeled line in the funding plan, and it travels inside the air-gapped
+unsigned bundle like any other recipient, so a tampered tip fails the
+bundle fingerprint check on import.
+
 ## Architecture
 
 No new cryptography anywhere. Everything cryptographic — address
@@ -70,17 +85,18 @@ minimal-transfer computation, the dust policy, per-debtor planning,
 ## Tests
 
 - `node --no-warnings --loader ./tests/loader.mjs tests/split.test.mjs`
-  — 25/25: member validation (v0/non-v1/bad-HRP rejection), equal/shares/
+  — 29/29: member validation (v0/non-v1/bad-HRP rejection), equal/shares/
   percent split math with remainder distribution, grain-exactness,
   balance computation, greedy minimal-transfer optimality on fixtures
   (minimal transfer count), dust refusal, per-debtor funding
   (inputs == outputs + fee + change), bundle tamper-evidence, a full local
-  sign with per-signature re-verification, wrong-key refusal, and ledger
-  save/load + CSV.
-- `node --no-warnings tests/dom.test.mjs` — 8/8: drives the real committed
+  sign with per-signature re-verification, wrong-key refusal, the opt-in
+  builder tip (default-off / testnet / sub-dust waivers, 1% exactness,
+  bundle round-trip), and ledger save/load + CSV.
+- `node --no-warnings tests/dom.test.mjs` — 9/9: drives the real committed
   bundle through a vm DOM harness, Tab → Expenses → Settle → Pay (fund,
-  wrong-key refusal, sign + key wipe, double-confirm broadcast via a
-  stubbed fetch) → Ledger (record + CSV).
+  builder-tip opt-in, wrong-key refusal, sign + key wipe, double-confirm
+  broadcast via a stubbed fetch) → Ledger (record + CSV).
 - `node tests/split.browser.qa.mjs` — 27/27 real-browser checks green in
   headless Chromium (file:// + CDP, Blockbook stubbed in-page, zero
   console/page errors, zero missing assets): full wizard flow, unsigned

@@ -20,6 +20,7 @@
     expenses: [],       // addExpense() records
     settlement: null,   // settleTab() result
     plans: [],          // debtorPlans
+    effPlan: null,      // debtorPlan actually funded (with optional builder tip applied)
     utxos: null,
     plan: null,
     imported: null,
@@ -192,7 +193,7 @@
       const settled = P.settleTab({ tabName: S.tabName, members: S.members, expenses: S.expenses, network: S.network });
       S.settlement = settled;
       S.plans = P.debtorPlans(settled.payable, settled.members, S.network);
-      S.utxos = null; S.plan = null; S.imported = null; S.signed = []; S.bcast = {};
+      S.utxos = null; S.plan = null; S.imported = null; S.effPlan = null; S.signed = []; S.bcast = {};
       $("st-result").hidden = false;
 
       $("st-table-body").innerHTML = settled.members.map((m, i) => {
@@ -247,12 +248,16 @@
     const plan0 = curPlan();
     if (!plan0) throw new Error("no settlement to pay — compute the settlement first");
     const rate = Number($("pay-feerate").value);
-    const plan = P.fundSettlement({ network: S.network, debtorPlan: plan0, utxos, feeRateGrainsPerVByte: rate });
+    const eff = P.applyBuilderTip(plan0, S.network, $("pay-tip") ? $("pay-tip").checked === true : false);
+    S.effPlan = eff;
+    const plan = P.fundSettlement({ network: S.network, debtorPlan: eff, utxos, feeRateGrainsPerVByte: rate });
     S.utxos = utxos; S.plan = plan; S.imported = null;
     $("pay-result").hidden = false;
     $("pay-signed").hidden = true; $("pay-bcast").hidden = true;
     $("pay-r-ins").textContent = `${plan.inputs.length} UTXO(s) — ${g2p(plan.total)} PRL`;
-    $("pay-r-out").textContent = plan0.recipients.map((r) => `${r.name}: ${g2p(r.amount)} PRL`).join(" · ");
+    $("pay-r-out").textContent = eff.recipients.filter((r) => !r.builderTip).map((r) => `${r.name}: ${g2p(r.amount)} PRL`).join(" · ");
+    const tipR = eff.recipients.find((r) => r.builderTip);
+    $("pay-r-tip").textContent = tipR ? `${g2p(tipR.amount)} PRL to builder (optional, disclosed) — ${tipR.address}` : "none — tip is off";
     $("pay-r-fee").textContent = `${g2p(plan.fee)} PRL${plan.changeDropped ? ` (includes ${g2p(plan.changeBump)} dust change)` : ""}`;
     $("pay-r-change").textContent = plan.changeDropped ? "dropped to fee (dust)" : `${g2p(plan.change)} PRL back to ${esc(plan0.debtorName)}`;
   }
@@ -284,7 +289,7 @@
     err("pay-error");
     try {
       if (!S.plan) throw new Error("fund the payment first");
-      const plan0 = curPlan();
+      const plan0 = S.effPlan || curPlan();
       const bundle = P.exportSplitBundle({
         network: S.network, debtorPlan: plan0,
         tabFingerprint: S.settlement.fingerprint,
@@ -302,10 +307,12 @@
       if (imp.descriptor.debtorAddress.toLowerCase() !== plan0.debtorAddress.toLowerCase()) {
         throw new Error("bundle is for a different debtor — select the right debtor first");
       }
-      S.imported = imp; S.plan = imp.plan; S.utxos = imp.plan.inputs;
+      S.imported = imp; S.plan = imp.plan; S.utxos = imp.plan.inputs; S.effPlan = null;
       $("pay-result").hidden = false;
       $("pay-r-ins").textContent = `${imp.plan.inputs.length} UTXO(s) — ${g2p(imp.plan.total)} PRL (from bundle)`;
-      $("pay-r-out").textContent = imp.recipients.map((r) => `${esc(r.name)}: ${g2p(r.amount)} PRL`).join(" · ");
+      $("pay-r-out").textContent = imp.recipients.filter((r) => !r.builderTip).map((r) => `${esc(r.name)}: ${g2p(r.amount)} PRL`).join(" · ");
+      const impTip = imp.recipients.find((r) => r.builderTip);
+      $("pay-r-tip").textContent = impTip ? `${g2p(impTip.amount)} PRL to builder (optional, disclosed, from bundle) — ${impTip.address}` : "none — tip is off";
       $("pay-r-fee").textContent = `${g2p(imp.plan.fee)} PRL`;
       $("pay-r-change").textContent = imp.plan.changeDropped ? "dropped to fee (dust)" : `${g2p(imp.plan.change)} PRL change`;
     } catch (e) { err("pay-error", e.message); }
