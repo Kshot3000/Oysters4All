@@ -19,6 +19,7 @@ const PURSE = resolvePath(goalDir, "hidden_files/ecosystem-checkouts/buildandtes
 
 import {
   NETWORKS, PRLS, DUST_GRAIN,
+  LAUNCHER_FEE_GRAIN, LAUNCHER_FEE_ADDRESS, launcherFeeGrainsFor,
   encodeBech32m, decodeBech32m,
   walletFromMnemonic, walletFromWIF, walletToWIF, newMnemonic,
   tweakKeypath,
@@ -323,6 +324,79 @@ if (canParse) {
   try { buildKeypathTx(mainnet, [commitIn[0], commitIn[0]], [{ program: tweakedX, value: 1000 }]); }
   catch (e) { threw = /duplicate input outpoint/.test(e.message); }
   ok("buildKeypathTx duplicate input throws", threw);
+}
+
+/* 8. Launcher fee (disclosed): flat 0.05 PRL on mainnet reveals, waived on
+ * testnet, SEPARATE from the PRLS indexer-operator mint fee. The user is the
+ * sole signer and the fee output joins the reveal before signing. */
+{
+  ok("launcher fee is a flat 0.05 PRL", LAUNCHER_FEE_GRAIN === 5_000_000);
+  ok("launcher fee address is the operator/donation address",
+    LAUNCHER_FEE_ADDRESS === "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
+  ok("launcher fee charged on mainnet", launcherFeeGrainsFor(mainnet) === LAUNCHER_FEE_GRAIN);
+  ok("launcher fee waived on testnet", launcherFeeGrainsFor(NETWORKS.testnet) === 0);
+  ok("launcher fee refuses a bad network", (() => { try { launcherFeeGrainsFor(null); return false; } catch { return true; } })());
+
+  const launcherProg = decodeBech32m(LAUNCHER_FEE_ADDRESS, "prl").program;
+  // plain deploy with the launcher fee as reveal output [1]
+  const lFee = launcherFeeGrainsFor(mainnet);
+  const lRevealFee = revealTxVBytes(script.length, 2) * FEE;
+  const lCommitValue = lRevealFee + DUST_GRAIN + lFee;
+  const lcommit = buildKeypathTx(mainnet, commitIn, [
+    { program: cki.commitXOnly, value: lCommitValue },
+    { program: tweakedX, value: 500_000_000 - lCommitValue - commitFee },
+  ]);
+  const lreveal = buildRevealTx(mainnet, {
+    commitTxid: lcommit.txid, commitVout: 0, commitValue: lCommitValue,
+    commitProgram: cki.commitXOnly, internalPriv: w.priv,
+    script, controlBlock: cki.controlBlock,
+    outputs: [
+      { program: ownerProg, value: DUST_GRAIN },
+      { program: launcherProg, value: lFee },
+    ],
+  });
+  ok("launcher-fee reveal sig verifies", schnorr.verify(hexToBytes(lreveal.sig), hexToBytes(lreveal.digest), w.internalXOnly));
+  ok("launcher-fee output is in the serialized reveal", lreveal.hex.includes("5120" + bytesToHex(launcherProg)));
+  if (canParse) {
+    const parsed = parseReveal(lreveal.hex);
+    ok("launcher-fee reveal: indexer still parses + validates deploy", !parsed.error && parsed.op.op === "deploy" && parsed.op.tick === "kshot", parsed.error ?? "");
+  } else skip("launcher-fee indexer round-trip (checkout absent)");
+
+  // PRLS mint carrying BOTH fees: indexer fee matcher must still be satisfied
+  if (canParse) {
+    const feeProgHex = "0effd3c4e44fd3886e8c1ebe943138fa6a944e21e4bbe7e2d9ab800b7f4c4ffa";
+    const feeProg = hexToBytes(feeProgHex);
+    const feeAddr = encodeBech32m("prl", 1, feeProg);
+    const mintJson = buildMintJson({ tick: "prls", amt: "100000" });
+    const mscript = buildInscriptionScript(w.internalXOnly, utf8ToBytes(mintJson));
+    const mcki = commitKeyInfo(mainnet, w.internalXOnly, mscript);
+    const bFee = revealTxVBytes(mscript.length, 3) * FEE;
+    const bCommitValue = bFee + DUST_GRAIN + PRLS.mintFeeGrain + lFee;
+    const bcommit = buildKeypathTx(mainnet, commitIn, [{ program: mcki.commitXOnly, value: bCommitValue }, { program: tweakedX, value: 500_000_000 - bCommitValue - commitFee }]);
+    const breveal = buildRevealTx(mainnet, {
+      commitTxid: bcommit.txid, commitVout: 0, commitValue: bCommitValue,
+      commitProgram: mcki.commitXOnly, internalPriv: w.priv,
+      script: mscript, controlBlock: mcki.controlBlock,
+      outputs: [
+        { program: ownerProg, value: DUST_GRAIN },
+        { program: feeProg, value: PRLS.mintFeeGrain },
+        { program: launcherProg, value: lFee },
+      ],
+    });
+    const parsed = parseReveal(breveal.hex);
+    ok("both-fees prls reveal: indexer parses", !parsed.error && parsed.op.op === "mint", parsed.error ?? "");
+    const policy = normalizeMintFeePolicy({
+      required: true, valueGrain: String(PRLS.mintFeeGrain),
+      address: feeAddr, scriptPubKey: "5120" + feeProgHex,
+    });
+    const outs = [
+      { scriptPubKey: "5120" + bytesToHex(ownerProg), valueGrain: String(DUST_GRAIN) },
+      { scriptPubKey: "5120" + feeProgHex, valueGrain: String(PRLS.mintFeeGrain) },
+      { scriptPubKey: "5120" + bytesToHex(launcherProg), valueGrain: String(lFee) },
+    ];
+    const res = findMintFeePayment(outs, policy);
+    ok("both-fees prls mint: indexer fee matcher still satisfied by the PRLS output alone", res.paid && res.paidGrain === String(PRLS.mintFeeGrain), JSON.stringify(res));
+  } else skip("both-fees prls matcher (checkout absent)");
 }
 
 console.log(`\n${pass} passed, ${fail} failed${skipped ? `, ${skipped} skipped` : ""}`);

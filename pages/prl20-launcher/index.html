@@ -288,6 +288,12 @@
 
       <div class="card">
         <h2>3 · Build transactions</h2>
+        <p class="hint"><strong>Launcher fee (disclosed):</strong> mainnet launches add a flat
+          <strong>0.05 PRL</strong> launcher fee as its own output in the reveal transaction, paid to the
+          builder address in the footer below — you will see it as its own line in the cost breakdown
+          before you sign or broadcast anything. Testnet launches pay none. This fee is separate from
+          the network (miner) fees, and separate from the PRLS 1 PRL mint fee, which goes to the
+          Pearlscriptions indexer operator, not to the builder.</p>
         <div id="l-cost" class="costbox hidden"></div>
         <div class="row">
           <button class="btn" id="l-build" type="button">Build commit + reveal</button>
@@ -358,6 +364,8 @@
           it carries the whole inscription in its witness). The launcher estimates both from the
           actual serialized sizes and shows a full cost breakdown before you sign anything.
           PRLS mints additionally pay a <strong>1 PRL</strong> launch fee to the operator's fee recipient.
+          Mainnet launches built here also pay a disclosed flat <strong>0.05 PRL launcher fee</strong> to the
+          builder (its own output in the reveal, shown in the cost breakdown before signing); testnet launches pay none.
         </p>
         <h3>Safety notes</h3>
         <ul class="checks">
@@ -384,7 +392,7 @@
 </main>
 
 <script src="qrcode.min.js?v=1"></script>
-<script src="pearl-bundle.js?v=2"></script>
-<script src="app.js?v=2"></script>
+<script src="pearl-bundle.js?v=3"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>

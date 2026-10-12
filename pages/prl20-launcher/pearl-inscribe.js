@@ -69,6 +69,23 @@ export const PRLS = Object.freeze({
   mintFeeGrain: 100_000_000,
 });
 
+/* Launcher fee (DISCLOSED — profit mandate): a flat 0.05 PRL per launch on
+ * mainnet, added by the launcher itself as an extra output of the REVEAL tx
+ * (after the owner output, and after the PRLS indexer-operator fee when one
+ * applies). The user is the sole signer of both commit and reveal and sees
+ * the fee in the cost breakdown before signing or broadcasting anything, so
+ * the fee is in the plan before any signature exists — it cannot be added
+ * or skimmed afterwards. Testnet launches pay no launcher fee. This fee is
+ * OURS (the launcher operator, same address as the footer donation address)
+ * and is entirely separate from the PRLS 1 PRL protocol mint fee above,
+ * which goes to the Pearlscriptions indexer operator — never conflate them. */
+export const LAUNCHER_FEE_GRAIN = 5_000_000; // 0.05 PRL flat per mainnet launch
+export const LAUNCHER_FEE_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+export function launcherFeeGrainsFor(network) {
+  if (!network || typeof network.id !== "string") throw new Error("bad network");
+  return network.id === "mainnet" ? LAUNCHER_FEE_GRAIN : 0;
+}
+
 /* ---------------- bech32m (audited, from pearlpurse) ---------------- */
 
 const CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";

@@ -14,7 +14,7 @@ on GitHub Pages.
   mint inscriptions (PRL-20 has no premine field).
 - **Mint designer** — custom tickers plus curated examples. PRLS mints lock the
   fixed `100000` amount and require the operator's fee-recipient address for the
-  1 PRL launch fee (never guessed — you paste it from your indexer operator).
+  1 PRL protocol mint fee (never guessed — you paste it from your indexer operator).
 - **Wallet** — BIP-39 mnemonic → BIP-86 (`m/86'/coin'/0'/0/0`) Taproot wallet,
   address QR, WIF import. Keys live in memory only and are never persisted.
 - **Launch** — fetches UTXOs from your Blockbook, estimates fees from real
@@ -25,6 +25,23 @@ on GitHub Pages.
 - **Directory** — live token list from your Pearlscriptions indexer (`GET /tokens`,
   read-only), with supply progress and per-token detail.
 - **Learn** — why commit→reveal exists and how fees work.
+
+## Launcher fee (disclosed)
+
+Mainnet launches built with this launcher pay a flat **0.05 PRL launcher fee**
+(5,000,000 grains), added as its own output in the reveal transaction — after
+the owner output (so inscription assignment is unaffected) and after the PRLS
+indexer-operator fee when one applies. It is paid to the builder address
+`prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d` (the same
+address as the donation footer), and it is shown as its own line in the cost
+breakdown **before** anything is signed or broadcast — no hidden fees.
+Testnet launches pay no launcher fee.
+
+This fee is entirely separate from the PRLS **1 PRL** protocol mint fee,
+which goes to the Pearlscriptions **indexer operator's** fee recipient (an
+address you supply from your indexer operator / release manifest) — not to
+the launcher builder. `launcherFeeGrainsFor(network)` in `pearl-inscribe.js`
+is the single source of the launcher-fee amount and waiver.
 
 ## Protocol notes
 

@@ -387,6 +387,12 @@ $("l-build").addEventListener("click", () => {
     const feeProg = feeRecipientForOp();
     const outputs = [{ program: P.decodeBech32m(wallet.address, net().hrp).program, value: P.DUST_GRAIN }];
     if (feeProg) outputs.push({ program: feeProg, value: P.PRLS.mintFeeGrain });
+    // Disclosed launcher fee: flat mainnet fee as its own reveal output,
+    // after the owner output (inscription assignment is unaffected) and
+    // after any PRLS indexer-operator fee. Shown in the cost breakdown
+    // before anything is signed or broadcast. Testnet: waived (0).
+    const launcherFee = P.launcherFeeGrainsFor(net());
+    if (launcherFee) outputs.push({ program: P.decodeBech32m(P.LAUNCHER_FEE_ADDRESS, net().hrp).program, value: launcherFee, launcherFee: true });
     const outSum = outputs.reduce((a, o) => a + o.value, 0);
 
     // two-pass commit sizing: assume change output, drop it if below dust
@@ -418,7 +424,7 @@ $("l-build").addEventListener("click", () => {
       outputs,
     });
 
-    launch.built = { commit, reveal, cki, commitValue, commitFee, change: changeShown, revealFee: P.revealTxVBytes(script.length, outputs.length) * rate, outputs, feeProg: !!feeProg };
+    launch.built = { commit, reveal, cki, commitValue, commitFee, change: changeShown, revealFee: P.revealTxVBytes(script.length, outputs.length) * rate, outputs, feeProg: !!feeProg, launcherFee };
     renderBuilt();
     updateConn("transactions built — nothing broadcast", "on");
   } catch (e) {
@@ -439,7 +445,8 @@ function renderBuilt() {
     ["Reveal fee", fmtPRL(b.revealFee)],
     ["Reveal owner output", fmtPRL(P.DUST_GRAIN)],
   ];
-  if (b.feeProg) rows.push(["PRLS launch fee", fmtPRL(P.PRLS.mintFeeGrain)]);
+  if (b.feeProg) rows.push(["PRLS mint fee (to indexer operator)", fmtPRL(P.PRLS.mintFeeGrain)]);
+  if (b.launcherFee) rows.push(["Launcher fee (disclosed, to builder)", fmtPRL(b.launcherFee)]);
   if (b.change) rows.push(["Change back to wallet", fmtPRL(b.change)]);
   rows.push(["Total from wallet", "<b>" + fmtPRL(b.commitValue + b.commitFee) + "</b>"]);
   $("l-cost").innerHTML = rows.map(([k, v]) => `<div class="krow"><span>${k}</span><span class="mono">${v}</span></div>`).join("");
