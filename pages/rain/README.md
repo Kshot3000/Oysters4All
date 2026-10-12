@@ -24,6 +24,22 @@ Live: https://kshot3000.github.io/Oysters4All/pages/rain/
    input signature is re-verified locally before the hex is exposed. Broadcast
    via Blockbook is an explicit, confirmed action.
 
+## Builder tip (optional, disclosed)
+
+Rain spends the funder's own funds, so the builder tip is **opt-in and off
+by default** — never automatic. Ticking the Plan-step box adds 1% of the
+rain total as its own recipient output to the builder
+(`prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`, the
+same address in the footer below), computed by `builderTipGrainsFor()` in
+`src/rain-core.js` (floor of 1% in BigInt grains). The tip joins the plan
+**before** signing and the funder is the sole signer, so the keypath
+sighash commits to it — it cannot be added or skimmed after signing. The
+plan shows it as its own labeled line before anything is signed. Waived
+on testnet, and waived when 1% would fall below the 546-grain dust floor
+(never rounded up). `applyBuilderTip()` refuses when the tip would push
+the rain past the 250-recipient cap, and `planRain()` refuses any
+recipient flagged as the tip that does not pay the builder address.
+
 ## Crypto lineage (no new cryptography)
 
 - Keys: `walletFromMnemonic` / `walletFromWIF` / `walletFromPriv` from the
@@ -38,15 +54,20 @@ Live: https://kshot3000.github.io/Oysters4All/pages/rain/
 
 ## Tests
 
-- `tests/rain.test.mjs` — 9/9: funder known-answer vector + secret-form
+- `tests/rain.test.mjs` — 13/13: funder known-answer vector + secret-form
   round-trips, recipient parsing (formats, units, merge, dust, rejects,
   250-output cap), sample CSV, exact plan fee math with change, dust-change
   absorption, insufficient-funds refusal, manual-UTXO parsing + belong-check,
   full build → sign → verify cycle with on-chain output accounting, wrong-key
-  signatures failing verification against the funded UTXOs.
-- `tests/dom.test.mjs` — 5/5: boots the committed bundle + real `index.html`
+  signatures failing verification against the funded UTXOs, and the optional
+  builder tip (exactness/waivers, non-mutating idempotent apply, cap refusal,
+  tipped plan + signed conservation with the tip output exact on the wire,
+  rerouted-flag refusal).
+- `tests/dom.test.mjs` — 6/6: boots the committed bundle + real `index.html`
   + `app.js` in a DOM shim and drives funder → recipients → plan → sign
-  (manual air-gapped UTXOs), plus hostile-`localStorage` fallback and
+  (manual air-gapped UTXOs), the builder-tip opt-in (unchecked by default,
+  tip line in the plan, tip output in the signed tx, opt-out restores the
+  untipped plan), plus hostile-`localStorage` fallback and
   footer-attribution checks.
 - Real-browser QA (headless Chromium, `file://` + CDP): 29/29 checks green —
   full funder → recipients → plan → sign → stubbed-broadcast flow, sample CSV

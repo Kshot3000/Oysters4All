@@ -151,6 +151,7 @@
     <p class="lede">Exact fee math up front: one transaction, N outputs, change back to the funder.
       Nothing is signed until you approve the plan.</p>
     <div class="panel">
+      <label><input type="checkbox" id="plan-tip"> Optional builder tip — add 1% of the rain total as its own output to the builder (<code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>). Off by default. Mainnet only; waived when 1% would fall below the 546-grain dust floor. Shown as its own labeled line in the plan before you sign — never added after signing.</label>
       <div class="row">
         <button id="plan-button" class="primary">Compute plan</button>
       </div>
@@ -200,6 +201,7 @@
       <li>UTXO fetching and broadcast need a Blockbook endpoint you configure (mainnet default:
         <code>https://blockbook.pearlresearch.ai</code>). The air-gapped paste mode never touches the network
         until broadcast.</li>
+      <li><strong>Builder tip is optional.</strong> The Plan step offers an opt-in 1% builder tip, off by default. It is never charged unless you tick the box, it appears as its own labeled line in the plan before signing, and testnet rains never carry it.</li>
       <li>No send was executed during development — this page needs your funds and your explicit broadcast.</li>
     </ul>
   </section>
@@ -210,7 +212,7 @@
   <p>Tips: <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code></p>
 </footer>
 
-<script src="pearl-rain.bundle.js?v=3"></script>
-<script src="app.js?v=2"></script>
+<script src="pearl-rain.bundle.js?v=4"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>

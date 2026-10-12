@@ -9,6 +9,7 @@ import {
   parseRainSecret, parseRecipients, sampleRainCsv, assertUtxosBelong,
   parseManualUtxos,
   planRain, buildRainTx,
+  builderTipGrainsFor, applyBuilderTip, BUILDER_TIP_ADDRESS, BUILDER_TIP_NAME,
   fmtPRL, parsePRL, decodeRawTx, verifySignedTx,
 } from "../src/rain-core.js";
 import {
@@ -192,6 +193,68 @@ test("buildRainTx: wrong-key signatures do not verify against the funded UTXOs",
   assert.ok(checks.length > 0 && checks.every((c) => !c.ok), "wrong-key sigs must fail verification");
 });
 
+
+test("builderTipGrainsFor: exact 1% floor + waivers", () => {
+  assert.equal(BUILDER_TIP_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
+  assert.equal(BUILDER_TIP_NAME, "Builder tip (optional)");
+  assert.equal(builderTipGrainsFor(175000000n, NETWORKS.mainnet, true), 1750000n, "1% exact");
+  assert.equal(builderTipGrainsFor(175000099n, NETWORKS.mainnet, true), 1750000n, "floored, never rounded up");
+  assert.equal(builderTipGrainsFor(175000000n, NETWORKS.mainnet, false), 0n, "off by default");
+  assert.equal(builderTipGrainsFor(175000000n, NETWORKS.mainnet, undefined), 0n, "only === true enables");
+  assert.equal(builderTipGrainsFor(175000000n, NETWORKS.testnet, true), 0n, "testnet waived");
+  assert.equal(builderTipGrainsFor(40000n, NETWORKS.mainnet, true), 0n, "sub-dust 1% waived, not rounded up");
+  assert.equal(builderTipGrainsFor(54600n, NETWORKS.mainnet, true), 546n, "1% landing exactly on dust is charged");
+});
+
+test("applyBuilderTip: non-mutating, idempotent, cap refusal", () => {
+  const { recipients } = parseRecipients(`${R1} 1.25\n${R2} 0.5`, NETWORKS.mainnet);
+  const off = applyBuilderTip(recipients, NETWORKS.mainnet, false);
+  assert.equal(off, recipients, "off returns the list unchanged");
+  const on = applyBuilderTip(recipients, NETWORKS.mainnet, true);
+  assert.equal(recipients.length, 2, "original list never mutated");
+  assert.equal(on.length, 3);
+  assert.equal(on[2].builderTip, true);
+  assert.equal(on[2].address, BUILDER_TIP_ADDRESS);
+  assert.equal(on[2].amount, 1750000n);
+  assert.equal(applyBuilderTip(on, NETWORKS.mainnet, true), on, "applying twice is a no-op");
+  // at the cap the tip refuses loudly instead of failing later in the planner
+  const atCap = Array.from({ length: MAX_OUTPUTS }, () => ({ address: R1, program: recipients[0].program, amount: 100000n }));
+  assert.throws(() => applyBuilderTip(atCap, NETWORKS.mainnet, true), /builder tip would exceed/);
+});
+
+test("planRain + buildRainTx: tipped rain signs, conserves, tip output exact", () => {
+  const f = parseRainSecret(MNEMONIC, NETWORKS.mainnet);
+  const utxos = [{ txid: "aa".repeat(32), vout: 0, value: 1_000_000_000 }];
+  const { recipients } = parseRecipients(`${R1} 3.5\n${R2} 1.25`, NETWORKS.mainnet);
+  const tipped = applyBuilderTip(recipients, NETWORKS.mainnet, true);
+  const plan = planRain({ utxos, recipients: tipped, funderProgram: f.program, feeRateGrainsPerVByte: 5 });
+  assert.equal(plan.builderTip, 4750000n, "1% of 4.75 PRL");
+  assert.equal(plan.sumOut, 475000000n + 4750000n, "sumOut includes the tip");
+  assert.equal(plan.outputs.filter((o) => o.builderTip).length, 1);
+  assert.equal(plan.total, plan.sumOut + plan.fee + plan.change, "accounting closes with the tip");
+
+  const { txid, hex } = buildRainTx({ privHex: f.privHex, utxos, plan });
+  const dec = decodeRawTx(hex);
+  assert.equal(dec.txid, txid);
+  assert.equal(dec.outputs.length, 4, "2 recipients + tip + change");
+  assert.equal(dec.outputs[2].value, 4750000n, "tip output exact on the wire");
+  const tipProgram = decodeBech32m(BUILDER_TIP_ADDRESS, "prl").program;
+  assert.equal(bytesToHex(dec.outputs[2].spk), bytesToHex(p2trScriptPubKey(tipProgram)), "tip pays the builder program");
+  const { tweakedX } = tweakKeypath(hexToBytes(f.internalXOnlyHex));
+  const checks = verifySignedTx(NETWORKS.mainnet, hex, [{ value: 1_000_000_000, spk: p2trScriptPubKey(tweakedX) }]);
+  assert.ok(checks.every((c) => c.ok), "tipped rain signatures re-verify");
+
+  // a tip flag on any other address is refused at plan time
+  const forged = [...recipients, { address: R1, program: recipients[0].program, amount: 4750000n, builderTip: true }];
+  assert.throws(
+    () => planRain({ utxos, recipients: forged, funderProgram: f.program, feeRateGrainsPerVByte: 5 }),
+    /flagged as the builder tip does not pay the builder address/,
+  );
+  // untipped plan is the pre-tip planner: no builderTip, byte-identical outputs
+  const plain = planRain({ utxos, recipients, funderProgram: f.program, feeRateGrainsPerVByte: 5 });
+  assert.equal(plain.builderTip, 0n);
+  assert.equal(plain.nOut, 3);
+});
 
 test("parseManualUtxos refuses a duplicated outpoint", () => {
   // The same txid:vout pasted twice was returned twice and double-counted

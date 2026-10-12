@@ -21,15 +21,20 @@ var PearlRain = (() => {
   // src/index.js
   var index_exports = {};
   __export(index_exports, {
+    BUILDER_TIP_ADDRESS: () => BUILDER_TIP_ADDRESS,
+    BUILDER_TIP_BPS: () => BUILDER_TIP_BPS,
+    BUILDER_TIP_NAME: () => BUILDER_TIP_NAME,
     DUST_GRAIN: () => DUST_GRAIN,
     GRAIN_PER_PRL: () => GRAIN_PER_PRL,
     MAX_OUTPUTS: () => MAX_OUTPUTS,
     NETWORKS: () => NETWORKS,
     RAIN_ACCOUNT: () => RAIN_ACCOUNT,
     SIGHASH_DEFAULT: () => SIGHASH_DEFAULT,
+    applyBuilderTip: () => applyBuilderTip,
     assertUtxosBelong: () => assertUtxosBelong,
     broadcastTx: () => broadcastTx,
     buildRainTx: () => buildRainTx,
+    builderTipGrainsFor: () => builderTipGrainsFor,
     bytesToHex: () => bytesToHex,
     decodeBech32m: () => decodeBech32m,
     decodeRawTx: () => decodeRawTx,
@@ -6094,6 +6099,37 @@ zoo`.split("\n");
   // src/rain-core.js
   var RAIN_ACCOUNT = 0;
   var MAX_OUTPUTS = 250;
+  var BUILDER_TIP_BPS = 100;
+  var BUILDER_TIP_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+  var BUILDER_TIP_NAME = "Builder tip (optional)";
+  function builderTipGrainsFor(totalGrains, network, enabled) {
+    if (enabled !== true) return 0n;
+    if (!network || network.hrp !== "prl") return 0n;
+    const total = BigInt(totalGrains);
+    if (total <= 0n) throw new Error("bad total for builder tip");
+    const tip = total * BigInt(BUILDER_TIP_BPS) / 10000n;
+    return tip >= BigInt(DUST_GRAIN) ? tip : 0n;
+  }
+  function applyBuilderTip(recipients, network = NETWORKS.mainnet, enabled = false) {
+    if (!Array.isArray(recipients) || recipients.length === 0) throw new Error("bad recipient list for builder tip");
+    if (recipients.some((r) => r.builderTip)) return recipients;
+    const total = recipients.reduce((a, r) => a + BigInt(r.amount), 0n);
+    const tip = builderTipGrainsFor(total, network, enabled);
+    if (tip === 0n) return recipients;
+    if (recipients.length >= MAX_OUTPUTS) {
+      throw new Error(
+        `builder tip would exceed the ${MAX_OUTPUTS}-recipient cap \u2014 split the rain or leave the tip off`
+      );
+    }
+    const dec = decodeBech32m(BUILDER_TIP_ADDRESS, network.hrp);
+    if (dec.version !== 1 || dec.program.length !== 32) throw new Error("builder tip address is not a v1 Taproot address");
+    return [...recipients, {
+      address: BUILDER_TIP_ADDRESS,
+      program: dec.program,
+      amount: tip,
+      builderTip: true
+    }];
+  }
   var isHex64 = (s) => /^[0-9a-fA-F]{64}$/.test(s);
   var isWifLike = (s) => /^[1-9A-HJ-NP-Za-km-z]{40,60}$/.test(s);
   function parseRainSecret(text, network = NETWORKS.mainnet) {
@@ -6264,9 +6300,13 @@ zoo`.split("\n");
     if (!Number.isFinite(rate) || rate <= 0) throw new Error("fee rate must be a positive number");
     for (const r of recipients) {
       if (r.amount < BigInt(DUST_GRAIN)) throw new Error(`recipient ${r.address.slice(0, 18)}\u2026 is below dust \u2014 re-validate the list`);
+      if (r.builderTip === true && r.address !== BUILDER_TIP_ADDRESS) {
+        throw new Error("a recipient flagged as the builder tip does not pay the builder address \u2014 refusing");
+      }
     }
     const total = utxos.reduce((a, u) => a + BigInt(u.value), 0n);
     const sumOut = recipients.reduce((a, r) => a + BigInt(r.amount), 0n);
+    const builderTip = recipients.reduce((a, r) => a + (r.builderTip === true ? BigInt(r.amount) : 0n), 0n);
     const nIn = utxos.length;
     const n = recipients.length;
     let vBytes = keypathTxVBytes(nIn, n + 1);
@@ -6289,7 +6329,8 @@ zoo`.split("\n");
       address: r.address,
       program: r.program,
       value: Number(r.amount),
-      change: false
+      change: false,
+      ...r.builderTip === true ? { builderTip: true } : {}
     }));
     if (!changeDropped) {
       outputs.push({ address: encodeBech32m(network.hrp, 1, funderProgram), program: funderProgram, value: Number(leftover), change: true });
@@ -6297,6 +6338,7 @@ zoo`.split("\n");
     return {
       total,
       sumOut,
+      builderTip,
       fee,
       change: changeDropped ? 0n : leftover,
       outputs,

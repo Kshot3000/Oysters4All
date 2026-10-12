@@ -32,6 +32,53 @@ export const RAIN_ACCOUNT = 0;
 /** Maximum recipients per rain transaction (relay/peer standardness headroom). */
 export const MAX_OUTPUTS = 250;
 
+/* ---------------- optional builder tip (profit mandate, 2026-10-12) ----------------
+ * Rain spends the funder's OWN funds, so — like Split/Payroll/Batch — the
+ * builder tip is OPTIONAL and OFF by default: it is only ever added when
+ * the funder explicitly opts in. builderTipGrainsFor() is the single
+ * source; applyBuilderTip() appends the tip as its own recipient BEFORE
+ * planning/signing, and the funder is the sole signer whose keypath
+ * sighash commits to every output — so the tip cannot be added or skimmed
+ * after signing. With the option off the recipient list is unchanged. */
+export const BUILDER_TIP_BPS = 100; // 1%
+export const BUILDER_TIP_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+export const BUILDER_TIP_NAME = "Builder tip (optional)";
+
+/** Builder tip in grains for a rain totaling totalGrains, on network.
+ *  Returns 0n unless enabled === true, the network is mainnet, and the
+ *  1% floor reaches the dust floor (waived, never rounded up). */
+export function builderTipGrainsFor(totalGrains, network, enabled) {
+  if (enabled !== true) return 0n;
+  if (!network || network.hrp !== "prl") return 0n;
+  const total = BigInt(totalGrains);
+  if (total <= 0n) throw new Error("bad total for builder tip");
+  const tip = (total * BigInt(BUILDER_TIP_BPS)) / 10000n;
+  return tip >= BigInt(DUST_GRAIN) ? tip : 0n;
+}
+
+/** Return a recipient list with the optional builder tip appended as its
+ *  own recipient (or the list unchanged when the tip does not apply). The
+ *  original list is never mutated; applying twice is a no-op. Refuses
+ *  loudly when the tip would push the rain past the recipient cap. */
+export function applyBuilderTip(recipients, network = NETWORKS.mainnet, enabled = false) {
+  if (!Array.isArray(recipients) || recipients.length === 0) throw new Error("bad recipient list for builder tip");
+  if (recipients.some((r) => r.builderTip)) return recipients;
+  const total = recipients.reduce((a, r) => a + BigInt(r.amount), 0n);
+  const tip = builderTipGrainsFor(total, network, enabled);
+  if (tip === 0n) return recipients;
+  if (recipients.length >= MAX_OUTPUTS) {
+    throw new Error(
+      `builder tip would exceed the ${MAX_OUTPUTS}-recipient cap — ` +
+      `split the rain or leave the tip off`
+    );
+  }
+  const dec = decodeBech32m(BUILDER_TIP_ADDRESS, network.hrp);
+  if (dec.version !== 1 || dec.program.length !== 32) throw new Error("builder tip address is not a v1 Taproot address");
+  return [...recipients, {
+    address: BUILDER_TIP_ADDRESS, program: dec.program, amount: tip, builderTip: true,
+  }];
+}
+
 const isHex64 = (s) => /^[0-9a-fA-F]{64}$/.test(s);
 const isWifLike = (s) => /^[1-9A-HJ-NP-Za-km-z]{40,60}$/.test(s);
 
@@ -192,8 +239,9 @@ export function parseManualUtxos(text, network = NETWORKS.mainnet) {
 /** Plan the rain transaction: N recipient outputs + change back to the funder.
  *  utxos: [{txid, vout, value (grains)}]; recipients: [{address, program, amount}].
  *  Fee = keypathTxVBytes(nIn, nOut) * rate, dust change is absorbed into the fee.
- *  Returns { total, sumOut, fee, change, outputs: [{address|funder, program, value, change:boolean}],
- *  vBytes, feeRate, nIn, nOut, changeDropped }.
+ *  Returns { total, sumOut, builderTip, fee, change, outputs: [{address|funder, program, value, change:boolean}],
+ *  vBytes, feeRate, nIn, nOut, changeDropped }. sumOut includes any
+ *  builder-tip recipient; builderTip reports that flagged part separately.
  *  Throws if inputs can't cover outputs + fee. */
 export function planRain({ utxos, recipients, funderProgram, feeRateGrainsPerVByte, network = NETWORKS.mainnet }) {
   if (!Array.isArray(utxos) || utxos.length === 0) throw new Error("no UTXOs to spend — fetch the funder's UTXOs first");
@@ -209,9 +257,13 @@ export function planRain({ utxos, recipients, funderProgram, feeRateGrainsPerVBy
   if (!Number.isFinite(rate) || rate <= 0) throw new Error("fee rate must be a positive number");
   for (const r of recipients) {
     if (r.amount < BigInt(DUST_GRAIN)) throw new Error(`recipient ${r.address.slice(0, 18)}… is below dust — re-validate the list`);
+    if (r.builderTip === true && r.address !== BUILDER_TIP_ADDRESS) {
+      throw new Error("a recipient flagged as the builder tip does not pay the builder address — refusing");
+    }
   }
   const total = utxos.reduce((a, u) => a + BigInt(u.value), 0n);
   const sumOut = recipients.reduce((a, r) => a + BigInt(r.amount), 0n);
+  const builderTip = recipients.reduce((a, r) => a + (r.builderTip === true ? BigInt(r.amount) : 0n), 0n);
   const nIn = utxos.length;
   const n = recipients.length;
 
@@ -235,12 +287,13 @@ export function planRain({ utxos, recipients, funderProgram, feeRateGrainsPerVBy
   const leftover = total - sumOut - fee; // to change, or extra fee when change was dropped
   const outputs = recipients.map((r) => ({
     address: r.address, program: r.program, value: Number(r.amount), change: false,
+    ...(r.builderTip === true ? { builderTip: true } : {}),
   }));
   if (!changeDropped) {
     outputs.push({ address: encodeBech32m(network.hrp, 1, funderProgram), program: funderProgram, value: Number(leftover), change: true });
   }
   return {
-    total, sumOut, fee, change: changeDropped ? 0n : leftover,
+    total, sumOut, builderTip, fee, change: changeDropped ? 0n : leftover,
     outputs, vBytes, feeRate: rate, nIn, nOut: outputs.length, changeDropped,
     feeBump: changeDropped ? leftover : 0n,
   };

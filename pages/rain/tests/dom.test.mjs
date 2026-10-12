@@ -196,6 +196,40 @@ test("plan: insufficient funds refused in the UI", () => {
   assert.match(getEl("plan-error").textContent, /insufficient funds/);
 });
 
+test("builder tip: checkbox off by default; opt-in renders the tip line and the signed rain carries it", () => {
+  const box = getEl("plan-tip");
+  assert.ok(!box.checked, "builder tip checkbox is unchecked by default");
+  assert.ok(html.includes('id="plan-tip"'), "checkbox present in the Plan step");
+  assert.ok(html.includes("Optional builder tip — add 1% of the rain total"), "checkbox discloses the 1% in the page");
+
+  // restore a funded funder + a clean recipient list (prior test left it short)
+  setVal("utxo-paste", `${"aa".repeat(32)}:0 250000000 ${FUNDER}`);
+  click("fund-fetch");
+  assert.equal(getEl("fetch-error").hidden, true, "no fetch error: " + getEl("fetch-error").textContent);
+  setVal("recip-list", `${R1} 1.25\n${R2} 0.5`);
+  click("recip-parse");
+  assert.equal(getEl("recip-error").hidden, true);
+
+  box.checked = true; box.fire("change");
+  setVal("fee-rate", "5");
+  click("plan-button");
+  assert.equal(getEl("plan-error").hidden, true, "no plan error: " + getEl("plan-error").textContent);
+  assert.ok(getEl("plan-summary").innerHTML.includes("Builder tip (optional)"), "tip line in the plan: " + getEl("plan-summary").innerHTML);
+  assert.ok(getEl("plan-summary").innerHTML.includes("0.0175"), "tip is exactly 1% of 1.75 PRL");
+
+  click("sign-button");
+  assert.equal(getEl("sign-error").hidden, true, "no sign error: " + getEl("sign-error").textContent);
+  const dec = N.decodeRawTx(getEl("rain-hex").value);
+  assert.equal(dec.outputs.length, 4, "2 recipients + tip + change");
+  assert.equal(String(dec.outputs[2].value), "1750000", "tip output exact on the wire");
+
+  // opting back out restores the untipped 3-output plan
+  box.checked = false; box.fire("change");
+  click("plan-button");
+  assert.equal(getEl("plan-error").hidden, true);
+  assert.ok(!getEl("plan-summary").innerHTML.includes("Builder tip"), "no tip line once opted out");
+});
+
 test("footer carries donation address + X link", () => {
   assert.ok(html.includes("prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d"));
   assert.ok(html.includes("https://x.com/kshot9000"));

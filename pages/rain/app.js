@@ -21,6 +21,7 @@
     funder: null,      // parseRainSecret() result
     utxos: [],         // {txid,vout,value,confirmations?,address?}
     recips: null,      // parseRecipients() result
+    builderTip: false, // OPTIONAL 1% builder tip — opt-in, default OFF
     plan: null,        // planRain() result
     signed: null,      // buildRainTx() result
   };
@@ -55,6 +56,7 @@
   });
   function resetFunder() {
     S.funder = null; S.utxos = []; S.plan = null; S.signed = null;
+    S.builderTip = false; $("plan-tip").checked = false;
     $("fund-card").hidden = true;
     $("fund-utxos").textContent = "";
     $("sign-button").disabled = true;
@@ -135,6 +137,13 @@
   });
 
   /* ---------- step 3: plan ---------- */
+  $("plan-tip").addEventListener("change", (e) => {
+    S.builderTip = e.target.checked === true;
+    S.plan = null; S.signed = null;
+    $("sign-button").disabled = true;
+    $("rain-result").hidden = true;
+    $("plan-summary").hidden = true;
+  });
   $("plan-button").addEventListener("click", () => {
     err("plan-error", null);
     try {
@@ -142,14 +151,16 @@
       if (!S.utxos.length) throw new Error("Find the funder's coins first (step 1).");
       if (!S.recips) throw new Error("Validate the recipient list first (step 2).");
       const rate = Number($("fee-rate").value);
+      const recips = N.applyBuilderTip(S.recips.recipients, S.network, S.builderTip);
       const plan = N.planRain({
-        utxos: S.utxos, recipients: S.recips.recipients,
+        utxos: S.utxos, recipients: recips,
         funderProgram: S.funder.program, feeRateGrainsPerVByte: rate, network: S.network,
       });
       S.plan = plan; S.signed = null;
       const rows = [
-        [`Recipients`, `${plan.nOut - (plan.changeDropped ? 0 : 1)} outputs`],
-        [`To recipients`, fmtPRL(plan.sumOut)],
+        [`Recipients`, `${recips.filter((r) => !r.builderTip).length} outputs`],
+        [`To recipients`, fmtPRL(plan.sumOut - plan.builderTip)],
+        ...(plan.builderTip > 0n ? [[N.BUILDER_TIP_NAME, fmtPRL(plan.builderTip)]] : []),
         [`Fee`, `${fmtPRL(plan.fee)} (${plan.vBytes} vB @ ${plan.feeRate} gr/vB)`],
         ...(plan.changeDropped ? [[`Dust change`, `absorbed into fee (+${fmtPRL(plan.feeBump)})`]] : [[`Change to funder`, fmtPRL(plan.change)]]),
         [`Inputs`, `${plan.nIn} UTXO${plan.nIn === 1 ? "" : "s"} · ${fmtPRL(plan.total)}`],
@@ -186,7 +197,8 @@
     if (!S.signed) { err("broadcast-error", "Nothing signed yet."); return; }
     const bb = ($("blockbook").value || "").trim() || S.network.blockbook;
     if (!bb) { err("broadcast-error", "No blockbook endpoint — paste the signed hex into a node manually instead."); return; }
-    if (!confirm(`Broadcast this rain transaction? This sends ${fmtPRL(S.plan.sumOut)} to ${S.recips.recipients.length} recipients — real PRL, irreversible.`)) return;
+    const tipNote = S.plan.builderTip > 0n ? ` plus a ${fmtPRL(S.plan.builderTip)} builder tip` : "";
+    if (!confirm(`Broadcast this rain transaction? This sends ${fmtPRL(S.plan.sumOut - S.plan.builderTip)} to ${S.recips.recipients.length} recipients${tipNote} — real PRL, irreversible.`)) return;
     try {
       const txid = await N.broadcastTx(bb, S.signed.hex);
       $("broadcast-ok").hidden = false;
