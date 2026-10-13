@@ -250,14 +250,18 @@
       const destRaw = $("c-dest").value.trim();
       const dest = destRaw ? B.addressToProgram(destRaw, network)
         : B.hexToBytes(round.winnerXOnly);
-      const planned = B.planClaim(network, round, outpoint("c"), dest, feeRate("c-feerate"));
+      const planned = B.planClaim(network, round, outpoint("c"), dest, feeRate("c-feerate"), $("c-builder-tip").checked === true);
       const priv = privFromInput($("c-key").value, network);
       pendingClaim = { round, planned, priv };
       $("c-confirmtext").innerHTML =
         `Sign the claim for <b>round ${round.index}</b> — winner <b>${esc(round.winnerName)}</b> ` +
         `takes <b>${prl(planned.outputs[0].value)} PRL</b>, fee ` +
-        `<b>${planned.fee.toLocaleString()} grains</b> (${planned.vBytes} vB). ` +
-        `The signature is re-verified locally before the tx is built. Proceed?`;
+        `<b>${planned.fee.toLocaleString()} grains</b> (${planned.vBytes} vB)` +
+        (planned.builderTip > 0
+          ? `, plus a builder tip of <b>${prl(planned.builderTip)} PRL</b> to ` +
+            `<b>${esc(B.BUILDER_TIP_ADDRESS)}</b> as its own output`
+          : ``) +
+        `. The signature is re-verified locally before the tx is built. Proceed?`;
       $("c-confirm").classList.remove("hidden");
     } catch (e) { setErr("c-err", e.message); }
   });
@@ -273,6 +277,7 @@
       const signed = B.signClaim(network, round, planned, priv);
       $("c-meta").textContent =
         `claim round ${round.index} · txid ${signed.txid} · fee ${planned.fee} grains · ` +
+        (planned.builderTip > 0 ? `builder tip ${prl(planned.builderTip)} PRL to ${B.BUILDER_TIP_ADDRESS} · ` : ``) +
         `signature re-verified ✓ · signed with SIGHASH_DEFAULT (0x00)`;
       $("c-hex").value = signed.hex;
       $("c-out").classList.remove("hidden");

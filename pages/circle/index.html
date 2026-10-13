@@ -22,7 +22,7 @@
 <meta name="twitter:image" content="https://kshot3000.github.io/Oysters4All/assets/og-card.png">
 <meta name="twitter:site" content="@kshot9000">
 <meta name="twitter:creator" content="@kshot9000">
-<link rel="stylesheet" href="styles.css?v=5">
+<link rel="stylesheet" href="styles.css?v=6">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Pearl Circle — Rotating Savings Club Desk for PRL","description":"Run a trust-minimized rotating savings club (ROSCA) on Pearl: commit-reveal payout lottery, per-round Taproot pot escrows, winner claims and m-of-n timeout refunds. Keys never leave the page.","url":"https://kshot3000.github.io/Oysters4All/pages/circle/","applicationCategory":"BrowserApplication","operatingSystem":"Any","isAccessibleForFree":true}</script>
 <link rel="stylesheet" href="../../visual-upgrade/theme.css?v=20261007">
 </head>
@@ -56,6 +56,7 @@
     <li>Round and lock "times" are <em>block-height estimates</em> (≈194&nbsp;s per block); the chain decides, not the clock.</li>
     <li>Funding and status checks read <em>Blockbook, a third-party indexer</em> — it can lag or be wrong. The page cannot tell you <em>who</em> funded a round, only that an address holds funds.</li>
     <li>Refunds need <em>m of n</em> member signatures on one template. With m&nbsp;&lt;&nbsp;n a coalition can refund early; with m&nbsp;=&nbsp;n one uncooperative member blocks refunds. Choose m with eyes open.</li>
+    <li>A winner claim may carry an <em>optional 1% builder tip</em> to the builder address in the footer — off by default, mainnet only, waived below the dust floor, and shown as its own output before you sign. Refunds never carry one.</li>
   </ul>
 </aside>
 
@@ -198,6 +199,13 @@
           <label>Fee rate (grains/vB)<input id="c-feerate" inputmode="decimal" value="2"></label>
           <label>Winner key (mnemonic / WIF / hex)<input id="c-key" type="password" autocomplete="off" spellcheck="false"></label>
         </div>
+        <label class="check" for="c-builder-tip">
+          <input id="c-builder-tip" type="checkbox">
+          <span><strong>Builder tip (optional):</strong> add a 1% tip to the builder address
+          <span class="mono">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</span>.
+          It is paid as its own output out of this claim — you receive the pot minus the fee and the tip — and it is
+          never automatic: with this box unchecked (the default) the claim is exactly as before. Refunds never carry a tip.</span>
+        </label>
         <div class="row">
           <button id="c-build" class="primary">Review &amp; sign claim</button>
           <button id="c-wipekey" class="ghost">Wipe key</button>
@@ -292,7 +300,7 @@
     cannot move anyone's coins but the keys you enter.</p>
 </footer>
 
-<script src="pearl-circle.bundle.js?v=4"></script>
-<script src="app.js?v=1"></script>
+<script src="pearl-circle.bundle.js?v=5"></script>
+<script src="app.js?v=2"></script>
 </body>
 </html>

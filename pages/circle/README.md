@@ -39,6 +39,8 @@ no smart contracts — and no new cryptography.
    signature is re-verified against the member's registered key; the witness
    uses the covenant CHECKSIGADD convention (signatures in reverse
    sorted-key order, exactly m sigs).
+
+**Builder tip (optional, disclosed).** A winner claim may carry an optional 1% builder tip: the winner is the sole signer of a full pot and explicitly checks the box in the Claim step (off by default, mainnet only, waived below the 546-grain dust floor instead of rounded up). `builderTipGrainsFor()` is the single source; `planClaim()` adds the tip as its own flagged second output before signing — the fee is computed over 2 outputs and the script-path sighash commits to every output, so it cannot be added or skimmed after signing — and `signClaim()` re-derives the tip program from the builder-address constant and refuses any flagged tip that does not pay it at exactly the planned amount. The tip is paid out of the winner's own claim (the winner receives the pot minus fee and tip, shown as its own line in the confirm and signed summary). Claiming to the builder address itself refuses when tipped (the tip would duplicate the claim output). Refunds never carry a tip: the refund builders take no tip parameter at all, and the refund planner asserts its outputs sum to exactly the pot minus the fee, so a tip output is excluded by construction.
 5. **Track** — paste a descriptor + payout order to re-derive every round
    address and classify it against Blockbook:
    `unfunded` / `funding` / `pot-full` (claimable by the winner) / `spent`,
@@ -66,8 +68,8 @@ leaves are byte-identical to the audited originals.
 
 ## Tests
 
-- `tests/circle.test.mjs` — 13/13: terms/member validation, pinned setup hash / fingerprint / payout order / round addresses / claim txid / refund txid, lottery tamper paths, leaf byte-equality with the audited lineage, descriptor round-trip + tamper detection, funding plan, claim/refund signing round-trips, classification.
-- `tests/dom.test.mjs` — 8/8: drives the real `app.js` against a strict DOM shim through found → lottery → fund → claim (double-confirm + wipe) → refund → track.
+- `tests/circle.test.mjs` — 16/16: terms/member validation, pinned setup hash / fingerprint / payout order / round addresses / claim txid / refund txid, lottery tamper paths, leaf byte-equality with the audited lineage, descriptor round-trip + tamper detection, funding plan, claim/refund signing round-trips, builder-tip exactness/waivers, tipped plan conservation + refusals, tipped claim signed with the tip exact on the wire, classification.
+- `tests/dom.test.mjs` — 9/9: drives the real `app.js` against a strict DOM shim through found → lottery → fund → claim (double-confirm + wipe) → refund → track, plus the claim builder-tip opt-in/opt-out flow with the tip parsed exact from the signed wire.
 - Real-browser QA (`hidden_files/qa-circle-browser.mjs`): headless Chromium 152 via file:// + CDP, stubbed Blockbook, zero console/page errors — 37/37 green.
 
 Run: `node --no-warnings --loader ./tests/loader.mjs --test tests/circle.test.mjs`

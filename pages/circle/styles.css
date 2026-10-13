@@ -86,6 +86,8 @@ main { max-width: 960px; margin: 0 auto; padding: 0 20px 40px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
 label { display: block; font-size: 13px; color: var(--dim); margin: 10px 0; }
 label.inline { display: inline-flex; align-items: center; gap: 8px; margin: 0; }
+label.check { display: flex; flex-direction: row; align-items: flex-start; gap: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; color: var(--ink); line-height: 1.5; }
+label.check input { width: auto; margin-top: 3px; flex: none; }
 label.inline input { width: 90px; margin: 0; }
 input, select, textarea {
   width: 100%; margin-top: 6px; padding: 10px 12px; font-size: 14px;

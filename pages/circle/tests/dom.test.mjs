@@ -185,7 +185,7 @@ test("bundle exposes the circle API", () => {
     "payoutOrderFor", "memberCommitment", "newSecret", "commitmentFor", "verifyReveal",
     "encodeCircleDescriptor", "decodeCircleDescriptor", "verifyDescriptor",
     "descriptorFingerprint", "circleSetupHash", "fundingPlan",
-    "planClaim", "signClaim", "planRefund", "signRefund", "finalizeRefund",
+    "planClaim", "signClaim", "builderTipGrainsFor", "planRefund", "signRefund", "finalizeRefund",
     "classifyRounds", "buildRefundScriptCircle", "numsInternalKeyCircle",
     "walletFromMnemonic", "newMnemonic", "broadcastTx", "fetchFeeRateGrainsPerVByte"]) {
     assert.equal(typeof B[fn], "function", fn + " exposed");
@@ -310,6 +310,71 @@ test("claim flow: double-confirm, sign, re-verify, wipe", async () => {
   assert.match($("c-hex").value, /^[0-9a-f]{200,}$/, "signed claim tx hex produced");
   assert.match($("c-meta").textContent, /re-verified/, "re-verification reported");
   assert.equal($("c-key").value, "", "key wiped after signing");
+});
+
+function parseOutputsHex(hex) {
+  const b = Buffer.from(hex, "hex"); let o = 4;
+  if (b[o] === 0 && b[o + 1] === 1) o += 2;
+  const vi = () => { const v = b[o]; if (v < 0xfd) { o += 1; return v; } if (v === 0xfd) { const n = b.readUInt16LE(o + 1); o += 3; return n; } throw new Error("varint too big"); };
+  const nIn = vi();
+  for (let i = 0; i < nIn; i++) { o += 36; const sl = vi(); o += sl + 4; }
+  const nOut = vi(); const outs = [];
+  for (let i = 0; i < nOut; i++) { const v = Number(b.readBigUInt64LE(o)); o += 8; const sl = vi(); const spk = b.subarray(o, o + sl).toString("hex"); o += sl; outs.push({ value: v, spk }); }
+  return outs;
+}
+
+test("claim builder tip: unchecked by default, opt-in pays 1% as its own output, opt-out restores", async () => {
+  const { $ } = bootApp();
+  const { mnA, mnB } = await forgeCircle2($);
+  // disclosure + default state in the real page
+  assert.ok(!$("c-builder-tip").checked, "tip checkbox unchecked by default");
+  const secrets = [B.newSecret(), B.newSecret()];
+  const commitments = secrets.map((s, i) => ({ memberIndex: i, commitment: B.commitmentFor(s) }));
+  $("l-commitments").value = JSON.stringify(commitments);
+  $("l-reveals").value = JSON.stringify(secrets.map((s, i) => ({ memberIndex: i, secretHex: s })));
+  $("l-draw").click();
+  await tick();
+  const order = JSON.parse($("l-orderjson").textContent);
+  const winnerMn = [mnA, mnB][order[0]];
+  $("c-load").click();
+  await tick();
+  const fillClaim = () => {
+    $("c-round").value = "1";
+    $("c-txid").value = "ab".repeat(32);
+    $("c-vout").value = "0";
+    $("c-value").value = String(2 * 5 * 100000000); // pot: 2 members x 5 PRL
+    $("c-dest").value = "";
+    $("c-feerate").value = "2";
+    $("c-key").value = winnerMn;
+  };
+  // opt in: confirm names the tip, signed wire carries it as output 1
+  fillClaim();
+  $("c-builder-tip").checked = true;
+  $("c-build").click();
+  await tick();
+  assert.equal($("c-err").textContent, "", "tipped build error box empty, got: " + $("c-err").textContent);
+  assert.match($("c-confirmtext").textContent, /builder tip of/, "confirm names the tip before signing");
+  assert.match($("c-confirmtext").textContent, /0\.1/, "tip is 0.1 PRL on a 10 PRL pot");
+  $("c-confirmyes").click();
+  await tick();
+  assert.equal($("c-err").textContent, "", "tipped sign error box empty");
+  assert.match($("c-meta").textContent, /builder tip 0\.1 PRL/, "signed meta repeats the tip");
+  const outs = parseOutputsHex($("c-hex").value);
+  assert.equal(outs.length, 2, "tipped claim has 2 outputs");
+  assert.equal(outs[1].value, 10_000_000, "tip output is exactly 1% of the pot");
+  const builderSpk = Buffer.from(B.p2trScriptPubKey(B.addressToProgram(B.BUILDER_TIP_ADDRESS, B.NETWORKS.mainnet))).toString("hex");
+  assert.equal(outs[1].spk, builderSpk, "tip output pays the builder program");
+  // opt back out: single-output claim, no tip line
+  fillClaim();
+  $("c-builder-tip").checked = false;
+  $("c-build").click();
+  await tick();
+  assert.equal($("c-err").textContent, "", "untipped build error box empty");
+  assert.doesNotMatch($("c-confirmtext").textContent, /builder tip/, "opt-out confirm has no tip");
+  $("c-confirmyes").click();
+  await tick();
+  assert.equal(parseOutputsHex($("c-hex").value).length, 1, "untipped claim has 1 output");
+  assert.doesNotMatch($("c-meta").textContent, /builder tip/, "opt-out meta has no tip line");
 });
 
 test("refund flow: template -> 1-of-2 sign -> finalize", async () => {
