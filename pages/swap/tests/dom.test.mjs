@@ -369,6 +369,33 @@ test("claim: Bob builds the script-path claim with the revealed preimage", () =>
   assert.ok($("alice-btc-steps").textContent.includes("Bitcoin"), "alice btc follow-up steps");
 });
 
+test("builder tip: claim checkbox is opt-in, disclosed, and the tip lands exact on the wire", () => {
+  const E = sandbox.window.PearlSwap;
+  // the claim just built above ran with the box at its default: unchecked, no tip
+  assert.ok(!$("claim-builder-tip").checked, "builder tip checkbox unchecked by default (shim: no checked attribute)");
+  assert.ok(html.includes("Builder tip (optional)"), "disclosure heading in the claim form");
+  assert.ok(html.includes("Refunds never carry a tip"), "refund exclusion disclosed");
+  assert.ok($("claim-tip-line").textContent.includes("No builder tip"), "untipped claim reports no tip: " + $("claim-tip-line").textContent);
+  // opt in and rebuild: Bob's key was cleared by the previous build, restore it
+  $("claim-builder-tip").checked = true;
+  $("claim-key").value = MNEMONICS[1];
+  $("claim-dest").value = BOB_ADDR();
+  $("claim-build-btn").click();
+  assert.equal($("claim-error").hidden, true, "no tipped claim error: " + $("claim-error").textContent);
+  assert.ok($("claim-tip-line").textContent.includes("0.1 PRL (10000000 grains)"), "tip line shows 0.1 PRL on the 10 PRL claim: " + $("claim-tip-line").textContent);
+  const outs = E.parseTx($("claim-hex").value).outputs;
+  assert.equal(outs.length, 2, "tipped claim has exactly 2 outputs");
+  assert.equal(outs[1].value, 10000000, "tip output is exactly 1% of 10 PRL");
+  assert.equal(E.bytesToHex(outs[1].spk), "5120" + E.bytesToHex(E.addressToProgram(E.BUILDER_TIP_ADDRESS, MAINNET)),
+    "tip pays the builder program");
+  // opt back out: single-output claim restored
+  $("claim-builder-tip").checked = false;
+  $("claim-key").value = MNEMONICS[1];
+  $("claim-build-btn").click();
+  assert.equal($("claim-error").hidden, true, "no untipped claim error: " + $("claim-error").textContent);
+  assert.equal(E.parseTx($("claim-hex").value).outputs.length, 1, "opt-out restores the single-output claim");
+});
+
 test("claim guard: wrong preimage is refused", () => {
   $("claim-pre").value = "00".repeat(32);
   $("claim-key").value = MNEMONICS[1];
@@ -429,8 +456,8 @@ test("amount inputs use the exact core parsers (float-parse class closed)", () =
   assert.ok(src.includes("E.parseBTCToSats(str)"), "parseBTC delegates to the core exact parser");
   assert.ok(!src.includes("Math.round(v * E.GRAIN_PER_PRL)"), "no float PRL parse left");
   assert.ok(!src.includes("Math.round(v * 1e8)"), "no float BTC parse left");
-  assert.ok(html.includes("pearl-swap.bundle.js?v=6"), "bundle cache key bumped");
-  assert.ok(html.includes('src="app.js?v=5"'), "app cache key bumped");
+  assert.ok(html.includes("pearl-swap.bundle.js?v=7"), "bundle cache key bumped");
+  assert.ok(html.includes('src="app.js?v=6"'), "app cache key bumped");
 });
 
 test("app.js grain formatter is BigInt-exact (pool float-format class)", async () => {

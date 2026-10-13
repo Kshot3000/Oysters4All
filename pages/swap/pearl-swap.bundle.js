@@ -22,6 +22,9 @@ var PearlSwap = (() => {
   var index_exports = {};
   __export(index_exports, {
     BTC_BLOCK_SECS: () => BTC_BLOCK_SECS,
+    BUILDER_TIP_ADDRESS: () => BUILDER_TIP_ADDRESS,
+    BUILDER_TIP_BPS: () => BUILDER_TIP_BPS,
+    BUILDER_TIP_NAME: () => BUILDER_TIP_NAME,
     DESCRIPTOR_PREFIX: () => DESCRIPTOR_PREFIX,
     DUST_GRAIN: () => DUST_GRAIN,
     GRAIN_PER_PRL: () => GRAIN_PER_PRL,
@@ -43,6 +46,7 @@ var PearlSwap = (() => {
     buildRefundScript: () => buildRefundScript,
     buildRefundSpend: () => buildRefundSpend,
     buildScriptPathSpend: () => buildScriptPathSpend,
+    builderTipGrainsFor: () => builderTipGrainsFor,
     bytesToHex: () => bytesToHex,
     claimSpendVBytes: () => claimSpendVBytes,
     classifySwapState: () => classifySwapState,
@@ -6627,9 +6631,19 @@ zoo`.split("\n");
       warnings
     };
   }
-  function claimSpendVBytes(swap) {
+  var BUILDER_TIP_BPS = 100;
+  var BUILDER_TIP_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+  var BUILDER_TIP_NAME = "Builder tip (optional)";
+  function builderTipGrainsFor(totalGrains, network, enabled) {
+    if (enabled !== true) return 0;
+    if (!network || network.hrp !== "prl") return 0;
+    if (!Number.isSafeInteger(totalGrains) || totalGrains <= 0) throw new Error("bad total for builder tip");
+    const tip = Number(BigInt(totalGrains) * BigInt(BUILDER_TIP_BPS) / 10000n);
+    return tip >= DUST_GRAIN ? tip : 0;
+  }
+  function claimSpendVBytes(swap, nOut = 1) {
     return spendVBytes({
-      nOut: 1,
+      nOut,
       scriptLen: swap.claimScriptHex.length / 2,
       controlLen: 65,
       stackLens: [64, PREIMAGE_LEN]
@@ -6641,7 +6655,8 @@ zoo`.split("\n");
     preimageHex,
     bobPrivHex,
     destAddress,
-    feeRateGrainsPerVByte
+    feeRateGrainsPerVByte,
+    builderTipEnabled = false
   }) {
     const preimage = parsePreimage(preimageHex);
     if (bytesToHex(secretHashOf(preimage)) !== swap.secretHashHex) {
@@ -6656,15 +6671,33 @@ zoo`.split("\n");
     if (!Number.isSafeInteger(utxo?.value) || utxo.value <= 0) throw new Error("bad utxo value");
     if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) throw new Error("bad fee rate");
     const destProgram = addressToProgram(destAddress, network);
-    const fee = Math.ceil(claimSpendVBytes(swap) * feeRateGrainsPerVByte);
-    const value = utxo.value - fee;
+    const builderTip = builderTipGrainsFor(utxo.value, network, builderTipEnabled === true);
+    const builderTipProgram = builderTip > 0 ? addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet) : null;
+    if (builderTip > 0 && constEq(destProgram, builderTipProgram)) {
+      throw new Error("claim destination is the builder address \u2014 the builder tip would duplicate the claim output; leave the tip off");
+    }
+    const fee = Math.ceil(claimSpendVBytes(swap, builderTip > 0 ? 2 : 1) * feeRateGrainsPerVByte);
+    const value = utxo.value - fee - builderTip;
     if (value < DUST_GRAIN) {
+      if (builderTip > 0) {
+        throw new Error(`claim value ${utxo.value} cannot cover fee ${fee} and the ${builderTip}-grain builder tip and still pay out >= dust (${DUST_GRAIN}); leave the builder tip off`);
+      }
       throw new Error(`claim output ${value} grains is below dust after fees \u2014 UTXO too small`);
     }
     const claimScript = hexToBytes(swap.claimScriptHex);
     const controlBlock = hexToBytes(swap.claimControlBlockHex);
     const input = { txid: utxo.txid.toLowerCase(), vout: utxo.vout, value: utxo.value, spk: hexToBytes(swap.spkHex) };
     const outputs = [{ program: destProgram, value }];
+    if (builderTip > 0) outputs.push({ program: builderTipProgram, value: builderTip, builderTip: true });
+    const flagged = outputs.filter((o) => o && o.builderTip);
+    if (builderTip > 0) {
+      const want = addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet);
+      if (flagged.length !== 1 || !constEq(flagged[0].program, want) || flagged[0].value !== builderTip) {
+        throw new Error("builder tip does not pay the builder address at the computed amount \u2014 refusing to build the claim");
+      }
+    } else if (flagged.length > 0) {
+      throw new Error("claim carries a flagged builder tip but no computed tip amount \u2014 refusing to build the claim");
+    }
     const digest = scriptPathSigDigestEx(network, input, outputs, claimScript, {});
     const sig = signForXOnly(hexToBytes(String(bobPrivHex).trim().toLowerCase()), digest);
     if (!verifySchnorrSig(sig, digest, hexToBytes(swap.bobXOnly))) {
@@ -6680,7 +6713,7 @@ zoo`.split("\n");
       {}
     );
     if (spend.digest !== bytesToHex(digest)) throw new Error("internal: claim digest mismatch");
-    return { ...spend, feeGrains: fee, preimageHex: bytesToHex(preimage) };
+    return { ...spend, feeGrains: fee, preimageHex: bytesToHex(preimage), builderTip };
   }
   function refundSpendVBytes(swap) {
     return spendVBytes({

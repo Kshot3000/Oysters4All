@@ -585,10 +585,14 @@
         bobPrivHex: priv,
         destAddress: $("claim-dest").value,
         feeRateGrainsPerVByte: Number($("claim-fee").value),
+        builderTipEnabled: $("claim-builder-tip").checked === true,
       });
       S.claimTx = claim;
       S.preimageHex = claim.preimageHex;
       $("claim-txid").textContent = claim.txid;
+      $("claim-tip-line").textContent = claim.builderTip > 0
+        ? `Builder tip (optional, 1%): ${fmtPRL(claim.builderTip)} PRL (${claim.builderTip} grains) to ${E.BUILDER_TIP_ADDRESS} — its own output, committed by the signature`
+        : "No builder tip (not opted in; refunds never carry a tip)";
       $("claim-hex").value = claim.hex;
       $("claim-confirm").checked = false;
       $("claim-ok").hidden = true;

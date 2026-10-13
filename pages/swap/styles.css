@@ -94,6 +94,9 @@ label { display: flex; flex-direction: column; gap: .35rem; font-size: .9rem; co
 label.confirm { flex-direction: row; align-items: flex-start; gap: .6rem; margin: .8rem 0;
   color: var(--amber); font-size: .9rem; }
 label.confirm input { width: auto; margin-top: .2rem; accent-color: var(--amber); }
+label.check { flex-direction: row; align-items: flex-start; gap: .6rem; border: 1px solid var(--line); border-radius: 8px; padding: .7rem .8rem; color: var(--ink); line-height: 1.5; cursor: pointer; }
+label.check input { width: auto; margin-top: .15rem; }
+label.check code { word-break: break-all; }
 input, select, textarea {
   background: var(--code); border: 1px solid var(--line); color: var(--ink);
   border-radius: 8px; padding: .6rem .7rem; font-size: .95rem; width: 100%;

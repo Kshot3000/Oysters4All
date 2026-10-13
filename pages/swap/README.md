@@ -54,10 +54,21 @@ from live Pearl/Bitcoin tips (194s vs 600s block pacing).
 Keys never leave the browser (in-memory only; secret fields are cleared after
 use). Every built transaction is signed and re-verified locally.
 
+## Builder tip (optional, disclosed)
+
+Bob's claim form offers an **optional 1% builder tip** to
+`prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`: off by
+default, disclosed next to its checkbox, and — when Bob opts in — paid as its
+own output out of his claim (he receives the swap amount minus the fee and
+the tip), committed by his signature before signing. It is waived on testnet
+and below the 546-grain dust floor. Alice's refund takes no tip parameter at
+all — it returns her own locked funds, so a tip there is impossible by
+construction.
+
 ## Files
 
-- `index.html` — the app (references `styles.css?v=4`, `qrcode.min.js?v=1`,
-  `pearl-swap.bundle.js?v=3`, `app.js?v=3`)
+- `index.html` — the app (references `styles.css?v=5`, `qrcode.min.js?v=1`,
+  `pearl-swap.bundle.js?v=7`, `app.js?v=6`)
 - `styles.css` — "collision chamber" theme (deep-space navy, PRL-cyan vs
   BTC-magenta particle streams)
 - `app.js` — UI wiring for all five steps
@@ -69,15 +80,16 @@ use). Every built transaction is signed and re-verified locally.
 
 ## Tests (2026-09-29)
 
-- Core: **19/19** — script byte vectors, NUMS determinism, control-block
+- Core: **23/23** — script byte vectors, NUMS determinism, control-block
   verification, known-answer SHA-256, descriptor round-trip + tamper
   detection, timelock guards, wrong-preimage/wrong-key refusals, lock tx +
   sig re-verification, synthetic lock→claim and lock→refund flows, sighash
   cross-checks, preimage extraction, lifecycle classification, BTC mirror,
-  exact amount parsers (the float-parse class).
-- DOM: **13/13** — boots real index.html + bundle + app.js in a VM harness;
+  exact amount parsers (the float-parse class), builder-tip exactness /
+  tipped-claim wire / refund exclusion.
+- DOM: **17/17** — boots real index.html + bundle + app.js in a VM harness;
   propose→lock→track→claim→refund, guard refusals, attribution,
-  exact-parser wiring pins.
+  exact-parser wiring pins, builder-tip opt-in wiring.
 - Real Chromium (headless, CDP, stubbed Blockbook): **27/27** checks, zero
   console/page errors — full flow incl. QR render, BC1P mirror, preimage
   extraction, maturity guard.

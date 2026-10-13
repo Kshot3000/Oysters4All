@@ -22,7 +22,7 @@
 <meta name="twitter:image" content="https://kshot3000.github.io/Oysters4All/assets/og-card.png">
 <meta name="twitter:site" content="@kshot9000">
 <meta name="twitter:creator" content="@kshot9000">
-<link rel="stylesheet" href="styles.css?v=4">
+<link rel="stylesheet" href="styles.css?v=5">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Pearl Swap — Trustless PRL↔BTC Atomic Swaps","description":"Pearl Swap: trustless PRL↔BTC atomic swaps with Taproot hash+timelock contracts. Propose, lock, track, claim, refund — all crypto runs locally in your browser.","url":"https://kshot3000.github.io/Oysters4All/pages/swap/","applicationCategory":"BrowserApplication","operatingSystem":"Any","isAccessibleForFree":true}</script>
 <link rel="stylesheet" href="../../visual-upgrade/theme.css?v=20261007">
 </head>
@@ -61,6 +61,7 @@
       <li><strong>Needs live Blockbook + real funds.</strong> UTXO lookup, fee estimates, tip height and broadcast all go through the Blockbook endpoint you configure.</li>
       <li><strong>The preimage is the money.</strong> Whoever reveals it claims the PRL. Generate it fresh per swap, back it up once, and clear secrets after the swap settles.</li>
       <li><strong>Verify out of band.</strong> Both parties must independently re-derive the swap address from the shared spec and confirm the secret hash H before anyone funds anything.</li>
+      <li>The <strong>builder tip on claims is optional</strong> — off by default, disclosed next to its checkbox at 1% of the claimed amount to the builder address shown there, and paid only inside a claim transaction Bob signs. Refunds never carry it.</li>
     </ul>
   </section>
 
@@ -306,6 +307,13 @@
             <label class="wide">Bob's key <span class="hint">— 32-byte hex private key or mnemonic</span>
               <textarea id="claim-key" rows="2" spellcheck="false" placeholder="private key — never leaves this page"></textarea></label>
             <label class="wide">Destination (P2TR address) <input id="claim-dest" spellcheck="false" placeholder="prl1p…"></label>
+            <label class="check wide" for="claim-builder-tip">
+              <input id="claim-builder-tip" type="checkbox">
+              <span><strong>Builder tip (optional):</strong> add a 1% tip to the builder address
+              <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>.
+              It is paid as its own output out of this claim — Bob receives the swap amount minus the fee and the tip — and it is
+              never automatic: with this box unchecked (the default) the claim is exactly as before. Refunds never carry a tip.</span>
+            </label>
           </div>
           <div class="row">
             <button class="btn primary" id="claim-build-btn">Build + sign claim tx</button>
@@ -313,6 +321,7 @@
           </div>
           <div id="claim-out" hidden>
             <p>txid: <code id="claim-txid" class="addr small"></code></p>
+            <p id="claim-tip-line" class="hint"></p>
             <textarea aria-label="Signed claim transaction hex" id="claim-hex" rows="6" spellcheck="false" readonly></textarea>
             <div class="row"><button class="btn ghost copy-btn" data-for="claim-hex">Copy hex</button></div>
             <label class="confirm"><input type="checkbox" id="claim-confirm"> I understand this reveals the preimage on-chain and releases the PRL to the destination.</label>
@@ -396,7 +405,7 @@
 </footer>
 
 <script src="qrcode.min.js?v=1"></script>
-<script src="pearl-swap.bundle.js?v=6"></script>
-<script src="app.js?v=5"></script>
+<script src="pearl-swap.bundle.js?v=7"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>

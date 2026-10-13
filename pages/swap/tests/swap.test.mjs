@@ -16,6 +16,7 @@ import {
   parseTx, extractPreimage, classifySwapState, swapCountdown,
   btcMirrorTemplate,
   parsePRLToGrains, parseBTCToSats,
+  builderTipGrainsFor, BUILDER_TIP_BPS, BUILDER_TIP_ADDRESS, BUILDER_TIP_NAME,
   partyKeyFromInput, parseXOnlyKey, addressToProgram,
   verifySchnorrSig, signForXOnly, scriptPathSigDigestEx, buildScriptPathSpend,
   walletFromMnemonic, walletToWIF,
@@ -495,4 +496,79 @@ test("exact amount parsers: PRL->grains and BTC->sats reject the float-parse cla
   assert.throws(() => parsePRLToGrains("90071992.54740992"), /out of range/);
   assert.throws(() => parsePRLToGrains(1.5), /must be a string/);
   assert.throws(() => parseBTCToSats(null), /must be a string/);
+});
+
+/* ---------------- builder tip (optional, disclosed, claim-only) ---------------- */
+
+test("builder tip: exactness and waivers", () => {
+  assert.equal(BUILDER_TIP_BPS, 100);
+  assert.equal(BUILDER_TIP_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
+  assert.equal(BUILDER_TIP_NAME, "Builder tip (optional)");
+  assert.equal(builderTipGrainsFor(3000000000, net, true), 30000000, "1% of 30 PRL");
+  assert.equal(builderTipGrainsFor(3000000000, net, false), 0, "off unless enabled === true");
+  assert.equal(builderTipGrainsFor(3000000000, net, 1), 0, "truthy is not true");
+  assert.equal(builderTipGrainsFor(3000000000, NETWORKS.testnet, true), 0, "mainnet only");
+  assert.equal(builderTipGrainsFor(54599, net, true), 0, "545-grain tip waived");
+  assert.equal(builderTipGrainsFor(54600, net, true), 546, "546-grain tip charged exactly");
+  assert.equal(builderTipGrainsFor(1000, net, true), 0, "10-grain tip waived");
+});
+
+test("builder tip: tipped claim carries the tip exact on the wire; untipped identical to before", () => {
+  const swap = makeSwap({ prlGrains: 3_000_000_000 }); // 30 PRL
+  const dest = walletFromMnemonic(
+    "legal winner thank year wave sausage worth useful legal winner thank yellow", net);
+  const utxo = { txid: "ab".repeat(32), vout: 0, value: 3_000_000_000 };
+  const base = { utxo, preimageHex: KAV_PREIMAGE, bobPrivHex: K[1].priv, destAddress: dest.address, feeRateGrainsPerVByte: 5 };
+  const plain = buildClaimSpend(net, swap, base);
+  const plainOuts = parseTx(plain.hex).outputs;
+  assert.equal(plain.builderTip, 0);
+  assert.equal(plainOuts.length, 1);
+  assert.equal(plainOuts[0].value + plain.feeGrains, 3_000_000_000, "untipped conservation");
+  const tipped = buildClaimSpend(net, swap, { ...base, builderTipEnabled: true });
+  assert.equal(tipped.builderTip, 30000000);
+  const outs = parseTx(tipped.hex).outputs;
+  assert.equal(outs.length, 2);
+  assert.equal(outs[1].value, 30000000, "tip is output 1 at exactly 1% of the claimed amount");
+  assert.equal(bytesToHex(outs[1].spk), "5120" + bytesToHex(addressToProgram(BUILDER_TIP_ADDRESS, net)));
+  assert.equal(outs[0].value + outs[1].value + tipped.feeGrains, 3_000_000_000, "tipped conservation");
+  assert.equal(tipped.feeGrains, Math.ceil(claimSpendVBytes(swap, 2) * 5), "fee computed over 2 outputs");
+  assert.notEqual(tipped.digest, plain.digest, "the sighash commits to the tip output");
+  // the preimage still extracts from the tipped claim (Alice's BTC path unaffected)
+  assert.equal(extractPreimage(tipped.hex, swap.secretHashHex), KAV_PREIMAGE);
+  // destination == builder address refuses while tipped (tip would duplicate the claim output)
+  assert.throws(() => buildClaimSpend(net, swap, { ...base, destAddress: BUILDER_TIP_ADDRESS, builderTipEnabled: true }),
+    /builder tip would duplicate/);
+  // a tip that would leave Bob below dust refuses naming the tip
+  assert.throws(() => buildClaimSpend(net, swap, {
+    ...base, utxo: { txid: "ab".repeat(32), vout: 0, value: 100000 }, feeRateGrainsPerVByte: 600, builderTipEnabled: true,
+  }), /builder tip/);
+});
+
+test("builder tip: refund never carries one; testnet claims waive it", () => {
+  const swap = makeSwap();
+  const dest = walletFromMnemonic(
+    "letter advice cage absurd amount doctor acoustic avoid letter advice cage above", net);
+  const utxo = { txid: "cd".repeat(32), vout: 0, value: swap.prlGrains };
+  // buildRefundSpend takes no tip parameter at all — exclusion by construction
+  const refund = buildRefundSpend(net, swap, {
+    utxo, alicePrivHex: K[0].priv, destAddress: dest.address, feeRateGrainsPerVByte: 5, currentHeight: swap.t1,
+  });
+  const rOuts = parseTx(refund.hex).outputs;
+  assert.equal(rOuts.length, 1);
+  assert.equal(rOuts[0].value + refund.feeGrains, swap.prlGrains, "refund conservation exact");
+  // testnet: the tip is waived even when opted in (mainnet-only, like every fleet surface)
+  const { swap: tswap } = proposeSwap({
+    role: "alice", network: NETWORKS.testnet, prlGrains: 100000000, btcSats: 5000000,
+    preimageHex: KAV_PREIMAGE, aliceKeyInput: K[0].xonly, bobKeyInput: K[1].xonly,
+    t1: 121000, t2: 120500, feeRateGrainsPerVByte: 5,
+  });
+  const tDest = walletFromMnemonic(
+    "legal winner thank year wave sausage worth useful legal winner thank yellow", NETWORKS.testnet);
+  const tClaim = buildClaimSpend(NETWORKS.testnet, tswap, {
+    utxo: { txid: "ab".repeat(32), vout: 0, value: 100000000 },
+    preimageHex: KAV_PREIMAGE, bobPrivHex: K[1].priv, destAddress: tDest.address,
+    feeRateGrainsPerVByte: 5, builderTipEnabled: true,
+  });
+  assert.equal(tClaim.builderTip, 0);
+  assert.equal(parseTx(tClaim.hex).outputs.length, 1);
 });

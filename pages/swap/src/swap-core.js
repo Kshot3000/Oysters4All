@@ -675,13 +675,45 @@ export function buildLockTx(network, {
 }
 
 /* ------------------------------------------------------------------ */
+/* Builder tip (optional, disclosed)                                   */
+/* ------------------------------------------------------------------ */
+
+/* Optional builder tip (profit mandate, disclosed, opt-in/default-off):
+ * a claim spends the whole swap UTXO through the claim leaf, signed by
+ * Bob alone, so — like Atomic/Circle/Bond — the tip is never automatic:
+ * Bob explicitly opts in. builderTipGrainsFor() is the single source;
+ * buildClaimSpend() adds the tip as its own second output BEFORE
+ * signing, and the script-path sighash commits to every output — so it
+ * cannot be added or skimmed after signing. Off = claim identical to
+ * the pre-tip builder. Offered on the claim flow only: the refund
+ * takes no tip parameter at all — it returns Alice's own locked funds
+ * after T1, so a tip output is excluded by construction. The recipient
+ * is the operator address published in every Swap footer. */
+export const BUILDER_TIP_BPS = 100; // 1%
+export const BUILDER_TIP_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+export const BUILDER_TIP_NAME = "Builder tip (optional)";
+
+/** Builder tip in grains for a claim of totalGrains on network.
+ *  Returns 0 unless enabled === true, the network is mainnet, and the
+ *  1% floor reaches the dust floor (waived, never rounded up). Computed
+ *  in BigInt so large claims stay exact, then returned in this core's
+ *  Number style (the input is already range-checked to a safe integer). */
+export function builderTipGrainsFor(totalGrains, network, enabled) {
+  if (enabled !== true) return 0;
+  if (!network || network.hrp !== "prl") return 0;
+  if (!Number.isSafeInteger(totalGrains) || totalGrains <= 0) throw new Error("bad total for builder tip");
+  const tip = Number((BigInt(totalGrains) * BigInt(BUILDER_TIP_BPS)) / 10000n);
+  return tip >= DUST_GRAIN ? tip : 0;
+}
+
+/* ------------------------------------------------------------------ */
 /* Claim: Bob spends via the claim leaf, revealing the preimage        */
 /* ------------------------------------------------------------------ */
 
-/** Exact worst-case vBytes for a claim spend (1 P2TR output). */
-export function claimSpendVBytes(swap) {
+/** Exact worst-case vBytes for a claim spend (nOut P2TR outputs, 1 by default). */
+export function claimSpendVBytes(swap, nOut = 1) {
   return spendVBytes({
-    nOut: 1,
+    nOut,
     scriptLen: swap.claimScriptHex.length / 2,
     controlLen: 65,
     stackLens: [64, PREIMAGE_LEN], // bob_sig + preimage
@@ -696,7 +728,7 @@ export function claimSpendVBytes(swap) {
  * extracts it from the confirmed claim tx to claim the BTC side.
  */
 export function buildClaimSpend(network, swap, {
-  utxo, preimageHex, bobPrivHex, destAddress, feeRateGrainsPerVByte,
+  utxo, preimageHex, bobPrivHex, destAddress, feeRateGrainsPerVByte, builderTipEnabled = false,
 }) {
   const preimage = parsePreimage(preimageHex);
   if (bytesToHex(secretHashOf(preimage)) !== swap.secretHashHex) {
@@ -711,15 +743,40 @@ export function buildClaimSpend(network, swap, {
   if (!Number.isSafeInteger(utxo?.value) || utxo.value <= 0) throw new Error("bad utxo value");
   if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) throw new Error("bad fee rate");
   const destProgram = addressToProgram(destAddress, network);
-  const fee = Math.ceil(claimSpendVBytes(swap) * feeRateGrainsPerVByte);
-  const value = utxo.value - fee;
+  const builderTip = builderTipGrainsFor(utxo.value, network, builderTipEnabled === true);
+  const builderTipProgram = builderTip > 0 ? addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet) : null;
+  if (builderTip > 0 && constEq(destProgram, builderTipProgram)) {
+    throw new Error("claim destination is the builder address — the builder tip would duplicate the claim output; leave the tip off");
+  }
+  const fee = Math.ceil(claimSpendVBytes(swap, builderTip > 0 ? 2 : 1) * feeRateGrainsPerVByte);
+  const value = utxo.value - fee - builderTip;
   if (value < DUST_GRAIN) {
+    if (builderTip > 0) {
+      throw new Error(`claim value ${utxo.value} cannot cover fee ${fee} and the ${builderTip}-grain builder tip and still pay out >= dust (${DUST_GRAIN}); leave the builder tip off`);
+    }
     throw new Error(`claim output ${value} grains is below dust after fees — UTXO too small`);
   }
   const claimScript = hexToBytes(swap.claimScriptHex);
   const controlBlock = hexToBytes(swap.claimControlBlockHex);
   const input = { txid: utxo.txid.toLowerCase(), vout: utxo.vout, value: utxo.value, spk: hexToBytes(swap.spkHex) };
   const outputs = [{ program: destProgram, value }];
+  if (builderTip > 0) outputs.push({ program: builderTipProgram, value: builderTip, builderTip: true });
+  // Last-hop builder-tip assertion: this builder is where the claim
+  // crosses from parameters to a signed transaction, so a flagged tip
+  // is a trust claim — the tip program is re-derived here from the
+  // builder address constant, never trusted from a caller-supplied
+  // plan, and the flagged output must pay it at exactly the computed
+  // amount before the digest is signed. An untipped claim must carry
+  // no flagged output at all.
+  const flagged = outputs.filter((o) => o && o.builderTip);
+  if (builderTip > 0) {
+    const want = addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet);
+    if (flagged.length !== 1 || !constEq(flagged[0].program, want) || flagged[0].value !== builderTip) {
+      throw new Error("builder tip does not pay the builder address at the computed amount — refusing to build the claim");
+    }
+  } else if (flagged.length > 0) {
+    throw new Error("claim carries a flagged builder tip but no computed tip amount — refusing to build the claim");
+  }
   const digest = scriptPathSigDigestEx(network, input, outputs, claimScript, {});
   const sig = signForXOnly(hexToBytes(String(bobPrivHex).trim().toLowerCase()), digest);
   if (!verifySchnorrSig(sig, digest, hexToBytes(swap.bobXOnly))) {
@@ -729,7 +786,7 @@ export function buildClaimSpend(network, swap, {
     network, input, outputs, claimScript, controlBlock, [sig, preimage], {},
   );
   if (spend.digest !== bytesToHex(digest)) throw new Error("internal: claim digest mismatch");
-  return { ...spend, feeGrains: fee, preimageHex: bytesToHex(preimage) };
+  return { ...spend, feeGrains: fee, preimageHex: bytesToHex(preimage), builderTip };
 }
 
 /* ------------------------------------------------------------------ */
