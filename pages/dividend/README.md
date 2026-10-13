@@ -30,6 +30,19 @@ Six steps: **Token → Snapshot → Plan → Fund → Sign → Broadcast & Verif
    snapshot fingerprint, the plan fingerprint, every share, and audits every
    payout transaction against the chunk list.
 
+## Builder tip (optional, disclosed)
+
+The Plan step offers an **optional builder tip**: 1% of the pool, paid by the
+funder **on top of the pool** as its own output in the last payout
+transaction, to `prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`.
+Holder shares are derived from the pool alone and are **never reduced** by
+the tip. It is off by default, mainnet only, and waived (never rounded up)
+when 1% would fall below the 546-grain dust floor. The tip is sealed in the
+plan descriptor before anyone signs — the funder's signature commits to
+every output — a bundle output flagged as the tip is refused on import
+unless it pays the builder address at exactly the sealed amount, and the
+standalone verifier recomputes the tip from the pool and checks it.
+
 ## Honest scope
 
 - Pearl has no smart contracts; PRL-20 state comes from an indexer. This app
@@ -47,8 +60,8 @@ Six steps: **Token → Snapshot → Plan → Fund → Sign → Broadcast & Verif
 ```bash
 cd pages/dividend
 node build.mjs              # emits pearl-dividend.bundle.js
-node --no-warnings --loader ./tests/loader.mjs tests/div.test.mjs   # 19 core tests
-node --no-warnings tests/dom.test.mjs                                # 9 DOM tests
+node --no-warnings --loader ./tests/loader.mjs tests/div.test.mjs   # 25 core tests
+node --no-warnings tests/dom.test.mjs                                # 11 DOM tests
 ```
 
 No external packages. Fonts degrade gracefully when no network is available.

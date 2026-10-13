@@ -20,6 +20,9 @@ var PearlDividend = (() => {
   // src/index.js
   var index_exports = {};
   __export(index_exports, {
+    BUILDER_TIP_ADDRESS: () => BUILDER_TIP_ADDRESS,
+    BUILDER_TIP_BPS: () => BUILDER_TIP_BPS,
+    BUILDER_TIP_NAME: () => BUILDER_TIP_NAME,
     DIV_ACCOUNT: () => DIV_ACCOUNT,
     DIV_BUNDLE_KIND: () => DIV_BUNDLE_KIND,
     DIV_DESCRIPTOR_KIND: () => DIV_DESCRIPTOR_KIND,
@@ -39,6 +42,7 @@ var PearlDividend = (() => {
     buildKeypathTxEx: () => buildKeypathTxEx,
     buildSnapshotDescriptor: () => buildSnapshotDescriptor,
     buildUnsignedTx: () => buildUnsignedTx,
+    builderTipGrainsFor: () => builderTipGrainsFor,
     bytesToHex: () => bytesToHex,
     canonicalAddress: () => canonicalAddress,
     canonicalJson: () => canonicalJson,
@@ -6309,6 +6313,17 @@ zoo`.split("\n");
     }
     return encodeBech32m(network.hrp, 1, dec.program);
   }
+  var BUILDER_TIP_BPS = 100;
+  var BUILDER_TIP_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+  var BUILDER_TIP_NAME = "Builder tip (optional)";
+  function builderTipGrainsFor(totalGrains, network, enabled) {
+    if (enabled !== true) return 0n;
+    if (!network || network.hrp !== "prl") return 0n;
+    const total = BigInt(totalGrains);
+    if (total <= 0n) throw new Error("bad total for builder tip");
+    const tip = total * BigInt(BUILDER_TIP_BPS) / 10000n;
+    return tip >= BigInt(DUST_GRAIN) ? tip : 0n;
+  }
   function assertUtxos(utxos) {
     if (!Array.isArray(utxos) || utxos.length === 0) throw new Error("no UTXOs \u2014 fetch the sender's UTXOs or paste them first");
     for (const u of utxos) {
@@ -6787,6 +6802,7 @@ zoo`.split("\n");
     // grains/vB (estimate; exact at sign time)
     maxOutputsPerTx = DIV_MAX_OUTPUTS,
     treasuryAddress = null,
+    builderTipEnabled = false,
     note = ""
   }) {
     if (!snapshot || !snapshot.descriptor) throw new Error("seal a holder snapshot first");
@@ -6815,11 +6831,18 @@ zoo`.split("\n");
     }
     const R = shares.remainderGrains;
     const remainderTo = treasury && R >= BigInt(DUST_GRAIN) ? treasury : R >= BigInt(DUST_GRAIN) ? "funder-change-output" : "funder-change-folded";
+    const builderTip = builderTipGrainsFor(pool, network, builderTipEnabled === true);
     const perTx = Math.max(1, Math.min(DIV_MAX_OUTPUTS, Math.floor(Number(maxOutputsPerTx)) || DIV_MAX_OUTPUTS));
+    const extrasLast = (R >= BigInt(DUST_GRAIN) ? 1 : 0) + (builderTip > 0n ? 1 : 0);
     const chunks = [];
-    for (let i = 0; i < shares.paid.length; i += perTx) {
-      const recips = shares.paid.slice(i, i + perTx);
-      const last = i + perTx >= shares.paid.length;
+    let i = 0;
+    while (i < shares.paid.length) {
+      let take = Math.min(perTx, shares.paid.length - i);
+      if (i + take >= shares.paid.length && extrasLast > 0) {
+        take = Math.min(take, Math.max(1, perTx - extrasLast));
+      }
+      const recips = shares.paid.slice(i, i + take);
+      const last = i + take >= shares.paid.length;
       const outs = recips.map((r) => ({ address: r.address, shareGrains: r.shareGrains.toString() }));
       let extraOut = 0;
       if (last && treasury && R >= BigInt(DUST_GRAIN)) {
@@ -6829,6 +6852,11 @@ zoo`.split("\n");
         outs.push({ address: null, shareGrains: R.toString(), remainder: true });
         extraOut = 1;
       }
+      if (last && builderTip > 0n) {
+        outs.push({ address: BUILDER_TIP_ADDRESS, shareGrains: builderTip.toString(), builderTip: true });
+        extraOut += 1;
+      }
+      void extraOut;
       const outputsGrains = outs.reduce((a, o) => a + BigInt(o.shareGrains), 0n);
       const estFee = BigInt(Math.ceil(keypathTxVBytes(1, outs.length + 1) * rate));
       chunks.push({
@@ -6839,6 +6867,7 @@ zoo`.split("\n");
         estFeeGrains: estFee.toString(),
         last
       });
+      i += take;
     }
     const recipientsGrains = shares.paid.reduce((a, p) => a + p.shareGrains, 0n);
     const estFeesGrains = chunks.reduce((a, c) => a + BigInt(c.estFeeGrains), 0n);
@@ -6876,14 +6905,18 @@ zoo`.split("\n");
           address: r.address,
           shareGrains: r.shareGrains,
           ...r.treasury ? { treasury: true } : {},
-          ...r.remainder ? { remainder: true } : {}
+          ...r.remainder ? { remainder: true } : {},
+          ...r.builderTip ? { builderTip: true } : {}
         }))
       })),
       remainderGrains: R.toString(),
       remainderTo,
+      builderTipGrains: builderTip.toString(),
+      builderTipAddress: builderTip > 0n ? BUILDER_TIP_ADDRESS : null,
       totals: {
         recipientsGrains: recipientsGrains.toString(),
-        estFeesGrains: estFeesGrains.toString()
+        estFeesGrains: estFeesGrains.toString(),
+        builderTipGrains: builderTip.toString()
       },
       note: String(note || "").slice(0, 280),
       createdAt: (/* @__PURE__ */ new Date()).toISOString()
@@ -6908,7 +6941,15 @@ zoo`.split("\n");
       const recips = c.recipients.map((r) => {
         const address = r.remainder ? funder : r.address;
         const dec = decodeBech32m(address, network.hrp);
-        return { address, program: dec.program, amount: BigInt(r.shareGrains), treasury: !!r.treasury, remainder: !!r.remainder };
+        if (r.builderTip) {
+          if (address !== BUILDER_TIP_ADDRESS) {
+            throw new Error(`chunk #${c.index + 1}: builder-tip output pays ${address} \u2014 the tip may only pay the builder address`);
+          }
+          if (BigInt(r.shareGrains) !== BigInt(descriptor.builderTipGrains || "0")) {
+            throw new Error(`chunk #${c.index + 1}: builder-tip amount does not match the sealed plan \u2014 re-plan`);
+          }
+        }
+        return { address, program: dec.program, amount: BigInt(r.shareGrains), treasury: !!r.treasury, remainder: !!r.remainder, builderTip: !!r.builderTip };
       });
       const sumOut = recips.reduce((a, r) => a + r.amount, 0n);
       const nOut = recips.length;
@@ -6936,6 +6977,7 @@ zoo`.split("\n");
         if (f) {
           o.treasury = !!f.treasury;
           o.remainder = !!f.remainder;
+          o.builderTip = !!f.builderTip;
         }
       }
       fundedChunks.push({ index: c.index, plan: dispatch, recipients: recips, last: c.last });
@@ -6963,7 +7005,8 @@ zoo`.split("\n");
         valueGrains: BigInt(o.value).toString(),
         change: !!o.change,
         treasury: !!o.treasury,
-        remainder: !!o.remainder
+        remainder: !!o.remainder,
+        builderTip: !!o.builderTip
       })),
       totals: {
         inputsGrains: fc.plan.total.toString(),
@@ -7013,10 +7056,18 @@ zoo`.split("\n");
       const dec = decodeBech32m(address, network.hrp);
       const amount = BigInt(o.valueGrains);
       if (amount < BigInt(DUST_GRAIN)) throw new Error(`bundle output to ${address.slice(0, 18)}\u2026 is below dust \u2014 refusing`);
-      return { address, program: dec.program, amount, treasury: !!o.treasury, remainder: !!o.remainder };
+      if (o.builderTip) {
+        if (address !== BUILDER_TIP_ADDRESS) {
+          throw new Error(`bundle output flagged as the builder tip pays ${address.slice(0, 18)}\u2026 \u2014 refusing to sign`);
+        }
+        if (amount !== BigInt(d.builderTipGrains || "0")) {
+          throw new Error("bundle builder-tip amount does not match the sealed plan \u2014 refusing to sign");
+        }
+      }
+      return { address, program: dec.program, amount, treasury: !!o.treasury, remainder: !!o.remainder, builderTip: !!o.builderTip };
     });
     if (recipients.length === 0) throw new Error("bundle has no recipient outputs");
-    if (recipients.length > DIV_MAX_OUTPUTS + 1) throw new Error("bundle exceeds the per-chunk recipient cap");
+    if (recipients.length > DIV_MAX_OUTPUTS + 2) throw new Error("bundle exceeds the per-chunk recipient cap");
     const plan = planDispatch({
       utxos: inputs,
       recipients,
@@ -7201,6 +7252,30 @@ zoo`.split("\n");
         }
       } catch (e) {
         fail("share math", e.message);
+      }
+    }
+    if (d.builderTipGrains != null || d.builderTipAddress != null) {
+      try {
+        const tipGrains = BigInt(d.builderTipGrains || "0");
+        if (tipGrains === 0n) {
+          if (d.builderTipAddress != null) fail("builder tip", "tip is waived in the descriptor but a tip address is sealed \u2014 inconsistent plan");
+          else pass("builder tip", "no builder tip in this plan (off or waived)");
+        } else {
+          const wantTip = builderTipGrainsFor(BigInt(d.poolGrains), network, true);
+          const lastChunk = d.chunks[d.chunks.length - 1];
+          const tipOuts = (lastChunk && lastChunk.recipients || []).filter((r) => r.builderTip);
+          if (d.builderTipAddress !== BUILDER_TIP_ADDRESS) {
+            fail("builder tip", `sealed tip address is not the builder address`);
+          } else if (wantTip !== tipGrains) {
+            fail("builder tip", `sealed tip ${tipGrains} grains != recomputed 1% of the pool ${wantTip} grains`);
+          } else if (tipOuts.length !== 1 || tipOuts[0].address !== BUILDER_TIP_ADDRESS || BigInt(tipOuts[0].shareGrains) !== tipGrains) {
+            fail("builder tip", "last chunk does not carry exactly one tip output of the sealed amount to the builder address");
+          } else {
+            pass("builder tip", `${fmtPRL(tipGrains)} PRL on top of the pool to the builder \u2014 holder shares untouched`);
+          }
+        }
+      } catch (e) {
+        fail("builder tip", e.message);
       }
     }
     const funder = String(b.funderAddress || "").trim();

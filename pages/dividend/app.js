@@ -210,6 +210,7 @@
         exclusions: $("plan-exclusions").value.split(/\r?\n/).map((s) => s.trim()).filter(Boolean),
         minBalance: ($("plan-minbal").value.trim() || "0"),
         treasuryAddress: treasury,
+        builderTipEnabled: $("plan-tip").checked,
         note: $("plan-note").value.trim(),
       });
       // drift check against the step-1 read, when available
@@ -233,6 +234,9 @@
       const exCount = (plan.shares && plan.shares.excludedCount) || 0;
       $("plan-r-counts").textContent = `${d.eligibleCount.toLocaleString()} eligible · ${d.paidCount.toLocaleString()} paid · ${dd.count.toLocaleString()} dust-dropped · ${exCount.toLocaleString()} excluded`;
       $("plan-r-total").textContent = grainsToPRL(d.totals.recipientsGrains) + " PRL";
+      $("plan-r-tip").textContent = BigInt(d.builderTipGrains || "0") > 0n
+        ? grainsToPRL(d.builderTipGrains) + " PRL → builder " + d.builderTipAddress + " (on top of the pool — holder shares unchanged)"
+        : "none — off or waived (testnet / below dust)";
       // remainderTo is a tag ("funder-change-output" / "funder-change-folded")
       // or the treasury address itself when the remainder goes to treasury.
       const rt = d.remainderTo;
@@ -294,13 +298,15 @@
     const funded = P.fundDividend({ network: net(), plan: S.plan, utxos, funderAddress: funder });
     S.funded = funded; S.utxos = utxos;
     $("fund-chunks").innerHTML = funded.fundedChunks.map((fc) => {
-      const nPay = fc.plan.outputs.filter((o) => !o.change && !o.remainder).length;
+      const nPay = fc.plan.outputs.filter((o) => !o.change && !o.remainder && !o.builderTip).length;
+      const tipOut = fc.plan.outputs.find((o) => o.builderTip);
       const outSum = fc.plan.outputs.reduce((a, o) => a + BigInt(o.value), 0n);
       return `
       <div class="chunk-card">
         <h4>Transaction ${fc.index + 1} of ${funded.fundedChunks.length}</h4>
         <div class="kv">
           <div><dt>Holder payouts</dt><dd>${nPay}</dd></div>
+          ${tipOut ? `<div><dt>Builder tip</dt><dd>${esc(grainsToPRL(tipOut.value))} PRL → builder (on top of the pool)</dd></div>` : ""}
           <div><dt>Inputs</dt><dd>${fc.plan.inputs.length} UTXO(s) — ${esc(grainsToPRL(fc.plan.total))} PRL in</dd></div>
           <div><dt>Outputs</dt><dd>${esc(grainsToPRL(outSum))} PRL out · fee ${esc(grainsToPRL(fc.plan.fee))} PRL · change ${esc(grainsToPRL(fc.plan.change))} PRL</dd></div>
         </div>
@@ -308,7 +314,7 @@
     $("fund-result").hidden = false;
     // populate sign select
     $("sign-chunk").innerHTML = funded.fundedChunks.map((fc) => {
-      const nPay = fc.plan.outputs.filter((o) => !o.change && !o.remainder).length;
+      const nPay = fc.plan.outputs.filter((o) => !o.change && !o.remainder && !o.builderTip).length;
       return `<option value="${fc.index}">Transaction ${fc.index + 1} — ${nPay} payouts</option>`; }).join("");
     S.imported = null; S.signed = []; S.bcast = {};
     unlock("sign");
@@ -389,7 +395,7 @@
     list.innerHTML = S.funded.fundedChunks.map((fc) => {
       const s = S.signed.find((x) => x.chunkIndex === fc.index);
       const b = S.bcast[fc.index];
-      const nPay = fc.plan.outputs.filter((o) => !o.change && !o.remainder).length;
+      const nPay = fc.plan.outputs.filter((o) => !o.change && !o.remainder && !o.builderTip).length;
       const status = b ? `<span class="st">broadcast · ${b.confirmations} confirmation(s)</span><br><span class="txid">${esc(b.txid)}</span>`
         : s ? `<span class="txid">${esc(s.txid)}</span>` : "<em>not signed yet</em>";
       return `<div class="chunk-card">

@@ -345,6 +345,154 @@ test("verifyDividend NOT PROVEN on tampered plan or payouts", () => {
   assert.equal(v4.verdict, "NOT PROVEN");
 });
 
+test("builderTipGrainsFor: exactness and waivers", () => {
+  assert.equal(D.BUILDER_TIP_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
+  assert.equal(D.builderTipGrainsFor(100_000_000n, NET, true), 1_000_000n); // 1% of 1 PRL
+  assert.equal(D.builderTipGrainsFor(123_456_789n, NET, true), 1_234_567n); // floored
+  assert.equal(D.builderTipGrainsFor(100_000_000n, NET, false), 0n); // off
+  assert.equal(D.builderTipGrainsFor(100_000_000n, NET, "yes"), 0n); // only === true counts
+  assert.equal(D.builderTipGrainsFor(100_000_000n, D.NETWORKS.testnet, true), 0n); // testnet waived
+  assert.equal(D.builderTipGrainsFor(50_000n, NET, true), 0n); // 500 grains < dust — waived, never rounded up
+  assert.equal(D.builderTipGrainsFor(54_600n, NET, true), 546n); // exactly at the dust floor — charged
+});
+
+test("builder tip sits ON TOP of the pool — holder shares unchanged", () => {
+  const plain = plan();
+  const tipped = plan({ builderTipEnabled: true });
+  assert.equal(tipped.descriptor.builderTipGrains, "1000000"); // 1% of the 1 PRL pool
+  assert.equal(tipped.descriptor.builderTipAddress, D.BUILDER_TIP_ADDRESS);
+  assert.equal(tipped.descriptor.totals.builderTipGrains, "1000000");
+  // every holder share and the remainder are identical to the untipped plan
+  assert.deepEqual(tipped.descriptor.recipients, plain.descriptor.recipients);
+  assert.equal(tipped.descriptor.remainderGrains, plain.descriptor.remainderGrains);
+  assert.equal(tipped.descriptor.totals.recipientsGrains, plain.descriptor.totals.recipientsGrains);
+  // exactly one tip output, in the last chunk, at the exact amount
+  const last = tipped.chunks[tipped.chunks.length - 1];
+  const tips = last.recipients.filter((r) => r.builderTip);
+  assert.equal(tips.length, 1);
+  assert.equal(tips[0].address, D.BUILDER_TIP_ADDRESS);
+  assert.equal(BigInt(tips[0].shareGrains), 1_000_000n);
+  const dtips = tipped.descriptor.chunks.flatMap((c) => c.recipients.filter((r) => r.builderTip));
+  assert.equal(dtips.length, 1);
+  // off by default: no tip fields set, no tip output
+  assert.equal(plain.descriptor.builderTipGrains, "0");
+  assert.equal(plain.descriptor.builderTipAddress, null);
+  assert.equal(plain.chunks.flatMap((c) => c.recipients.filter((r) => r.builderTip)).length, 0);
+  // testnet: enabled still waives
+  const TNET = D.NETWORKS.testnet;
+  const taddr = (tag) => D.encodeBech32m("tprl", 1, D.sha256(new TextEncoder().encode(tag)));
+  const ts = D.buildSnapshotDescriptor({
+    network: TNET, tick: "pearl", decimals: 8,
+    holders: [{ address: taddr("div-th-1"), units: 100n * 100_000_000n }],
+    maxSupplyUnits: null,
+  });
+  const tp = D.planDividend({
+    network: TNET, snapshot: ts, snapshotFingerprint: ts.fingerprint,
+    poolPRL: "1", rule: "proportional", feeRate: 2, builderTipEnabled: true,
+  });
+  assert.equal(tp.descriptor.builderTipGrains, "0");
+  assert.equal(tp.descriptor.builderTipAddress, null);
+});
+
+test("builder tip + remainder reserve room in the final chunk", () => {
+  const holders = [A1, A2, A3, A4, A5, A6].map((a, i) => [a, BigInt(i + 1) * 100_000_000n]);
+  const s = snapshot(holders);
+  const p = D.planDividend({
+    network: NET, snapshot: s, snapshotFingerprint: s.fingerprint,
+    poolPRL: "1", rule: "fixed", fixedPRL: "0.1", feeRate: 2,
+    maxOutputsPerTx: 3, builderTipEnabled: true,
+  });
+  // 6 paid shares, remainder 0.4 PRL (>= dust) AND a 0.01 PRL tip both belong
+  // to the last chunk: no chunk may exceed the 3-output cap.
+  for (const c of p.chunks) assert.ok(c.recipients.length <= 3, `chunk ${c.index} has ${c.recipients.length} outputs`);
+  const last = p.chunks[p.chunks.length - 1];
+  assert.equal(last.recipients.filter((r) => r.builderTip).length, 1);
+  assert.equal(last.recipients.filter((r) => r.remainder).length, 1);
+  const paidOuts = p.chunks.flatMap((c) => c.recipients.filter((r) => !r.remainder && !r.builderTip));
+  assert.equal(paidOuts.length, 6);
+});
+
+test("tipped dividend funds, signs, and the signed wire carries the tip exact", () => {
+  const p = plan({ builderTipEnabled: true }); // 1 chunk, remainder 0
+  const funded = D.fundDividend({ network: NET, plan: p, utxos: utxos(3, 80_000_000), funderAddress: FUNDER });
+  const fc = funded.fundedChunks[funded.fundedChunks.length - 1];
+  const tipOut = fc.plan.outputs.find((o) => o.builderTip);
+  assert.ok(tipOut, "funded plan carries the flagged tip output");
+  assert.equal(tipOut.address, D.BUILDER_TIP_ADDRESS);
+  assert.equal(BigInt(tipOut.value), 1_000_000n);
+  // conservation: inputs = holders + tip + fee + change
+  assert.equal(fc.plan.total, fc.plan.sumOut + fc.plan.fee + fc.plan.change);
+  assert.equal(fc.plan.sumOut, 100_000_000n + 1_000_000n);
+  const b = D.exportChunkBundle({ network: NET, funded, chunkIndex: fc.index });
+  const imp = D.importChunkBundle(b);
+  const signed = D.signChunk({ network: NET, imported: imp, secretText: FUNDER_PRIV });
+  const dec = D.decodeRawTx(signed.hex);
+  const builderProg = D.decodeBech32m(D.BUILDER_TIP_ADDRESS, "prl").program;
+  const builderSpk = "5120" + D.bytesToHex(builderProg);
+  const wireTip = dec.outputs.filter((o) => D.bytesToHex(o.spk) === builderSpk);
+  assert.equal(wireTip.length, 1, "exactly one builder output on the wire");
+  assert.equal(BigInt(wireTip[0].value), 1_000_000n);
+  // tampered descriptor tip amount refuses at funding (fingerprint mismatch)
+  const badPlan = JSON.parse(JSON.stringify(p.descriptor));
+  badPlan.builderTipGrains = "2000000";
+  assert.throws(
+    () => D.fundDividend({ network: NET, plan: { descriptor: badPlan, fingerprint: p.fingerprint, chunks: p.chunks }, utxos: utxos(3, 80_000_000), funderAddress: FUNDER }),
+    /FINGERPRINT MISMATCH/
+  );
+});
+
+test("chunk bundle refuses a rerouted builder-tip flag on import", () => {
+  const p = plan({ builderTipEnabled: true });
+  const funded = D.fundDividend({ network: NET, plan: p, utxos: utxos(3, 80_000_000), funderAddress: FUNDER });
+  const b = D.exportChunkBundle({ network: NET, funded, chunkIndex: 0 });
+  // flag a HOLDER output as the tip instead — the flag is a trust claim
+  const bad = JSON.parse(JSON.stringify(b));
+  const holderOut = bad.plan.outputs.find((o) => !o.change && !o.builderTip);
+  holderOut.builderTip = true;
+  assert.throws(() => D.importChunkBundle(bad), /flagged as the builder tip pays/);
+  // shrink the real tip output — amount must match the sealed plan
+  const bad2 = JSON.parse(JSON.stringify(b));
+  const tipOut = bad2.plan.outputs.find((o) => o.builderTip);
+  tipOut.valueGrains = "999999";
+  assert.throws(() => D.importChunkBundle(bad2), /builder-tip amount does not match|DIGEST MISMATCH/);
+});
+
+test("verifyDividend recomputes the builder tip", () => {
+  const p = plan({ builderTipEnabled: true });
+  const csv = `${A1},100\n${A2},300\n${A3},600`;
+  const funded = D.fundDividend({ network: NET, plan: p, utxos: utxos(3, 80_000_000), funderAddress: FUNDER });
+  const payouts = funded.fundedChunks.map((fc, i) => {
+    const bnd = D.exportChunkBundle({ network: NET, funded, chunkIndex: i });
+    const signed = D.signChunk({ network: NET, imported: D.importChunkBundle(bnd), secretText: FUNDER_PRIV });
+    const txJson = fakePayoutTxJson({
+      txid: signed.txid, funder: FUNDER,
+      inputs: fc.plan.inputs.map((u) => u.value),
+      outputs: fc.plan.outputs.map((o) => ({ value: BigInt(o.value), address: o.address })),
+    });
+    return { chunkIndex: i, txid: signed.txid, txJson };
+  });
+  const v = D.verifyDividend({
+    network: NET, snapshotCsvText: csv,
+    dividendBundle: { descriptor: p.descriptor, fingerprint: p.fingerprint, funderAddress: FUNDER },
+    payouts,
+  });
+  assert.equal(v.verdict, "PROVEN", JSON.stringify(v.checks.filter((c) => !c.ok)));
+  const tipCheck = v.checks.find((c) => c.name === "builder tip");
+  assert.ok(tipCheck && tipCheck.ok, "tip leg passes on the honest tipped flow");
+  // tamper the sealed tip (fingerprint recomputed so ONLY the tip leg can fail)
+  const badD = JSON.parse(JSON.stringify(p.descriptor));
+  badD.builderTipGrains = "500000";
+  const badFp = D.descriptorFingerprint(badD);
+  const v2 = D.verifyDividend({
+    network: NET, snapshotCsvText: csv,
+    dividendBundle: { descriptor: badD, fingerprint: badFp, funderAddress: FUNDER },
+    payouts: [],
+  });
+  assert.equal(v2.verdict, "NOT PROVEN");
+  const tc2 = v2.checks.find((c) => c.name === "builder tip");
+  assert.ok(tc2 && !tc2.ok, "tip leg fails on a tampered tip amount");
+});
+
 test("indexer fetchers handle ok / 404 / network failure", async () => {
   const okFetch = async (url) => ({
     ok: true, json: async () => url.includes("/tokens/") ? { ticker: "pearl", holderCount: 42 } : { height: 123 },

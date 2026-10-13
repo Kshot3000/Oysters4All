@@ -18,7 +18,10 @@
  *      <=250-output transactions;
  *   4. funds each chunk from your key (GET-only Blockbook reads or an
  *      air-gapped paste), signs locally with per-input Schnorr
- *      re-verification;
+ *      re-verification — with an OPTIONAL builder tip: 1% of the pool,
+ *      paid by the funder ON TOP of the pool (holder shares never reduced),
+ *      as its own flagged output in the last chunk, sealed in the plan
+ *      descriptor and recomputed by the verifier;
  *   5. verifies: anyone recomputes the shares from the snapshot CSV plus the
  *      descriptor and audits every broadcast chunk against the chain.
  *
@@ -33,6 +36,7 @@ import {
   canonicalJson, descriptorFingerprint, buildUnsignedTx,
   parseBatchSecret, assertKeyControlsAddress, canonicalAddress,
   autoSelectUtxos, planDispatch, buildBatchTx, auditBatchTx,
+  builderTipGrainsFor, BUILDER_TIP_ADDRESS, BUILDER_TIP_BPS, BUILDER_TIP_NAME,
   BATCH_MAX_OUTPUTS,
 } from "../../batch/src/batch-core.js";
 import {
@@ -54,6 +58,7 @@ export {
   canonicalJson, descriptorFingerprint, buildUnsignedTx,
   parseBatchSecret, assertKeyControlsAddress, canonicalAddress,
   autoSelectUtxos, planDispatch, buildBatchTx, auditBatchTx,
+  builderTipGrainsFor, BUILDER_TIP_ADDRESS, BUILDER_TIP_BPS, BUILDER_TIP_NAME,
   selectCoins, buildKeypathTxEx, verifySignedTx, decodeRawTx,
   walletFromMnemonic, walletFromPriv, walletFromWIF,
   fetchUtxos, fetchFeeRateGrainsPerVByte, broadcastTx, fetchTxStatus,
@@ -363,6 +368,7 @@ export function planDividend({
   feeRate = 1,         // grains/vB (estimate; exact at sign time)
   maxOutputsPerTx = DIV_MAX_OUTPUTS,
   treasuryAddress = null,
+  builderTipEnabled = false,
   note = "",
 }) {
   if (!snapshot || !snapshot.descriptor) throw new Error("seal a holder snapshot first");
@@ -396,11 +402,28 @@ export function planDividend({
   const remainderTo = treasury && R >= BigInt(DUST_GRAIN) ? treasury
     : R >= BigInt(DUST_GRAIN) ? "funder-change-output" : "funder-change-folded";
 
+  // Optional builder tip: 1% of the pool, paid ON TOP of the pool by the
+  // funder — holder shares are derived from the pool alone and are never
+  // reduced by it. Single source is the batch core's builderTipGrainsFor
+  // (mainnet only, waived below dust, 0 unless enabled === true). The tip
+  // rides as its own flagged output in the LAST chunk, sealed in the
+  // descriptor below, so every signer and the verifier see it pre-signing.
+  const builderTip = builderTipGrainsFor(pool, network, builderTipEnabled === true);
+
   const perTx = Math.max(1, Math.min(DIV_MAX_OUTPUTS, Math.floor(Number(maxOutputsPerTx)) || DIV_MAX_OUTPUTS));
+  // Outputs the last chunk must reserve room for beyond holder shares.
+  const extrasLast = (R >= BigInt(DUST_GRAIN) ? 1 : 0) + (builderTip > 0n ? 1 : 0);
   const chunks = [];
-  for (let i = 0; i < shares.paid.length; i += perTx) {
-    const recips = shares.paid.slice(i, i + perTx);
-    const last = i + perTx >= shares.paid.length;
+  let i = 0;
+  while (i < shares.paid.length) {
+    let take = Math.min(perTx, shares.paid.length - i);
+    if (i + take >= shares.paid.length && extrasLast > 0) {
+      // Final chunk: reserve room for the extra outputs so the chunk never
+      // exceeds perTx outputs (degenerate perTx <= extras keeps 1 share).
+      take = Math.min(take, Math.max(1, perTx - extrasLast));
+    }
+    const recips = shares.paid.slice(i, i + take);
+    const last = i + take >= shares.paid.length;
     const outs = recips.map((r) => ({ address: r.address, shareGrains: r.shareGrains.toString() }));
     let extraOut = 0;
     if (last && treasury && R >= BigInt(DUST_GRAIN)) {
@@ -410,6 +433,11 @@ export function planDividend({
       outs.push({ address: null, shareGrains: R.toString(), remainder: true }); // funder change output, address filled at fund time
       extraOut = 1;
     }
+    if (last && builderTip > 0n) {
+      outs.push({ address: BUILDER_TIP_ADDRESS, shareGrains: builderTip.toString(), builderTip: true });
+      extraOut += 1;
+    }
+    void extraOut;
     const outputsGrains = outs.reduce((a, o) => a + BigInt(o.shareGrains), 0n);
     const estFee = BigInt(Math.ceil(keypathTxVBytes(1, outs.length + 1) * rate));
     chunks.push({
@@ -420,6 +448,7 @@ export function planDividend({
       estFeeGrains: estFee.toString(),
       last,
     });
+    i += take;
   }
 
   const recipientsGrains = shares.paid.reduce((a, p) => a + p.shareGrains, 0n);
@@ -459,13 +488,17 @@ export function planDividend({
         shareGrains: r.shareGrains,
         ...(r.treasury ? { treasury: true } : {}),
         ...(r.remainder ? { remainder: true } : {}),
+        ...(r.builderTip ? { builderTip: true } : {}),
       })),
     })),
     remainderGrains: R.toString(),
     remainderTo,
+    builderTipGrains: builderTip.toString(),
+    builderTipAddress: builderTip > 0n ? BUILDER_TIP_ADDRESS : null,
     totals: {
       recipientsGrains: recipientsGrains.toString(),
       estFeesGrains: estFeesGrains.toString(),
+      builderTipGrains: builderTip.toString(),
     },
     note: String(note || "").slice(0, 280),
     createdAt: new Date().toISOString(),
@@ -500,7 +533,17 @@ export function fundDividend({ network = NETWORKS.mainnet, plan, utxos, funderAd
     const recips = c.recipients.map((r) => {
       const address = r.remainder ? funder : r.address;
       const dec = decodeBech32m(address, network.hrp);
-      return { address, program: dec.program, amount: BigInt(r.shareGrains), treasury: !!r.treasury, remainder: !!r.remainder };
+      if (r.builderTip) {
+        // The flag is a trust claim: a flagged tip may only pay the builder
+        // address, at exactly the amount sealed in the plan descriptor.
+        if (address !== BUILDER_TIP_ADDRESS) {
+          throw new Error(`chunk #${c.index + 1}: builder-tip output pays ${address} — the tip may only pay the builder address`);
+        }
+        if (BigInt(r.shareGrains) !== BigInt(descriptor.builderTipGrains || "0")) {
+          throw new Error(`chunk #${c.index + 1}: builder-tip amount does not match the sealed plan — re-plan`);
+        }
+      }
+      return { address, program: dec.program, amount: BigInt(r.shareGrains), treasury: !!r.treasury, remainder: !!r.remainder, builderTip: !!r.builderTip };
     });
     const sumOut = recips.reduce((a, r) => a + r.amount, 0n);
     const nOut = recips.length;
@@ -524,7 +567,7 @@ export function fundDividend({ network = NETWORKS.mainnet, plan, utxos, funderAd
     for (const o of dispatch.outputs) {
       if (o.change) continue;
       const f = flagByKey.get(`${String(o.address).toLowerCase()}:${BigInt(o.value)}`);
-      if (f) { o.treasury = !!f.treasury; o.remainder = !!f.remainder; }
+      if (f) { o.treasury = !!f.treasury; o.remainder = !!f.remainder; o.builderTip = !!f.builderTip; }
     }
     fundedChunks.push({ index: c.index, plan: dispatch, recipients: recips, last: c.last });
   }
@@ -552,7 +595,7 @@ export function exportChunkBundle({ network = NETWORKS.mainnet, funded, chunkInd
     })),
     outputs: fc.plan.outputs.map((o) => ({
       address: o.address, valueGrains: BigInt(o.value).toString(),
-      change: !!o.change, treasury: !!o.treasury, remainder: !!o.remainder,
+      change: !!o.change, treasury: !!o.treasury, remainder: !!o.remainder, builderTip: !!o.builderTip,
     })),
     totals: {
       inputsGrains: fc.plan.total.toString(),
@@ -610,10 +653,20 @@ export function importChunkBundle(bundle) {
       const dec = decodeBech32m(address, network.hrp);
       const amount = BigInt(o.valueGrains);
       if (amount < BigInt(DUST_GRAIN)) throw new Error(`bundle output to ${address.slice(0, 18)}… is below dust — refusing`);
-      return { address, program: dec.program, amount, treasury: !!o.treasury, remainder: !!o.remainder };
+      if (o.builderTip) {
+        // The flag is a trust claim: a flagged tip may only pay the builder
+        // address, at exactly the amount sealed in the descriptor.
+        if (address !== BUILDER_TIP_ADDRESS) {
+          throw new Error(`bundle output flagged as the builder tip pays ${address.slice(0, 18)}… — refusing to sign`);
+        }
+        if (amount !== BigInt(d.builderTipGrains || "0")) {
+          throw new Error("bundle builder-tip amount does not match the sealed plan — refusing to sign");
+        }
+      }
+      return { address, program: dec.program, amount, treasury: !!o.treasury, remainder: !!o.remainder, builderTip: !!o.builderTip };
     });
   if (recipients.length === 0) throw new Error("bundle has no recipient outputs");
-  if (recipients.length > DIV_MAX_OUTPUTS + 1) throw new Error("bundle exceeds the per-chunk recipient cap");
+  if (recipients.length > DIV_MAX_OUTPUTS + 2) throw new Error("bundle exceeds the per-chunk recipient cap");
   const plan = planDispatch({
     utxos: inputs, recipients, senderProgram: funderDec.program,
     feeRateGrainsPerVByte: b.feeRate, network,
@@ -820,6 +873,34 @@ export function verifyDividend({ network = NETWORKS.mainnet, snapshotCsvText, di
       }
     } catch (e) {
       fail("share math", e.message);
+    }
+  }
+
+  // 2b. builder tip: recomputed from the pool alone (holder shares are
+  // derived in leg 2 without it — the tip sits ON TOP of the pool). A
+  // pre-tip descriptor carries no tip fields and skips this leg.
+  if (d.builderTipGrains != null || d.builderTipAddress != null) {
+    try {
+      const tipGrains = BigInt(d.builderTipGrains || "0");
+      if (tipGrains === 0n) {
+        if (d.builderTipAddress != null) fail("builder tip", "tip is waived in the descriptor but a tip address is sealed — inconsistent plan");
+        else pass("builder tip", "no builder tip in this plan (off or waived)");
+      } else {
+        const wantTip = builderTipGrainsFor(BigInt(d.poolGrains), network, true);
+        const lastChunk = d.chunks[d.chunks.length - 1];
+        const tipOuts = ((lastChunk && lastChunk.recipients) || []).filter((r) => r.builderTip);
+        if (d.builderTipAddress !== BUILDER_TIP_ADDRESS) {
+          fail("builder tip", `sealed tip address is not the builder address`);
+        } else if (wantTip !== tipGrains) {
+          fail("builder tip", `sealed tip ${tipGrains} grains != recomputed 1% of the pool ${wantTip} grains`);
+        } else if (tipOuts.length !== 1 || tipOuts[0].address !== BUILDER_TIP_ADDRESS || BigInt(tipOuts[0].shareGrains) !== tipGrains) {
+          fail("builder tip", "last chunk does not carry exactly one tip output of the sealed amount to the builder address");
+        } else {
+          pass("builder tip", `${fmtPRL(tipGrains)} PRL on top of the pool to the builder — holder shares untouched`);
+        }
+      }
+    } catch (e) {
+      fail("builder tip", e.message);
     }
   }
 

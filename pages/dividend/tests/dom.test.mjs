@@ -270,6 +270,35 @@ test("verify step: plan-only verify returns PROVEN", async () => {
   assert.match(get("ver-verdict").textContent, /PROVEN/);
 });
 
+test("builder tip: checkbox unchecked by default, disclosure in page", () => {
+  assert.equal(get("plan-tip").checked, false, "tip checkbox starts unchecked");
+  assert.match(html, /Optional builder tip — add 1% of the pool/);
+  assert.match(html, /holder shares are never reduced/);
+  assert.ok(html.includes("prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d"), "builder address disclosed in page");
+  assert.equal(typeof P.builderTipGrainsFor, "function", "bundle exposes the tip API");
+  assert.equal(P.builderTipGrainsFor(100_000_000n, P.NETWORKS.mainnet, true), 1_000_000n);
+});
+
+test("builder tip: opt-in renders the tip line, holder total unchanged, opt-out restores", () => {
+  set("plan-pool", "1");
+  set("plan-rule", "proportional");
+  set("plan-funder", FUNDER);
+  get("plan-tip").checked = true;
+  click("plan-build");
+  noErr("plan-error");
+  assert.equal(get("plan-result").hidden, false);
+  assert.match(get("plan-r-tip").textContent, /0\.01 PRL → builder prl1p62/);
+  assert.match(get("plan-r-tip").textContent, /on top of the pool/);
+  assert.match(get("plan-r-total").textContent, /1 PRL/, "holders still get the full pool");
+  const st = sandbox.__divTest.state();
+  assert.equal(st.plan.descriptor.builderTipGrains, "1000000");
+  get("plan-tip").checked = false;
+  click("plan-build");
+  noErr("plan-error");
+  assert.match(get("plan-r-tip").textContent, /none — off or waived/);
+  assert.equal(sandbox.__divTest.state().plan.descriptor.builderTipGrains, "0");
+});
+
 test("verify step: tampered fingerprint is NOT PROVEN", async () => {
   set("ver-bundle", JSON.stringify({ descriptor: { kind: "pearl-div:v1" }, fingerprint: "0".repeat(16) }));
   click("ver-run");
