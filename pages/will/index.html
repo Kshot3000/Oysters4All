@@ -22,7 +22,7 @@
 <meta name="twitter:image" content="https://kshot3000.github.io/Oysters4All/assets/og-card.png">
 <meta name="twitter:site" content="@kshot9000">
 <meta name="twitter:creator" content="@kshot9000">
-<link rel="stylesheet" href="styles.css?v=7">
+<link rel="stylesheet" href="styles.css?v=8">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Pearl Will — Taproot inheritance vaults for PRL","description":"Pearl Will: lock PRL in a 2-leaf Taproot vault. The owner can reclaim at any time; m-of-n heirs can claim only after the unlock block (CLTV-gated). NUMS internal key, sealed descriptors, standalone verifier. Fully offline except optional Blockbook lookups.","url":"https://kshot3000.github.io/Oysters4All/pages/will/","applicationCategory":"BrowserApplication","operatingSystem":"Any","isAccessibleForFree":true}</script>
 <link rel="stylesheet" href="../../visual-upgrade/theme.css?v=20261007">
 </head>
@@ -61,6 +61,7 @@
     <li><strong>The owner can always move the funds</strong> — until the moment the heirs claim them. There is no dead-man's switch on-chain; if you spend the vault, the heirs' claim becomes worthless. Tell them how to watch the vault.</li>
     <li><strong>Not legal advice:</strong> this is a key-management tool, not a legal will. No probate, no executor, no estate law — just Taproot.</li>
     <li><strong>This page never holds your keys:</strong> mnemonics and private keys live in this page's memory only and are never sent anywhere. Broadcasts go through Blockbook only with your double-confirm.</li>
+    <li><strong>Optional builder tip (owner reclaims only):</strong> the Claim step offers an opt-in 1% builder tip on owner reclaims, added as its own output before signing and shown as its own line on the signed panel. It is off by default, mainnet-only, and waived when 1% falls below the dust floor. Heir claims never carry a tip — the heir leaf is m-of-n, so no single heir can add one.</li>
   </ul>
 </aside>
 
@@ -266,6 +267,7 @@
           <label>Fee rate (grains/vByte)
             <input id="co-feerate" type="number" min="1" value="10">
           </label>
+          <label class="wide check"><input type="checkbox" id="co-tip"> <span>Optional builder tip — add 1% of the reclaimed amount as a separate output to the app builder (<code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>), committed before signing. You receive the reclaimed amount minus the fee and the tip. Off by default; heir claims never carry a tip.</span></label>
         </div>
         <div class="row"><button id="co-build" class="primary">Build owner claim</button></div>
         <p class="err" id="co-err" hidden></p>
@@ -273,6 +275,7 @@
           <dl class="kv">
             <dt>Signed txid</dt><dd><code id="co-txid"></code></dd>
             <dt>Fee</dt><dd><span id="co-fee"></span></dd>
+            <dt>Builder tip</dt><dd><span id="co-tip-amt"></span></dd>
             <dt>Signed hex</dt><dd><textarea aria-label="Owner claim signed transaction hex" id="co-hex" rows="5" readonly spellcheck="false"></textarea></dd>
           </dl>
           <div class="row">
@@ -360,7 +363,7 @@
 </footer>
 
 <script src="qrcode.min.js?v=1"></script>
-<script src="pearl-will.bundle.js?v=3"></script>
-<script src="app.js?v=3"></script>
+<script src="pearl-will.bundle.js?v=4"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

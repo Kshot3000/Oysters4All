@@ -408,14 +408,20 @@
       W.addressToProgram(payments[0].address, net); // validates
       W.addressToProgram(changeAddress, net);
       // Payment value: everything minus fee (single-recipient reclaim). Use planSpend via buildOwnerClaim with full-value payment:
-      const feeEst = Math.ceil(W.spendVBytes({ nOut: 2, scriptLen: v.ownerScript.length, controlLen: v.controlBlocks[0].length, stackLens: [64] }) * feeRate);
-      const value = input.value - feeEst;
-      if (value < W.DUST_GRAIN) throw new Error("WILL REFUSED: UTXO value " + input.value + " grains cannot cover the ~" + feeEst + "-grain fee");
+      // Optional builder tip (opt-in checkbox): 1% of the reclaim, added by
+      // buildOwnerClaim as its own output before signing; the destination
+      // payment is reduced by the tip so the reclaim conserves exactly.
+      const tipEnabled = $("co-tip").checked === true;
+      const tip = W.builderTipGrainsFor(input.value, net, tipEnabled);
+      const feeEst = Math.ceil(W.spendVBytes({ nOut: tip > 0 ? 3 : 2, scriptLen: v.ownerScript.length, controlLen: v.controlBlocks[0].length, stackLens: [64] }) * feeRate);
+      const value = input.value - feeEst - tip;
+      if (value < W.DUST_GRAIN) throw new Error("WILL REFUSED: UTXO value " + input.value + " grains cannot cover the ~" + feeEst + "-grain fee" + (tip > 0 ? " and the " + tip + "-grain builder tip — leave the tip off" : ""));
       payments[0].value = value;
       const built = W.buildOwnerClaim(v, {
         input,
         payments: payments.map((p) => ({ address: p.address, value: p.value })),
         changeAddress, feeRateGrainsPerVByte: feeRate, privOwner: priv, signerXOnly: ownerX,
+        builderTipEnabled: tipEnabled,
       });
       // Independent re-verification: decode the built hex, recompute the
       // sighash from its decoded outputs, re-check the control block against
@@ -426,6 +432,7 @@
       if (!rv.ok) throw new Error("WILL REFUSED: built transaction failed local re-verification");
       $("co-txid").textContent = built.txid;
       $("co-fee").textContent = fmtPRL(built.fee) + " (" + built.vBytes + " vB)";
+      $("co-tip-amt").textContent = built.builderTipGrains > 0 ? fmtPRL(built.builderTipGrains) + " to " + W.BUILDER_TIP_ADDRESS : "none (opt-in off)";
       $("co-hex").value = built.hex;
       $("co-out").hidden = false;
       priv.fill(0);

@@ -294,9 +294,41 @@ export function assertClaimable(unlockHeight, chainTip, who) {
   return true;
 }
 
+/* ---------- optional builder tip (owner reclaim only) ---------- */
+/** Optional, disclosed 1% builder tip on OWNER RECLAIMS. The owner leaf
+ *  is a sole-signer CHECKSIG — the owner alone sweeps the vault — so an
+ *  owner who opts in can add the tip as its own output BEFORE signing;
+ *  the script-path sighash commits to every output, so it cannot be
+ *  added or skimmed after signing. It is never automatic: it applies
+ *  only when the caller passes builderTipEnabled === true. The HEIR
+ *  leaf is m-of-n CHECKSIGADD — no single heir owns the swept funds —
+ *  so buildHeirClaim takes no tip parameter at all: a tip output is
+ *  unbuildable there, not just unoffered. */
+export const BUILDER_TIP_BPS = 100; // 1%
+export const BUILDER_TIP_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+export const BUILDER_TIP_NAME = "Builder tip (optional)";
+
+/** Builder tip in grains for an owner reclaim of totalGrains on network.
+ *  Returns 0 unless enabled === true, the network is mainnet, and the
+ *  1% floor reaches the dust floor (waived, never rounded up). Computed
+ *  in BigInt so large reclaims stay exact, then returned in this core's
+ *  Number style (the input is already range-checked to a safe integer). */
+export function builderTipGrainsFor(totalGrains, network, enabled) {
+  if (enabled !== true) return 0;
+  if (!network || network.hrp !== "prl") return 0;
+  if (!Number.isSafeInteger(totalGrains) || totalGrains <= 0) throw new Error("bad total for builder tip");
+  const tip = Number((BigInt(totalGrains) * BigInt(BUILDER_TIP_BPS)) / 10000n);
+  return tip >= DUST_GRAIN ? tip : 0;
+}
+
 /** Owner reclaim: build a script-path spend through leaf O. sequence stays
- *  final, locktime 0 (no timelock on the owner path). */
-export function buildOwnerClaim(vault, { input, payments, changeAddress, feeRateGrainsPerVByte, privOwner, signerXOnly }) {
+ *  final, locktime 0 (no timelock on the owner path).
+ *  builderTipEnabled (optional, default off): append the disclosed 1%
+ *  builder tip (builderTipGrainsFor) as its own payment before planning —
+ *  the owner is the sole signer and the script-path sighash commits to
+ *  every output. The caller's payments must already be reduced by the
+ *  tip (the desk computes payment = input − fee estimate − tip). */
+export function buildOwnerClaim(vault, { input, payments, changeAddress, feeRateGrainsPerVByte, privOwner, signerXOnly, builderTipEnabled = false }) {
   const stackLens = [64]; // one owner signature
   const ownerX = bytesToHex(vault.ownerScript.slice(1, 33));
   const sx = String(signerXOnly || "").trim().toLowerCase();
@@ -304,9 +336,18 @@ export function buildOwnerClaim(vault, { input, payments, changeAddress, feeRate
     throw new Error("WILL REFUSED: signer key is not the owner key of this vault — refusing to sign");
   }
   const changeProgram = addressToProgram(changeAddress, vault.net);
+  const builderTip = builderTipGrainsFor(input.value, vault.net, builderTipEnabled === true);
+  const payPrograms = payments.map((p) => ({ program: addressToProgram(p.address, vault.net), value: p.value }));
+  if (builderTip > 0) {
+    const builderProgram = addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet);
+    if (payPrograms.some((p) => u8eq(p.program, builderProgram))) {
+      throw new Error("WILL REFUSED: a reclaim payment already pays the builder address — the builder tip would duplicate it; leave the tip off");
+    }
+    payPrograms.push({ program: builderProgram, value: builderTip });
+  }
   const plan = planSpend({
     inputValue: input.value,
-    payments: payments.map((p) => ({ program: addressToProgram(p.address, vault.net), value: p.value })),
+    payments: payPrograms,
     feeRateGrainsPerVByte, scriptLen: vault.ownerScript.length,
     controlLen: vault.controlBlocks[0].length, stackLens,
   });
@@ -314,6 +355,20 @@ export function buildOwnerClaim(vault, { input, payments, changeAddress, feeRate
     program: o.program || changeProgram,
     value: o.value,
   }));
+  // Last-hop builder-tip assertion: buildOwnerClaim is where the reclaim
+  // crosses from parameters to a signed transaction (Will signs this leaf
+  // internally), so the tip slot — the final payment, ahead of any change
+  // output planSpend appended — is re-derived here from the builder
+  // address constant and must pay it at exactly the computed amount
+  // before the digest is signed. planSpend strips caller flags, so the
+  // slot position + constant-derived program is the trust check.
+  if (builderTip > 0) {
+    const want = addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet);
+    const slot = outputs[payPrograms.length - 1];
+    if (!slot || !u8eq(slot.program, want) || slot.value !== builderTip) {
+      throw new Error("WILL REFUSED: builder tip does not pay the builder address at the computed amount — refusing to build the reclaim");
+    }
+  }
   const inputEx = { txid: input.txid, vout: input.vout, value: input.value, spk: vault.spk };
   const digest = scriptPathSigDigestEx(vault.net, inputEx, outputs, vault.ownerScript, { sequence: 0xffffffff, locktime: 0 });
   const sig = signForXOnly(privOwner, digest);
@@ -322,6 +377,7 @@ export function buildOwnerClaim(vault, { input, payments, changeAddress, feeRate
   }
   const built = buildScriptPathSpend(vault.net, inputEx, outputs, vault.ownerScript, vault.controlBlocks[0], [sig], { sequence: 0xffffffff, locktime: 0 });
   built.fee = input.value - outputs.reduce((a, o) => a + o.value, 0);
+  built.builderTipGrains = builderTip;
   return built;
 }
 

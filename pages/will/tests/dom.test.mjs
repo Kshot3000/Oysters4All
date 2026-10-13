@@ -91,7 +91,7 @@ test("index.html: five steps, five panels, honest limits, attribution", () => {
     const src = m[1];
     if (!src.startsWith("http")) assert.ok(src.includes("?v="), "cache-busted: " + src);
   }
-  assert.ok(html.includes('href="styles.css?v=7"'), "styles cache-busted");
+  assert.ok(html.includes('href="styles.css?v=8"'), "styles cache-busted");
 });
 
 test("styles.css exists and is non-trivial", () => {
@@ -109,8 +109,37 @@ test("offline tally uses the exact core parser (float-parse class closed)", () =
   assert.ok(js.includes("W.parsePRLToGrains(parts[1])"), "tally delegates to the core exact parser");
   assert.ok(!js.includes("Math.round(amt * 1e8)"), "no float tally parse left");
   const html = readFileSync(P(appDir, "index.html"), "utf8");
-  assert.ok(html.includes("pearl-will.bundle.js?v=3"), "bundle cache key bumped");
-  assert.ok(html.includes('src="app.js?v=3"'), "app cache key bumped");
+  assert.ok(html.includes("pearl-will.bundle.js?v=4"), "bundle cache key bumped");
+  assert.ok(html.includes('src="app.js?v=4"'), "app cache key bumped");
+});
+
+test("builder tip: checkbox opt-in, disclosure, bundle tipped owner claim exact on the wire", () => {
+  const html = readFileSync(P(appDir, "index.html"), "utf8");
+  assert.ok(html.includes('id="co-tip"'), "tip checkbox present");
+  assert.ok(html.includes('type="checkbox" id="co-tip"'), "tip control is a checkbox");
+  assert.ok(!/<input type="checkbox" id="co-tip" checked/.test(html), "tip checkbox unchecked by default");
+  assert.ok(html.includes("Optional builder tip — add 1% of the reclaimed amount"), "disclosure names the 1%");
+  assert.ok(html.includes("heir claims never carry a tip"), "heir exclusion disclosed");
+  assert.ok(html.includes('id="co-tip-amt"'), "signed panel shows the tip as its own line");
+  // Bundle-level: tipped owner claim pays the builder exactly 1% as its own output.
+  const priv = new Uint8Array(32).fill(0x11);
+  const ownerX = W.bytesToHex(W.schnorr.getPublicKey(priv));
+  const heirX = W.bytesToHex(W.schnorr.getPublicKey(new Uint8Array(32).fill(0x22)));
+  const v = W.buildWillVault({ network: "mainnet", owner: ownerX, heirs: [heirX], m: 1, unlockHeight: 240000 });
+  const dest = W.encodeBech32m("prl", 1, W.tweakKeypath(W.hexToBytes(ownerX)).tweakedX);
+  const input = { txid: "ab".repeat(32), vout: 0, value: 200_000_000_00 };
+  const tip = W.builderTipGrainsFor(input.value, W.NETWORKS.mainnet, true);
+  assert.equal(tip, 200_000_000);
+  const built = W.buildOwnerClaim(v, {
+    input, payments: [{ address: dest, value: input.value - 100000 - tip }],
+    changeAddress: dest, feeRateGrainsPerVByte: 10,
+    privOwner: priv, signerXOnly: ownerX, builderTipEnabled: true,
+  });
+  const dec = W.decodeRawTx(built.hex);
+  const builderSpk = "5120" + W.bytesToHex(W.addressToProgram(W.BUILDER_TIP_ADDRESS, W.NETWORKS.mainnet));
+  const tipOuts = dec.outputs.filter((o) => W.bytesToHex(o.spk) === builderSpk);
+  assert.equal(tipOuts.length, 1);
+  assert.equal(Number(tipOuts[0].value), 200_000_000);
 });
 
 test("app.js grain formatter is BigInt-exact (pool float-format class)", async () => {

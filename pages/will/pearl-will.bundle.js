@@ -10,6 +10,9 @@
   var will_core_exports = {};
   __export(will_core_exports, {
     BLOCK_SECONDS: () => BLOCK_SECONDS,
+    BUILDER_TIP_ADDRESS: () => BUILDER_TIP_ADDRESS,
+    BUILDER_TIP_BPS: () => BUILDER_TIP_BPS,
+    BUILDER_TIP_NAME: () => BUILDER_TIP_NAME,
     DESCRIPTOR_PREFIX: () => DESCRIPTOR_PREFIX,
     DUST_GRAIN: () => DUST_GRAIN,
     GRAIN_PER_PRL: () => GRAIN_PER_PRL,
@@ -25,6 +28,7 @@
     buildOwnerScript: () => buildOwnerScript,
     buildScriptPathSpend: () => buildScriptPathSpend,
     buildWillVault: () => buildWillVault,
+    builderTipGrainsFor: () => builderTipGrainsFor,
     bytesToHex: () => bytesToHex,
     convertBits: () => convertBits,
     decodeBech32m: () => decodeBech32m,
@@ -6039,11 +6043,18 @@ zoo`.split("\n");
     const base = 4 + 1 + 41 + 1 + nOut * 43 + 4;
     return Math.ceil((base * 3 + (base + 2 + wit)) / 4);
   }
-  function planSpend({ inputValue, payments, feeRateGrainsPerVByte, scriptLen, controlLen, stackLens }) {
+  function planSpend({ inputValue, payments, feeRateGrainsPerVByte, scriptLen, controlLen, stackLens, serviceFeeGrains = 0, serviceFeeProgram = null }) {
     if (!Number.isSafeInteger(inputValue) || inputValue <= 0) throw new Error("bad input value");
     if (!Array.isArray(payments) || payments.length === 0) throw new Error("need at least one payment");
+    const serviceFee = Number(serviceFeeGrains);
+    if (!Number.isSafeInteger(serviceFee) || serviceFee < 0 || serviceFee > 0 && serviceFee < DUST_GRAIN)
+      throw new Error("bad service fee");
+    if (serviceFee > 0 && (!(serviceFeeProgram instanceof Uint8Array) || serviceFeeProgram.length !== 32))
+      throw new Error("service fee program must be 32 bytes");
+    const allPayments = payments.map((p) => ({ program: p.program, value: p.value }));
+    if (serviceFee > 0) allPayments.push({ program: serviceFeeProgram, value: serviceFee, serviceFee: true });
     let paySum = 0;
-    for (const p of payments) {
+    for (const p of allPayments) {
       if (!(p.program instanceof Uint8Array) || p.program.length !== 32) throw new Error("payment program must be 32 bytes");
       if (!Number.isSafeInteger(p.value) || p.value < DUST_GRAIN) throw new Error(`payment below dust (${DUST_GRAIN} grains)`);
       paySum += p.value;
@@ -6052,13 +6063,13 @@ zoo`.split("\n");
     const vbytes = (nOut) => spendVBytes({ nOut, scriptLen, controlLen, stackLens });
     const feeFor = (nOut) => Math.ceil(vbytes(nOut) * feeRateGrainsPerVByte);
     const need = (f) => paySum + f;
-    let fee = feeFor(payments.length + 1);
+    let fee = feeFor(allPayments.length + 1);
     let change = inputValue - need(fee);
-    let outputs = payments.map((p) => ({ program: p.program, value: p.value }));
+    let outputs = allPayments;
     if (change >= DUST_GRAIN) {
       outputs.push({ program: null, value: change, change: true });
     } else {
-      fee = feeFor(payments.length);
+      fee = feeFor(allPayments.length);
       change = inputValue - need(fee);
       if (change < 0) throw new Error(`insufficient funds: need ${need(fee)} grains, have ${inputValue}`);
       if (change > 0) {
@@ -6067,7 +6078,7 @@ zoo`.split("\n");
       }
     }
     if (change < 0) throw new Error(`insufficient funds: need ${need(fee)} grains, have ${inputValue}`);
-    return { outputs, fee, vBytes: vbytes(outputs.length), change };
+    return { outputs, fee, vBytes: vbytes(outputs.length), change, serviceFeeGrains: serviceFee };
   }
   function scriptAsm(script) {
     const names = { 82: "2", 117: "DROP", 135: "EQUAL", 136: "EQUALVERIFY", 168: "SHA256", 172: "CHECKSIG", 186: "CHECKSIGADD", 177: "CLTV" };
@@ -6408,7 +6419,17 @@ zoo`.split("\n");
     }
     return true;
   }
-  function buildOwnerClaim(vault, { input, payments, changeAddress, feeRateGrainsPerVByte, privOwner, signerXOnly }) {
+  var BUILDER_TIP_BPS = 100;
+  var BUILDER_TIP_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+  var BUILDER_TIP_NAME = "Builder tip (optional)";
+  function builderTipGrainsFor(totalGrains, network, enabled) {
+    if (enabled !== true) return 0;
+    if (!network || network.hrp !== "prl") return 0;
+    if (!Number.isSafeInteger(totalGrains) || totalGrains <= 0) throw new Error("bad total for builder tip");
+    const tip = Number(BigInt(totalGrains) * BigInt(BUILDER_TIP_BPS) / 10000n);
+    return tip >= DUST_GRAIN ? tip : 0;
+  }
+  function buildOwnerClaim(vault, { input, payments, changeAddress, feeRateGrainsPerVByte, privOwner, signerXOnly, builderTipEnabled = false }) {
     const stackLens = [64];
     const ownerX = bytesToHex(vault.ownerScript.slice(1, 33));
     const sx = String(signerXOnly || "").trim().toLowerCase();
@@ -6416,9 +6437,18 @@ zoo`.split("\n");
       throw new Error("WILL REFUSED: signer key is not the owner key of this vault \u2014 refusing to sign");
     }
     const changeProgram = addressToProgram(changeAddress, vault.net);
+    const builderTip = builderTipGrainsFor(input.value, vault.net, builderTipEnabled === true);
+    const payPrograms = payments.map((p) => ({ program: addressToProgram(p.address, vault.net), value: p.value }));
+    if (builderTip > 0) {
+      const builderProgram = addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet);
+      if (payPrograms.some((p) => u8eq(p.program, builderProgram))) {
+        throw new Error("WILL REFUSED: a reclaim payment already pays the builder address \u2014 the builder tip would duplicate it; leave the tip off");
+      }
+      payPrograms.push({ program: builderProgram, value: builderTip });
+    }
     const plan = planSpend({
       inputValue: input.value,
-      payments: payments.map((p) => ({ program: addressToProgram(p.address, vault.net), value: p.value })),
+      payments: payPrograms,
       feeRateGrainsPerVByte,
       scriptLen: vault.ownerScript.length,
       controlLen: vault.controlBlocks[0].length,
@@ -6428,6 +6458,13 @@ zoo`.split("\n");
       program: o.program || changeProgram,
       value: o.value
     }));
+    if (builderTip > 0) {
+      const want = addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet);
+      const slot = outputs[payPrograms.length - 1];
+      if (!slot || !u8eq(slot.program, want) || slot.value !== builderTip) {
+        throw new Error("WILL REFUSED: builder tip does not pay the builder address at the computed amount \u2014 refusing to build the reclaim");
+      }
+    }
     const inputEx = { txid: input.txid, vout: input.vout, value: input.value, spk: vault.spk };
     const digest = scriptPathSigDigestEx(vault.net, inputEx, outputs, vault.ownerScript, { sequence: 4294967295, locktime: 0 });
     const sig = signForXOnly(privOwner, digest);
@@ -6436,6 +6473,7 @@ zoo`.split("\n");
     }
     const built = buildScriptPathSpend(vault.net, inputEx, outputs, vault.ownerScript, vault.controlBlocks[0], [sig], { sequence: 4294967295, locktime: 0 });
     built.fee = input.value - outputs.reduce((a, o) => a + o.value, 0);
+    built.builderTipGrains = builderTip;
     return built;
   }
   function buildHeirClaim(vault, heirHexes, m, unlockHeight, { input, payments, changeAddress, feeRateGrainsPerVByte, signatures, chainTip, outputsOverride = null }) {

@@ -212,6 +212,79 @@ test("owner claim: builds, signs, re-verifies from decoded hex", () => {
   assert.equal(rv.ok, true); assert.equal(rv.sigs, 1);
 });
 
+test("builder tip: exactness, opt-in gate, mainnet-only, dust waiver", () => {
+  assert.equal(W.BUILDER_TIP_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
+  assert.equal(W.builderTipGrainsFor(200_000_000_00, net, true), 200_000_000); // 1% of 200 PRL
+  assert.equal(W.builderTipGrainsFor(200_000_000_00, net, false), 0);
+  assert.equal(W.builderTipGrainsFor(200_000_000_00, net, 1), 0); // only === true counts
+  assert.equal(W.builderTipGrainsFor(200_000_000_00, W.NETWORKS.testnet, true), 0);
+  assert.equal(W.builderTipGrainsFor(50_000, net, true), 0); // 500 < dust: waived, not rounded up
+  assert.equal(W.builderTipGrainsFor(54_600, net, true), 546); // exact dust floor is charged
+});
+
+test("owner claim with builder tip: tip output exact on the signed wire, re-verifies, conserves", () => {
+  const v = vaultFixture();
+  const destAddr = W.encodeBech32m(net.hrp, 1, payProgram());
+  const changeAddr = W.encodeBech32m(net.hrp, 1, payProgram());
+  const input = fakeUtxo(200_000_000_00); // 200 PRL
+  const tip = W.builderTipGrainsFor(input.value, net, true);
+  assert.equal(tip, 200_000_000);
+  const feeEst = Math.ceil(W.spendVBytes({ nOut: 3, scriptLen: v.ownerScript.length, controlLen: v.controlBlocks[0].length, stackLens: [64] }) * 10);
+  const built = W.buildOwnerClaim(v, {
+    input,
+    payments: [{ address: destAddr, value: input.value - feeEst - tip }],
+    changeAddress: changeAddr, feeRateGrainsPerVByte: 10,
+    privOwner: OWNER.priv, signerXOnly: OWNER.xonly, builderTipEnabled: true,
+  });
+  assert.equal(built.builderTipGrains, tip);
+  const dec = W.decodeRawTx(built.hex);
+  const builderSpk = "5120" + H(W.addressToProgram(W.BUILDER_TIP_ADDRESS, net));
+  const tipOuts = dec.outputs.filter((o) => H(o.spk) === builderSpk);
+  assert.equal(tipOuts.length, 1);
+  assert.equal(Number(tipOuts[0].value), tip);
+  const sumOut = dec.outputs.reduce((a, o) => a + Number(o.value), 0);
+  assert.equal(sumOut + built.fee, input.value); // conservation
+  const rv = W.reverifyClaimTx(v, built, {
+    leaf: "owner", input, sequence: 0xffffffff, locktime: 0, keys: [OWNER.xonly],
+  });
+  assert.equal(rv.ok, true);
+  // Opt-out: identical reclaim without the flag carries no builder output.
+  const plain = W.buildOwnerClaim(v, {
+    input,
+    payments: [{ address: destAddr, value: input.value - feeEst }],
+    changeAddress: changeAddr, feeRateGrainsPerVByte: 10,
+    privOwner: OWNER.priv, signerXOnly: OWNER.xonly,
+  });
+  assert.equal(plain.builderTipGrains, 0);
+  assert.equal(W.decodeRawTx(plain.hex).outputs.filter((o) => H(o.spk) === builderSpk).length, 0);
+});
+
+test("owner claim tip refusals + heir claim carries no tip by construction", () => {
+  const v = vaultFixture();
+  const changeAddr = W.encodeBech32m(net.hrp, 1, payProgram());
+  const input = fakeUtxo(200_000_000_00);
+  assert.throws(() => W.buildOwnerClaim(v, {
+    input,
+    payments: [{ address: W.BUILDER_TIP_ADDRESS, value: input.value - 5000 }],
+    changeAddress: changeAddr, feeRateGrainsPerVByte: 10,
+    privOwner: OWNER.priv, signerXOnly: OWNER.xonly, builderTipEnabled: true,
+  }), /builder tip would duplicate/);
+  // Heir claim: buildHeirClaim takes no tip parameter — a normal heir
+  // claim pays only the heirs' destination (no builder output).
+  const destAddr = W.encodeBech32m(net.hrp, 1, payProgram());
+  const feeEst = Math.ceil(W.spendVBytes({ nOut: 2, scriptLen: v.heirScript.length, controlLen: v.controlBlocks[1].length, stackLens: [64, 64, 64] }) * 10);
+  const outputs = [{ program: W.addressToProgram(destAddr, net), value: input.value - feeEst }];
+  const digest = W.scriptPathSigDigestEx(net, { ...input, spk: v.spk }, outputs, v.heirScript, { sequence: 0xfffffffe, locktime: UNLOCK });
+  const sigs = HEIRS.slice(0, 2).map((h) => ({ key: h.xonly, sig: W.signForXOnly(h.priv, digest) }));
+  const heirBuilt = W.buildHeirClaim(v, HEIRS.map((h) => h.xonly), 2, UNLOCK, {
+    input, payments: [{ address: destAddr, value: input.value - feeEst }],
+    changeAddress: changeAddr, feeRateGrainsPerVByte: 10,
+    signatures: sigs, chainTip: UNLOCK, outputsOverride: outputs,
+  });
+  const builderSpk = "5120" + H(W.addressToProgram(W.BUILDER_TIP_ADDRESS, net));
+  assert.equal(W.decodeRawTx(heirBuilt.hex).outputs.filter((o) => H(o.spk) === builderSpk).length, 0);
+});
+
 test("owner claim refuses the wrong key", () => {
   const v = vaultFixture();
   const dest = payProgram(), change = payProgram();
