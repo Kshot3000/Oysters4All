@@ -10,6 +10,7 @@ import {
   buildClaimScript, buildTransferScript, numsInternalKeyBond, taptreeBond,
   forgeTranche, forgeBond, encodeBondDescriptor, decodeBondDescriptor,
   verifyDescriptor, fundingPlan, planClaim, signClaim,
+  builderTipGrainsFor, BUILDER_TIP_ADDRESS, addressToProgram,
   scriptPathSigDigest83, transferLegVBytes, presignTransferLeg,
   verifyTransferLeg, buildFillTx, classifyTranches,
   BLOCK_TIME_SEC, DUST_GRAIN, GRAIN_PER_PRL, NETWORKS,
@@ -154,6 +155,70 @@ test("planClaim + signClaim round-trip; lock enforced", () => {
   assert.ok(/^[0-9a-f]{64}$/.test(signed.txid));
   // witness commits the claim leaf + control block; sig re-verified inside signClaim
   assert.ok(signed.hex.includes(bytesToHex(t.claimScript).slice(0, 40)));
+});
+
+/* ---------- optional builder tip on claims ---------- */
+
+function parseOutputs(hex) {
+  const b = Buffer.from(hex, "hex"); let o = 4;
+  if (b[o] === 0 && b[o + 1] === 1) o += 2;
+  const vi = () => { const v = b[o]; if (v < 0xfd) { o += 1; return v; } if (v === 0xfd) { const n = b.readUInt16LE(o + 1); o += 3; return n; } throw new Error("varint too big"); };
+  const nIn = vi();
+  for (let i = 0; i < nIn; i++) { o += 36; const sl = vi(); o += sl + 4; }
+  const nOut = vi(); const outs = [];
+  for (let i = 0; i < nOut; i++) { const v = Number(b.readBigUInt64LE(o)); o += 8; const sl = vi(); const spk = b.subarray(o, o + sl).toString("hex"); o += sl; outs.push({ value: v, spk }); }
+  return outs;
+}
+
+test("builderTipGrainsFor: exactness + waivers", () => {
+  assert.equal(builderTipGrainsFor(100_000_000, MAINNET, true), 1_000_000);
+  assert.equal(builderTipGrainsFor(100_000_000, MAINNET, false), 0);
+  assert.equal(builderTipGrainsFor(100_000_000, NETWORKS.testnet, true), 0);
+  assert.equal(builderTipGrainsFor(54_599, MAINNET, true), 0); // sub-dust waived
+  assert.equal(builderTipGrainsFor(54_600, MAINNET, true), 546); // exact dust charged
+  assert.equal(BUILDER_TIP_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
+});
+
+test("tipped claim plan: fee over 2 outputs, conservation, dest==builder + tip-dust refusals", () => {
+  const bond = forgeBond(MAINNET, TERMS, { key: sellerXOnly, mode: "raw" });
+  const t = bond.tranches[0];
+  const op = { txid: "ab".repeat(32), vout: 0, value: t.amountGrains };
+  const off = planClaim(MAINNET, t, op, buyerXOnly, 10, t.lockHeight);
+  const on = planClaim(MAINNET, t, op, buyerXOnly, 10, t.lockHeight, true);
+  assert.equal(on.builderTip, 25_000_000);
+  assert.equal(on.outputs.length, 2);
+  assert.equal(on.outputs[1].builderTip, true);
+  assert.equal(on.outputs[1].value, 25_000_000);
+  assert.ok(on.fee > off.fee);
+  assert.equal(on.outputs[0].value + on.outputs[1].value + on.fee, t.amountGrains);
+  assert.equal(off.outputs.length, 1);
+  assert.equal(off.builderTip, 0);
+  const builderProg = addressToProgram(BUILDER_TIP_ADDRESS, MAINNET);
+  assert.throws(() => planClaim(MAINNET, t, op, builderProg, 10, t.lockHeight, true), /builder tip would duplicate/);
+  assert.throws(
+    () => planClaim(MAINNET, t, { ...op, value: 100_000 }, buyerXOnly, 600, t.lockHeight, true),
+    /builder tip/);
+});
+
+test("tipped claim signs with tip exact on the wire; rerouted flag refused at sign", () => {
+  const bond = forgeBond(MAINNET, TERMS, { key: sellerXOnly, mode: "raw" });
+  const t = bond.tranches[0];
+  const op = { txid: "ab".repeat(32), vout: 0, value: t.amountGrains };
+  const planned = planClaim(MAINNET, t, op, buyerXOnly, 10, t.lockHeight, true);
+  const signed = signClaim(MAINNET, t, planned, SELLER_PRIV);
+  const outs = parseOutputs(signed.hex);
+  assert.equal(outs.length, 2);
+  const builderSpk = Buffer.from(p2trScriptPubKey(addressToProgram(BUILDER_TIP_ADDRESS, MAINNET))).toString("hex");
+  assert.equal(outs[1].value, 25_000_000);
+  assert.equal(outs[1].spk, builderSpk);
+  // rerouted tip flag: same amount, wrong program — refused before signing
+  const evil = planClaim(MAINNET, t, op, buyerXOnly, 10, t.lockHeight, true);
+  evil.outputs[1] = { ...evil.outputs[1], program: buyerXOnly };
+  assert.throws(() => signClaim(MAINNET, t, evil, SELLER_PRIV), /does not pay the builder address/);
+  // untipped plan carrying a stray flagged output is refused too
+  const stray = planClaim(MAINNET, t, op, buyerXOnly, 10, t.lockHeight);
+  stray.outputs.push({ program: buyerXOnly, value: 1000, builderTip: true });
+  assert.throws(() => signClaim(MAINNET, t, stray, SELLER_PRIV), /no planned tip amount/);
 });
 
 test("claim with wrong key fails re-verification", () => {

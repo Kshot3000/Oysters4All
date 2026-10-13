@@ -294,12 +294,15 @@
       const keyParsed = parseKeyField($("r-key").value, network);
       const priv = resolveSigningKey(keyParsed, network);
       const outpoint = { txid, vout, value: tranche.amountGrains };
-      const planned = B.planClaim(network, tranche, outpoint, destProgram, feeRate, height);
+      const planned = B.planClaim(network, tranche, outpoint, destProgram, feeRate, height, $("r-builder-tip").checked === true);
       const signed = B.signClaim(network, tranche, planned, priv);
       $("r-meta").innerHTML =
         `Tranche #${tranche.index} (${escapeHtml(tranche.kind)}) — ${prl(tranche.amountGrains)} PRL, ` +
         `lock ${tranche.lockHeight}, chain ${height}.<br>` +
         `Fee: <strong>${signed.feeGrains !== undefined ? signed.feeGrains : planned.fee} grains</strong> (${planned.vBytes} vB) · ` +
+        (planned.builderTip > 0
+          ? `builder tip: <strong>${prl(planned.builderTip)} PRL</strong> to ${escapeHtml(B.BUILDER_TIP_ADDRESS)} · `
+          : ``) +
         `you receive: <strong>${prl(planned.outputs[0].value)} PRL</strong>.<br>` +
         `<span class="hint">Signature re-verified locally before building. Broadcast with your node or wallet — this page never broadcasts on its own.</span>`;
       $("r-hex").value = signed.hex;

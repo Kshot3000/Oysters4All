@@ -357,6 +357,43 @@ export function fundingPlan(bond, feeRateGrainsPerVByte, nFundingInputs = 1) {
   };
 }
 
+/* Optional builder tip (profit mandate, disclosed, opt-in/default-off):
+ * a claim spends a matured tranche through the holder's own CLTV leaf,
+ * signed by the holder alone, so — like Vesting/Stream — the tip is
+ * never automatic: the holder explicitly opts in. builderTipGrainsFor()
+ * is the single source; planClaim() adds the tip as its own second
+ * output BEFORE signing, and the script-path sighash commits to every
+ * output — so it cannot be added or skimmed after signing. Off = plan
+ * identical to the pre-tip planner. Offered on the claim (redeem) flow
+ * only: the secondary-transfer leg is pre-signed with
+ * SIGHASH_SINGLE|ANYONECANPAY, which commits to exactly one output, so
+ * it carries no tip by construction (its builders take no tip
+ * parameter at all). The recipient is the operator address published
+ * in every Bond footer. */
+export const BUILDER_TIP_BPS = 100; // 1%
+export const BUILDER_TIP_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+export const BUILDER_TIP_NAME = "Builder tip (optional)";
+
+function constEq(a, b) {
+  if (!(a instanceof Uint8Array) || !(b instanceof Uint8Array) || a.length !== b.length) return false;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d |= a[i] ^ b[i];
+  return d === 0;
+}
+
+/** Builder tip in grains for a claim of totalGrains on network.
+ *  Returns 0 unless enabled === true, the network is mainnet, and the
+ *  1% floor reaches the dust floor (waived, never rounded up). Computed
+ *  in BigInt so large claims stay exact, then returned in this core's
+ *  Number style (the input is already range-checked to a safe integer). */
+export function builderTipGrainsFor(totalGrains, network, enabled) {
+  if (enabled !== true) return 0;
+  if (!network || network.hrp !== "prl") return 0;
+  if (!Number.isSafeInteger(totalGrains) || totalGrains <= 0) throw new Error("bad total for builder tip");
+  const tip = Number((BigInt(totalGrains) * BigInt(BUILDER_TIP_BPS)) / 10000n);
+  return tip >= DUST_GRAIN ? tip : 0;
+}
+
 /* ---------------- claim (leaf A, after maturity) ---------------- */
 
 function validOutpoint(txid, vout) {
@@ -368,7 +405,7 @@ function validOutpoint(txid, vout) {
 
 /** Build + sign a claim of one matured tranche to destProgram.
  *  Returns the signed tx; every signature is re-verified before return. */
-export function planClaim(network, tranche, outpoint, destProgram, feeRateGrainsPerVByte, currentHeight) {
+export function planClaim(network, tranche, outpoint, destProgram, feeRateGrainsPerVByte, currentHeight, builderTipEnabled = false) {
   if (!(destProgram instanceof Uint8Array) || destProgram.length !== 32) {
     throw new Error("destination program must be 32 bytes");
   }
@@ -384,20 +421,48 @@ export function planClaim(network, tranche, outpoint, destProgram, feeRateGrains
   if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) {
     throw new Error("fee rate must be positive");
   }
+  const builderTip = builderTipGrainsFor(input.value, network, builderTipEnabled === true);
+  const builderTipProgram = builderTip > 0 ? addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet) : null;
+  if (builderTip > 0 && constEq(destProgram, builderTipProgram)) {
+    throw new Error("destination is the builder address — the builder tip would duplicate the claim output; leave the tip off");
+  }
   // Single payment, no change output: fee from the exact witness size, the
   // rest goes to the destination (dust remainder folds into the fee).
+  // With the optional builder tip enabled the tip is its own second
+  // output, so the fee is computed over 2 outputs.
   const scriptLen = tranche.claimScript.length;
   const controlLen = tranche.claimControlBlock.length;
-  const vBytes = spendVBytes({ nOut: 1, scriptLen, controlLen, stackLens: [64] });
+  const vBytes = spendVBytes({ nOut: builderTip > 0 ? 2 : 1, scriptLen, controlLen, stackLens: [64] });
   const fee = Math.ceil(vBytes * feeRateGrainsPerVByte);
-  const payValue = input.value - fee;
-  if (payValue < DUST_GRAIN) throw new Error(`tranche value ${input.value} cannot cover fee ${fee}`);
+  const payValue = input.value - fee - builderTip;
+  if (payValue < DUST_GRAIN) {
+    if (builderTip > 0) {
+      throw new Error(`tranche value ${input.value} cannot cover fee ${fee} and the ${builderTip}-grain builder tip and still pay out >= dust (${DUST_GRAIN}); leave the builder tip off`);
+    }
+    throw new Error(`tranche value ${input.value} cannot cover fee ${fee}`);
+  }
   const outputs = [{ program: destProgram, value: payValue }];
-  return { input, outputs, fee, vBytes, lockHeight: tranche.lockHeight };
+  if (builderTip > 0) outputs.push({ program: builderTipProgram, value: builderTip, builderTip: true });
+  return { input, outputs, fee, vBytes, lockHeight: tranche.lockHeight, builderTip, builderTipProgram };
 }
 
 /** Sign a planned claim with the holder's privkey (32 bytes). */
 export function signClaim(network, tranche, planned, holderPriv) {
+  // Last-hop builder-tip assertion (Gift/Vesting/Bounty pattern): the
+  // in-memory plan is the last hop before signing, so a flagged tip is
+  // a trust claim — the tip program is re-derived here from the builder
+  // address constant, never trusted from the plan, and the flagged
+  // output must pay it at exactly the planned amount. An untipped plan
+  // must carry no flagged output at all.
+  const flagged = (planned.outputs || []).filter((o) => o && o.builderTip);
+  if (planned.builderTip > 0) {
+    const want = addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet);
+    if (flagged.length !== 1 || !constEq(flagged[0].program, want) || flagged[0].value !== planned.builderTip) {
+      throw new Error("builder tip in the plan does not pay the builder address at the planned amount — refusing to sign");
+    }
+  } else if (flagged.length > 0) {
+    throw new Error("plan carries a flagged builder tip but no planned tip amount — refusing to sign");
+  }
   const digest = scriptPathSigDigestEx(network, planned.input, planned.outputs, tranche.claimScript, {
     sequence: SEQ_NONFINAL, locktime: tranche.lockHeight,
   });

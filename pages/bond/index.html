@@ -22,7 +22,7 @@
 <meta name="twitter:image" content="https://kshot3000.github.io/Oysters4All/assets/og-card.png">
 <meta name="twitter:site" content="@kshot9000">
 <meta name="twitter:creator" content="@kshot9000">
-<link rel="stylesheet" href="styles.css?v=5">
+<link rel="stylesheet" href="styles.css?v=6">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Pearl Bond — fixed-income desk for PRL","description":"Pearl Bond: issue fixed-income bonds on Pearl. Pre-funded Taproot tranches — N coupons plus principal at maturity — fully collateralized by construction. Local signing, atomic secondary transfers, YTM solver. All crypto runs locally in your browser.","url":"https://kshot3000.github.io/Oysters4All/pages/bond/","applicationCategory":"BrowserApplication","operatingSystem":"Any","isAccessibleForFree":true}</script>
 <link rel="stylesheet" href="../../visual-upgrade/theme.css?v=20261007">
 </head>
@@ -183,6 +183,15 @@
         <label for="r-key">Holder signing key <span class="hint">(mnemonic or 64-hex privkey — never leaves this page)</span></label>
         <input id="r-key" type="password" placeholder="needed to sign the claim" autocomplete="off" spellcheck="false">
       </div>
+      <div class="field">
+        <label class="check" for="r-builder-tip">
+          <input id="r-builder-tip" type="checkbox">
+          <span><strong>Builder tip (optional):</strong> add a 1% tip to the builder address
+          <span class="mono">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</span>.
+          It is paid as its own output out of this claim — you receive the tranche minus the fee and the tip — and it is
+          never automatic: with this box unchecked (the default) the claim is exactly as before. Secondary transfers never carry a tip.</span>
+        </label>
+      </div>
     </div>
     <div class="row">
       <button id="r-build" class="btn primary">Plan &amp; sign claim</button>
@@ -269,6 +278,7 @@
       <li>Coupon dates are block-height estimates (194&nbsp;s target). Real maturity follows the chain, not the calendar.</li>
       <li>Secondary transfers need the seller's cooperation to presign; there is no trustless listing or price discovery here.</li>
       <li>Tracking reads the public Blockbook indexer. Balances shown are on-chain facts, not promises.</li>
+      <li>The optional builder tip on claims is off by default and mainnet-only: when a holder checks the box, 1% of the tranche is paid as its own output to the builder address named next to the checkbox, out of that claim — the holder receives the rest. It is sealed into the claim before signing (the script-path sighash commits to every output), so it cannot be added or changed after signing. Secondary transfers never carry a tip.</li>
       <li>Test on testnet first. This is a fixed-income toolkit, not legal, tax, or investment advice.</li>
     </ul>
   </section>
@@ -279,7 +289,7 @@
   <p>Donations: <code id="donate">prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code> <button class="copy-btn" data-for="donate">Copy</button></p>
 </footer>
 
-<script src="pearl-bond.bundle.js?v=5"></script>
-<script src="app.js?v=3"></script>
+<script src="pearl-bond.bundle.js?v=6"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

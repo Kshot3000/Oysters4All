@@ -105,6 +105,8 @@ input[type="text"], input[type="number"], input[type="password"], select, textar
   font-family: inherit; font-size: 0.95rem;
 }
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--gold); }
+.field label.check { display: flex; flex-direction: row; align-items: flex-start; gap: .5em; border: 1px solid var(--line); border-radius: 2px; padding: .6em .8em; font-variant: normal; letter-spacing: normal; color: var(--text); }
+.field label.check input { width: auto; margin-top: .2rem; flex: none; }
 textarea { resize: vertical; }
 .row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.7rem; margin: 0.9rem 0; }
 

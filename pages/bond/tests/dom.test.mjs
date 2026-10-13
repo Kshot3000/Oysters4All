@@ -174,7 +174,7 @@ async function forgeBond($) {
 
 test("bundle exposes the bond API", () => {
   bootApp();
-  for (const fn of ["forgeBond", "couponSchedule", "planClaim", "signClaim",
+  for (const fn of ["forgeBond", "couponSchedule", "planClaim", "signClaim", "builderTipGrainsFor",
     "presignTransferLeg", "verifyTransferLeg", "buildFillTx",
     "verifyDescriptor", "decodeBondDescriptor", "yieldToMaturity",
     "fundingPlan", "classifyTranches", "tweakKeypath", "tweakPrivKeypath",
@@ -247,6 +247,32 @@ test("redeem flow: load descriptor -> build a signed claim tx", async () => {
   assert.match($("r-err").textContent, /locked until height 280165/, "early claim refused");
 });
 
+test("redeem builder tip: unchecked by default, opt-in pays 1% as its own output, opt-out restores", async () => {
+  const { $, document } = bootApp();
+  const { seller } = await forgeBond($);
+  // disclosure + default state in the real page
+  assert.ok(!$("r-builder-tip").checked, "tip checkbox unchecked by default");
+  $("r-load").click();
+  await tick();
+  $("r-tranche").value = "1";
+  $("r-txid").value = "ab".repeat(32);
+  $("r-vout").value = "0";
+  $("r-dest").value = seller.address;
+  $("r-height").value = "300000";
+  $("r-builder-tip").checked = true;
+  $("r-build").click();
+  await tick();
+  assert.equal($("r-err").textContent, "", "tipped build error box empty, got: " + $("r-err").textContent);
+  assert.match($("r-meta").textContent, /builder tip:/, "signed meta names the tip");
+  assert.match($("r-meta").textContent, /0\.25/, "tip is 0.25 PRL on a 25 PRL tranche");
+  // opting back out restores the untipped claim
+  $("r-builder-tip").checked = false;
+  $("r-build").click();
+  await tick();
+  assert.equal($("r-err").textContent, "", "untipped build error box empty");
+  assert.doesNotMatch($("r-meta").textContent, /builder tip:/, "opt-out meta has no tip line");
+});
+
 test("transfer flow: presign legs -> buyer verifies + fills", async () => {
   const { $ } = bootApp();
   const { seller, buyer, net, buyerMn } = await forgeBond($);
@@ -299,9 +325,9 @@ test("index.html carries attribution, honest limits, and cache keys", () => {
   assert.match(html, /@kshot9000/, "X attribution");
   assert.match(html, /prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d/, "donation address, character-for-character");
   assert.match(html, /honest-limits|Honest limits/i, "honest limits panel");
-  assert.match(html, /pearl-bond\.bundle\.js\?v=5/, "bundle cache key");
-  assert.match(html, /app\.js\?v=3/, "app cache key");
-  assert.match(html, /styles\.css\?v=5/, "css cache key");
+  assert.match(html, /pearl-bond\.bundle\.js\?v=6/, "bundle cache key");
+  assert.match(html, /app\.js\?v=4/, "app cache key");
+  assert.match(html, /styles\.css\?v=6/, "css cache key");
 });
 
 test("forge refuses inexact PRL amounts (float-parser round-up class)", async () => {
