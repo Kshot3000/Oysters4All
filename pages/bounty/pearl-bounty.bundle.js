@@ -25,6 +25,9 @@ var PearlBounty = (() => {
     BLOCKBOOK_TESTNET: () => BLOCKBOOK_TESTNET,
     BOUNTY_KIND: () => BOUNTY_KIND,
     BOUNTY_VERSION: () => BOUNTY_VERSION,
+    BUILDER_TIP_ADDRESS: () => BUILDER_TIP_ADDRESS,
+    BUILDER_TIP_BPS: () => BUILDER_TIP_BPS,
+    BUILDER_TIP_NAME: () => BUILDER_TIP_NAME,
     DESCRIPTOR_PREFIX: () => DESCRIPTOR_PREFIX,
     DUST_GRAIN: () => DUST_GRAIN,
     GRAIN_PER_PRL: () => GRAIN_PER_PRL,
@@ -44,6 +47,7 @@ var PearlBounty = (() => {
     buildReclaimTx: () => buildReclaimTx,
     buildRefundScript: () => buildRefundScript,
     buildScriptPathSpend: () => buildScriptPathSpend,
+    builderTipGrainsFor: () => builderTipGrainsFor,
     bytesToHex: () => bytesToHex,
     checkDeadlineHeight: () => checkDeadlineHeight,
     checkRewardGrains: () => checkRewardGrains,
@@ -6148,11 +6152,18 @@ zoo`.split("\n");
     const base = 4 + 1 + 41 + 1 + nOut * 43 + 4;
     return Math.ceil((base * 3 + (base + 2 + wit)) / 4);
   }
-  function planSpend({ inputValue, payments, feeRateGrainsPerVByte, scriptLen, controlLen, stackLens }) {
+  function planSpend({ inputValue, payments, feeRateGrainsPerVByte, scriptLen, controlLen, stackLens, serviceFeeGrains = 0, serviceFeeProgram = null }) {
     if (!Number.isSafeInteger(inputValue) || inputValue <= 0) throw new Error("bad input value");
     if (!Array.isArray(payments) || payments.length === 0) throw new Error("need at least one payment");
+    const serviceFee = Number(serviceFeeGrains);
+    if (!Number.isSafeInteger(serviceFee) || serviceFee < 0 || serviceFee > 0 && serviceFee < DUST_GRAIN)
+      throw new Error("bad service fee");
+    if (serviceFee > 0 && (!(serviceFeeProgram instanceof Uint8Array) || serviceFeeProgram.length !== 32))
+      throw new Error("service fee program must be 32 bytes");
+    const allPayments = payments.map((p) => ({ program: p.program, value: p.value }));
+    if (serviceFee > 0) allPayments.push({ program: serviceFeeProgram, value: serviceFee, serviceFee: true });
     let paySum = 0;
-    for (const p of payments) {
+    for (const p of allPayments) {
       if (!(p.program instanceof Uint8Array) || p.program.length !== 32) throw new Error("payment program must be 32 bytes");
       if (!Number.isSafeInteger(p.value) || p.value < DUST_GRAIN) throw new Error(`payment below dust (${DUST_GRAIN} grains)`);
       paySum += p.value;
@@ -6161,13 +6172,13 @@ zoo`.split("\n");
     const vbytes = (nOut) => spendVBytes({ nOut, scriptLen, controlLen, stackLens });
     const feeFor = (nOut) => Math.ceil(vbytes(nOut) * feeRateGrainsPerVByte);
     const need = (f) => paySum + f;
-    let fee = feeFor(payments.length + 1);
+    let fee = feeFor(allPayments.length + 1);
     let change = inputValue - need(fee);
-    let outputs = payments.map((p) => ({ program: p.program, value: p.value }));
+    let outputs = allPayments;
     if (change >= DUST_GRAIN) {
       outputs.push({ program: null, value: change, change: true });
     } else {
-      fee = feeFor(payments.length);
+      fee = feeFor(allPayments.length);
       change = inputValue - need(fee);
       if (change < 0) throw new Error(`insufficient funds: need ${need(fee)} grains, have ${inputValue}`);
       if (change > 0) {
@@ -6176,7 +6187,7 @@ zoo`.split("\n");
       }
     }
     if (change < 0) throw new Error(`insufficient funds: need ${need(fee)} grains, have ${inputValue}`);
-    return { outputs, fee, vBytes: vbytes(outputs.length), change };
+    return { outputs, fee, vBytes: vbytes(outputs.length), change, serviceFeeGrains: serviceFee };
   }
   function scriptAsm(script) {
     const names = { 82: "2", 117: "DROP", 135: "EQUAL", 136: "EQUALVERIFY", 168: "SHA256", 172: "CHECKSIG", 186: "CHECKSIGADD", 177: "CLTV" };
@@ -6582,7 +6593,21 @@ zoo`.split("\n");
   }
   var AWARD_SCRIPT_LEN = 34;
   var CONTROL_LEN = 65;
-  function planAward({ network, bounty, utxo, winnerAddr, awardGrains, changeAddr, feeRateGrainsPerVByte }) {
+  var BUILDER_TIP_BPS = 100;
+  var BUILDER_TIP_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+  var BUILDER_TIP_NAME = "Builder tip (optional)";
+  function builderTipGrainsFor(totalGrains, network, enabled) {
+    if (enabled !== true) return 0n;
+    if (!network || network.hrp !== "prl") return 0n;
+    const total = BigInt(totalGrains);
+    if (total <= 0n) throw new Error("bad total for builder tip");
+    const tip = total * BigInt(BUILDER_TIP_BPS) / 10000n;
+    return tip >= BigInt(DUST_GRAIN) ? tip : 0n;
+  }
+  function builderTipProgram() {
+    return decodeBech32m(BUILDER_TIP_ADDRESS, "prl").program;
+  }
+  function planAward({ network, bounty, utxo, winnerAddr, awardGrains, changeAddr, feeRateGrainsPerVByte, builderTipEnabled = false }) {
     if (!bounty || !bounty.awardScriptHex) throw new Error("bad bounty");
     if (!Number.isSafeInteger(awardGrains) || awardGrains < DUST_GRAIN) {
       throw new Error(`award must be at least the dust floor (${DUST_GRAIN} grains)`);
@@ -6591,25 +6616,48 @@ zoo`.split("\n");
     if (awardGrains > utxo.value) throw new Error(`award ${awardGrains} exceeds the bounty UTXO value ${utxo.value}`);
     const winnerProgram = addressToProgram(winnerAddr, network);
     const changeProgram = addressToProgram(changeAddr, network);
+    const builderTip = builderTipGrainsFor(awardGrains, network, builderTipEnabled === true);
+    if (builderTip > 0n && constEq2(winnerProgram, builderTipProgram())) {
+      throw new Error("winner is the builder tip address \u2014 the tip would duplicate the award output; leave the tip off");
+    }
+    const builderTipGrains = Number(builderTip);
+    if (!Number.isSafeInteger(builderTipGrains)) throw new Error("builder tip out of range");
     const planned = planSpend({
       inputValue: utxo.value,
       payments: [{ program: winnerProgram, value: awardGrains }],
       feeRateGrainsPerVByte,
       scriptLen: AWARD_SCRIPT_LEN,
       controlLen: CONTROL_LEN,
-      stackLens: [64]
+      stackLens: [64],
+      serviceFeeGrains: builderTipGrains,
+      serviceFeeProgram: builderTip > 0n ? builderTipProgram() : null
     });
-    const outputs = planned.outputs.map((o) => o.change ? { program: changeProgram, value: o.value, change: true } : { program: o.program, value: o.value });
-    return { outputs, feeGrains: planned.fee, vBytes: planned.vBytes, changeGrains: planned.change };
+    const outputs = planned.outputs.map((o) => o.change ? { program: changeProgram, value: o.value, change: true } : o.serviceFee ? { program: o.program, value: o.value, builderTip: true } : { program: o.program, value: o.value });
+    return {
+      outputs,
+      feeGrains: planned.fee,
+      vBytes: planned.vBytes,
+      changeGrains: planned.change,
+      builderTipGrains,
+      builderTipAddress: builderTip > 0n ? BUILDER_TIP_ADDRESS : null
+    };
   }
-  function buildAwardTx({ network, bounty, utxo, posterPrivHex, winnerAddr, awardGrains, changeAddr, feeRateGrainsPerVByte }) {
+  function buildAwardTx({ network, bounty, utxo, posterPrivHex, winnerAddr, awardGrains, changeAddr, feeRateGrainsPerVByte, builderTipEnabled = false }) {
     const posterXOnly = pubkeyFromPriv(posterPrivHex);
     if (posterXOnly !== bounty.posterXOnly) {
       throw new Error("this key is not the poster's award key for this bounty \u2014 award refused");
     }
     if (!/^[0-9a-f]{64}$/i.test(utxo?.txid || "")) throw new Error("bad utxo txid");
     if (!Number.isInteger(utxo?.vout) || utxo.vout < 0) throw new Error("bad utxo vout");
-    const planned = planAward({ network, bounty, utxo, winnerAddr, awardGrains, changeAddr, feeRateGrainsPerVByte });
+    const planned = planAward({ network, bounty, utxo, winnerAddr, awardGrains, changeAddr, feeRateGrainsPerVByte, builderTipEnabled });
+    if (planned.builderTipGrains > 0) {
+      const tipOuts = planned.outputs.filter((o) => o.builderTip);
+      if (tipOuts.length !== 1 || tipOuts[0].value !== planned.builderTipGrains || !constEq2(tipOuts[0].program, builderTipProgram())) {
+        throw new Error("builder tip in the plan does not pay the builder address at the planned amount \u2014 refusing to sign");
+      }
+    } else if (planned.outputs.some((o) => o.builderTip)) {
+      throw new Error("builder tip flagged in the plan but not planned \u2014 refusing to sign");
+    }
     const bountySpk = hexToBytes(bounty.spkHex);
     const input = { txid: utxo.txid.toLowerCase(), vout: utxo.vout, value: utxo.value, spk: bountySpk };
     const awardScript = hexToBytes(bounty.awardScriptHex);

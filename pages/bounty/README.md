@@ -28,6 +28,20 @@ Six steps, one page, zero build step:
    standalone transaction conformance check for award/reclaim txs, and the
    honesty-limits note.
 
+## Builder tip (optional, disclosed)
+
+The Award step offers an **optional 1% builder tip**, off by default. When
+the poster ticks the box, `builderTipGrainsFor()` computes 1% of the award
+(floor, BigInt; mainnet only; waived when 1% would fall below the 546-grain
+dust floor instead of being rounded up) and the award plan adds it as its
+own output **out of the poster's own change** — the winner's award amount
+is byte-identical with the tip on or off. The tip joins the plan before the
+poster signs, and the script-path sighash commits to every output, so it
+cannot be added or skimmed after signing. If the bounty pot cannot cover
+award + tip + fee, the award is refused outright rather than shorting the
+winner. Reclaims never carry a tip. The tip pays the same address published
+in every Bounty footer: `prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`.
+
 ## Crypto & safety
 
 - No new cryptography — everything rides on the audited `sign`/`escrow` lineage
@@ -45,12 +59,13 @@ Six steps, one page, zero build step:
 ## Tests
 
 - `node build.mjs` → `pearl-bounty.bundle.js` (`window.PearlBounty`).
-- `node --no-warnings --loader ./tests/loader.mjs tests/bounty.test.mjs` — 16/16 core tests green
+- `node --no-warnings --loader ./tests/loader.mjs tests/bounty.test.mjs` — 19/19 core tests green
   (descriptor round-trip, reclaim-leaf byte-identity with the audited escrow,
-  award/reclaim sign + verify, commit-reveal, deadline rules, fixture address pin).
-- `node --test tests/dom.test.mjs` — 7/7 DOM tests green (real `app.js` driven
+  award/reclaim sign + verify, commit-reveal, deadline rules, fixture address pin,
+  builder-tip exactness/waivers, winner-invariant tipped plan + signed wire, reclaim untipped).
+- `node --test tests/dom.test.mjs` — 8/8 DOM tests green (real `app.js` driven
   against a strict DOM shim: forge → commit/reveal → award plan/sign →
-  reclaim pre/post-deadline → verify).
+  reclaim pre/post-deadline → verify, builder-tip opt-in plan/sign + opt-out).
 - `node ../../hidden_files/qa-bounty-browser.mjs` — 43/43 real-browser QA green
   (headless Chromium, `file://` + CDP, stubbed Blockbook, zero console/page errors).
 

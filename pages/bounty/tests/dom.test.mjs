@@ -274,6 +274,42 @@ test("award flow: plan -> double-confirm -> signed hex, wrong key refused", asyn
   assert.equal($("a-key").value, "", "key wiped");
 });
 
+test("award builder tip: unchecked by default + disclosure; opt-in plans and signs the tip out of change", async () => {
+  const html = readFileSync(resolvePath(appDir, "index.html"), "utf8");
+  assert.ok(!/<input type="checkbox" id="a-tip"[^>]*\schecked/.test(html), "tip checkbox must default off");
+  assert.match(html, /Builder tip \(optional\)/, "disclosure heading in page");
+  assert.match(html, /winner still receives the full award amount/, "winner-invariance disclosed in page");
+  assert.ok(html.includes(B.BUILDER_TIP_ADDRESS), "full builder address disclosed in page");
+  const { $ } = bootApp();
+  await forgeBountyDom($);
+  $("a-utxo").value = `${"ab".repeat(32)}:0`;
+  $("a-value").value = "25";
+  const winnerXOnly = B.bytesToHex(B.schnorr.getPublicKey(sha("pearl-bounty-dom-winner")));
+  $("a-winner").value = B.encodeBech32m("prl", 1, B.hexToBytes(winnerXOnly));
+  $("a-amount").value = "20";
+  const posterXOnly = B.bytesToHex(B.schnorr.getPublicKey(sha("pearl-bounty-dom-poster")));
+  $("a-change").value = B.encodeBech32m("prl", 1, B.hexToBytes(posterXOnly));
+  $("a-feerate").value = "2";
+  $("a-tip").checked = true;
+  $("a-plan").click(); await tick();
+  assert.equal($("a-err").textContent, "", "tipped plan error box empty");
+  assert.match($("a-planmeta").textContent, /builder tip/, "plan labels the tip output");
+  assert.match($("a-planmeta").textContent, /0\.2 PRL/, "plan shows the 1% tip amount before signing");
+  $("a-key").value = POSTER_PRIV();
+  $("a-build").click(); await tick();
+  assert.match($("a-confirmtext").textContent, /builder tip of 0\.2 PRL/, "double-confirm names the tip");
+  $("a-confirmyes").click(); await tick();
+  assert.equal($("a-err").textContent, "", "tipped sign error box empty");
+  assert.match($("a-meta").textContent, /builder tip/, "signed meta repeats the tip");
+  const parsed = B.parseTx($("a-hex").value);
+  assert.equal(parsed.outputs.length, 3, "winner + tip + change on the wire");
+  assert.equal(Number(parsed.outputs[1].value), 20_000_000, "tip exact on the wire");
+  // Opting back out restores the untipped two-output plan.
+  $("a-tip").checked = false;
+  $("a-plan").click(); await tick();
+  assert.doesNotMatch($("a-planmeta").textContent, /builder tip/, "opt-out removes the tip line");
+});
+
 test("reclaim flow: pre-deadline refusal, post-deadline sign", async () => {
   const { $ } = bootApp();
   await forgeBountyDom($);

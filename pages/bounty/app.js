@@ -270,10 +270,11 @@
         awardGrains,
         changeAddr: $("a-change").value.trim(),
         feeRateGrainsPerVByte: Number($("a-feerate").value),
+        builderTipEnabled: $("a-tip").checked,
       });
-      pendingAward = { utxo, awardGrains, planned };
+      pendingAward = { utxo, awardGrains, planned, builderTipEnabled: $("a-tip").checked };
       const outs = planned.outputs.map((o) =>
-        `${prl(o.value)} PRL → ${short(B.bytesToHex(o.program), 16, 10)}${o.change ? " (change to poster)" : " (winner)"}`).join("<br>");
+        `${prl(o.value)} PRL → ${short(B.bytesToHex(o.program), 16, 10)}${o.builderTip ? " (builder tip)" : o.change ? " (change to poster)" : " (winner)"}`).join("<br>");
       $("a-planmeta").innerHTML =
         `Award <b>${prl(awardGrains)} PRL</b> from <code>${esc(short(op.txid))}:${op.vout}</code>.<br>${outs}<br>` +
         `Fee <b>${planned.feeGrains}</b> grains (${planned.vBytes} vB)${planned.changeGrains ? "" : " — dust remainder folded into the fee"}.`;
@@ -287,7 +288,7 @@
     if (!pendingAward) { setErr("a-err", "plan the award first"); return; }
     $("a-confirmtext").textContent =
       `Sign the award of ${prl(pendingAward.awardGrains)} PRL to ${short($("a-winner").value.trim())} ` +
-      `from the bounty “${bounty.title}”? This moves real PRL once broadcast.`;
+      `from the bounty “${bounty.title}”?${pendingAward.planned.builderTipGrains ? ` This includes the builder tip of ${prl(pendingAward.planned.builderTipGrains)} PRL out of your change.` : ""} This moves real PRL once broadcast.`;
     $("a-confirm").classList.remove("hidden");
   });
   $("a-confirmno").addEventListener("click", () => $("a-confirm").classList.add("hidden"));
@@ -303,11 +304,12 @@
         awardGrains: pendingAward.awardGrains,
         changeAddr: $("a-change").value.trim(),
         feeRateGrainsPerVByte: Number($("a-feerate").value),
+        builderTipEnabled: pendingAward.builderTipEnabled,
       });
       $("a-hex").value = tx.hex;
       $("a-meta").innerHTML =
         `Signed &amp; <b>re-verified</b> — txid <code>${esc(tx.txid)}</code>, ` +
-        `fee <b>${tx.feeGrains}</b> grains. The key stays in memory until you wipe it.`;
+        `fee <b>${tx.feeGrains}</b> grains${tx.builderTipGrains ? `, builder tip <b>${prl(tx.builderTipGrains)} PRL</b> to <code>${esc(short(tx.builderTipAddress))}</code>` : ""}. The key stays in memory until you wipe it.`;
       $("a-out").classList.remove("hidden");
       pendingAward = null;
     } catch (e) { setErr("a-err", e.message); }

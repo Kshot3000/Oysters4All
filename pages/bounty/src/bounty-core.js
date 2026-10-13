@@ -466,11 +466,39 @@ export function newSalt() {
 const AWARD_SCRIPT_LEN = 34; // <32-byte key> CHECKSIG
 const CONTROL_LEN = 65;
 
+/* Optional builder tip (profit mandate, disclosed): the poster may opt in
+ * to a 1% tip on the AWARD, paid as its own output out of the poster's own
+ * remainder (change) — the winner's award amount is byte-identical with
+ * the tip on or off, and if the pot cannot cover award + tip + fee the
+ * award refuses rather than shorting the winner. builderTipGrainsFor()
+ * is the single source: 1% floor in BigInt, mainnet only, waived below
+ * the 546-grain dust floor instead of rounded up, 0 unless enabled ===
+ * true. The tip joins the plan BEFORE the poster signs and the
+ * script-path sighash commits to every output, so it cannot be added or
+ * skimmed after signing. Reclaims never carry it: planReclaim /
+ * buildReclaimTx take no tip parameter at all. */
+export const BUILDER_TIP_BPS = 100; // 1%
+export const BUILDER_TIP_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+export const BUILDER_TIP_NAME = "Builder tip (optional)";
+
+export function builderTipGrainsFor(totalGrains, network, enabled) {
+  if (enabled !== true) return 0n;
+  if (!network || network.hrp !== "prl") return 0n;
+  const total = BigInt(totalGrains);
+  if (total <= 0n) throw new Error("bad total for builder tip");
+  const tip = (total * BigInt(BUILDER_TIP_BPS)) / 10000n;
+  return tip >= BigInt(DUST_GRAIN) ? tip : 0n;
+}
+
+function builderTipProgram() {
+  return decodeBech32m(BUILDER_TIP_ADDRESS, "prl").program;
+}
+
 /** Plan an award spend of one bounty UTXO.
  *  awardGrains: amount to the winner (<= utxo value). Remainder is returned
  *  to changeAddr (the poster's own address) — dust remainder is folded into
  *  the fee and disclosed. Returns { outputs, feeGrains, vBytes, changeGrains }. */
-export function planAward({ network, bounty, utxo, winnerAddr, awardGrains, changeAddr, feeRateGrainsPerVByte }) {
+export function planAward({ network, bounty, utxo, winnerAddr, awardGrains, changeAddr, feeRateGrainsPerVByte, builderTipEnabled = false }) {
   if (!bounty || !bounty.awardScriptHex) throw new Error("bad bounty");
   if (!Number.isSafeInteger(awardGrains) || awardGrains < DUST_GRAIN) {
     throw new Error(`award must be at least the dust floor (${DUST_GRAIN} grains)`);
@@ -479,6 +507,12 @@ export function planAward({ network, bounty, utxo, winnerAddr, awardGrains, chan
   if (awardGrains > utxo.value) throw new Error(`award ${awardGrains} exceeds the bounty UTXO value ${utxo.value}`);
   const winnerProgram = addressToProgram(winnerAddr, network);
   const changeProgram = addressToProgram(changeAddr, network);
+  const builderTip = builderTipGrainsFor(awardGrains, network, builderTipEnabled === true);
+  if (builderTip > 0n && constEq(winnerProgram, builderTipProgram())) {
+    throw new Error("winner is the builder tip address — the tip would duplicate the award output; leave the tip off");
+  }
+  const builderTipGrains = Number(builderTip);
+  if (!Number.isSafeInteger(builderTipGrains)) throw new Error("builder tip out of range");
   const planned = planSpend({
     inputValue: utxo.value,
     payments: [{ program: winnerProgram, value: awardGrains }],
@@ -486,11 +520,18 @@ export function planAward({ network, bounty, utxo, winnerAddr, awardGrains, chan
     scriptLen: AWARD_SCRIPT_LEN,
     controlLen: CONTROL_LEN,
     stackLens: [64],
+    serviceFeeGrains: builderTipGrains,
+    serviceFeeProgram: builderTip > 0n ? builderTipProgram() : null,
   });
   const outputs = planned.outputs.map((o) => o.change
     ? { program: changeProgram, value: o.value, change: true }
-    : { program: o.program, value: o.value });
-  return { outputs, feeGrains: planned.fee, vBytes: planned.vBytes, changeGrains: planned.change };
+    : o.serviceFee
+      ? { program: o.program, value: o.value, builderTip: true }
+      : { program: o.program, value: o.value });
+  return {
+    outputs, feeGrains: planned.fee, vBytes: planned.vBytes, changeGrains: planned.change,
+    builderTipGrains, builderTipAddress: builderTip > 0n ? BUILDER_TIP_ADDRESS : null,
+  };
 }
 
 /**
@@ -501,14 +542,25 @@ export function planAward({ network, bounty, utxo, winnerAddr, awardGrains, chan
  *  - the signature is re-verified before the witness is assembled;
  *  - wire-level checks: witness layout [sig, awardScript, awardCB].
  */
-export function buildAwardTx({ network, bounty, utxo, posterPrivHex, winnerAddr, awardGrains, changeAddr, feeRateGrainsPerVByte }) {
+export function buildAwardTx({ network, bounty, utxo, posterPrivHex, winnerAddr, awardGrains, changeAddr, feeRateGrainsPerVByte, builderTipEnabled = false }) {
   const posterXOnly = pubkeyFromPriv(posterPrivHex);
   if (posterXOnly !== bounty.posterXOnly) {
     throw new Error("this key is not the poster's award key for this bounty — award refused");
   }
   if (!/^[0-9a-f]{64}$/i.test(utxo?.txid || "")) throw new Error("bad utxo txid");
   if (!Number.isInteger(utxo?.vout) || utxo.vout < 0) throw new Error("bad utxo vout");
-  const planned = planAward({ network, bounty, utxo, winnerAddr, awardGrains, changeAddr, feeRateGrainsPerVByte });
+  const planned = planAward({ network, bounty, utxo, winnerAddr, awardGrains, changeAddr, feeRateGrainsPerVByte, builderTipEnabled });
+  // Last hop before signing: a flagged tip must pay the builder address
+  // at exactly the planned amount — the flag is a trust claim, not a label.
+  if (planned.builderTipGrains > 0) {
+    const tipOuts = planned.outputs.filter((o) => o.builderTip);
+    if (tipOuts.length !== 1 || tipOuts[0].value !== planned.builderTipGrains ||
+        !constEq(tipOuts[0].program, builderTipProgram())) {
+      throw new Error("builder tip in the plan does not pay the builder address at the planned amount — refusing to sign");
+    }
+  } else if (planned.outputs.some((o) => o.builderTip)) {
+    throw new Error("builder tip flagged in the plan but not planned — refusing to sign");
+  }
   const bountySpk = hexToBytes(bounty.spkHex);
   const input = { txid: utxo.txid.toLowerCase(), vout: utxo.vout, value: utxo.value, spk: bountySpk };
   const awardScript = hexToBytes(bounty.awardScriptHex);

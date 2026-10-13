@@ -22,7 +22,7 @@
 <meta name="twitter:image" content="https://kshot3000.github.io/Oysters4All/assets/og-card.png">
 <meta name="twitter:site" content="@kshot9000">
 <meta name="twitter:creator" content="@kshot9000">
-<link rel="stylesheet" href="styles.css?v=4">
+<link rel="stylesheet" href="styles.css?v=5">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Pearl Bounty — Bug-Bounty & Task-Bounty Desk for PRL","description":"Post PRL bounties on pure Taproot script: poster-funded bounty outputs with an award leaf and a post-deadline CLTV reclaim leaf. Commit-reveal hunter submissions, local signing, keys never leave the page.","url":"https://kshot3000.github.io/Oysters4All/pages/bounty/","applicationCategory":"BrowserApplication","operatingSystem":"Any","isAccessibleForFree":true}</script>
 <link rel="stylesheet" href="../../visual-upgrade/theme.css?v=20261007">
 </head>
@@ -57,6 +57,7 @@
     <li>The deadline is an <em>absolute block height</em>. Day-estimates use ≈194&nbsp;s per block; the chain decides, not the clock.</li>
     <li>Funding and status checks read <em>Blockbook, a third-party indexer</em> — it can lag or be wrong.</li>
     <li>No real bounty was funded in testing (that needs the poster's funds and a live chain). Everything here is real cryptography and real transaction construction — verify the hex before you broadcast.</li>
+    <li>The optional <em>builder tip</em> on an award is off by default, is always shown as its own line before you sign, and is paid out of the poster's own change — never deducted from the winner's award.</li>
   </ul>
 </aside>
 
@@ -200,6 +201,7 @@
       <label>Fee rate (grains/vB)<input id="a-feerate" inputmode="decimal" value="2"></label>
       <label>Poster key<input id="a-key" type="password" autocomplete="off" spellcheck="false" placeholder="paste the poster key"></label>
     </div>
+    <label class="check"><input type="checkbox" id="a-tip"> <span><b>Builder tip (optional):</b> add 1% of the award as a tip to the builder of this desk, <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>. The tip comes out of <em>your</em> change — the winner still receives the full award amount. If the pot cannot cover award + tip + fee, the award is refused rather than shorting the winner. Mainnet only; waived when 1% would fall below the 546-grain dust floor. Reclaims never carry a tip.</span></label>
     <div class="row">
       <button id="a-plan" class="primary">Plan award</button>
       <span id="a-err" class="err" role="alert"></span>
@@ -313,7 +315,7 @@
   <p class="dim">Pearl Bounty — pure Taproot script, no smart contracts. Verify every hex before you broadcast.</p>
 </footer>
 
-<script src="pearl-bounty.bundle.js?v=4"></script>
-<script src="app.js?v=1"></script>
+<script src="pearl-bounty.bundle.js?v=5"></script>
+<script src="app.js?v=2"></script>
 </body>
 </html>

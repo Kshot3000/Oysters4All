@@ -15,6 +15,8 @@ import {
   classifyBounty, verifyBountyTx, checkRewardGrains, checkDeadlineHeight,
   parsePRLToGrains, fmtPRL, pubkeyFromPriv,
   buildRefundScript, verifyControlBlock,
+  builderTipGrainsFor, BUILDER_TIP_ADDRESS,
+  parseTx, decodeBech32m,
   DUST_GRAIN, GRAIN_PER_PRL, NETWORKS, SEQ_FINAL,
   schnorr, sha256, bytesToHex, hexToBytes, encodeBech32m, tapLeafHash,
   signForXOnly, verifySchnorrSig,
@@ -226,6 +228,74 @@ test("buildAwardTx: sign round-trip, key guard, wire layout", () => {
   assert.equal(v.ok, true);
   assert.equal(v.spends[0].leaf, "award");
   assert.equal(v.spends.length, 1);
+});
+
+test("builderTipGrainsFor: 1% floor, mainnet only, dust waived, opt-in only", () => {
+  assert.equal(builderTipGrainsFor(100_000_000, MAINNET, true), 1_000_000n);
+  assert.equal(builderTipGrainsFor(100_000_000, MAINNET, false), 0n);
+  assert.equal(builderTipGrainsFor(100_000_000, MAINNET, undefined), 0n);
+  assert.equal(builderTipGrainsFor(100_000_000, NETWORKS.testnet, true), 0n);
+  assert.equal(builderTipGrainsFor(54_599, MAINNET, true), 0n); // 545 < dust: waived, never rounded up
+  assert.equal(builderTipGrainsFor(54_600, MAINNET, true), 546n); // exact dust floor: charged
+  assert.equal(BUILDER_TIP_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
+});
+
+test("planAward builder tip: winner byte-identical, tip out of poster change, refusals", () => {
+  const b = forge();
+  const utxo = { txid: "ab".repeat(32), vout: 0, value: 25 * GRAIN_PER_PRL };
+  const base = { network: MAINNET, bounty: b, utxo, winnerAddr: WINNER_ADDR, awardGrains: 20 * GRAIN_PER_PRL, changeAddr: POSTER_ADDR, feeRateGrainsPerVByte: 2 };
+  const off = planAward(base);
+  const on = planAward({ ...base, builderTipEnabled: true });
+  assert.equal(on.builderTipGrains, 20_000_000); // 1% of the 20 PRL award
+  assert.equal(on.builderTipAddress, BUILDER_TIP_ADDRESS);
+  assert.equal(on.outputs[0].value, off.outputs[0].value, "winner amount identical on/off");
+  const tipOut = on.outputs.find((o) => o.builderTip);
+  assert.ok(tipOut, "tip is its own flagged output");
+  assert.equal(tipOut.value, 20_000_000);
+  assert.equal(bytesToHex(tipOut.program), bytesToHex(decodeBech32m(BUILDER_TIP_ADDRESS, "prl").program));
+  const sum = on.outputs.reduce((a, o) => a + o.value, 0);
+  assert.equal(sum + on.feeGrains, utxo.value, "conservation including the tip");
+  assert.equal(on.changeGrains, off.changeGrains - 20_000_000 - (on.feeGrains - off.feeGrains),
+    "tip + the extra output's fee come out of the poster's change only");
+  assert.ok(on.feeGrains > off.feeGrains, "fee is computed over the extra output");
+  // Testnet: tip waived even when enabled.
+  const bt = forge({ network: NETWORKS.testnet, posterKeyInput: POSTER_PRIV });
+  const tWinner = encodeBech32m("tprl", 1, hexToBytes(WINNER_XONLY));
+  const tChange = encodeBech32m("tprl", 1, hexToBytes(POSTER_XONLY));
+  const tOn = planAward({ network: NETWORKS.testnet, bounty: bt, utxo, winnerAddr: tWinner, awardGrains: 20 * GRAIN_PER_PRL, changeAddr: tChange, feeRateGrainsPerVByte: 2, builderTipEnabled: true });
+  assert.equal(tOn.builderTipGrains, 0);
+  assert.ok(!tOn.outputs.some((o) => o.builderTip));
+  // Winner == builder address: the tip would duplicate the award output.
+  assert.throws(() => planAward({ ...base, winnerAddr: BUILDER_TIP_ADDRESS, builderTipEnabled: true }), /builder tip address/);
+  // Pot covers award + fee but not award + tip + fee: refuse, never short the winner.
+  assert.throws(() => planAward({
+    ...base, utxo: { ...utxo, value: 20 * GRAIN_PER_PRL + 600 }, builderTipEnabled: true,
+  }), /insufficient funds/);
+});
+
+test("buildAwardTx builder tip: signed wire carries the tip exact; reclaim never tipped", () => {
+  const b = forge();
+  const utxo = { txid: "ab".repeat(32), vout: 0, value: 25 * GRAIN_PER_PRL };
+  const base = { network: MAINNET, bounty: b, utxo, posterPrivHex: POSTER_PRIV, winnerAddr: WINNER_ADDR, awardGrains: 20 * GRAIN_PER_PRL, changeAddr: POSTER_ADDR, feeRateGrainsPerVByte: 2 };
+  const tx = buildAwardTx({ ...base, builderTipEnabled: true });
+  assert.equal(tx.builderTipGrains, 20_000_000);
+  const builderSpk = "5120" + bytesToHex(decodeBech32m(BUILDER_TIP_ADDRESS, "prl").program);
+  const parsed = parseTx(tx.hex);
+  assert.equal(parsed.outputs.length, 3, "winner + tip + change");
+  assert.equal(Number(parsed.outputs[0].value), 20 * GRAIN_PER_PRL, "winner paid in full on the wire");
+  assert.equal(Number(parsed.outputs[1].value), 20_000_000, "tip exact on the wire");
+  assert.equal(bytesToHex(parsed.outputs[1].spk), builderSpk, "tip pays the builder program on the wire");
+  assert.equal(verifyBountyTx(tx.hex, b).spends[0].leaf, "award", "tipped award still verifies");
+  const untipped = buildAwardTx(base);
+  const p2 = parseTx(untipped.hex);
+  assert.equal(p2.outputs.length, 2, "untipped award is winner + change only");
+  assert.ok(!p2.outputs.some((o) => bytesToHex(o.spk) === builderSpk), "no builder output when off");
+  // Reclaim takes no tip parameter: a signed reclaim pays exactly one output.
+  const reclaim = buildReclaimTx({
+    network: MAINNET, bounty: b, utxo, posterPrivHex: POSTER_PRIV,
+    destAddr: POSTER_ADDR, feeRateGrainsPerVByte: 2, currentHeight: 900123,
+  });
+  assert.equal(parseTx(reclaim.hex).outputs.length, 1, "reclaim is a single-output sweep of the poster's own pot");
 });
 
 test("planReclaim: refuses before the deadline", () => {
