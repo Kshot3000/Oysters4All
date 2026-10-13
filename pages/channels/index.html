@@ -289,6 +289,34 @@
           commitment confirmed — otherwise the network rejects it and you pay a fee for nothing.</div>
         </div>
       </div>
+      <div class="closecard">
+        <h3>Penalty claim — revoked state</h3>
+        <p class="lede">If your peer broadcasts a <strong>revoked</strong> state, sweep their entire
+        to_local output at once via the penalty leaf — no CSV wait. You need the revocation secret
+        they revealed for that state (recorded in the State step).</p>
+        <label>Peer's revocation secret (revoked state) <input id="close-pen-secret" autocomplete="off" spellcheck="false" placeholder="64 hex chars"></label>
+        <label class="check"><input type="checkbox" id="close-pen-tip"> Optional builder tip — add 1% of the penalized amount as its own output to the builder (prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d). You receive the penalized to_local balance minus the claim fee and the tip. Off by default; commitment transactions and cooperative closes never carry a tip.</label>
+        <div class="row"><button id="close-pen-build" class="primary">Build penalty claim</button></div>
+        <div id="close-pen-error" class="error" hidden role="alert"></div>
+        <div id="close-pen-result" hidden aria-live="polite">
+          <dl class="kv">
+            <div><dt>Revoked state</dt><dd id="close-pen-version"></dd></div>
+            <div><dt>Commitment txid</dt><dd><code id="close-pen-ctid" class="addr"></code></dd></div>
+            <div><dt>Penalty claim txid</dt><dd><code id="close-pen-txid" class="addr"></code></dd></div>
+            <div><dt>Claim fee</dt><dd id="close-pen-fee"></dd></div>
+            <div id="close-pen-tip-row" hidden><dt>Builder tip (optional)</dt><dd id="close-pen-tip-amt"></dd></div>
+          </dl>
+          <div class="row">
+            <label class="inline">Signing key <input id="close-pen-key" type="password" autocomplete="off" spellcheck="false"></label>
+            <button id="close-pen-sign" class="primary">Sign penalty claim</button>
+            <button id="close-pen-broadcast" class="ghost">Broadcast penalty claim (double-confirm)</button>
+          </div>
+          <textarea aria-label="Penalty claim transaction hex" id="close-pen-hex" rows="3" readonly spellcheck="false" hidden></textarea>
+          <div class="note">Only broadcast after the revoked commitment has confirmed on-chain.
+          The claim spends that commitment's to_local output — if the peer never broadcast it,
+          there is nothing to spend and the claim cannot confirm.</div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -356,7 +384,7 @@
       <li>The penalty model is opt-in training wheels: revocation secrets are exchanged by hand, and the claim delay is in blocks, not wall-clock time.</li>
       <li>Commitment fees are fixed when a state is signed; if chain fees spike, a unilateral close can get expensive.</li>
       <li>Broadcasting a revoked state lets your peer take your entire to_local output. Don't.</li>
-      <li>The optional builder tip on a unilateral claim is off by default, is never automatic, and is added before you sign — commitment transactions and cooperative closes never carry one.</li>
+      <li>The optional builder tip on a unilateral or penalty claim is off by default, is never automatic, and is added before you sign — commitment transactions and cooperative closes never carry one.</li>
     </ul>
   </aside>
 </main>
@@ -367,7 +395,7 @@
   <button id="donate-copy" class="ghost">Copy</button></p>
 </footer>
 
-<script src="pearl-channels.bundle.js?v=7"></script>
-<script src="app.js?v=4"></script>
+<script src="pearl-channels.bundle.js?v=8"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>

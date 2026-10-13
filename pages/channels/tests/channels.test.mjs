@@ -366,3 +366,70 @@ test("to_local output re-derives and control blocks verify", () => {
   assert.ok(C.verifyControlBlock(internal, delayLeaf, tol.controlBlocks[0], C.decodeBech32m(tol.address).program));
   assert.ok(C.verifyControlBlock(internal, penaltyLeaf, tol.controlBlocks[1], C.decodeBech32m(tol.address).program));
 });
+
+test("penalty claim: sole-signer sweep of a revoked peer commitment, secret in witness, no CSV delay", () => {
+  const chan = openTestChannel(72);
+  const state = testState(chan);
+  const pair = C.buildCommitmentPair("mainnet", chan, FUNDING_TXID, 0, state, FEE_RATE);
+  const toLocal = BigInt(pair.theirs.outputs.find((o) => o.kind === "to_local").value);
+  const pen = C.buildPenaltyClaimTx("mainnet", chan, pair.theirs, myPayout, "bb".repeat(32), FEE_RATE);
+  assert.equal(pen.outputs.length, 1);
+  assert.equal(pen.builderTipGrains, "0");
+  assert.equal(BigInt(pen.outputs[0].value) + BigInt(pen.fee), toLocal, "conservation: claim + fee == to_local");
+  assert.equal(pen.sequence, 0xffffffff, "penalty is immediate — final sequence, no CSV");
+  const sig = C.signChannelDigest(privA, pen.digest);
+  const asm = C.assemblePenaltyClaimTx("mainnet", chan, pen, sig, "bb".repeat(32));
+  const dec = C.decodeRawTx(asm.hex);
+  assert.equal(dec.outputs.length, 1);
+  assert.equal(dec.inputs[0].sequence, 0xffffffff);
+  assert.equal(dec.inputs[0].txid, pair.theirs.txid, "input spends the revoked commitment's to_local (vout 0)");
+  assert.equal(dec.witness[0].length, 4, "witness = [sig, secret, penalty leaf, control block]");
+  assert.equal(C.bytesToHex(dec.witness[0][1]), "bb".repeat(32), "revocation secret is the second witness item");
+  assert.equal(C.bytesToHex(dec.witness[0][2]), pair.theirs.toLocal.penaltyScript, "witness carries the penalty leaf");
+});
+
+test("penalty claim: optional builder tip exact on the wire; opt-out builder-free", () => {
+  const chan = openTestChannel(72);
+  const state = testState(chan);
+  const pair = C.buildCommitmentPair("mainnet", chan, FUNDING_TXID, 0, state, FEE_RATE);
+  const toLocal = BigInt(pair.theirs.outputs.find((o) => o.kind === "to_local").value);
+  const tip = C.builderTipGrainsFor(Number(toLocal), C.NETWORKS.mainnet, true);
+  assert.equal(tip, Number(toLocal / 100n));
+  const pen = C.buildPenaltyClaimTx("mainnet", chan, pair.theirs, myPayout, "bb".repeat(32), FEE_RATE, true);
+  assert.equal(pen.builderTipGrains, String(tip));
+  assert.equal(pen.outputs.length, 2);
+  assert.equal(pen.outputs[1].kind, "builder-tip");
+  assert.equal(BigInt(pen.outputs[0].value) + BigInt(pen.outputs[1].value) + BigInt(pen.fee), toLocal, "conservation over 2 outputs");
+  const plain = C.buildPenaltyClaimTx("mainnet", chan, pair.theirs, myPayout, "bb".repeat(32), FEE_RATE);
+  assert.ok(BigInt(pen.fee) > BigInt(plain.fee), "tipped claim pays the 2-output fee");
+  const sig = C.signChannelDigest(privA, pen.digest);
+  const asm = C.assemblePenaltyClaimTx("mainnet", chan, pen, sig, "bb".repeat(32));
+  const dec = C.decodeRawTx(asm.hex);
+  const builderProg = C.bytesToHex(C.payoutProgram(C.BUILDER_TIP_ADDRESS, C.NETWORKS.mainnet));
+  assert.equal(dec.outputs.length, 2);
+  assert.equal(Number(dec.outputs[1].value), tip);
+  assert.equal(C.bytesToHex(dec.outputs[1].spk), "5120" + builderProg);
+});
+
+test("penalty claim: wrong secret, wrong side, payout==builder, tip-dust and tampered-tip refusals", () => {
+  const chan = openTestChannel(72);
+  const state = testState(chan);
+  const pair = C.buildCommitmentPair("mainnet", chan, FUNDING_TXID, 0, state, FEE_RATE);
+  // wrong secret (mine instead of the peer's) refuses at build
+  assert.throws(() => C.buildPenaltyClaimTx("mainnet", chan, pair.theirs, myPayout, "aa".repeat(32), FEE_RATE), /does not match this commitment's penalty leaf/);
+  // my own commitment's penalty leaf pays the peer — I cannot penalize myself
+  assert.throws(() => C.buildPenaltyClaimTx("mainnet", chan, pair.mine, myPayout, "aa".repeat(32), FEE_RATE), /pays the peer, not you/);
+  // payout == builder with the tip on duplicates the claim output
+  assert.throws(() => C.buildPenaltyClaimTx("mainnet", chan, pair.theirs, C.BUILDER_TIP_ADDRESS, "bb".repeat(32), FEE_RATE, true), /builder tip would duplicate/);
+  // tip-dust: tiny peer balance at a huge fee rate refuses naming the tip
+  const small = testState(chan, 0, BigInt(chan.capacity) - 100_000n, 100_000n);
+  const smallPair = C.buildCommitmentPair("mainnet", chan, FUNDING_TXID, 0, small, FEE_RATE);
+  assert.throws(() => C.buildPenaltyClaimTx("mainnet", chan, smallPair.theirs, myPayout, "bb".repeat(32), 600, true), /builder tip/);
+  // tampered template tip amount refuses at assemble (the last hop)
+  const pen = C.buildPenaltyClaimTx("mainnet", chan, pair.theirs, myPayout, "bb".repeat(32), FEE_RATE, true);
+  const sig = C.signChannelDigest(privA, pen.digest);
+  assert.throws(() => C.assemblePenaltyClaimTx("mainnet", chan, { ...pen, builderTipGrains: "1" }, sig, "bb".repeat(32)), /does not match the computed tip/);
+  // wrong signer refuses at assemble
+  const badSig = C.signChannelDigest(privB, pen.digest);
+  assert.throws(() => C.assemblePenaltyClaimTx("mainnet", chan, pen, badSig, "bb".repeat(32)), /signature does not verify/);
+});

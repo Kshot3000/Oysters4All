@@ -718,6 +718,135 @@ export function assembleClaimTx(networkId, chan, template, sigHex) {
   return { hex: built.hex, txid: built.txid, vBytes: built.vBytes };
 }
 
+/* ---------------- penalty claim (revoked state broadcast) ---------------- */
+
+/** Parse a penalty leaf: OP_HASH160 <20-byte hash> OP_EQUALVERIFY
+ *  <32-byte peer key> OP_CHECKSIG. Returns { revokeHash160, peerXOnly }
+ *  as byte arrays; throws on any shape mismatch. */
+function parsePenaltyLeaf(leaf) {
+  if (!(leaf instanceof Uint8Array) || leaf.length !== 57) throw new Error("bad penalty leaf (length)");
+  if (leaf[0] !== OP.HASH160 || leaf[1] !== 0x14 || leaf[22] !== OP.EQUALVERIFY || leaf[23] !== 0x20 || leaf[56] !== OP.CHECKSIG) {
+    throw new Error("bad penalty leaf (template)");
+  }
+  return { revokeHash160: leaf.slice(2, 22), peerXOnly: leaf.slice(24, 56) };
+}
+
+function assertPenaltySecret(leaf, secretHex) {
+  const { revokeHash160, peerXOnly } = parsePenaltyLeaf(leaf);
+  if (typeof secretHex !== "string" || !/^[0-9a-fA-F]{64}$/.test(secretHex.trim())) {
+    throw new Error("revocation secret must be 64 hex characters (32 bytes)");
+  }
+  const secret = hexToBytes(secretHex.trim().toLowerCase());
+  if (!constEq(revocationHash160(secret), revokeHash160)) {
+    throw new Error("revocation secret does not match this commitment's penalty leaf — wrong secret or wrong state; refusing to build an unspendable penalty claim");
+  }
+  return { secret, peerXOnly };
+}
+
+/** Penalty claim tx: spends the PEER's to_local output from a REVOKED
+ *  commitment they broadcast, via the penalty leaf
+ *  (HASH160 <revokeHash160> EQUALVERIFY <you> CHECKSIG). You are the sole
+ *  signer; the revocation secret the peer revealed for that state is the
+ *  second witness item. No CSV delay — the penalty is immediate, so the
+ *  input sequence is final. Returns the unsigned template; sign with
+ *  signChannelDigest + assemblePenaltyClaimTx.
+ *  With builderTipEnabled === true an optional disclosed 1% builder tip
+ *  (of the penalized to_local value) is added as its own second output
+ *  BEFORE signing — the same opt-in as the unilateral claim; the
+ *  penalizer receives the to_local value minus fee and tip. */
+export function buildPenaltyClaimTx(networkId, chan, commitment, myPayoutAddr, revocationSecretHex, feeRateGrainsPerVByte, builderTipEnabled = false) {
+  const network = resolveNetwork(networkId);
+  const toLocalOut = commitment.outputs.find((o) => o.kind === "to_local");
+  if (!toLocalOut) throw new Error("commitment has no to_local output");
+  const toLocalValue = BigInt(toLocalOut.value);
+  const myProg = payoutProgram(myPayoutAddr, network);
+  const penaltyLeaf = hexToBytes(commitment.toLocal.penaltyScript);
+  const { peerXOnly } = assertPenaltySecret(penaltyLeaf, revocationSecretHex);
+  if (!constEq(peerXOnly, parseXOnlyKey(chan.aXOnly))) {
+    throw new Error("this commitment's penalty leaf pays the peer, not you — only the counterparty of the broadcaster can penalize it");
+  }
+  const toLocalSpk = p2trScriptPubKey(hexToBytes(toLocalOut.program));
+  if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) throw new Error("bad fee rate");
+
+  const builderTip = builderTipGrainsFor(Number(toLocalValue), network, builderTipEnabled === true);
+  const builderTipProgram = builderTip > 0 ? addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet) : null;
+  if (builderTip > 0 && constEq(myProg, builderTipProgram)) {
+    throw new Error("payout address is the builder address — the builder tip would duplicate the penalty-claim output; leave the builder tip off");
+  }
+
+  const vBytes = spendVBytes({ nOut: builderTip > 0 ? 2 : 1, scriptLen: penaltyLeaf.length, controlLen: 65, stackLens: [64, 32] });
+  const fee = BigInt(Math.ceil(vBytes * feeRateGrainsPerVByte));
+  const out = toLocalValue - fee - BigInt(builderTip);
+  if (out < BigInt(DUST_GRAIN)) {
+    if (builderTip > 0) throw new Error(`penalty-claim output would be dust after the claim fee and the ${builderTip}-grain builder tip — to_local value too small; leave the builder tip off`);
+    throw new Error("penalty-claim output would be dust — to_local value too small for this fee rate");
+  }
+  const input = { txid: commitment.txid, vout: 0, value: Number(toLocalValue), spk: toLocalSpk };
+  const outputs = [{ program: myProg, value: Number(out) }];
+  if (builderTip > 0) outputs.push({ program: builderTipProgram, value: builderTip, builderTip: true });
+  const digest = scriptPathSigDigestEx(network, input, outputs, penaltyLeaf, { sequence: FINAL_SEQ, locktime: 0 });
+  const { txid, hex } = serializeUnsignedTx(network, input, outputs, FINAL_SEQ, 0);
+  return {
+    kind: "pearl-channel-penalty-claim:v1",
+    version: commitment.version, txid, unsignedHex: hex,
+    digest: bytesToHex(digest),
+    sequence: FINAL_SEQ, locktime: 0,
+    fee: fee.toString(), vBytes,
+    penaltyScriptHex: bytesToHex(penaltyLeaf),
+    toLocalRef: {
+      commitTxid: commitment.txid, vout: 0,
+      value: toLocalValue.toString(), program: bytesToHex(hexToBytes(toLocalOut.program)),
+      controlPenalty: commitment.toLocal.controlPenalty,
+    },
+    outputs: outputs.map((o, i) => ({
+      kind: i === 0 ? "penalty-claim" : "builder-tip",
+      value: BigInt(o.value).toString(), program: bytesToHex(o.program),
+      ...(o.builderTip ? { builderTip: true } : {}),
+    })),
+    builderTipGrains: builderTip.toString(),
+    fingerprint: bytesToHex(sha256(Uint8Array.from([...utf8(FP_DOMAIN + "/penalty-claim"), ...hexToBytes(txid)]))).slice(0, 16),
+  };
+}
+
+/** Assemble a signed penalty claim: verifies YOUR signature against your
+ *  key and the revocation secret against the penalty leaf first. */
+export function assemblePenaltyClaimTx(networkId, chan, template, sigHex, revocationSecretHex) {
+  const network = resolveNetwork(networkId);
+  assertChannelSig(sigHex, template.digest, chan.aXOnly, "your");
+  // Last-hop builder-tip assertion (same pattern as assembleClaimTx):
+  // the tip program is re-derived from the builder address constant and
+  // the amount recomputed from the penalized to_local value.
+  const flagged = (template.outputs || []).filter((o) => o && (o.builderTip || o.kind === "builder-tip"));
+  if (flagged.length > 0) {
+    const wantTip = builderTipGrainsFor(Number(BigInt(template.toLocalRef.value)), network, true);
+    const wantProg = bytesToHex(addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet));
+    if (flagged.length !== 1 || wantTip <= 0 || flagged[0].program !== wantProg || BigInt(flagged[0].value) !== BigInt(wantTip)) {
+      throw new Error("builder tip does not pay the builder address at the computed amount — refusing to assemble the penalty claim");
+    }
+    if (BigInt(template.builderTipGrains ?? "0") !== BigInt(wantTip)) {
+      throw new Error("penalty-claim template builder-tip amount does not match the computed tip — refusing to assemble");
+    }
+  } else if (BigInt(template.builderTipGrains ?? "0") !== 0n) {
+    throw new Error("penalty-claim template declares a builder tip but carries no tip output — refusing to assemble");
+  }
+  if (!template.penaltyScriptHex) throw new Error("penalty-claim template missing penaltyScriptHex");
+  const penaltyLeaf = hexToBytes(template.penaltyScriptHex);
+  const { secret, peerXOnly } = assertPenaltySecret(penaltyLeaf, revocationSecretHex);
+  if (!constEq(peerXOnly, parseXOnlyKey(chan.aXOnly))) {
+    throw new Error("this template's penalty leaf pays the peer, not you — refusing to assemble");
+  }
+  const toLocalOut = template.toLocalRef;
+  const input = {
+    txid: toLocalOut.commitTxid, vout: toLocalOut.vout,
+    value: Number(BigInt(toLocalOut.value)), spk: p2trScriptPubKey(hexToBytes(toLocalOut.program)),
+  };
+  const outputs = template.outputs.map((o) => ({ program: hexToBytes(o.program), value: Number(BigInt(o.value)) }));
+  const built = buildScriptPathSpend(network, input, outputs, penaltyLeaf, hexToBytes(toLocalOut.controlPenalty),
+    [hexToBytes(sigHex), secret], { sequence: FINAL_SEQ, locktime: 0 });
+  if (built.digest !== template.digest.toLowerCase()) throw new Error("rebuilt penalty-claim digest mismatch — template tampered");
+  return { hex: built.hex, txid: built.txid, vBytes: built.vBytes };
+}
+
 function delayLeafFromTemplate(template) {
   // The claim template is always built by buildClaimTx, which stores the
   // delay script hex on the sibling commitment; the page passes it through.

@@ -431,6 +431,59 @@ test("builder tip: checkbox opt-in, disclosure, UI tipped claim exact on the wir
   assert.ok(get("close-uni-tip-row").hidden, "tip row hidden when off");
 });
 
+test("penalty claim: revoked state sweeps via the penalty leaf, tip exact on the wire, wrong secret refused", () => {
+  assert.ok(html.includes('id="close-pen-tip"'), "penalty tip checkbox present");
+  assert.ok(!/<input type="checkbox" id="close-pen-tip" checked/.test(html), "penalty tip checkbox unchecked by default");
+  assert.ok(html.includes("sweep their entire"), "penalty card explains the sweep");
+  const st0 = T.state();
+  const revoked = st0.states[0];
+  assert.ok(revoked.revoked && revoked.peerSecret, "state 0 revoked with the peer secret recorded");
+  // expected tip from the revoked state's own commitment template
+  const pair = R.buildCommitmentPair("mainnet", st0.chan, FUNDING_TXID, 0, {
+    version: revoked.version, myBal: revoked.myBal, peerBal: revoked.peerBal,
+    myPayoutAddr: PAYOUT_ME, myRevokeHash160: revoked.myRevokeHash160, peerRevokeHash160: revoked.peerRevokeHash160,
+  }, 2);
+  const toLocal = BigInt(pair.theirs.outputs.find((o) => o.kind === "to_local").value);
+  const tip = R.builderTipGrainsFor(Number(toLocal), R.NETWORKS.mainnet, true);
+  assert.ok(tip > 0, "tip is live on the ~5 PRL penalized output");
+  T.set("close-pen-secret", revoked.peerSecret);
+  const box = get("close-pen-tip");
+  box.checked = true;
+  T.click("close-pen-build");
+  let e = T.err("close-pen-error");
+  assert.ok(e.hidden, "penalty build ok: " + e.text);
+  const st = T.state();
+  assert.ok(st.penalty, "penalty template built");
+  assert.equal(st.penalty.version, 0, "penalty targets the revoked v0 state");
+  assert.equal(st.penalty.outputs.length, 2);
+  assert.equal(st.penalty.builderTipGrains, String(tip), "tip = floor(1% of the penalized to_local)");
+  assert.ok(!get("close-pen-tip-row").hidden, "tip row shown");
+  T.set("close-pen-key", PRIV_A);
+  T.click("close-pen-sign");
+  e = T.err("close-pen-error");
+  assert.ok(e.hidden, "penalty sign ok: " + e.text);
+  const dec = R.decodeRawTx(st.penalty.hex);
+  assert.equal(dec.outputs.length, 2);
+  const builderSpk = "5120" + R.bytesToHex(R.payoutProgram(R.BUILDER_TIP_ADDRESS, R.NETWORKS.mainnet));
+  assert.equal(R.bytesToHex(dec.outputs[1].spk), builderSpk);
+  assert.equal(BigInt(dec.outputs[1].value), BigInt(tip));
+  assert.equal(dec.inputs[0].sequence, 0xffffffff, "penalty claim is immediate — no CSV sequence");
+  assert.equal(R.bytesToHex(dec.witness[0][1]), revoked.peerSecret, "revocation secret rides as the second witness item");
+  // wrong secret refuses at build
+  T.set("close-pen-secret", "cc".repeat(32));
+  T.click("close-pen-build");
+  e = T.err("close-pen-error");
+  assert.ok(!e.hidden && e.text.includes("does not match"), "wrong secret refused: " + e.text);
+  // opt-out restores the single-output sweep
+  T.set("close-pen-secret", revoked.peerSecret);
+  box.checked = false;
+  T.click("close-pen-build");
+  const st2 = T.state();
+  assert.equal(st2.penalty.outputs.length, 1);
+  assert.equal(st2.penalty.builderTipGrains, "0");
+  assert.ok(get("close-pen-tip-row").hidden, "tip row hidden when off");
+});
+
 test("verify: descriptor-only check passes", () => {
   T.set("verify-descriptor", JSON.stringify(T.state().chan));
   T.click("verify-desc");

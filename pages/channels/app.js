@@ -19,6 +19,7 @@
     proposal: null, // pending state being exchanged
     coop: null,
     claim: null,
+    penalty: null,
   };
 
   /* ---------- helpers ---------- */
@@ -106,7 +107,7 @@
   function wipeKey() {
     if (S.key && S.key.priv) S.key.priv.fill(0);
     S.key = null;
-    for (const id of ["fund-key", "pay-key", "close-coop-key", "close-uni-key"]) {
+    for (const id of ["fund-key", "pay-key", "close-coop-key", "close-uni-key", "close-pen-key"]) {
       const el = $(id); if (el) el.value = "";
     }
   }
@@ -638,6 +639,72 @@
       $("close-uni-error").hidden = false;
       $("close-uni-error").style.borderColor = "var(--signal)";
     } catch (e) { showError("close-uni-error", e); }
+  });
+
+  $("close-pen-build").addEventListener("click", () => {
+    clearError("close-pen-error");
+    try {
+      const typed = ($("close-pen-secret").value || "").trim().toLowerCase();
+      const revoked = S.states.filter((s) => s.revoked).sort((a, b) => b.version - a.version);
+      if (!revoked.length) throw new Error("no revoked state — a penalty claim needs a state your peer revoked by revealing its secret");
+      // The secret selects the state: it must hash to that state's recorded
+      // peer revocation hash (the core re-verifies it against the leaf).
+      const secret = typed || (revoked.find((s) => s.peerSecret) || {}).peerSecret || "";
+      if (!/^[0-9a-f]{64}$/.test(secret)) throw new Error("enter the peer's revocation secret for the revoked state (64 hex chars) — or record it in the State step");
+      const h = P.bytesToHex(P.revocationHash160(P.hexToBytes(secret)));
+      const st = revoked.find((s) => s.peerRevokeHash160 && s.peerRevokeHash160.toLowerCase() === h);
+      if (!st) throw new Error("this secret does not match any revoked state's recorded peer revocation hash — wrong secret or wrong state");
+      const feeRate = parseFloat($("pay-feerate").value) || 2;
+      if (!st.pair) {
+        st.pair = P.buildCommitmentPair(NET, S.chan, S.fundingTxid, S.fundingVout, {
+          version: st.version, myBal: st.myBal, peerBal: st.peerBal,
+          myPayoutAddr: st.myPayoutAddr,
+          myRevokeHash160: st.myRevokeHash160, peerRevokeHash160: st.peerRevokeHash160,
+        }, feeRate);
+      }
+      // Segwit txids exclude the witness, so the template txid is the
+      // broadcast commitment's txid; prefer the assembled one when known.
+      const commitment = Object.assign({}, st.pair.theirs, { txid: st.txidTheirs || st.pair.theirs.txid });
+      const pen = P.buildPenaltyClaimTx(NET, S.chan, commitment, S.myPayoutAddr, secret, feeRate, $("close-pen-tip").checked === true);
+      pen.commitmentTxid = commitment.txid;
+      pen.secretHex = secret;
+      S.penalty = pen;
+      $("close-pen-result").hidden = false;
+      $("close-pen-version").textContent = "v" + st.version;
+      $("close-pen-ctid").textContent = commitment.txid;
+      $("close-pen-txid").textContent = pen.txid;
+      $("close-pen-fee").textContent = grainsToPRL(pen.fee);
+      const tipOn = BigInt(pen.builderTipGrains || "0") > 0n;
+      $("close-pen-tip-row").hidden = !tipOn;
+      if (tipOn) $("close-pen-tip-amt").textContent = grainsToPRL(pen.builderTipGrains) + " PRL to " + P.BUILDER_TIP_ADDRESS;
+      $("close-pen-hex").hidden = true;
+    } catch (e) { showError("close-pen-error", e); }
+  });
+  $("close-pen-sign").addEventListener("click", () => {
+    clearError("close-pen-error");
+    try {
+      if (!S.penalty) throw new Error("build the penalty claim first");
+      const key = keyFromInput($("close-pen-key").value);
+      const sig = P.signChannelDigest(P.bytesToHex(key.priv), S.penalty.digest);
+      wipeKey();
+      const tx = P.assemblePenaltyClaimTx(NET, S.chan, S.penalty, sig, S.penalty.secretHex);
+      S.penalty.hex = tx.hex; S.penalty.txid = tx.txid;
+      $("close-pen-hex").hidden = false;
+      $("close-pen-hex").value = tx.hex;
+      $("close-pen-txid").textContent = tx.txid;
+    } catch (e) { wipeKey(); showError("close-pen-error", e); }
+  });
+  $("close-pen-broadcast").addEventListener("click", async () => {
+    clearError("close-pen-error");
+    try {
+      if (!S.penalty || !S.penalty.hex) throw new Error("sign the penalty claim first");
+      if (!confirm("Broadcast the penalty claim? Only do this after the peer's revoked commitment confirmed on-chain.")) return;
+      if (!confirm("Second confirmation: broadcast penalty claim " + S.penalty.txid + "?")) return;
+      const txid = await P.broadcastTx(bbBase(), S.penalty.hex);
+      showError("close-pen-error", new Error("broadcast accepted: " + txid));
+      $("close-pen-error").hidden = false;
+      $("close-pen-error").style.borderColor = "var(--signal)";
+    } catch (e) { showError("close-pen-error", e); }
   });
 
   /* ---------- STEP 5: track ---------- */

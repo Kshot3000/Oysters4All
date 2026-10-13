@@ -18,8 +18,11 @@ adapted to Pearl's `prl1` bech32m rails.
 3. **State** — propose a payment, sign both commitment copies, export/import state
    bundles with your peer, assemble both fully-signed commitments, activate the new
    state and revoke the old one (reveal secrets both ways).
-4. **Close** — cooperative close (both signatures, immediate) or unilateral close
-   (broadcast your commitment, claim after the CSV delay).
+4. **Close** — cooperative close (both signatures, immediate), unilateral close
+   (broadcast your commitment, claim after the CSV delay), or a penalty claim:
+   if your peer broadcasts a revoked state, sweep their entire to_local output
+   at once via the penalty leaf with the revocation secret they revealed —
+   no CSV wait.
 5. **Track** — GET-only Blockbook reads: funding confirmations, address activity,
    active state, claim status.
 6. **Verify** — standalone verifier: descriptor re-derivation + full signed-tx
@@ -59,6 +62,10 @@ balance minus the claim fee (computed over 2 outputs when tipped) and
 the tip. Commitment transactions and the cooperative close are 2-of-2
 spends whose outputs are the two parties' agreed balances — their
 builders take no tip parameter at all, so a tip is unbuildable there.
+A penalty claim offers the same optional tip: the penalizer is the sole
+signer sweeping the broadcaster's to_local, the secret is verified
+against the penalty leaf before anything is built, and the tip is
+computed over the penalized amount exactly as on a unilateral claim.
 
 ## Files
 
@@ -68,13 +75,13 @@ builders take no tip parameter at all, so a tip is unbuildable there.
 - `pearl-channels.bundle.js` — built from `src/` via `node build.mjs` (esbuild)
 - `src/channels-core.js` — channel cryptography: NUMS funding output, commitment
   pairs, revocation/penalty leaves, cooperative close, CSV claims, state bundles
-- `tests/channels.test.mjs` — 19 core crypto tests (run with node)
+- `tests/channels.test.mjs` — 22 core crypto tests (run with node)
 - `tests/dom.test.mjs` — headless-Chromium UI tests
 
 ## Tests
 
 ```sh
-node --test tests/channels.test.mjs        # core, 19/19
+node --test tests/channels.test.mjs        # core, 22/22
 node tests/dom.test.mjs                    # UI in headless Chromium
 node build.mjs                             # rebuild the bundle after src changes
 ```
