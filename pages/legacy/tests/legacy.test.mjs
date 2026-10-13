@@ -12,6 +12,7 @@ import {
   planLegacy, legacyDescriptor, parseDescriptor, serializeVault, parseVaultSpec,
   verifyDescriptor, describeVault, legacyScriptAsm,
   claimSpendVBytes, buildHeirClaim,
+  builderTipGrainsFor, BUILDER_TIP_BPS, BUILDER_TIP_ADDRESS, BUILDER_TIP_NAME,
   buildOwnerRefresh, buildMultiScriptPathSpend, multiScriptPathVBytes,
   vaultUtxoStatus,
   parseTx, parseXOnlyKey, addressToProgram,
@@ -363,6 +364,88 @@ test("heir claim: dust refusal", () => {
     heirPrivHex: K[1].priv, destAddress: dest.address,
     feeRateGrainsPerVByte: 5, fundingHeight: 120000, currentHeight: 120445,
   }), /below dust/);
+});
+
+/* ---------------- builder tip (optional, disclosed, heir-claim-only) ---------------- */
+
+test("builder tip: exactness and waivers", () => {
+  assert.equal(BUILDER_TIP_BPS, 100);
+  assert.equal(BUILDER_TIP_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
+  assert.equal(BUILDER_TIP_NAME, "Builder tip (optional)");
+  assert.equal(builderTipGrainsFor(100_000_000, net, true), 1_000_000, "1% of 1 PRL");
+  assert.equal(builderTipGrainsFor(100_000_000, net, false), 0, "off unless enabled === true");
+  assert.equal(builderTipGrainsFor(100_000_000, net, 1), 0, "truthy is not true");
+  assert.equal(builderTipGrainsFor(100_000_000, NETWORKS.testnet, true), 0, "mainnet only");
+  assert.equal(builderTipGrainsFor(54599, net, true), 0, "545-grain tip waived");
+  assert.equal(builderTipGrainsFor(54600, net, true), 546, "546-grain tip charged exactly");
+  assert.equal(builderTipGrainsFor(1000, net, true), 0, "10-grain tip waived");
+});
+
+test("builder tip: tipped heir claim carries the tip exact on the wire; untipped identical to before", () => {
+  const vault = makeVault(); // n = 445
+  const dest = walletFromMnemonic(
+    "legal winner thank year wave sausage worth useful legal winner thank yellow", net);
+  const utxo = { txid: "ab".repeat(32), vout: 0, value: 3_000_000_000 }; // 30 PRL
+  const base = {
+    utxo, heirPrivHex: K[1].priv, destAddress: dest.address,
+    feeRateGrainsPerVByte: 2, fundingHeight: 120000, currentHeight: 120445,
+  };
+  const plain = buildHeirClaim(net, vault, base);
+  assert.equal(plain.builderTip, 0);
+  const plainOuts = parseTx(plain.hex).outputs;
+  assert.equal(plainOuts.length, 1);
+  assert.equal(plainOuts[0].value + plain.feeGrains, 3_000_000_000, "untipped conservation");
+  assert.equal(plain.feeGrains, Math.ceil(claimSpendVBytes(vault) * 2), "untipped fee pinned to 1 output");
+  const tipped = buildHeirClaim(net, vault, { ...base, builderTipEnabled: true });
+  assert.equal(tipped.builderTip, 30_000_000);
+  const outs = parseTx(tipped.hex).outputs;
+  assert.equal(outs.length, 2);
+  assert.equal(outs[1].value, 30_000_000, "tip is output 1 at exactly 1% of the claim");
+  assert.equal(bytesToHex(outs[1].spk), "5120" + bytesToHex(addressToProgram(BUILDER_TIP_ADDRESS, net)));
+  assert.equal(outs[0].value + outs[1].value + tipped.feeGrains, 3_000_000_000, "tipped conservation");
+  assert.equal(tipped.feeGrains, Math.ceil(claimSpendVBytes(vault, 2) * 2), "fee computed over 2 outputs");
+  assert.notEqual(tipped.txid, plain.txid, "the sighash commits to the tip output");
+  // CSV structure survives the tip: nSequence == n, flags clear
+  const parsed = parseTx(tipped.hex);
+  assert.equal(parsed.inputs[0].sequence, 445);
+  assert.equal(parsed.inputs[0].sequence & 0x80000000, 0);
+  // destination == builder address refuses while tipped (tip would duplicate the claim output)
+  assert.throws(() => buildHeirClaim(net, vault, {
+    ...base, destAddress: BUILDER_TIP_ADDRESS, builderTipEnabled: true,
+  }), /builder tip would duplicate/);
+  // a tip that would leave the heir below dust refuses naming the tip
+  assert.throws(() => buildHeirClaim(net, vault, {
+    ...base, utxo: { txid: "ab".repeat(32), vout: 0, value: 100_000 },
+    feeRateGrainsPerVByte: 600, builderTipEnabled: true,
+  }), /builder tip/);
+});
+
+test("builder tip: owner refresh never carries one; testnet claims waive it", () => {
+  const vault = makeVault();
+  const spkHex = vault.spkHex;
+  const r = buildOwnerRefresh(net, vault, {
+    utxos: [{ txid: "ab".repeat(32), vout: 0, value: 3_000_000_000, spkHex }],
+    ownerPrivHex: K[0].priv, feeRateGrainsPerVByte: 5,
+  });
+  const outs = parseTx(r.hex).outputs;
+  assert.equal(outs.length, 1, "refresh stays single-output — its output must pay the vault itself");
+  assert.equal(bytesToHex(outs[0].spk), spkHex);
+  // testnet: the tip is waived even when enabled (mainnet-only by construction)
+  const tnet = NETWORKS.testnet;
+  const { vault: tvault } = planLegacy({
+    network: tnet, ownerKeyInput: K[0].xonly, ownerKeyMode: "watch",
+    heirKeyInput: K[1].xonly, n: 445,
+  });
+  const dest = walletFromMnemonic(
+    "legal winner thank year wave sausage worth useful legal winner thank yellow", tnet);
+  const claim = buildHeirClaim(tnet, tvault, {
+    utxo: { txid: "ab".repeat(32), vout: 0, value: GRAIN_PER_PRL },
+    heirPrivHex: K[1].priv, destAddress: dest.address,
+    feeRateGrainsPerVByte: 5, fundingHeight: 120000, currentHeight: 120445,
+    builderTipEnabled: true,
+  });
+  assert.equal(claim.builderTip, 0);
+  assert.equal(parseTx(claim.hex).outputs.length, 1);
 });
 
 test("owner refresh: same address, fresh clock, multi-input, exact fee", () => {

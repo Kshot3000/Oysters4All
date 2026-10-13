@@ -238,6 +238,35 @@ test("flow: watch -> heir claim (mature, exact fee, verified sig)", () => {
   assert.ok(getEl("c-fee-out").textContent.includes("grains @"), "fee + vbytes shown");
 });
 
+test("builder tip: claim checkbox is opt-in, disclosed, and the tip lands exact on the wire", () => {
+  const vault = sandbox.__vault;
+  assert.ok(!getEl("c-builder-tip").checked, "builder tip checkbox unchecked by default");
+  assert.ok(html.includes("Builder tip (optional)"), "disclosure heading in the claim form");
+  assert.ok(html.includes("owner refreshes never carry a tip"), "refresh exclusion disclosed");
+  assert.ok(html.includes("The heir receives the claim minus the fee and the tip"), "heir-pays disclosure in page");
+  // opt in through the real UI and rebuild the mature claim
+  setVal("c-heir-input", HEIR_PRIV);
+  setVal("c-dest", HEIR_ADDR);
+  setVal("c-cheight", "120600");
+  getEl("c-builder-tip").checked = true;
+  click("c-build");
+  assert.equal(getEl("c-error").hidden, true, "no tipped claim error: " + getEl("c-error").textContent);
+  const tipped = E.parseTx(getEl("c-hex").value);
+  assert.equal(tipped.outputs.length, 2, "tipped claim has exactly 2 outputs");
+  assert.equal(tipped.outputs[1].value, 1_000_000, "tip is output 1 at exactly 1% of the 1 PRL claim");
+  assert.equal(E.bytesToHex(tipped.outputs[1].spk),
+    "5120" + E.bytesToHex(E.addressToProgram(E.BUILDER_TIP_ADDRESS, net)), "tip pays the builder program");
+  assert.ok(getEl("c-tip-out").textContent.includes("1000000 grains"), "tip shown in the signed panel");
+  // opt back out: the single-output claim is restored
+  setVal("c-heir-input", HEIR_PRIV);
+  getEl("c-builder-tip").checked = false;
+  click("c-build");
+  assert.equal(getEl("c-error").hidden, true, "no untipped claim error: " + getEl("c-error").textContent);
+  assert.equal(E.parseTx(getEl("c-hex").value).outputs.length, 1, "opt-out restores the single-output claim");
+  assert.equal(getEl("c-tip-out").textContent, "none", "signed panel shows no tip");
+  assert.equal(vault.n, 445);
+});
+
 test("flow: owner refresh (same address, fresh UTXO, multi-input)", () => {
   const vault = sandbox.__vault;
   setRadio("c-mode", "refresh"); // the UI's claimMode() reads this on change

@@ -112,6 +112,20 @@ contrast, is self-checking: loading re-derives every field from the spec's
 own keys + n and byte-compares, so a modified spec cannot pass as the
 original.
 
+## Builder tip (optional, disclosed)
+
+The heir claim offers an **optional 1% builder tip**: only when the heir
+checks the box in the Claim step, `buildHeirClaim` adds the tip as its own
+second output — paid to `prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d` —
+*before* signing, so the script-path sighash commits to it and it cannot be
+added or skimmed afterwards. The heir receives the claim minus the fee and
+the tip; the fee is computed over both outputs. The tip is mainnet-only,
+waived (never rounded up) when 1% falls below the 546-grain dust floor,
+and refused when the claim destination is the builder address itself.
+Owner refreshes never carry a tip: `buildOwnerRefresh` takes no tip
+parameter and its single output must pay the vault's own address, so a
+tip output is unbuildable there, not just unoffered.
+
 ## Risks, stated plainly
 
 - **Broadcast risk.** A signed transaction is final once broadcast. The page
@@ -144,8 +158,8 @@ covenant-style contract on top of it.
 ## Tests
 
 ```sh
-node --no-warnings --loader ./tests/loader.mjs --test tests/legacy.test.mjs   # 18/18
-node --no-warnings --loader ./tests/loader.mjs --test tests/dom.test.mjs       # 6/6
+node --no-warnings --loader ./tests/loader.mjs --test tests/legacy.test.mjs   # 21/21
+node --no-warnings --loader ./tests/loader.mjs --test tests/dom.test.mjs       # 7/7
 node ../../../../hidden_files/qa-legacy-browser.mjs                            # real-browser QA (hidden_files, not committed) — 47/47 checks green (2026-10-02)
 ```
 

@@ -357,6 +357,9 @@
     S.lastBuild = build;
     $("c-txid-out").textContent = build.txid;
     $("c-fee-out").textContent = `${fmtPRL(build.feeGrains)} (${build.feeGrains} grains @ ${build.vBytes} vbytes)`;
+    $("c-tip-out").textContent = build.builderTip > 0
+      ? `${fmtPRL(build.builderTip)} (${build.builderTip} grains to the builder)`
+      : "none";
     $("c-vsize-out").textContent = `${build.vBytes} vbytes`;
     $("c-hex").value = build.hex;
     $("c-result").hidden = false;
@@ -385,6 +388,7 @@
         fundingHeight: Number($("c-fheight").value),
         currentHeight: Number($("c-cheight").value),
         feeRateGrainsPerVByte: Number($("c-fee").value),
+        builderTipEnabled: $("c-builder-tip").checked === true,
       });
       showResult({ kind: "claim", ...build });
       $("c-heir-input").value = ""; // wipe secret

@@ -242,6 +242,9 @@
           <label for="c-fee">Fee rate (grains/vbyte)</label>
           <input type="number" id="c-fee" value="5" min="1" step="1">
         </div>
+        <div class="field">
+          <label><input type="checkbox" id="c-builder-tip"> <b>Builder tip (optional):</b> add a 1% tip for the builder, paid to <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code> as its own output of this claim. The heir receives the claim minus the fee and the tip. Off by default; owner refreshes never carry a tip.</label>
+        </div>
         <button class="btn" id="c-build">Build heir claim</button>
       </div>
 
@@ -275,6 +278,7 @@
         <div class="kv">
           <dt>txid</dt><dd><code id="c-txid-out"></code></dd>
           <dt>fee</dt><dd id="c-fee-out"></dd>
+          <dt>builder tip</dt><dd id="c-tip-out">none</dd>
           <dt>vsize</dt><dd id="c-vsize-out"></dd>
         </div>
         <textarea aria-label="Signed transaction hex" id="c-hex" readonly></textarea>
@@ -318,6 +322,7 @@
       <li>Blockbook is read-only and never trusted blindly — every UTXO script is re-checked against the vault contract.</li>
       <li>The descriptor is <b>not signed</b> — anyone can mint a valid-looking one for a different vault. Verify it against the address it was published with.</li>
       <li>Heartbeat refreshes pay the <b>same</b> vault address — a different address means different keys or a different <i>n</i>.</li>
+      <li>The <b>builder tip is optional and heir-claim-only</b>: 1% of the claimed UTXO, only when the heir checks the box, paid as its own output to the builder address printed next to the checkbox. Refreshes never carry one — a refresh output must pay the vault itself.</li>
       <li>This page never moves PRL by itself: every broadcast needs your explicit double confirmation.</li>
       <li>Lose both keys and the funds are unspendable. The heir needs the descriptor <i>and</i> their key.</li>
     </ul>
@@ -331,7 +336,7 @@
 </footer>
 
 <script src="qrcode.min.js?v=1"></script>
-<script src="pearl-legacy.bundle.js?v=4"></script>
-<script src="app.js?v=1"></script>
+<script src="pearl-legacy.bundle.js?v=5"></script>
+<script src="app.js?v=2"></script>
 </body>
 </html>
