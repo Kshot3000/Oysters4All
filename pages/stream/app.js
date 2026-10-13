@@ -440,13 +440,15 @@
         scriptLens: inputs.map((x) => { const { leaf } = E.tickLeafFor(x.tick, "claim"); return leaf.length; }),
         controlLens: inputs.map((x) => x.tick.claimControlBlock.length),
         feeRateGrainsPerVByte: feeRate,
+        network: S.network, builderTipEnabled: $("claim-builder-tip").checked === true,
       });
-      S.claimPlan = { cur, idxs, inputs, signerPriv: signer.priv, destProgram, feeRate, sweep };
+      S.claimPlan = { cur, idxs, inputs, signerPriv: signer.priv, destProgram, feeRate, sweep, builderTipEnabled: $("claim-builder-tip").checked === true };
       const locks = idxs.map((i) => cur.ticks[i].lock);
       reviewDl($("claim-review-dl"), [
         ["Inputs", `${inputs.length} tick${inputs.length > 1 ? "s" : ""} (#${idxs.map((i) => i + 1).join(", #")})`],
         ["Total in", `${grainsToPRL(sweep.inputSum)} PRL`],
         ["Payout", `${grainsToPRL(sweep.payment)} PRL → ${$("claim-dest").value.slice(0, 24)}…`],
+        ...(sweep.builderTip > 0 ? [["Builder tip (optional, 1%)", `${grainsToPRL(sweep.builderTip)} PRL`], ["Builder tip to", E.BUILDER_TIP_ADDRESS]] : []),
         ["Fee", `${sweep.fee} grains (${sweep.vBytes} vB @ ${feeRate} grains/vB)`],
         ["nLockTime", `${Math.max(...locks)} (${fmtDate(Math.max(...locks))})`],
         ["Sequence", "0xfffffffe on every input (non-final, CLTV satisfied)"],
@@ -466,11 +468,13 @@
         network: S.network, inputs: p.inputs, role: "claim",
         signerPriv: p.signerPriv, destinationProgram: p.destProgram,
         feeRateGrainsPerVByte: p.feeRate,
+        builderTipEnabled: p.builderTipEnabled === true,
       });
       S.claimPlan.signed = signed;
       reviewDl($("claim-signed-dl"), [
         ["TXID", signed.txid],
         ["Inputs swept", String(signed.inputCount)],
+        ...(signed.builderTip > 0 ? [["Builder tip", `${grainsToPRL(signed.builderTip)} PRL → ${E.BUILDER_TIP_ADDRESS}`]] : []),
         ["Fee paid", `${signed.fee} grains`],
         ["Size", `${signed.vBytes} vB`],
         ["Signatures", `${signed.inputCount} verified locally against each tick's leaf key before hex was produced`],

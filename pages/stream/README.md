@@ -33,6 +33,23 @@ unmatured ticks in one transaction.
    `nLockTime` = the last selected tick's unlock, so it confirms only once that time
    passes — it pre-empts future claims, it does not claw back PRL today.
 
+## Builder tip (optional, disclosed)
+
+The Claim step offers an **optional builder tip** — off by default, never automatic.
+When the beneficiary checks the box, `builderTipGrainsFor(total, network, enabled)`
+(the single source: floor of 1% computed in BigInt, **mainnet only**, waived when 1%
+would fall below the 546-grain dust floor instead of rounded up) is added as its own
+second output in the batch claim **before signing**, paid to the operator address
+published in every Stream footer (`prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`).
+The fee is computed over both outputs (`batchClaimVBytes` with `nOut: 2`), the plan
+shows the tip as its own line before signing, and the script-path sighash commits to
+every output — the tip cannot be added or skimmed after signing (the test suite
+proves the tip-less digests differ). With the box off (the default) the plan is
+identical to the pre-tip planner. The tip is offered on the beneficiary **claim**
+flow only: cancel (clawback) never carries it — the core refuses the flag on the
+clawback role outright — because the funder reclaiming their own unmatured ticks
+is a different consent shape.
+
 ## Crypto notes
 
 - Reuses the audited `pages/vesting` per-tick forge, beneficiary key handling, and
@@ -55,8 +72,8 @@ unmatured ticks in one transaction.
 
 ## Tests
 
-- `node --no-warnings --loader ./tests/loader.mjs tests/stream.test.mjs` — 14 core tests
-- `node --no-warnings --loader ./tests/loader.mjs tests/dom.test.mjs` — 9 DOM tests
+- `node --no-warnings --loader ./tests/loader.mjs tests/stream.test.mjs` — 18 core tests
+- `node --no-warnings --loader ./tests/loader.mjs tests/dom.test.mjs` — 12 DOM tests
   (real `index.html` + committed bundle + `app.js` against a minimal DOM shim, hostile localStorage)
 - Real-browser QA (headless Chromium, file:// + CDP) — 18/18 checks green,
   zero console/page errors, plus a 375px mobile tab-sweep

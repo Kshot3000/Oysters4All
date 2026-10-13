@@ -21,6 +21,9 @@ var PearlStream = (() => {
   // src/index.js
   var index_exports = {};
   __export(index_exports, {
+    BUILDER_TIP_ADDRESS: () => BUILDER_TIP_ADDRESS,
+    BUILDER_TIP_BPS: () => BUILDER_TIP_BPS,
+    BUILDER_TIP_NAME: () => BUILDER_TIP_NAME,
     DESCRIPTOR_PREFIX: () => DESCRIPTOR_PREFIX,
     DUST_GRAIN: () => DUST_GRAIN,
     GRAIN_PER_PRL: () => GRAIN_PER_PRL,
@@ -34,6 +37,7 @@ var PearlStream = (() => {
     broadcastTx: () => broadcastTx,
     buildBatchClaimTx: () => buildBatchClaimTx,
     buildBatchScriptPathSpend: () => buildBatchScriptPathSpend,
+    builderTipGrainsFor: () => builderTipGrainsFor,
     bytesToHex: () => bytesToHex,
     committedLeafKey: () => committedLeafKey,
     convertBits: () => convertBits,
@@ -6324,9 +6328,10 @@ zoo`.split("\n");
     ]);
     return taggedHash2("TapSighash", msg);
   }
-  function batchClaimVBytes({ nIn, scriptLens, controlLens }) {
+  function batchClaimVBytes({ nIn, scriptLens, controlLens, nOut = 1 }) {
     const varintLen = (n) => n < 253 ? 1 : n <= 65535 ? 3 : n <= 4294967295 ? 5 : 9;
     if (!Number.isInteger(nIn) || nIn < 1) throw new Error("bad nIn");
+    if (!Number.isInteger(nOut) || nOut < 1) throw new Error("bad nOut");
     if (!Array.isArray(scriptLens) || scriptLens.length !== nIn) throw new Error("scriptLens must have one entry per input");
     if (!Array.isArray(controlLens) || controlLens.length !== nIn) throw new Error("controlLens must have one entry per input");
     let wit = 0;
@@ -6336,10 +6341,20 @@ zoo`.split("\n");
       if (!Number.isSafeInteger(cl) || cl <= 0) throw new Error(`input ${i}: bad control length`);
       wit += varintLen(3) + varintLen(64) + 64 + varintLen(sl) + sl + varintLen(cl) + cl;
     }
-    const base = 4 + varintLen(nIn) + nIn * 41 + varintLen(1) + 43 + 4;
+    const base = 4 + varintLen(nIn) + nIn * 41 + varintLen(nOut) + 43 * nOut + 4;
     return Math.ceil((base * 3 + (base + 2 + wit)) / 4);
   }
-  function planBatchClaim({ inputs, scriptLens, controlLens, feeRateGrainsPerVByte }) {
+  var BUILDER_TIP_BPS = 100;
+  var BUILDER_TIP_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+  var BUILDER_TIP_NAME = "Builder tip (optional)";
+  function builderTipGrainsFor(totalGrains, network, enabled) {
+    if (enabled !== true) return 0;
+    if (!network || network.hrp !== "prl") return 0;
+    if (!Number.isSafeInteger(totalGrains) || totalGrains <= 0) throw new Error("bad total for builder tip");
+    const tip = Number(BigInt(totalGrains) * BigInt(BUILDER_TIP_BPS) / 10000n);
+    return tip >= DUST_GRAIN ? tip : 0;
+  }
+  function planBatchClaim({ inputs, scriptLens, controlLens, feeRateGrainsPerVByte, network = NETWORKS.mainnet, builderTipEnabled = false }) {
     if (!Array.isArray(inputs) || inputs.length === 0) throw new Error("inputs required");
     if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) throw new Error("bad fee rate");
     let sum = 0;
@@ -6353,13 +6368,18 @@ zoo`.split("\n");
       }
       sum += x.value;
     });
-    const vBytes = batchClaimVBytes({ nIn: inputs.length, scriptLens, controlLens });
+    const builderTip = builderTipGrainsFor(sum, network, builderTipEnabled === true);
+    const builderTipProgram = builderTip > 0 ? addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet) : null;
+    const vBytes = batchClaimVBytes({ nIn: inputs.length, scriptLens, controlLens, nOut: builderTip > 0 ? 2 : 1 });
     const fee = Math.ceil(vBytes * feeRateGrainsPerVByte);
-    const payment = sum - fee;
+    const payment = sum - fee - builderTip;
     if (payment < DUST_GRAIN) {
+      if (builderTip > 0) {
+        throw new Error(`insufficient funds: ${sum} grains covers the ${fee}-grain fee and the ${builderTip}-grain builder tip but leaves < dust (${DUST_GRAIN}); top the ticks up or leave the builder tip off`);
+      }
       throw new Error(`insufficient funds: ${sum} grains covers the ${fee}-grain fee but leaves < dust (${DUST_GRAIN}); top the ticks up`);
     }
-    return { payment, fee, vBytes, inputSum: sum };
+    return { payment, fee, vBytes, inputSum: sum, builderTip, builderTipProgram };
   }
   function signerXOnly(signerPriv) {
     const p = signerPriv instanceof Uint8Array ? signerPriv : hexToBytes(String(signerPriv));
@@ -6416,8 +6436,11 @@ zoo`.split("\n");
     const vBytes = Math.ceil((baseBytes * 3 + totalBytes) / 4);
     return { txid, hex: bytesToHex(Uint8Array.from(full)), vBytes, baseBytes, totalBytes, digests: digests.map(bytesToHex) };
   }
-  function buildBatchClaimTx({ network, inputs, role = "claim", signerPriv, destinationProgram, feeRateGrainsPerVByte }) {
+  function buildBatchClaimTx({ network, inputs, role = "claim", signerPriv, destinationProgram, feeRateGrainsPerVByte, builderTipEnabled = false }) {
     if (!network || !network.hrp) throw new Error("network required");
+    if (builderTipEnabled === true && role !== "claim") {
+      throw new Error("the builder tip is only offered on beneficiary claims \u2014 clawback never carries a tip");
+    }
     if (!Array.isArray(inputs) || inputs.length === 0) throw new Error("inputs required");
     if (inputs.length > MAX_TICKS) throw new Error(`at most ${MAX_TICKS} inputs per sweep`);
     if (!(destinationProgram instanceof Uint8Array) || destinationProgram.length !== 32) {
@@ -6445,9 +6468,18 @@ zoo`.split("\n");
       inputs: specs,
       scriptLens: leaves.map((l) => l.length),
       controlLens: controls.map((c) => c.length),
-      feeRateGrainsPerVByte
+      feeRateGrainsPerVByte,
+      network,
+      builderTipEnabled: builderTipEnabled === true
     });
     const outputs = [{ program: destinationProgram, value: plan.payment }];
+    if (plan.builderTip > 0) {
+      const want = addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet);
+      if (!plan.builderTipProgram || !constEq(plan.builderTipProgram, want)) {
+        throw new Error("builder tip in the plan does not pay the builder address \u2014 refusing to sign");
+      }
+      outputs.push({ program: want, value: plan.builderTip });
+    }
     const digests = specs.map((_, i) => batchScriptPathSigDigest(network, specs, outputs, leaves[i], { sequence: MAX_SEQ_NONFINAL, locktime, inputIdx: i }));
     const sigs = digests.map((dg, i) => {
       const sig = signForXOnly(signerPriv, dg);
@@ -6470,6 +6502,8 @@ zoo`.split("\n");
       fee: plan.fee,
       vBytes: spend.vBytes,
       payment: plan.payment,
+      builderTip: plan.builderTip,
+      builderTipProgram: plan.builderTipProgram,
       inputSum: plan.inputSum,
       inputCount: inputs.length,
       sigsHex: sigs.map(bytesToHex),

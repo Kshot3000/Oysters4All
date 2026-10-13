@@ -343,12 +343,14 @@ export function batchScriptPathSigDigest(network, inputs, outputs, leafScript, o
   return taggedHash("TapSighash", msg);
 }
 
-/** Exact vBytes for an n-input script-path sweep with one P2TR output.
+/** Exact vBytes for an n-input script-path sweep with nOut P2TR outputs
+ *  (default 1; 2 when the optional builder tip is enabled on a claim).
  *  Each input contributes a witness of [64-byte sig, leaf script, control
- *  block]; base = version + counts + n*41 + output + locktime. */
-export function batchClaimVBytes({ nIn, scriptLens, controlLens }) {
+ *  block]; base = version + counts + n*41 + outputs + locktime. */
+export function batchClaimVBytes({ nIn, scriptLens, controlLens, nOut = 1 }) {
   const varintLen = (n) => (n < 0xfd ? 1 : n <= 0xffff ? 3 : n <= 0xffffffff ? 5 : 9);
   if (!Number.isInteger(nIn) || nIn < 1) throw new Error("bad nIn");
+  if (!Number.isInteger(nOut) || nOut < 1) throw new Error("bad nOut");
   if (!Array.isArray(scriptLens) || scriptLens.length !== nIn) throw new Error("scriptLens must have one entry per input");
   if (!Array.isArray(controlLens) || controlLens.length !== nIn) throw new Error("controlLens must have one entry per input");
   let wit = 0;
@@ -358,13 +360,44 @@ export function batchClaimVBytes({ nIn, scriptLens, controlLens }) {
     if (!Number.isSafeInteger(cl) || cl <= 0) throw new Error(`input ${i}: bad control length`);
     wit += varintLen(3) + varintLen(64) + 64 + varintLen(sl) + sl + varintLen(cl) + cl;
   }
-  const base = 4 + varintLen(nIn) + nIn * 41 + varintLen(1) + 43 + 4;
+  const base = 4 + varintLen(nIn) + nIn * 41 + varintLen(nOut) + 43 * nOut + 4;
   return Math.ceil((base * 3 + (base + 2 + wit)) / 4);
 }
 
-/** Exact sweep plan for a batch claim: everything in, one output, fee from
- *  the real multi-input witness size. Throws when the payment would be dust. */
-export function planBatchClaim({ inputs, scriptLens, controlLens, feeRateGrainsPerVByte }) {
+/* Optional builder tip (profit mandate, disclosed, opt-in/default-off):
+ * a batch claim spends matured ticks through the beneficiary's own claim
+ * leaves, signed by the beneficiary alone, so — like Vesting/Gift/Sweep —
+ * the tip is never automatic: the claimant explicitly opts in.
+ * builderTipGrainsFor() is the single source; planBatchClaim() adds the
+ * tip as its own second output BEFORE signing, and the script-path
+ * sighash commits to every output — so it cannot be added or skimmed
+ * after signing. Off = plan identical to the pre-tip planner. Offered on
+ * the beneficiary CLAIM flow only: clawback (the funder reclaiming their
+ * own unmatured ticks) never carries it — buildBatchClaimTx refuses the
+ * flag on the clawback role outright, since this builder knows its role.
+ * The recipient is the operator address published in every Stream
+ * footer. */
+export const BUILDER_TIP_BPS = 100; // 1%
+export const BUILDER_TIP_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+export const BUILDER_TIP_NAME = "Builder tip (optional)";
+
+/** Builder tip in grains for a batch claim totaling totalGrains.
+ *  Returns 0 unless enabled === true, the network is mainnet, and the
+ *  1% floor reaches the dust floor (waived, never rounded up). Computed
+ *  in BigInt so large claims stay exact. */
+export function builderTipGrainsFor(totalGrains, network, enabled) {
+  if (enabled !== true) return 0;
+  if (!network || network.hrp !== "prl") return 0;
+  if (!Number.isSafeInteger(totalGrains) || totalGrains <= 0) throw new Error("bad total for builder tip");
+  const tip = Number((BigInt(totalGrains) * BigInt(BUILDER_TIP_BPS)) / 10000n);
+  return tip >= DUST_GRAIN ? tip : 0;
+}
+
+/** Exact sweep plan for a batch claim: everything in, one output (plus the
+ *  optional builder-tip output when builderTipEnabled is set — the fee is
+ *  then computed over 2 outputs), fee from the real multi-input witness
+ *  size. Throws when the payment would be dust. */
+export function planBatchClaim({ inputs, scriptLens, controlLens, feeRateGrainsPerVByte, network = NETWORKS.mainnet, builderTipEnabled = false }) {
   if (!Array.isArray(inputs) || inputs.length === 0) throw new Error("inputs required");
   if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) throw new Error("bad fee rate");
   let sum = 0;
@@ -383,13 +416,18 @@ export function planBatchClaim({ inputs, scriptLens, controlLens, feeRateGrainsP
     }
     sum += x.value;
   });
-  const vBytes = batchClaimVBytes({ nIn: inputs.length, scriptLens, controlLens });
+  const builderTip = builderTipGrainsFor(sum, network, builderTipEnabled === true);
+  const builderTipProgram = builderTip > 0 ? addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet) : null;
+  const vBytes = batchClaimVBytes({ nIn: inputs.length, scriptLens, controlLens, nOut: builderTip > 0 ? 2 : 1 });
   const fee = Math.ceil(vBytes * feeRateGrainsPerVByte);
-  const payment = sum - fee;
+  const payment = sum - fee - builderTip;
   if (payment < DUST_GRAIN) {
+    if (builderTip > 0) {
+      throw new Error(`insufficient funds: ${sum} grains covers the ${fee}-grain fee and the ${builderTip}-grain builder tip but leaves < dust (${DUST_GRAIN}); top the ticks up or leave the builder tip off`);
+    }
     throw new Error(`insufficient funds: ${sum} grains covers the ${fee}-grain fee but leaves < dust (${DUST_GRAIN}); top the ticks up`);
   }
-  return { payment, fee, vBytes, inputSum: sum };
+  return { payment, fee, vBytes, inputSum: sum, builderTip, builderTipProgram };
 }
 
 function signerXOnly(signerPriv) {
@@ -454,15 +492,20 @@ export function buildBatchScriptPathSpend(network, inputSpecs, outputs, leaves, 
 }
 
 /** Build, sign and locally re-verify a batch-claim (or cancel/clawback)
- *  sweep: n funded tick UTXOs in, ONE sweep output to `destinationProgram`.
+ *  sweep: n funded tick UTXOs in, ONE sweep output to `destinationProgram`
+ *  (plus the optional builder-tip output on claims when
+ *  builderTipEnabled is set; clawback refuses that flag).
  *  role 'claim' spends each input's claim leaf with the beneficiary key;
  *  role 'clawback' spends each input's clawback leaf with the funder key
  *  (cancel). nLockTime = max(lock of inputs), every input sequence =
  *  0xfffffffe. The returned hex is only produced after EVERY signature is
  *  re-verified against its input's digest and the signer matches the key
  *  committed in every leaf. */
-export function buildBatchClaimTx({ network, inputs, role = "claim", signerPriv, destinationProgram, feeRateGrainsPerVByte }) {
+export function buildBatchClaimTx({ network, inputs, role = "claim", signerPriv, destinationProgram, feeRateGrainsPerVByte, builderTipEnabled = false }) {
   if (!network || !network.hrp) throw new Error("network required");
+  if (builderTipEnabled === true && role !== "claim") {
+    throw new Error("the builder tip is only offered on beneficiary claims — clawback never carries a tip");
+  }
   if (!Array.isArray(inputs) || inputs.length === 0) throw new Error("inputs required");
   if (inputs.length > MAX_TICKS) throw new Error(`at most ${MAX_TICKS} inputs per sweep`);
   if (!(destinationProgram instanceof Uint8Array) || destinationProgram.length !== 32) {
@@ -492,8 +535,20 @@ export function buildBatchClaimTx({ network, inputs, role = "claim", signerPriv,
     scriptLens: leaves.map((l) => l.length),
     controlLens: controls.map((c) => c.length),
     feeRateGrainsPerVByte,
+    network,
+    builderTipEnabled: builderTipEnabled === true,
   });
   const outputs = [{ program: destinationProgram, value: plan.payment }];
+  if (plan.builderTip > 0) {
+    // The tip program is derived here from the builder address constant,
+    // never taken from caller data — and asserted against the plan before
+    // it joins the outputs the sighash commits to.
+    const want = addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet);
+    if (!plan.builderTipProgram || !constEq(plan.builderTipProgram, want)) {
+      throw new Error("builder tip in the plan does not pay the builder address — refusing to sign");
+    }
+    outputs.push({ program: want, value: plan.builderTip });
+  }
   const digests = specs.map((_, i) =>
     batchScriptPathSigDigest(network, specs, outputs, leaves[i], { sequence: MAX_SEQ_NONFINAL, locktime, inputIdx: i }));
   const sigs = digests.map((dg, i) => {
@@ -514,6 +569,7 @@ export function buildBatchClaimTx({ network, inputs, role = "claim", signerPriv,
   return {
     txid: spend.txid, hex: spend.hex,
     fee: plan.fee, vBytes: spend.vBytes, payment: plan.payment,
+    builderTip: plan.builderTip, builderTipProgram: plan.builderTipProgram,
     inputSum: plan.inputSum, inputCount: inputs.length,
     sigsHex: sigs.map(bytesToHex), digestsHex: spend.digests,
     locktime, sequence: MAX_SEQ_NONFINAL, role,

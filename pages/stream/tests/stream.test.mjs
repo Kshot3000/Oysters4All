@@ -10,6 +10,7 @@ import {
   scheduleFromDescriptor, streamState,
   batchScriptPathSigDigest, batchClaimVBytes, planBatchClaim,
   buildBatchClaimTx, buildBatchScriptPathSpend, committedLeafKey, tickLeafFor,
+  builderTipGrainsFor, BUILDER_TIP_ADDRESS, BUILDER_TIP_BPS,
   beneficiaryKeyFromInput, beneficiarySignerFor, isMature,
   parsePRLToGrains,
   partyKeyFromInput, parseXOnlyKey, scriptAsm, addressToProgram,
@@ -432,6 +433,103 @@ test("beneficiaryKeyFromInput reuse: x-only, address, mnemonic", () => {
   assert.throws(() => parseXOnlyKey("00".repeat(31)), /64 hex/);
   const prog = addressToProgram(w.address, net);
   assert.equal(prog.length, 32);
+});
+
+test("builderTipGrainsFor: exact 1%, mainnet only, opt-in only, sub-dust waived", () => {
+  assert.equal(BUILDER_TIP_BPS, 100);
+  assert.equal(BUILDER_TIP_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
+  assert.equal(builderTipGrainsFor(180_000_000, net, true), 1_800_000);
+  assert.equal(builderTipGrainsFor(180_000_001, net, true), 1_800_000); // floor, never rounds up
+  assert.equal(builderTipGrainsFor(180_000_000, net, false), 0);
+  assert.equal(builderTipGrainsFor(180_000_000, net, undefined), 0);
+  assert.equal(builderTipGrainsFor(180_000_000, NETWORKS.testnet, true), 0);
+  assert.equal(builderTipGrainsFor(54_599, net, true), 0); // 1% = 545 grains < dust -> waived
+  assert.equal(builderTipGrainsFor(54_600, net, true), 546); // exactly at dust -> kept
+});
+
+function parseWireOutputs(hex, nIn) {
+  const raw = hexToBytes(hex);
+  let off = 4 + 2 + 1 + nIn * 41; // version, marker+flag, count, inputs
+  const nOut = raw[off++];
+  const outs = [];
+  for (let i = 0; i < nOut; i++) {
+    let v = 0n; for (let b = 7; b >= 0; b--) v = (v << 8n) | BigInt(raw[off + b]);
+    off += 8;
+    const sl = raw[off++];
+    outs.push({ value: Number(v), script: raw.slice(off, off + sl) });
+    off += sl;
+  }
+  return outs;
+}
+
+test("builder tip on batch claim: tipped plan, signed 2-output wire, sighash commits to the tip", () => {
+  const { ticks } = planTestStream({ tickCount: 3 });
+  const inputs = syntheticInputs(ticks, [50_000_000, 60_000_000, 70_000_000]);
+  const dest = hexToBytes(B.xonly);
+  const scriptLens = ticks.map((t) => t.claimScript.length);
+  const controlLens = ticks.map((t) => t.claimControlBlock.length);
+  const plan = planBatchClaim({
+    inputs, scriptLens, controlLens, feeRateGrainsPerVByte: 10,
+    network: net, builderTipEnabled: true,
+  });
+  assert.equal(plan.builderTip, 1_800_000);
+  assert.equal(plan.payment + plan.fee + plan.builderTip, 180_000_000);
+  assert.equal(plan.vBytes, batchClaimVBytes({ nIn: 3, scriptLens, controlLens, nOut: 2 }));
+  const off = planBatchClaim({ inputs, scriptLens, controlLens, feeRateGrainsPerVByte: 10 });
+  assert.equal(off.builderTip, 0);
+  assert.ok(plan.fee > off.fee, "fee computed over the extra tip output");
+
+  const built = buildBatchClaimTx({
+    network: net, inputs, role: "claim",
+    signerPriv: hexToBytes(B.priv), destinationProgram: dest,
+    feeRateGrainsPerVByte: 10, builderTipEnabled: true,
+  });
+  assert.equal(built.builderTip, 1_800_000);
+  assert.equal(built.payment + built.fee + built.builderTip, 180_000_000);
+  assert.equal(built.vBytes, plan.vBytes);
+  const tipProgram = addressToProgram(BUILDER_TIP_ADDRESS, net);
+  assert.equal(bytesToHex(built.builderTipProgram), bytesToHex(tipProgram));
+  const outs = parseWireOutputs(built.hex, 3);
+  assert.equal(outs.length, 2);
+  assert.equal(outs[0].value, built.payment);
+  assert.equal(outs[1].value, 1_800_000);
+  assert.equal(bytesToHex(outs[1].script.slice(2)), bytesToHex(tipProgram), "tip output pays the builder program");
+  built.digestsHex.forEach((dh, i) => {
+    assert.ok(verifySchnorrSig(hexToBytes(built.sigsHex[i]), hexToBytes(dh), hexToBytes(B.xonly)), "tipped sig " + i + " verifies");
+  });
+  // the sighash commits to every output: the same claim without the tip
+  // produces different digests, so the tip cannot be added or skimmed later
+  const untipped = buildBatchClaimTx({
+    network: net, inputs, role: "claim",
+    signerPriv: hexToBytes(B.priv), destinationProgram: dest,
+    feeRateGrainsPerVByte: 10,
+  });
+  assert.equal(untipped.builderTip, 0);
+  assert.notDeepEqual(built.digestsHex, untipped.digestsHex);
+  assert.equal(parseWireOutputs(untipped.hex, 3).length, 1);
+});
+
+test("builder tip: clawback refuses the flag, tip-dust refusal names the tip", () => {
+  const start = NOW + 30 * 86_400;
+  const { ticks } = planStream({
+    network: net, beneficiaryXOnly: B.xonly, funderXOnly: F.xonly,
+    rateGrainsPerTick: 10_000_000, tickSeconds: 86_400,
+    startTime: start, tickCount: 2, revocable: true,
+  });
+  assert.throws(() => buildBatchClaimTx({
+    network: net, inputs: syntheticInputs(ticks, [50_000_000, 50_000_000]),
+    role: "clawback", signerPriv: hexToBytes(F.priv),
+    destinationProgram: hexToBytes(F.xonly), feeRateGrainsPerVByte: 10,
+    builderTipEnabled: true,
+  }), /only offered on beneficiary claims/);
+  // small claim at a punitive fee rate: tip >= dust but fee + tip eats the payment
+  const { ticks: smallTicks } = planTestStream({ tickCount: 2 });
+  assert.throws(() => planBatchClaim({
+    inputs: [{ value: 30_000 }, { value: 30_000 }],
+    scriptLens: smallTicks.map((t) => t.claimScript.length),
+    controlLens: smallTicks.map((t) => t.claimControlBlock.length),
+    feeRateGrainsPerVByte: 600, network: net, builderTipEnabled: true,
+  }), /builder tip/);
 });
 
 test("parsePRLToGrains: exact decimal parsing, strict rejection (float-parse regression)", () => {

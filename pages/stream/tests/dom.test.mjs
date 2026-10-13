@@ -271,6 +271,23 @@ test("track: descriptor loads and re-derives the same tick addresses", () => {
   assert.equal($("track-err").hidden, true);
 });
 
+test("builder tip: claim checkbox off by default, disclosure in page, bundle API exact", () => {
+  const box = $("claim-builder-tip");
+  assert.ok(box, "tip checkbox present in the claim form");
+  assert.notEqual(box.checked, true, "tip checkbox off by default");
+  assert.ok(html.includes("Optional builder tip — add 1% of the claimed amount"), "disclosure names the 1% in the page");
+  assert.ok(html.includes("Cancel (clawback) never carries a tip"), "clawback exclusion disclosed in the page");
+  const src = fs.readFileSync(resolvePath(dir, "app.js"), "utf8");
+  assert.ok(src.includes("builderTipEnabled: $(\"claim-builder-tip\").checked === true"), "claim plan wires the checkbox into the core planner");
+  assert.ok(src.includes("Builder tip (optional, 1%)"), "claim review renders the tip as its own line before signing");
+  const S = E();
+  assert.equal(typeof S.builderTipGrainsFor, "function", "bundle exposes the tip API");
+  assert.equal(S.builderTipGrainsFor(100_000_000, S.NETWORKS.mainnet, true), 1_000_000);
+  assert.equal(S.builderTipGrainsFor(100_000_000, S.NETWORKS.mainnet, false), 0);
+  assert.equal(S.BUILDER_TIP_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
+  assert.deepEqual(errors, [], "console errors: " + errors.join(" | "));
+});
+
 test("claim: matured ticks batch-claim in ONE tx with manual UTXOs, signs locally", async () => {
   // stream: start 2020-01-01, 7-day ticks -> all 4 ticks matured
   const claimChecks = $("claim-ticks").querySelectorAll(".tick-check");
@@ -362,8 +379,8 @@ test("forge rejects sub-grain rates instead of silently rounding them", () => {
   const src = fs.readFileSync(resolvePath(dir, "app.js"), "utf8");
   assert.ok(src.includes("E.parsePRLToGrains($(\"rate\").value)"), "rate uses exact parser");
   assert.ok(!/parseFloat\([^)]*\)\s*\*\s*E\.GRAIN_PER_PRL/.test(src), "no float money parse remains");
-  assert.ok(html.includes("pearl-stream.bundle.js?v=5"), "bundle cache pin");
-  assert.ok(html.includes("app.js?v=4"), "app cache pin");
+  assert.ok(html.includes("pearl-stream.bundle.js?v=6"), "bundle cache pin");
+  assert.ok(html.includes("app.js?v=5"), "app cache pin");
   assert.deepEqual(errors, [], "console errors: " + errors.join(" | "));
 });
 
@@ -392,6 +409,6 @@ test("forge rejects silently-truncated tick counts", () => {
   $("forge").click();
   assert.equal($("forge-err").hidden, false);
   assert.ok(/tick count/.test($("forge-err").textContent), "error text: " + $("forge-err").textContent);
-  assert.ok(html.includes("app.js?v=4"), "app cache pin");
+  assert.ok(html.includes("app.js?v=5"), "app cache pin");
   assert.deepEqual(errors, [], "console errors: " + errors.join(" | "));
 });
