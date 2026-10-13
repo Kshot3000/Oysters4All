@@ -27,7 +27,9 @@
  *      checks sha256(preimage) == lockHash, refuses to build the exercise
  *      before the expiry block, signs locally with the buyer's key, and
  *      RE-VERIFIES the Schnorr signature before exposing hex.
- *      nLockTime = expiry, sequence = 0xfffffffe.
+ *      nLockTime = expiry, sequence = 0xfffffffe. An exercise may carry
+ *      an OPTIONAL disclosed 1% builder tip (opt-in, exercise-only —
+ *      see the builder-tip section below); refunds never carry one.
  *   4. Refund (writer side): same shape through leaf X after expiry; refused
  *      before expiry.
  *   5. Track: Blockbook lifecycle (unfunded/funded/spent/expired), expiry
@@ -361,18 +363,52 @@ export async function verifyStrikePayment({ blockbookBase, txid, writerAddress, 
   return { ok: true, confirmations: conf, paidGrains: paid };
 }
 
-/** Exact spend plan for a single-input, single-output script-path spend.
- *  stackLens: witness item lengths (e.g. [64, 32] for exercise: sig+preimage). */
-export function planOptionSpend({ inputValue, feeRateGrainsPerVByte, scriptLen, controlLen, stackLens }) {
+/* ---------------- builder tip (optional, disclosed, exercise-only) ----------------
+ * Pearl Hedge offers an OPTIONAL 1% builder tip on exercises — never
+ * automatic, and only when the buyer explicitly opts in. builderTipGrainsFor()
+ * is the single source; buildExerciseTx() adds the tip as its own second
+ * output BEFORE signing, and the script-path sighash commits to every
+ * output — so it cannot be added or skimmed after signing. Off = exercise
+ * identical to the pre-tip builder. Offered on the exercise flow only: the
+ * refund takes no tip parameter at all — it returns the writer's own
+ * locked collateral after expiry, so a tip output is excluded by
+ * construction. The recipient is the operator address published in every
+ * Hedge footer. */
+export const BUILDER_TIP_BPS = 100; // 1%
+export const BUILDER_TIP_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+export const BUILDER_TIP_NAME = "Builder tip (optional)";
+
+/** Builder tip in grains for an exercise of totalGrains on network.
+ *  Returns 0 unless enabled === true, the network is mainnet, and the
+ *  1% floor reaches the dust floor (waived, never rounded up). Computed
+ *  in BigInt so large exercises stay exact, then returned in this core's
+ *  Number style (the input is already range-checked to a safe integer). */
+export function builderTipGrainsFor(totalGrains, network, enabled) {
+  if (enabled !== true) return 0;
+  if (!network || network.hrp !== "prl") return 0;
+  if (!Number.isSafeInteger(totalGrains) || totalGrains <= 0) throw new Error("bad total for builder tip");
+  const tip = Number((BigInt(totalGrains) * BigInt(BUILDER_TIP_BPS)) / 10000n);
+  return tip >= DUST_GRAIN ? tip : 0;
+}
+
+/** Exact spend plan for a single-input script-path spend.
+ *  stackLens: witness item lengths (e.g. [64, 32] for exercise: sig+preimage).
+ *  nOut defaults to 1 (the pre-tip shape); builderTipGrains defaults to 0 —
+ *  a flagged tip is paid out of the payment, never on top of the vault. */
+export function planOptionSpend({ inputValue, feeRateGrainsPerVByte, scriptLen, controlLen, stackLens, nOut = 1, builderTipGrains = 0 }) {
   if (!Number.isSafeInteger(inputValue) || inputValue <= 0) throw new Error("bad input value");
   if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) throw new Error("bad fee rate");
-  const vBytes = spendVBytes({ nOut: 1, scriptLen, controlLen, stackLens });
+  if (!Number.isSafeInteger(builderTipGrains) || builderTipGrains < 0) throw new Error("bad builder tip");
+  const vBytes = spendVBytes({ nOut, scriptLen, controlLen, stackLens });
   const fee = Math.ceil(vBytes * feeRateGrainsPerVByte);
-  const payment = inputValue - fee;
+  const payment = inputValue - fee - builderTipGrains;
   if (payment < DUST_GRAIN) {
+    if (builderTipGrains > 0) {
+      throw new Error(`insufficient funds: ${inputValue} grains covers the ${fee}-grain fee and the ${builderTipGrains}-grain builder tip but leaves < dust (${DUST_GRAIN}); leave the builder tip off`);
+    }
     throw new Error(`insufficient funds: ${inputValue} grains covers the ${fee}-grain fee but leaves < dust (${DUST_GRAIN}); the vault must be topped up`);
   }
-  return { payment, fee, vBytes };
+  return { payment, fee, vBytes, builderTip: builderTipGrains };
 }
 
 /** Shared secret parser: 12/24-word mnemonic or WIF. Throws loudly otherwise. */
@@ -451,6 +487,7 @@ export function writerSignerFor(secretInput, network, writerKeyHex, mode) {
 export function buildExerciseTx({
   network, utxo, option, preimage, signerPriv,
   destinationProgram, feeRateGrainsPerVByte, chainTip = null,
+  builderTipEnabled = false,
 }) {
   if (!network || !network.hrp) throw new Error("network required");
   if (!utxo || !/^[0-9a-f]{64}$/i.test(utxo.txid || "")) throw new Error("utxo.txid required");
@@ -469,17 +506,41 @@ export function buildExerciseTx({
     throw new Error(`exercise not yet possible: chain tip ${chainTip} is before expiry ${expiry} (CLTV would fail)`);
   }
   const input = { txid: utxo.txid, vout: utxo.vout, value: utxo.value, spk: option.forged.spk };
+  if (!(destinationProgram instanceof Uint8Array) || destinationProgram.length !== 32) {
+    throw new Error("destination program must be 32 bytes");
+  }
+  const builderTip = builderTipGrainsFor(utxo.value, network, builderTipEnabled === true);
+  const builderTipProgram = builderTip > 0 ? addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet) : null;
+  if (builderTip > 0 && constEq(destinationProgram, builderTipProgram)) {
+    throw new Error("exercise destination is the builder address — the builder tip would duplicate the exercise output; leave the tip off");
+  }
   const spend = planOptionSpend({
     inputValue: utxo.value,
     feeRateGrainsPerVByte,
     scriptLen: option.exerciseScript.length,
     controlLen: option.exerciseControlBlock.length,
     stackLens: [64, 32], // buyer sig + preimage
+    nOut: builderTip > 0 ? 2 : 1,
+    builderTipGrains: builderTip,
   });
-  if (!(destinationProgram instanceof Uint8Array) || destinationProgram.length !== 32) {
-    throw new Error("destination program must be 32 bytes");
-  }
   const outputs = [{ program: destinationProgram, value: spend.payment }];
+  if (builderTip > 0) outputs.push({ program: builderTipProgram, value: builderTip, builderTip: true });
+  // Last-hop builder-tip assertion: this builder is where the exercise
+  // crosses from parameters to a signed transaction (Hedge has no
+  // plan/assemble split — the builder signs internally), so a flagged tip
+  // is a trust claim — the tip program is re-derived here from the builder
+  // address constant, never trusted from a caller-supplied plan, and the
+  // flagged output must pay it at exactly the computed amount before the
+  // digest is signed. An untipped exercise must carry no flagged output.
+  const flagged = outputs.filter((o) => o && o.builderTip);
+  if (builderTip > 0) {
+    const want = addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet);
+    if (flagged.length !== 1 || !constEq(flagged[0].program, want) || flagged[0].value !== builderTip) {
+      throw new Error("builder tip does not pay the builder address at the computed amount — refusing to build the exercise");
+    }
+  } else if (flagged.length !== 0) {
+    throw new Error("untipped exercise carries a flagged builder-tip output — refusing to build the exercise");
+  }
   const digest = scriptPathSigDigestEx(network, input, outputs, option.exerciseScript, {
     sequence: MAX_SEQ_NONFINAL, locktime: expiry,
   });
@@ -505,6 +566,7 @@ export function buildExerciseTx({
     sigHex: bytesToHex(sig), digestHex: bytesToHex(digest),
     locktime: expiry, sequence: MAX_SEQ_NONFINAL,
     scriptAsm: scriptAsm(option.exerciseScript),
+    builderTip,
   };
 }
 

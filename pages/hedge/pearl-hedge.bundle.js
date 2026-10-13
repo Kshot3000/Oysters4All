@@ -10,6 +10,9 @@
   var hedge_core_exports = {};
   __export(hedge_core_exports, {
     BLOCK_SECONDS: () => BLOCK_SECONDS,
+    BUILDER_TIP_ADDRESS: () => BUILDER_TIP_ADDRESS,
+    BUILDER_TIP_BPS: () => BUILDER_TIP_BPS,
+    BUILDER_TIP_NAME: () => BUILDER_TIP_NAME,
     DESCRIPTOR_PREFIX: () => DESCRIPTOR_PREFIX,
     DUST_GRAIN: () => DUST_GRAIN,
     GRAIN_PER_PRL: () => GRAIN_PER_PRL,
@@ -23,6 +26,7 @@
     buildHedgeRefundScript: () => buildHedgeRefundScript,
     buildRefundScript: () => buildRefundScript,
     buildRefundTx: () => buildRefundTx,
+    builderTipGrainsFor: () => builderTipGrainsFor,
     buyerSignerFor: () => buyerSignerFor,
     bytesToHex: () => bytesToHex,
     classifyLifecycle: () => classifyLifecycle,
@@ -6007,11 +6011,18 @@ zoo`.split("\n");
     const base = 4 + 1 + 41 + 1 + nOut * 43 + 4;
     return Math.ceil((base * 3 + (base + 2 + wit)) / 4);
   }
-  function planSpend({ inputValue, payments, feeRateGrainsPerVByte, scriptLen, controlLen, stackLens }) {
+  function planSpend({ inputValue, payments, feeRateGrainsPerVByte, scriptLen, controlLen, stackLens, serviceFeeGrains = 0, serviceFeeProgram = null }) {
     if (!Number.isSafeInteger(inputValue) || inputValue <= 0) throw new Error("bad input value");
     if (!Array.isArray(payments) || payments.length === 0) throw new Error("need at least one payment");
+    const serviceFee = Number(serviceFeeGrains);
+    if (!Number.isSafeInteger(serviceFee) || serviceFee < 0 || serviceFee > 0 && serviceFee < DUST_GRAIN)
+      throw new Error("bad service fee");
+    if (serviceFee > 0 && (!(serviceFeeProgram instanceof Uint8Array) || serviceFeeProgram.length !== 32))
+      throw new Error("service fee program must be 32 bytes");
+    const allPayments = payments.map((p) => ({ program: p.program, value: p.value }));
+    if (serviceFee > 0) allPayments.push({ program: serviceFeeProgram, value: serviceFee, serviceFee: true });
     let paySum = 0;
-    for (const p of payments) {
+    for (const p of allPayments) {
       if (!(p.program instanceof Uint8Array) || p.program.length !== 32) throw new Error("payment program must be 32 bytes");
       if (!Number.isSafeInteger(p.value) || p.value < DUST_GRAIN) throw new Error(`payment below dust (${DUST_GRAIN} grains)`);
       paySum += p.value;
@@ -6020,13 +6031,13 @@ zoo`.split("\n");
     const vbytes = (nOut) => spendVBytes({ nOut, scriptLen, controlLen, stackLens });
     const feeFor = (nOut) => Math.ceil(vbytes(nOut) * feeRateGrainsPerVByte);
     const need = (f) => paySum + f;
-    let fee = feeFor(payments.length + 1);
+    let fee = feeFor(allPayments.length + 1);
     let change = inputValue - need(fee);
-    let outputs = payments.map((p) => ({ program: p.program, value: p.value }));
+    let outputs = allPayments;
     if (change >= DUST_GRAIN) {
       outputs.push({ program: null, value: change, change: true });
     } else {
-      fee = feeFor(payments.length);
+      fee = feeFor(allPayments.length);
       change = inputValue - need(fee);
       if (change < 0) throw new Error(`insufficient funds: need ${need(fee)} grains, have ${inputValue}`);
       if (change > 0) {
@@ -6035,7 +6046,7 @@ zoo`.split("\n");
       }
     }
     if (change < 0) throw new Error(`insufficient funds: need ${need(fee)} grains, have ${inputValue}`);
-    return { outputs, fee, vBytes: vbytes(outputs.length), change };
+    return { outputs, fee, vBytes: vbytes(outputs.length), change, serviceFeeGrains: serviceFee };
   }
   function scriptAsm(script) {
     const names = { 82: "2", 117: "DROP", 135: "EQUAL", 136: "EQUALVERIFY", 168: "SHA256", 172: "CHECKSIG", 186: "CHECKSIGADD", 177: "CLTV" };
@@ -6345,16 +6356,30 @@ zoo`.split("\n");
     }
     return { ok: true, confirmations: conf, paidGrains: paid };
   }
-  function planOptionSpend({ inputValue, feeRateGrainsPerVByte, scriptLen, controlLen, stackLens }) {
+  var BUILDER_TIP_BPS = 100;
+  var BUILDER_TIP_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+  var BUILDER_TIP_NAME = "Builder tip (optional)";
+  function builderTipGrainsFor(totalGrains, network, enabled) {
+    if (enabled !== true) return 0;
+    if (!network || network.hrp !== "prl") return 0;
+    if (!Number.isSafeInteger(totalGrains) || totalGrains <= 0) throw new Error("bad total for builder tip");
+    const tip = Number(BigInt(totalGrains) * BigInt(BUILDER_TIP_BPS) / 10000n);
+    return tip >= DUST_GRAIN ? tip : 0;
+  }
+  function planOptionSpend({ inputValue, feeRateGrainsPerVByte, scriptLen, controlLen, stackLens, nOut = 1, builderTipGrains = 0 }) {
     if (!Number.isSafeInteger(inputValue) || inputValue <= 0) throw new Error("bad input value");
     if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) throw new Error("bad fee rate");
-    const vBytes = spendVBytes({ nOut: 1, scriptLen, controlLen, stackLens });
+    if (!Number.isSafeInteger(builderTipGrains) || builderTipGrains < 0) throw new Error("bad builder tip");
+    const vBytes = spendVBytes({ nOut, scriptLen, controlLen, stackLens });
     const fee = Math.ceil(vBytes * feeRateGrainsPerVByte);
-    const payment = inputValue - fee;
+    const payment = inputValue - fee - builderTipGrains;
     if (payment < DUST_GRAIN) {
+      if (builderTipGrains > 0) {
+        throw new Error(`insufficient funds: ${inputValue} grains covers the ${fee}-grain fee and the ${builderTipGrains}-grain builder tip but leaves < dust (${DUST_GRAIN}); leave the builder tip off`);
+      }
       throw new Error(`insufficient funds: ${inputValue} grains covers the ${fee}-grain fee but leaves < dust (${DUST_GRAIN}); the vault must be topped up`);
     }
-    return { payment, fee, vBytes };
+    return { payment, fee, vBytes, builderTip: builderTipGrains };
   }
   function walletFromSecret(secretInput, network, role) {
     const t = String(secretInput || "").trim();
@@ -6418,7 +6443,8 @@ zoo`.split("\n");
     signerPriv,
     destinationProgram,
     feeRateGrainsPerVByte,
-    chainTip = null
+    chainTip = null,
+    builderTipEnabled = false
   }) {
     if (!network || !network.hrp) throw new Error("network required");
     if (!utxo || !/^[0-9a-f]{64}$/i.test(utxo.txid || "")) throw new Error("utxo.txid required");
@@ -6436,18 +6462,35 @@ zoo`.split("\n");
       throw new Error(`exercise not yet possible: chain tip ${chainTip} is before expiry ${expiry} (CLTV would fail)`);
     }
     const input = { txid: utxo.txid, vout: utxo.vout, value: utxo.value, spk: option.forged.spk };
+    if (!(destinationProgram instanceof Uint8Array) || destinationProgram.length !== 32) {
+      throw new Error("destination program must be 32 bytes");
+    }
+    const builderTip = builderTipGrainsFor(utxo.value, network, builderTipEnabled === true);
+    const builderTipProgram = builderTip > 0 ? addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet) : null;
+    if (builderTip > 0 && constEq(destinationProgram, builderTipProgram)) {
+      throw new Error("exercise destination is the builder address \u2014 the builder tip would duplicate the exercise output; leave the tip off");
+    }
     const spend = planOptionSpend({
       inputValue: utxo.value,
       feeRateGrainsPerVByte,
       scriptLen: option.exerciseScript.length,
       controlLen: option.exerciseControlBlock.length,
-      stackLens: [64, 32]
+      stackLens: [64, 32],
       // buyer sig + preimage
+      nOut: builderTip > 0 ? 2 : 1,
+      builderTipGrains: builderTip
     });
-    if (!(destinationProgram instanceof Uint8Array) || destinationProgram.length !== 32) {
-      throw new Error("destination program must be 32 bytes");
-    }
     const outputs = [{ program: destinationProgram, value: spend.payment }];
+    if (builderTip > 0) outputs.push({ program: builderTipProgram, value: builderTip, builderTip: true });
+    const flagged = outputs.filter((o) => o && o.builderTip);
+    if (builderTip > 0) {
+      const want = addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet);
+      if (flagged.length !== 1 || !constEq(flagged[0].program, want) || flagged[0].value !== builderTip) {
+        throw new Error("builder tip does not pay the builder address at the computed amount \u2014 refusing to build the exercise");
+      }
+    } else if (flagged.length !== 0) {
+      throw new Error("untipped exercise carries a flagged builder-tip output \u2014 refusing to build the exercise");
+    }
     const digest = scriptPathSigDigestEx(network, input, outputs, option.exerciseScript, {
       sequence: MAX_SEQ_NONFINAL,
       locktime: expiry
@@ -6479,7 +6522,8 @@ zoo`.split("\n");
       digestHex: bytesToHex(digest),
       locktime: expiry,
       sequence: MAX_SEQ_NONFINAL,
-      scriptAsm: scriptAsm(option.exerciseScript)
+      scriptAsm: scriptAsm(option.exerciseScript),
+      builderTip
     };
   }
   function buildRefundTx({

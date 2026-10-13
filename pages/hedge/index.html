@@ -22,7 +22,7 @@
 <meta name="twitter:image" content="https://kshot3000.github.io/Oysters4All/assets/og-card.png">
 <meta name="twitter:site" content="@kshot9000">
 <meta name="twitter:creator" content="@kshot9000">
-<link rel="stylesheet" href="styles.css?v=6">
+<link rel="stylesheet" href="styles.css?v=7">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Pearl Hedge — Taproot options desk for PRL","description":"Pearl Hedge: write covered calls and protective puts on PRL in pure Taproot — no smart contracts. Hashlocked exercise leaf, CLTV refund leaf, NUMS internal key, local signing, Blockbook-verified strike payments.","url":"https://kshot3000.github.io/Oysters4All/pages/hedge/","applicationCategory":"BrowserApplication","operatingSystem":"Any","isAccessibleForFree":true}</script>
 <link rel="stylesheet" href="../../visual-upgrade/theme.css?v=20261007">
 </head>
@@ -231,12 +231,20 @@
           <label class="wide">Buyer payout address (collateral destination)
             <input id="x-buyer-dest" type="text" autocomplete="off" spellcheck="false" placeholder="prl1p…">
           </label>
+          <label class="check wide" for="x-builder-tip">
+            <input id="x-builder-tip" type="checkbox">
+            <span><strong>Builder tip (optional):</strong> add a 1% tip to the builder address
+            <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>.
+            It is paid as its own output out of this exercise — the buyer receives the collateral minus the fee and the tip — and it is
+            never automatic: with this box unchecked (the default) the exercise is exactly as before. Refunds never carry a tip.</span>
+          </label>
         </div>
         <div class="row">
           <button id="x-verify-strike" class="ghost">1 · Verify strike payment</button>
           <button id="x-exercise" class="primary">2 · Build &amp; sign exercise</button>
           <button id="x-buyer-clear" class="ghost">Clear secrets</button>
         </div>
+        <p id="x-tip-line" class="hint"></p>
         <p class="ok" id="x-strike-ok" hidden></p>
       </div>
       <div class="col">
@@ -330,6 +338,7 @@
       <li>No real options were exercised in testing — all exercise/refund flows were verified against synthetic UTXOs in a real browser.</li>
       <li>The premium is a pledged off-chain payment. The desk never escrows it and cannot enforce it.</li>
       <li>Exercise before the expiry block is impossible on-chain (CLTV). Refunds before expiry are refused. After expiry there is a race: the writer should confirm no buyer exercise before refunding.</li>
+      <li>The <strong>builder tip on exercises is optional</strong> — off by default, disclosed next to its checkbox at 1% of the collateral to the builder address shown there, and paid only inside an exercise transaction the buyer signs. Refunds never carry it.</li>
       <li>Expiry is a block height; the days→blocks conversion uses ~194 s/block and is approximate. Only deal with counterparties you trust.</li>
       <li>Not financial advice. Test on testnet first.</li>
     </ul>
@@ -342,7 +351,7 @@
 </footer>
 
 <script src="qrcode.min.js?v=1"></script>
-<script src="pearl-hedge.bundle.js?v=2"></script>
-<script src="app.js?v=3"></script>
+<script src="pearl-hedge.bundle.js?v=3"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

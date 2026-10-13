@@ -344,6 +344,7 @@
       <dt>Type</dt><dd>${esc(label)}</dd>
       <dt>txid</dt><dd>${esc(tx.txid)}</dd>
       <dt>Payout</dt><dd>${esc(grainsToPRL(tx.payment))} PRL (${tx.payment} grains)</dd>
+      ${tx.builderTip > 0 ? `<dt>Builder tip</dt><dd>${esc(grainsToPRL(tx.builderTip))} PRL (${tx.builderTip} grains) to ${esc(E.BUILDER_TIP_ADDRESS)}</dd>` : ""}
       <dt>Fee</dt><dd>${tx.fee} grains · ${tx.vBytes} vB</dd>
       <dt>nLockTime</dt><dd>${tx.locktime}</dd>
       <dt>Signature</dt><dd>locally signed + re-verified ✓ (${esc(tx.sigHex.slice(0, 32))}…)</dd>`;
@@ -377,8 +378,12 @@
         network: S.network, utxo, option: o,
         preimage: preHex, signerPriv: signer.priv,
         destinationProgram: dest, feeRateGrainsPerVByte: await feeRate(), chainTip: tip,
+        builderTipEnabled: $("x-builder-tip").checked === true,
       });
       showSigned(tx, "Buyer exercise (leaf E)", tx.scriptAsm);
+      $("x-tip-line").textContent = tx.builderTip > 0
+        ? `Builder tip (optional, 1%): ${grainsToPRL(tx.builderTip)} PRL (${tx.builderTip} grains) to ${E.BUILDER_TIP_ADDRESS} — its own output, committed by the signature`
+        : "No builder tip (not opted in; refunds never carry a tip)";
       if (tip == null) showErr("x-err", "Note: chain tip unreachable — the desk could not pre-check CLTV; the network enforces it. Broadcast carefully.");
     } catch (e) { showErr("x-err", e.message); }
     finally {

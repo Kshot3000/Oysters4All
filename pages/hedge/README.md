@@ -36,6 +36,17 @@ wiped after use), reveals the preimage (checked against the lock hash), and the
 desk builds a script-path spend (`nLockTime = expiry`, witness
 `<sig> <preimage>`), re-verifying the Schnorr signature before exposing hex.
 
+## Builder tip (optional, disclosed)
+
+The buyer exercise form offers an **optional 1% builder tip** to
+`prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`: off by
+default, disclosed next to its checkbox, and — when the buyer opts in — paid
+as its own output out of the exercise (the buyer receives the collateral
+minus the fee and the tip), committed by the buyer's signature before
+signing. It is waived on testnet and below the 546-grain dust floor. The
+writer refund takes no tip parameter at all — it returns the writer's own
+locked collateral, so a tip there is impossible by construction.
+
 **Track** — Blockbook lifecycle: unfunded / funded / expired-funded / spent,
 plus an expiry countdown in blocks (~194 s/block, labeled approximate).
 
@@ -60,7 +71,7 @@ commitment).
 ## Verification
 
 - `node --no-warnings --loader ./tests/loader.mjs tests/hedge.test.mjs` —
-  19/19 core tests: pinned canonical vector (descriptor → address → sealed
+  22/22 core tests: pinned canonical vector (descriptor → address → sealed
   hash), refund leaf byte-identical to the audited escrow
   `buildRefundScript`, exercise leaf byte-shape + parser round-trip, control
   blocks verified against the tweaked key, descriptor tamper semantics
@@ -71,7 +82,7 @@ commitment).
   (paid, underpaid shortfall in grains, unconfirmed, bad txid), lifecycle
   classification.
 - `node --no-warnings --loader ./tests/loader.mjs tests/dom.test.mjs` —
-  11/11 DOM tests: page boots with zero console errors under hostile
+  13/13 DOM tests: page boots with zero console errors under hostile
   localStorage, full write→fund→exercise→verify flow, put role-label swap,
   honest refusals, PROVEN/NOT PROVEN verdicts, @kshot9000 + donation address
   in the footer.

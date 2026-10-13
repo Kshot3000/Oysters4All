@@ -306,6 +306,59 @@ test("exercise refuses to build without a verified strike payment", async () => 
   assert.deepEqual(errors, [], "console errors: " + errors.join(" | "));
 });
 
+test("builder tip: exercise checkbox is opt-in, disclosed, and the tip lands exact on the wire", () => {
+  const H = E();
+  const net = H.NETWORKS.mainnet;
+  assert.equal($("x-builder-tip").checked, false, "builder tip checkbox unchecked by default");
+  assert.ok(html.includes("Builder tip (optional)"), "disclosure heading in the exercise form");
+  assert.ok(html.includes("Refunds never carry a tip"), "refund exclusion disclosed");
+  assert.ok(html.includes("the buyer receives the collateral minus the fee and the tip"), "buyer-pays disclosure in page");
+  // Bundle-level tipped exercise (the UI build is gated on a live strike
+  // verification, covered by the refusal test above): forge an option
+  // between the two test mnemonics and exercise it through the bundle.
+  const writer = H.counterpartyKeyFromInput(WRITER_MNEMONIC, net);
+  const buyer = H.counterpartyKeyFromInput(BUYER_MNEMONIC, net);
+  const PRE = "deadbeef".repeat(8);
+  const forged = H.forgeOption({
+    network: net, kind: "C", writer: writer.key, buyer: buyer.key,
+    lockHash: H.lockHashForPreimage(PRE), qtyGrains: 100_000_000,
+    strikeGrains: 250_000_000, expiry: 800_000, premiumGrains: 0,
+  });
+  const opt = {
+    parsed: { expiry: 800_000 }, forged,
+    exerciseScript: forged.exerciseScript, exerciseControlBlock: forged.exerciseControlBlock, expiry: 800_000,
+  };
+  const signer = H.buyerSignerFor(BUYER_MNEMONIC, net, H.bytesToHex(buyer.key), "address");
+  const dest = H.addressToProgram(H.walletFromMnemonic(BUYER_MNEMONIC, net).address, net);
+  const utxo = { txid: "f".repeat(64), vout: 0, value: 100_000_000 };
+  const base = {
+    network: net, utxo, option: opt, preimage: PRE, signerPriv: signer.priv,
+    destinationProgram: dest, feeRateGrainsPerVByte: 2, chainTip: 800_000,
+  };
+  const parseOutputs = (hex) => {
+    const b = Buffer.from(hex, "hex");
+    let o = 4;
+    if (b[o] === 0 && b[o + 1] === 1) o += 2;
+    const vi = () => { const v = b[o]; if (v < 0xfd) { o += 1; return v; } const n = b.readUInt16LE(o + 1); o += 3; return n; };
+    const nIn = vi();
+    for (let i = 0; i < nIn; i++) { o += 36; const sl = vi(); o += sl + 4; }
+    const nOut = vi(); const outs = [];
+    for (let i = 0; i < nOut; i++) { const value = Number(b.readBigUInt64LE(o)); o += 8; const sl = vi(); outs.push({ value, spk: b.subarray(o, o + sl).toString("hex") }); o += sl; }
+    return outs;
+  };
+  const tipped = H.buildExerciseTx({ ...base, builderTipEnabled: true });
+  assert.equal(tipped.builderTip, 1_000_000, "tip is exactly 1% of the 1 PRL collateral");
+  const outs = parseOutputs(tipped.hex);
+  assert.equal(outs.length, 2, "tipped exercise has exactly 2 outputs");
+  assert.equal(outs[1].value, 1_000_000, "tip output exact on the wire");
+  assert.equal(outs[1].spk, "5120" + H.bytesToHex(H.addressToProgram(H.BUILDER_TIP_ADDRESS, net)), "tip pays the builder program");
+  const plain = H.buildExerciseTx(base);
+  assert.equal(plain.builderTip, 0);
+  assert.equal(parseOutputs(plain.hex).length, 1, "opt-out restores the single-output exercise");
+  H.wipeSecrets(signer.priv);
+  assert.deepEqual(errors, [], "console errors: " + errors.join(" | "));
+});
+
 test("step nav switches panels", () => {
   document.querySelector('#steps button[data-step="track"]').click();
   assert.ok($("step-track").classList.contains("active"));

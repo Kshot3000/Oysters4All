@@ -114,6 +114,9 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 2px var(--chartreuse-glow);
 }
 input[type="password"] { font-family: var(--mono); }
+label.check { flex-direction: row; align-items: flex-start; gap: .6rem; border: 1px solid var(--line); border-radius: 8px; padding: .7rem .8rem; color: var(--ink); line-height: 1.5; cursor: pointer; }
+label.check input { width: auto; margin-top: .15rem; }
+label.check code { word-break: break-all; }
 textarea { font-family: var(--mono); font-size: 0.82rem; resize: vertical; }
 .hint { color: var(--ink-faint); font-size: 0.82rem; }
 .hint-inline { color: var(--ink-faint); font-size: 0.78rem; }

@@ -11,6 +11,8 @@ import {
   descriptorFor, sealedDescriptor, parseDescriptor, optionFromDescriptor,
   verifyStrikePayment, planOptionSpend, buyerSignerFor, writerSignerFor,
   buildExerciseTx, buildRefundTx, classifyLifecycle, expectedAddress,
+  builderTipGrainsFor, BUILDER_TIP_BPS, BUILDER_TIP_ADDRESS, BUILDER_TIP_NAME,
+  addressToProgram,
   partyKeyFromInput, scriptAsm, parseXOnlyKey, wipeSecrets,
   encodeScriptNum, spendVBytes, tweakKeypath,
   buildRefundScript, walletFromMnemonic,
@@ -316,6 +318,110 @@ test("expectedAddress audit one-liner matches forgeOption", () => {
     expectedAddress({ network: net, kind: "C", writer: W.xonly, buyer: B.xonly, lockHash: LOCKHASH, qtyGrains: 100_000_000, strikeGrains: 250_000_000, expiry: 800_000, premiumGrains: 5_000_000 }),
     PIN_ADDR
   );
+});
+
+/* ---------------- builder tip (optional, disclosed, exercise-only) ---------------- */
+
+/** Parse a signed tx hex into its outputs: [{ value, spk }] (spk = full
+ *  scriptPubKey bytes, so a P2TR output is 5120 + program). */
+function parseOutputs(hex) {
+  const b = Buffer.from(hex, "hex");
+  let o = 4;
+  if (b[o] === 0 && b[o + 1] === 1) o += 2; // segwit marker+flag
+  const vi = () => {
+    const v = b[o];
+    if (v < 0xfd) { o += 1; return v; }
+    if (v === 0xfd) { const n = b.readUInt16LE(o + 1); o += 3; return n; }
+    throw new Error("varint too big");
+  };
+  const nIn = vi();
+  for (let i = 0; i < nIn; i++) { o += 36; const sl = vi(); o += sl + 4; }
+  const nOut = vi();
+  const outs = [];
+  for (let i = 0; i < nOut; i++) {
+    const value = Number(b.readBigUInt64LE(o)); o += 8;
+    const sl = vi();
+    const spk = b.subarray(o, o + sl); o += sl;
+    outs.push({ value, spk });
+  }
+  return outs;
+}
+
+function exerciseOpt() {
+  const { parsed, forged } = optionFromDescriptor(PIN_DESC);
+  return { parsed, forged, exerciseScript: forged.exerciseScript, exerciseControlBlock: forged.exerciseControlBlock, refundScript: forged.refundScript, refundControlBlock: forged.refundControlBlock, expiry: parsed.expiry };
+}
+
+test("builder tip: exactness and waivers", () => {
+  assert.equal(BUILDER_TIP_BPS, 100);
+  assert.equal(BUILDER_TIP_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
+  assert.equal(BUILDER_TIP_NAME, "Builder tip (optional)");
+  assert.equal(builderTipGrainsFor(100_000_000, net, true), 1_000_000, "1% of 1 PRL");
+  assert.equal(builderTipGrainsFor(100_000_000, net, false), 0, "off unless enabled === true");
+  assert.equal(builderTipGrainsFor(100_000_000, net, 1), 0, "truthy is not true");
+  assert.equal(builderTipGrainsFor(100_000_000, NETWORKS.testnet, true), 0, "mainnet only");
+  assert.equal(builderTipGrainsFor(54599, net, true), 0, "545-grain tip waived");
+  assert.equal(builderTipGrainsFor(54600, net, true), 546, "546-grain tip charged exactly");
+  assert.equal(builderTipGrainsFor(1000, net, true), 0, "10-grain tip waived");
+});
+
+test("builder tip: tipped exercise carries the tip exact on the wire; untipped identical to before", () => {
+  const opt = exerciseOpt();
+  const utxo = { txid: "f".repeat(64), vout: 0, value: 3_000_000_000 }; // 30 PRL vault
+  const base = {
+    network: net, utxo, option: opt, preimage: PREIMAGE, signerPriv: B.priv,
+    destinationProgram: DEST, feeRateGrainsPerVByte: 2, chainTip: 800_000,
+  };
+  const plain = buildExerciseTx(base);
+  const plainOuts = parseOutputs(plain.hex);
+  assert.equal(plain.builderTip, 0);
+  assert.equal(plainOuts.length, 1);
+  assert.equal(plainOuts[0].value + plain.fee, 3_000_000_000, "untipped conservation");
+  const tipped = buildExerciseTx({ ...base, builderTipEnabled: true });
+  assert.equal(tipped.builderTip, 30_000_000);
+  const outs = parseOutputs(tipped.hex);
+  assert.equal(outs.length, 2);
+  assert.equal(outs[1].value, 30_000_000, "tip is output 1 at exactly 1% of the vault");
+  assert.equal(bytesToHex(outs[1].spk), "5120" + bytesToHex(addressToProgram(BUILDER_TIP_ADDRESS, net)));
+  assert.equal(outs[0].value + outs[1].value + tipped.fee, 3_000_000_000, "tipped conservation");
+  const expectVB2 = spendVBytes({ nOut: 2, scriptLen: opt.forged.exerciseScript.length, controlLen: 65, stackLens: [64, 32] });
+  assert.equal(tipped.fee, Math.ceil(expectVB2 * 2), "fee computed over 2 outputs");
+  assert.notEqual(tipped.digestHex, plain.digestHex, "the sighash commits to the tip output");
+  // destination == builder address refuses while tipped (tip would duplicate the exercise output)
+  assert.throws(() => buildExerciseTx({
+    ...base, destinationProgram: addressToProgram(BUILDER_TIP_ADDRESS, net), builderTipEnabled: true,
+  }), /builder tip would duplicate/);
+  // a tip that would leave the buyer below dust refuses naming the tip
+  assert.throws(() => buildExerciseTx({
+    ...base, utxo: { txid: "f".repeat(64), vout: 0, value: 100_000 }, feeRateGrainsPerVByte: 600, builderTipEnabled: true,
+  }), /builder tip/);
+});
+
+test("builder tip: refund never carries one; testnet exercises waive it", () => {
+  const opt = exerciseOpt();
+  // buildRefundTx takes no tip parameter at all — exclusion by construction
+  const refund = buildRefundTx({
+    network: net, utxo: UTXO, option: opt,
+    signerPriv: W.priv, destinationProgram: DEST, feeRateGrainsPerVByte: 2, chainTip: 800_001,
+  });
+  const rOuts = parseOutputs(refund.hex);
+  assert.equal(rOuts.length, 1);
+  assert.equal(rOuts[0].value + refund.fee, UTXO.value, "refund conservation exact");
+  // testnet: the tip is waived even when opted in (mainnet-only, like every fleet surface)
+  const tForged = forgeOption({
+    network: NETWORKS.testnet, kind: "C", writer: W.xonly, buyer: B.xonly, lockHash: LOCKHASH,
+    qtyGrains: 100_000_000, strikeGrains: 250_000_000, expiry: 800_000, premiumGrains: 0,
+  });
+  const tOpt = {
+    parsed: { expiry: 800_000 }, forged: tForged,
+    exerciseScript: tForged.exerciseScript, exerciseControlBlock: tForged.exerciseControlBlock, expiry: 800_000,
+  };
+  const tTx = buildExerciseTx({
+    network: NETWORKS.testnet, utxo: UTXO, option: tOpt, preimage: PREIMAGE, signerPriv: B.priv,
+    destinationProgram: DEST, feeRateGrainsPerVByte: 2, chainTip: 800_000, builderTipEnabled: true,
+  });
+  assert.equal(tTx.builderTip, 0);
+  assert.equal(parseOutputs(tTx.hex).length, 1);
 });
 
 test("script asm renders both leaves human-readably", () => {
