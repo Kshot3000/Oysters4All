@@ -22,7 +22,7 @@
 <meta name="twitter:image" content="https://kshot3000.github.io/Oysters4All/assets/og-card.png">
 <meta name="twitter:site" content="@kshot9000">
 <meta name="twitter:creator" content="@kshot9000">
-<link rel="stylesheet" href="styles.css?v=5">
+<link rel="stylesheet" href="styles.css?v=6">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Pearl Atomic — Cross-Chain HTLC Desk for PRL","description":"Pearl Atomic: trustless cross-chain swaps for Pearl (PRL) with hash-time-locked Taproot contracts. Claim with a preimage or refund after the timeout. All crypto runs locally in your browser.","url":"https://kshot3000.github.io/Oysters4All/pages/atomic/","applicationCategory":"BrowserApplication","operatingSystem":"Any","isAccessibleForFree":true}</script>
 <link rel="stylesheet" href="../../visual-upgrade/theme.css?v=20261007">
 </head>
@@ -288,6 +288,13 @@
         <label>Fee rate (grains/vB)
           <input id="claim-feerate" type="number" min="1" step="1" value="20">
         </label>
+        <label class="check wide" for="claim-builder-tip">
+          <input id="claim-builder-tip" type="checkbox">
+          <span><strong>Builder tip (optional):</strong> add a 1% tip to the builder address
+          <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>.
+          It is paid as its own output out of this claim — you receive the HTLC value minus the fee and the tip — and it is
+          never automatic: with this box unchecked (the default) the claim is exactly as before. Refunds never carry a tip.</span>
+        </label>
       </div>
     </div>
     <div id="settle-refund-form" hidden>
@@ -312,6 +319,7 @@
         <div><dt>Digest to sign</dt><dd><code id="plan-digest" class="digest"></code> <button class="btn ghost copy-btn" data-for="plan-digest">Copy</button></dd></div>
         <div><dt>Outputs</dt><dd id="plan-outputs"></dd></div>
         <div><dt>Fee</dt><dd id="plan-fee"></dd></div>
+        <div><dt>Builder tip</dt><dd id="plan-tip">—</dd></div>
       </dl>
       <h3>Sign <span class="hint-inline">(locally — the key never leaves this page)</span></h3>
       <div class="form-grid">
@@ -392,6 +400,7 @@
       <li>No real swaps were executed while testing this app (needs a live counterparty and funds on both chains).</li>
       <li>Blockbook reads are GET-only until you press Broadcast; a pasted outpoint is trusted as-is.</li>
       <li>Saved deals and secrets live in this browser's localStorage — use Wipe, and never reuse a revealed secret.</li>
+      <li>The <strong>builder tip on claims is optional</strong> — off by default, disclosed next to its checkbox at 1% of the claimed amount to the builder address shown there, and paid only inside a claim transaction you sign. Refunds never carry it.</li>
     </ul>
   </section>
 </main>
@@ -405,7 +414,7 @@
 </footer>
 
 <script src="qrcode.min.js?v=1"></script>
-<script src="pearl-atomic.bundle.js?v=5"></script>
-<script src="app.js?v=2"></script>
+<script src="pearl-atomic.bundle.js?v=6"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>

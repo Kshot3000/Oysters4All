@@ -28,12 +28,30 @@ Six-step wizard (Deal → Contract → Fund → Track → Settle → Verify):
 All cryptography runs locally in your browser. The page only reads the chain
 (GET) until you press **Broadcast**.
 
+## Builder tip (optional, disclosed)
+
+Settling a claim offers an **optional 1% builder tip** to the builder
+address `prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`:
+the Settle step's Claim form has a checkbox (unchecked by default) that
+adds the tip as its own output of the claim transaction, paid out of the
+claimed amount — the claimer receives the HTLC value minus the network
+fee and the tip, stated in those words next to the checkbox. The tip is
+computed by `builderTipGrainsFor` (1% floor in BigInt, mainnet only,
+waived when the 1% would fall below the 546-grain dust floor instead of
+rounded up) and is added before signing, so the script-path sighash
+commits to it — it cannot be added or skimmed afterwards, and assembly
+re-derives the builder program from the address constant and refuses a
+flagged tip that does not pay it exactly. With the box unchecked the
+claim plan is identical to the pre-tip planner. **Refunds never carry a
+tip** — the refund planner takes no tip parameter at all, since it
+returns the maker's own locked funds.
+
 ## Run the tests
 
 ```bash
 cd pages/atomic
-node --no-warnings --loader ./tests/loader.mjs --test tests/atomic.test.mjs   # 15/15 core tests
-node --no-warnings --test tests/dom.test.mjs               # DOM/id cross-check + init smoke
+node --no-warnings --loader ./tests/loader.mjs --test tests/atomic.test.mjs   # 18/18 core tests
+node --no-warnings --test tests/dom.test.mjs               # 4/4 DOM tests: id cross-check + init smoke + tip wiring
 ```
 
 Browser bundle is committed; rebuild it after editing `src/`:

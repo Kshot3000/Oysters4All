@@ -16,6 +16,7 @@ import {
   timeoutRules, validateTimeout, timeoutOrderingWarning,
   makeDescriptor, parseDescriptor,
   planClaim, planRefund, settleDigest, assembleClaim, assembleRefund,
+  builderTipGrainsFor, BUILDER_TIP_BPS, BUILDER_TIP_ADDRESS, BUILDER_TIP_NAME,
   exportUnsignedBundle, importUnsignedBundle,
   classifyHtlcState, fmtPRL, parsePRLtoGrains,
   signForXOnly, verifySchnorrSig,
@@ -317,6 +318,133 @@ test("fmtPRL / parsePRLtoGrains", () => {
   assert.equal(parsePRLtoGrains("90071992.54740991"), 9007199254740991);
   assert.throws(() => parsePRLtoGrains("90071992.54740992"), /out of range/);
   assert.throws(() => parsePRLtoGrains("100000000.00000001"), /out of range/);
+});
+
+/* ---------------- builder tip (optional, disclosed, claim-only) ---------------- */
+
+function parseOutputsFromHex(hex) {
+  const b = Buffer.from(hex, "hex");
+  let o = 4;
+  if (b[o] === 0 && b[o + 1] === 1) o += 2;
+  const vi = () => {
+    const v = b[o];
+    if (v < 0xfd) { o += 1; return v; }
+    if (v === 0xfd) { const n = b.readUInt16LE(o + 1); o += 3; return n; }
+    throw new Error("varint too big");
+  };
+  const nIn = vi();
+  for (let i = 0; i < nIn; i++) { o += 36; const sl = vi(); o += sl + 4; }
+  const nOut = vi();
+  const outs = [];
+  for (let i = 0; i < nOut; i++) {
+    const v = Number(b.readBigUInt64LE(o)); o += 8;
+    const sl = vi(); const spk = b.subarray(o, o + sl).toString("hex"); o += sl;
+    outs.push({ value: v, spk });
+  }
+  return outs;
+}
+
+test("builder tip: exactness and waivers", () => {
+  assert.equal(BUILDER_TIP_BPS, 100);
+  assert.equal(BUILDER_TIP_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
+  assert.equal(BUILDER_TIP_NAME, "Builder tip (optional)");
+  assert.equal(builderTipGrainsFor(100000000, net, true), 1000000, "1% of 1 PRL");
+  assert.equal(builderTipGrainsFor(100000000, net, false), 0, "off unless enabled === true");
+  assert.equal(builderTipGrainsFor(100000000, net, 1), 0, "truthy is not true");
+  assert.equal(builderTipGrainsFor(100000000, NETWORKS.testnet, true), 0, "mainnet only");
+  // dust floor: waived below it, never rounded up; charged exactly at it
+  assert.equal(builderTipGrainsFor(54599, net, true), 0, "545-grain tip waived");
+  assert.equal(builderTipGrainsFor(54600, net, true), 546, "546-grain tip charged exactly");
+  assert.equal(builderTipGrainsFor(1000, net, true), 0, "10-grain tip waived");
+});
+
+test("builder tip: tipped claim plans, signs, assembles with the tip exact on the wire", () => {
+  const np = newPreimage();
+  const c = forgeHtlc(net, { claimerXOnly: KEYS[0], refundeeXOnly: KEYS[1], hash: np.hash, timeout: TIMEOUT });
+  const input = { txid: "ab".repeat(32), vout: 0, value: 100000000, spk: c.tree.spk };
+  const dest = wallets[0].internalXOnly;
+  const builderProgram = addressToProgram(BUILDER_TIP_ADDRESS, net);
+  const plan = planClaim({
+    network: net, contract: c, input,
+    preimageHex: bytesToHex(np.preimage), destProgram: dest, feeRateGrainsPerVByte: 20,
+    builderTipEnabled: true,
+  });
+  assert.equal(plan.builderTip, 1000000);
+  assert.equal(plan.outputs.length, 2);
+  assert.equal(plan.outputs[1].value, 1000000);
+  assert.equal(plan.outputs[1].builderTip, true);
+  assert.equal(bytesToHex(plan.outputs[1].program), bytesToHex(builderProgram));
+  const wantVB = spendVBytes({ nOut: 2, scriptLen: c.claimScript.length, controlLen: 65, stackLens: [64, 32] });
+  assert.equal(plan.vBytes, wantVB, "fee computed over 2 outputs");
+  assert.equal(plan.fee, Math.ceil(wantVB * 20));
+  assert.equal(plan.outputs[0].value + plan.outputs[1].value + plan.fee, 100000000, "conservation");
+  // untipped plan is identical to the pre-tip planner and its digest differs
+  const plain = planClaim({
+    network: net, contract: c, input,
+    preimageHex: bytesToHex(np.preimage), destProgram: dest, feeRateGrainsPerVByte: 20,
+  });
+  assert.equal(plain.builderTip, 0);
+  assert.equal(plain.outputs.length, 1);
+  assert.notEqual(bytesToHex(settleDigest(net, plan)), bytesToHex(settleDigest(net, plain)),
+    "the sighash commits to the tip output — it cannot be added after signing");
+  // sign + assemble: the tip is output 1 on the wire, exact to the builder program
+  const digest = settleDigest(net, plan);
+  const sig = signForXOnly(PRIVS[0], digest);
+  const spend = assembleClaim(net, plan, bytesToHex(sig), KEYS[0]);
+  const outs = parseOutputsFromHex(spend.hex);
+  assert.equal(outs.length, 2);
+  assert.equal(outs[1].value, 1000000);
+  assert.equal(outs[1].spk, "5120" + bytesToHex(builderProgram));
+  assert.equal(outs[0].value, plan.outputs[0].value);
+  // destination == builder address refuses at plan time (tip would duplicate)
+  assert.throws(() => planClaim({
+    network: net, contract: c, input,
+    preimageHex: bytesToHex(np.preimage), destProgram: builderProgram, feeRateGrainsPerVByte: 20,
+    builderTipEnabled: true,
+  }), /builder tip would duplicate/);
+  // rerouted flagged tip refused at assembly (last hop before the tx is built)
+  const rerouted = { ...plan, outputs: plan.outputs.map((o, i) => i === 1 ? { ...o, program: dest } : o) };
+  assert.throws(() => assembleClaim(net, rerouted, bytesToHex(sig), KEYS[0]), /does not pay the builder address/);
+  // stray flagged output on an untipped plan refused at assembly
+  const stray = { ...plain, outputs: [...plain.outputs, { program: builderProgram, value: 1000, builderTip: true }] };
+  const straySig = signForXOnly(PRIVS[0], settleDigest(net, stray));
+  assert.throws(() => assembleClaim(net, stray, bytesToHex(straySig), KEYS[0]), /flagged builder tip but no planned tip/);
+  // a tip that would leave the claimer below dust refuses at plan time naming the tip
+  assert.throws(() => planClaim({
+    network: net, contract: c,
+    input: { txid: "ab".repeat(32), vout: 0, value: 100000, spk: c.tree.spk },
+    preimageHex: bytesToHex(np.preimage), destProgram: dest, feeRateGrainsPerVByte: 600,
+    builderTipEnabled: true,
+  }), /builder tip/);
+});
+
+test("builder tip: refund never carries one; tipped claim bundle round-trips", () => {
+  const np = newPreimage();
+  const c = forgeHtlc(net, { claimerXOnly: KEYS[0], refundeeXOnly: KEYS[1], hash: np.hash, timeout: TIMEOUT });
+  const d = makeDescriptor(net, c, { timeout: TIMEOUT, amountGrains: 100000000 });
+  const input = { txid: "cd".repeat(32), vout: 1, value: 50000000, spk: c.tree.spk };
+  // planRefund takes no tip parameter at all — exclusion by construction
+  const refund = planRefund({
+    network: net, contract: c, input, destProgram: wallets[1].internalXOnly,
+    feeRateGrainsPerVByte: 20, chainHeight: TIMEOUT,
+  });
+  assert.equal(refund.outputs.length, 1);
+  assert.ok(!refund.builderTip, "refund plan carries no tip");
+  assert.equal(refund.outputs[0].value + refund.fee, 50000000, "refund conservation exact");
+  // a tipped claim survives the air-gapped bundle round-trip (the digest
+  // inside the bundle commits to both outputs — no separate tip leg needed)
+  const claimInput = { txid: "ab".repeat(32), vout: 0, value: 100000000, spk: c.tree.spk };
+  const tipped = planClaim({
+    network: net, contract: c, input: claimInput,
+    preimageHex: bytesToHex(np.preimage), destProgram: KEYS[0], feeRateGrainsPerVByte: 20,
+    builderTipEnabled: true,
+  });
+  const b = exportUnsignedBundle(net, tipped, d);
+  assert.equal(b.outputs.length, 2);
+  assert.equal(Number(b.outputs[1].value), 1000000);
+  assert.equal(b.outputs[1].address, BUILDER_TIP_ADDRESS);
+  const imp = importUnsignedBundle(net, JSON.stringify(b), c);
+  assert.equal(imp.bundle.fingerprint, b.fingerprint);
 });
 
 test("partyKeyFromInput + addressToProgram gates", () => {

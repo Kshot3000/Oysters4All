@@ -21,6 +21,9 @@ var PearlAtomic = (() => {
   // src/index.js
   var index_exports = {};
   __export(index_exports, {
+    BUILDER_TIP_ADDRESS: () => BUILDER_TIP_ADDRESS,
+    BUILDER_TIP_BPS: () => BUILDER_TIP_BPS,
+    BUILDER_TIP_NAME: () => BUILDER_TIP_NAME,
     DUST_GRAIN: () => DUST_GRAIN,
     GRAIN_PER_PRL: () => GRAIN_PER_PRL,
     NETWORKS: () => NETWORKS,
@@ -31,6 +34,7 @@ var PearlAtomic = (() => {
     buildClaimScript: () => buildClaimScript,
     buildRefundScript: () => buildRefundScript,
     buildScriptPathSpend: () => buildScriptPathSpend,
+    builderTipGrainsFor: () => builderTipGrainsFor,
     bytesToHex: () => bytesToHex,
     checkPreimage: () => checkPreimage,
     classifyHtlcState: () => classifyHtlcState,
@@ -6325,7 +6329,17 @@ zoo`.split("\n");
     for (let i = bytes.length - 1; i >= 0; i--) n = n * 256 + bytes[i];
     return n;
   }
-  function planClaim({ network, contract, input, preimageHex, destProgram, feeRateGrainsPerVByte }) {
+  var BUILDER_TIP_BPS = 100;
+  var BUILDER_TIP_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+  var BUILDER_TIP_NAME = "Builder tip (optional)";
+  function builderTipGrainsFor(totalGrains, network, enabled) {
+    if (enabled !== true) return 0;
+    if (!network || network.hrp !== "prl") return 0;
+    if (!Number.isSafeInteger(totalGrains) || totalGrains <= 0) throw new Error("bad total for builder tip");
+    const tip = Number(BigInt(totalGrains) * BigInt(BUILDER_TIP_BPS) / 10000n);
+    return tip >= DUST_GRAIN ? tip : 0;
+  }
+  function planClaim({ network, contract, input, preimageHex, destProgram, feeRateGrainsPerVByte, builderTipEnabled = false }) {
     const preimage = checkPreimage(preimageHex, hashFromClaimScript(contract.claimScript));
     if (!(destProgram instanceof Uint8Array) || destProgram.length !== 32) {
       throw new Error("claim destination must be a 32-byte P2TR program");
@@ -6336,11 +6350,22 @@ zoo`.split("\n");
     if (!Number.isSafeInteger(input?.value) || input.value <= 0) {
       throw new Error("ATOMIC REFUSED: bad input value (must be a positive whole number of grains)");
     }
-    const vB = spendVBytes({ nOut: 1, scriptLen: contract.claimScript.length, controlLen: 65, stackLens: [64, 32] });
+    const builderTip = builderTipGrainsFor(input.value, network, builderTipEnabled === true);
+    const builderTipProgram = builderTip > 0 ? addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet) : null;
+    if (builderTip > 0 && constEq2(destProgram, builderTipProgram)) {
+      throw new Error("ATOMIC REFUSED: claim destination is the builder address \u2014 the builder tip would duplicate the claim output; leave the tip off");
+    }
+    const vB = spendVBytes({ nOut: builderTip > 0 ? 2 : 1, scriptLen: contract.claimScript.length, controlLen: 65, stackLens: [64, 32] });
     const fee = Math.ceil(vB * feeRateGrainsPerVByte);
-    const payVal = input.value - fee;
-    if (payVal < DUST_GRAIN) throw new Error(`ATOMIC REFUSED: insufficient funds for the claim fee (need ${fee} grains)`);
+    const payVal = input.value - fee - builderTip;
+    if (payVal < DUST_GRAIN) {
+      if (builderTip > 0) {
+        throw new Error(`ATOMIC REFUSED: claim value ${input.value} cannot cover fee ${fee} and the ${builderTip}-grain builder tip and still pay out >= dust (${DUST_GRAIN}); leave the builder tip off`);
+      }
+      throw new Error(`ATOMIC REFUSED: insufficient funds for the claim fee (need ${fee} grains)`);
+    }
     const outputs = [{ program: destProgram, value: payVal }];
+    if (builderTip > 0) outputs.push({ program: builderTipProgram, value: builderTip, builderTip: true });
     return {
       kind: "claim",
       input,
@@ -6353,7 +6378,9 @@ zoo`.split("\n");
       stackLens: [64, 32],
       sequence: MAX_SEQ2,
       locktime: 0,
-      preimage
+      preimage,
+      builderTip,
+      builderTipProgram
     };
   }
   function planRefund({ network, contract, input, destProgram, feeRateGrainsPerVByte, chainHeight }) {
@@ -6395,6 +6422,15 @@ zoo`.split("\n");
     });
   }
   function assembleClaim(network, p, sigHex, claimerXOnly) {
+    const flagged = (p.outputs || []).filter((o) => o && o.builderTip);
+    if (p.builderTip > 0) {
+      const want = addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet);
+      if (flagged.length !== 1 || !constEq2(flagged[0].program, want) || flagged[0].value !== p.builderTip) {
+        throw new Error("ATOMIC REFUSED: builder tip in the plan does not pay the builder address at the planned amount \u2014 refusing to assemble");
+      }
+    } else if (flagged.length > 0) {
+      throw new Error("ATOMIC REFUSED: plan carries a flagged builder tip but no planned tip amount \u2014 refusing to assemble");
+    }
     if (!/^[0-9a-fA-F]{128}$/.test(String(sigHex || "").trim())) {
       throw new Error("claim signature must be 128 hex characters (64 bytes)");
     }

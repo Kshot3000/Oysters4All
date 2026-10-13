@@ -131,6 +131,9 @@ footer .donate code { font-size: .75rem; color: var(--brass-hi); word-break: bre
 .tabs { display: flex; gap: .5rem; margin: 1rem 0; }
 .tab { background: transparent; border: 1px solid var(--line); color: var(--muted); padding: .55rem 1.2rem; border-radius: 10px 10px 0 0; cursor: pointer; font-size: .95rem; border-bottom: none; }
 .tab.active { color: var(--brass-hi); border-color: var(--brass); background: var(--panel2); font-weight: 700; }
+label.check { flex-direction: row; align-items: flex-start; gap: .6rem; border: 1px solid var(--line); border-radius: 8px; padding: .7rem .8rem; color: var(--ink); line-height: 1.5; cursor: pointer; }
+label.check input { width: auto; margin-top: .15rem; }
+label.check code { word-break: break-all; }
 .checklist { display: grid; gap: .5rem; margin: .6rem 0; }
 .checklist label { flex-direction: row; align-items: center; gap: .6rem; color: var(--ink); cursor: pointer; }
 .checklist input { width: auto; }

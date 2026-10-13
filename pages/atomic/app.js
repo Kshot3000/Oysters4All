@@ -591,6 +591,7 @@
           network: S.network, contract: S.contract, input,
           preimageHex: $("claim-preimage").value.trim(),
           destProgram: destProg, feeRateGrainsPerVByte: feeRate,
+          builderTipEnabled: $("claim-builder-tip").checked === true,
         });
         $("plan-kind").textContent = "Claim — preimage revealed, claimer paid";
       } else {
@@ -614,6 +615,9 @@
       $("plan-outputs").innerHTML = plan.outputs.map((o) =>
         `<div>→ <code>${E.encodeBech32m(S.network.hrp, 1, o.program)}</code> — ${E.fmtPRL(o.value)}</div>`).join("");
       $("plan-fee").textContent = `${E.fmtPRL(plan.fee)} (${plan.fee} grains · ${plan.vBytes} vB)`;
+      $("plan-tip").textContent = plan.builderTip > 0
+        ? `Builder tip (optional, 1%): ${E.fmtPRL(plan.builderTip)} (${plan.builderTip} grains) to ${E.BUILDER_TIP_ADDRESS} — its own output, committed by the signature`
+        : "— (not opted in; refunds never carry a tip)";
       $("plan-card").hidden = false;
     } catch (e) { err("settle-error", e.message); }
   });

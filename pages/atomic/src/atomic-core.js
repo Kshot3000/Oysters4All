@@ -368,11 +368,43 @@ function timeoutFromRefundScript(script) {
   return n;
 }
 
+/* ---------------- builder tip (optional, disclosed) ---------------- */
+
+/* Optional builder tip (profit mandate, disclosed, opt-in/default-off):
+ * a claim spends the whole HTLC through the claim leaf, signed by the
+ * claimer alone, so — like Circle/Bond — the tip is never automatic:
+ * the claimer explicitly opts in. builderTipGrainsFor() is the single
+ * source; planClaim() adds the tip as its own second output BEFORE
+ * signing, and the script-path sighash commits to every output — so it
+ * cannot be added or skimmed after signing. Off = plan identical to
+ * the pre-tip planner. Offered on the claim flow only: the refund
+ * takes no tip parameter at all — it returns the maker's own locked
+ * funds after the timeout, so a tip output is excluded by
+ * construction. The recipient is the operator address published in
+ * every Atomic footer. */
+export const BUILDER_TIP_BPS = 100; // 1%
+export const BUILDER_TIP_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+export const BUILDER_TIP_NAME = "Builder tip (optional)";
+
+/** Builder tip in grains for a claim of totalGrains on network.
+ *  Returns 0 unless enabled === true, the network is mainnet, and the
+ *  1% floor reaches the dust floor (waived, never rounded up). Computed
+ *  in BigInt so large HTLCs stay exact, then returned in this core's
+ *  Number style (the input is already range-checked to a safe integer). */
+export function builderTipGrainsFor(totalGrains, network, enabled) {
+  if (enabled !== true) return 0;
+  if (!network || network.hrp !== "prl") return 0;
+  if (!Number.isSafeInteger(totalGrains) || totalGrains <= 0) throw new Error("bad total for builder tip");
+  const tip = Number((BigInt(totalGrains) * BigInt(BUILDER_TIP_BPS)) / 10000n);
+  return tip >= DUST_GRAIN ? tip : 0;
+}
+
 /* ---------------- settle planning ---------------- */
 
 /** Plan a CLAIM spend: the claimer reveals the preimage and pays themselves
- *  (minus fee). The preimage is hash-checked BEFORE anything is built. */
-export function planClaim({ network, contract, input, preimageHex, destProgram, feeRateGrainsPerVByte }) {
+ *  (minus fee, and minus the optional builder tip when the claimer opts
+ *  in). The preimage is hash-checked BEFORE anything is built. */
+export function planClaim({ network, contract, input, preimageHex, destProgram, feeRateGrainsPerVByte, builderTipEnabled = false }) {
   const preimage = checkPreimage(preimageHex, hashFromClaimScript(contract.claimScript));
   if (!(destProgram instanceof Uint8Array) || destProgram.length !== 32) {
     throw new Error("claim destination must be a 32-byte P2TR program");
@@ -383,13 +415,25 @@ export function planClaim({ network, contract, input, preimageHex, destProgram, 
   if (!Number.isSafeInteger(input?.value) || input.value <= 0) {
     throw new Error("ATOMIC REFUSED: bad input value (must be a positive whole number of grains)");
   }
-  // Claim takes everything to one output: fee from the exact witness size
-  // (1 sig + 32-byte preimage + claim script + 65-byte control block).
-  const vB = spendVBytes({ nOut: 1, scriptLen: contract.claimScript.length, controlLen: 65, stackLens: [64, 32] });
+  const builderTip = builderTipGrainsFor(input.value, network, builderTipEnabled === true);
+  const builderTipProgram = builderTip > 0 ? addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet) : null;
+  if (builderTip > 0 && constEq(destProgram, builderTipProgram)) {
+    throw new Error("ATOMIC REFUSED: claim destination is the builder address — the builder tip would duplicate the claim output; leave the tip off");
+  }
+  // Claim takes everything to one output (two with the optional builder
+  // tip): fee from the exact witness size (1 sig + 32-byte preimage +
+  // claim script + 65-byte control block).
+  const vB = spendVBytes({ nOut: builderTip > 0 ? 2 : 1, scriptLen: contract.claimScript.length, controlLen: 65, stackLens: [64, 32] });
   const fee = Math.ceil(vB * feeRateGrainsPerVByte);
-  const payVal = input.value - fee;
-  if (payVal < DUST_GRAIN) throw new Error(`ATOMIC REFUSED: insufficient funds for the claim fee (need ${fee} grains)`);
+  const payVal = input.value - fee - builderTip;
+  if (payVal < DUST_GRAIN) {
+    if (builderTip > 0) {
+      throw new Error(`ATOMIC REFUSED: claim value ${input.value} cannot cover fee ${fee} and the ${builderTip}-grain builder tip and still pay out >= dust (${DUST_GRAIN}); leave the builder tip off`);
+    }
+    throw new Error(`ATOMIC REFUSED: insufficient funds for the claim fee (need ${fee} grains)`);
+  }
   const outputs = [{ program: destProgram, value: payVal }];
+  if (builderTip > 0) outputs.push({ program: builderTipProgram, value: builderTip, builderTip: true });
   return {
     kind: "claim",
     input, outputs, fee, vBytes: vB, change: 0,
@@ -398,6 +442,7 @@ export function planClaim({ network, contract, input, preimageHex, destProgram, 
     stackLens: [64, 32],
     sequence: MAX_SEQ, locktime: 0,
     preimage,
+    builderTip, builderTipProgram,
   };
 }
 
@@ -444,6 +489,21 @@ export function settleDigest(network, p) {
  *  The signature is verified against the claimer key before assembly — a bad
  *  sig never reaches the chain. */
 export function assembleClaim(network, p, sigHex, claimerXOnly) {
+  // Last-hop builder-tip assertion (Circle/Bond pattern): assembly is
+  // the last hop before the tx exists, so a flagged tip is a trust
+  // claim — the tip program is re-derived here from the builder
+  // address constant, never trusted from the plan, and the flagged
+  // output must pay it at exactly the planned amount. An untipped plan
+  // must carry no flagged output at all.
+  const flagged = (p.outputs || []).filter((o) => o && o.builderTip);
+  if (p.builderTip > 0) {
+    const want = addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet);
+    if (flagged.length !== 1 || !constEq(flagged[0].program, want) || flagged[0].value !== p.builderTip) {
+      throw new Error("ATOMIC REFUSED: builder tip in the plan does not pay the builder address at the planned amount — refusing to assemble");
+    }
+  } else if (flagged.length > 0) {
+    throw new Error("ATOMIC REFUSED: plan carries a flagged builder tip but no planned tip amount — refusing to assemble");
+  }
   if (!/^[0-9a-fA-F]{128}$/.test(String(sigHex || "").trim())) {
     throw new Error("claim signature must be 128 hex characters (64 bytes)");
   }
@@ -484,7 +544,12 @@ function canonicalBundleJson(b) {
 }
 
 /** Export an unsigned settle bundle for cold signing. The fingerprint is the
- *  first 64 bits of SHA-256 over the canonical JSON — any tampering breaks it. */
+ *  first 64 bits of SHA-256 over the canonical JSON — any tampering breaks it.
+ *  A tipped claim's tip output travels as a plain output to the builder
+ *  address (the flag is a plan-level label, not a wire field): the bundle
+ *  digest recomputes over both outputs, so import needs no separate tip
+ *  leg — a stripped or rerouted tip breaks the digest (checked, not
+ *  assumed — same call as Bounty's output-blind verifier). */
 export function exportUnsignedBundle(network, p, descriptor) {
   const b = {
     bundle: "pearl-atomic-unsigned:v1:",
