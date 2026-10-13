@@ -21,6 +21,9 @@ var PearlChannels = (() => {
   // src/index.js
   var index_exports = {};
   __export(index_exports, {
+    BUILDER_TIP_ADDRESS: () => BUILDER_TIP_ADDRESS,
+    BUILDER_TIP_BPS: () => BUILDER_TIP_BPS,
+    BUILDER_TIP_NAME: () => BUILDER_TIP_NAME,
     DUST_GRAIN: () => DUST_GRAIN,
     FUNDING_SCRIPT_LEN: () => FUNDING_SCRIPT_LEN,
     GRAIN_PER_PRL: () => GRAIN_PER_PRL,
@@ -39,6 +42,7 @@ var PearlChannels = (() => {
     buildFundingScript: () => buildFundingScript,
     buildKeypathTxEx: () => buildKeypathTxEx,
     buildPenaltyLeaf: () => buildPenaltyLeaf,
+    builderTipGrainsFor: () => builderTipGrainsFor,
     bytesToHex: () => bytesToHex,
     channelFingerprint: () => channelFingerprint,
     decodeBech32m: () => decodeBech32m,
@@ -6899,7 +6903,17 @@ zoo`.split("\n");
       notes
     };
   }
-  function buildClaimTx(networkId, chan, commitment, myPayoutAddr, feeRateGrainsPerVByte) {
+  var BUILDER_TIP_BPS = 100;
+  var BUILDER_TIP_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+  var BUILDER_TIP_NAME = "Builder tip (optional)";
+  function builderTipGrainsFor(totalGrains, network, enabled) {
+    if (enabled !== true) return 0;
+    if (!network || network.hrp !== "prl") return 0;
+    if (!Number.isSafeInteger(totalGrains) || totalGrains <= 0) throw new Error("bad total for builder tip");
+    const tip = Number(BigInt(totalGrains) * BigInt(BUILDER_TIP_BPS) / 10000n);
+    return tip >= DUST_GRAIN ? tip : 0;
+  }
+  function buildClaimTx(networkId, chan, commitment, myPayoutAddr, feeRateGrainsPerVByte, builderTipEnabled = false) {
     const network = resolveNetwork(networkId);
     const csvDelay = validateCsvDelay(chan.csvDelay);
     const toLocalOut = commitment.outputs.find((o) => o.kind === "to_local");
@@ -6909,12 +6923,21 @@ zoo`.split("\n");
     const delayLeaf = hexToBytes(commitment.toLocal.delayScript);
     const toLocalSpk = p2trScriptPubKey(hexToBytes(toLocalOut.program));
     if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) throw new Error("bad fee rate");
-    const vBytes = spendVBytes({ nOut: 1, scriptLen: delayLeaf.length, controlLen: 65, stackLens: [64] });
+    const builderTip = builderTipGrainsFor(Number(toLocalValue), network, builderTipEnabled === true);
+    const builderTipProgram = builderTip > 0 ? addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet) : null;
+    if (builderTip > 0 && constEq2(myProg, builderTipProgram)) {
+      throw new Error("payout address is the builder address \u2014 the builder tip would duplicate the claim output; leave the builder tip off");
+    }
+    const vBytes = spendVBytes({ nOut: builderTip > 0 ? 2 : 1, scriptLen: delayLeaf.length, controlLen: 65, stackLens: [64] });
     const fee = BigInt(Math.ceil(vBytes * feeRateGrainsPerVByte));
-    const out = toLocalValue - fee;
-    if (out < BigInt(DUST_GRAIN)) throw new Error("claim output would be dust \u2014 to_local value too small for this fee rate");
+    const out = toLocalValue - fee - BigInt(builderTip);
+    if (out < BigInt(DUST_GRAIN)) {
+      if (builderTip > 0) throw new Error(`claim output would be dust after the claim fee and the ${builderTip}-grain builder tip \u2014 to_local value too small; leave the builder tip off`);
+      throw new Error("claim output would be dust \u2014 to_local value too small for this fee rate");
+    }
     const input = { txid: commitment.txid, vout: 0, value: Number(toLocalValue), spk: toLocalSpk };
     const outputs = [{ program: myProg, value: Number(out) }];
+    if (builderTip > 0) outputs.push({ program: builderTipProgram, value: builderTip, builderTip: true });
     const digest = scriptPathSigDigestEx(network, input, outputs, delayLeaf, { sequence: csvDelay, locktime: 0 });
     const { txid, hex } = serializeUnsignedTx(network, input, outputs, csvDelay, 0);
     return {
@@ -6936,13 +6959,32 @@ zoo`.split("\n");
         program: bytesToHex(hexToBytes(toLocalOut.program)),
         controlDelay: commitment.toLocal.controlDelay
       },
-      outputs: [{ kind: "claim", value: out.toString(), program: bytesToHex(myProg) }],
+      outputs: outputs.map((o, i) => ({
+        kind: i === 0 ? "claim" : "builder-tip",
+        value: BigInt(o.value).toString(),
+        program: bytesToHex(o.program),
+        ...o.builderTip ? { builderTip: true } : {}
+      })),
+      builderTipGrains: builderTip.toString(),
       fingerprint: bytesToHex(sha2562(Uint8Array.from([...utf8(FP_DOMAIN + "/claim"), ...hexToBytes(txid)]))).slice(0, 16)
     };
   }
   function assembleClaimTx(networkId, chan, template, sigHex) {
     const network = resolveNetwork(networkId);
     assertChannelSig(sigHex, template.digest, chan.aXOnly, "your");
+    const flagged = (template.outputs || []).filter((o) => o && (o.builderTip || o.kind === "builder-tip"));
+    if (flagged.length > 0) {
+      const wantTip = builderTipGrainsFor(Number(BigInt(template.toLocalRef.value)), network, true);
+      const wantProg = bytesToHex(addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet));
+      if (flagged.length !== 1 || wantTip <= 0 || flagged[0].program !== wantProg || BigInt(flagged[0].value) !== BigInt(wantTip)) {
+        throw new Error("builder tip does not pay the builder address at the computed amount \u2014 refusing to assemble the claim");
+      }
+      if (BigInt(template.builderTipGrains ?? "0") !== BigInt(wantTip)) {
+        throw new Error("claim template builder-tip amount does not match the computed tip \u2014 refusing to assemble");
+      }
+    } else if (BigInt(template.builderTipGrains ?? "0") !== 0n) {
+      throw new Error("claim template declares a builder tip but carries no tip output \u2014 refusing to assemble");
+    }
     const delayLeaf = delayLeafFromTemplate(template);
     const toLocalOut = template.toLocalRef;
     const input = {

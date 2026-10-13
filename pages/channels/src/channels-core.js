@@ -596,12 +596,40 @@ export function buildCoopClose(networkId, chan, fundingTxid, fundingVout, myPayo
   };
 }
 
+/* ---------------- builder tip (optional, disclosed) ---------------- */
+
+/** OPTIONAL builder tip on unilateral claims: 1% of the claimed to_local
+ *  value, added as its own output BEFORE signing (the script-path sighash
+ *  commits to every output, so it cannot be added or skimmed afterwards).
+ *  Never automatic: the claimer explicitly opts in. builderTipGrainsFor()
+ *  is the single source for the amount. Only the unilateral claim carries
+ *  it: commitment txs and the cooperative close are 2-of-2 spends whose
+ *  outputs are the two parties' agreed balances, and their builders take
+ *  no tip parameter at all — a tip output is unbuildable there. */
+export const BUILDER_TIP_BPS = 100; // 1%
+export const BUILDER_TIP_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+export const BUILDER_TIP_NAME = "Builder tip (optional)";
+
+/** Builder tip in grains for a claim of totalGrains on network.
+ *  Returns 0 unless enabled === true, the network is mainnet, and the
+ *  1% floor reaches the dust floor (waived, never rounded up). */
+export function builderTipGrainsFor(totalGrains, network, enabled) {
+  if (enabled !== true) return 0;
+  if (!network || network.hrp !== "prl") return 0;
+  if (!Number.isSafeInteger(totalGrains) || totalGrains <= 0) throw new Error("bad total for builder tip");
+  const tip = Number((BigInt(totalGrains) * BigInt(BUILDER_TIP_BPS)) / 10000n);
+  return tip >= DUST_GRAIN ? tip : 0;
+}
+
 /* ---------------- unilateral claim (after CSV matures) ---------------- */
 
 /** Claim tx: spends YOUR to_local output from your latest commitment tx via
  *  the CSV delay leaf. Input sequence = csvDelay (BIP-68, block units).
- *  Returns the unsigned template; sign with signChannelDigest + assembleClaim. */
-export function buildClaimTx(networkId, chan, commitment, myPayoutAddr, feeRateGrainsPerVByte) {
+ *  Returns the unsigned template; sign with signChannelDigest + assembleClaim.
+ *  With builderTipEnabled === true an optional disclosed 1% builder tip is
+ *  added as its own second output before signing; the claimer receives
+ *  the to_local value minus fee and tip. */
+export function buildClaimTx(networkId, chan, commitment, myPayoutAddr, feeRateGrainsPerVByte, builderTipEnabled = false) {
   const network = resolveNetwork(networkId);
   const csvDelay = validateCsvDelay(chan.csvDelay);
   const toLocalOut = commitment.outputs.find((o) => o.kind === "to_local");
@@ -612,12 +640,22 @@ export function buildClaimTx(networkId, chan, commitment, myPayoutAddr, feeRateG
   const toLocalSpk = p2trScriptPubKey(hexToBytes(toLocalOut.program));
   if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) throw new Error("bad fee rate");
 
-  const vBytes = spendVBytes({ nOut: 1, scriptLen: delayLeaf.length, controlLen: 65, stackLens: [64] });
+  const builderTip = builderTipGrainsFor(Number(toLocalValue), network, builderTipEnabled === true);
+  const builderTipProgram = builderTip > 0 ? addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet) : null;
+  if (builderTip > 0 && constEq(myProg, builderTipProgram)) {
+    throw new Error("payout address is the builder address — the builder tip would duplicate the claim output; leave the builder tip off");
+  }
+
+  const vBytes = spendVBytes({ nOut: builderTip > 0 ? 2 : 1, scriptLen: delayLeaf.length, controlLen: 65, stackLens: [64] });
   const fee = BigInt(Math.ceil(vBytes * feeRateGrainsPerVByte));
-  const out = toLocalValue - fee;
-  if (out < BigInt(DUST_GRAIN)) throw new Error("claim output would be dust — to_local value too small for this fee rate");
+  const out = toLocalValue - fee - BigInt(builderTip);
+  if (out < BigInt(DUST_GRAIN)) {
+    if (builderTip > 0) throw new Error(`claim output would be dust after the claim fee and the ${builderTip}-grain builder tip — to_local value too small; leave the builder tip off`);
+    throw new Error("claim output would be dust — to_local value too small for this fee rate");
+  }
   const input = { txid: commitment.txid, vout: 0, value: Number(toLocalValue), spk: toLocalSpk };
   const outputs = [{ program: myProg, value: Number(out) }];
+  if (builderTip > 0) outputs.push({ program: builderTipProgram, value: builderTip, builderTip: true });
   const digest = scriptPathSigDigestEx(network, input, outputs, delayLeaf, { sequence: csvDelay, locktime: 0 });
   const { txid, hex } = serializeUnsignedTx(network, input, outputs, csvDelay, 0);
   return {
@@ -633,7 +671,12 @@ export function buildClaimTx(networkId, chan, commitment, myPayoutAddr, feeRateG
       value: toLocalValue.toString(), program: bytesToHex(hexToBytes(toLocalOut.program)),
       controlDelay: commitment.toLocal.controlDelay,
     },
-    outputs: [{ kind: "claim", value: out.toString(), program: bytesToHex(myProg) }],
+    outputs: outputs.map((o, i) => ({
+      kind: i === 0 ? "claim" : "builder-tip",
+      value: BigInt(o.value).toString(), program: bytesToHex(o.program),
+      ...(o.builderTip ? { builderTip: true } : {}),
+    })),
+    builderTipGrains: builderTip.toString(),
     fingerprint: bytesToHex(sha256(Uint8Array.from([...utf8(FP_DOMAIN + "/claim"), ...hexToBytes(txid)]))).slice(0, 16),
   };
 }
@@ -642,6 +685,26 @@ export function buildClaimTx(networkId, chan, commitment, myPayoutAddr, feeRateG
 export function assembleClaimTx(networkId, chan, template, sigHex) {
   const network = resolveNetwork(networkId);
   assertChannelSig(sigHex, template.digest, chan.aXOnly, "your");
+  // Last-hop builder-tip assertion: assembleClaimTx is where the claim
+  // template crosses into a signed transaction, so a flagged tip output
+  // is a trust claim — the tip program is re-derived here from the
+  // builder address constant and the amount recomputed from the claimed
+  // to_local value, never trusted from the template. (The signature over
+  // the template digest already binds the output set; this pins WHAT a
+  // flagged tip is allowed to be.)
+  const flagged = (template.outputs || []).filter((o) => o && (o.builderTip || o.kind === "builder-tip"));
+  if (flagged.length > 0) {
+    const wantTip = builderTipGrainsFor(Number(BigInt(template.toLocalRef.value)), network, true);
+    const wantProg = bytesToHex(addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet));
+    if (flagged.length !== 1 || wantTip <= 0 || flagged[0].program !== wantProg || BigInt(flagged[0].value) !== BigInt(wantTip)) {
+      throw new Error("builder tip does not pay the builder address at the computed amount — refusing to assemble the claim");
+    }
+    if (BigInt(template.builderTipGrains ?? "0") !== BigInt(wantTip)) {
+      throw new Error("claim template builder-tip amount does not match the computed tip — refusing to assemble");
+    }
+  } else if (BigInt(template.builderTipGrains ?? "0") !== 0n) {
+    throw new Error("claim template declares a builder tip but carries no tip output — refusing to assemble");
+  }
   const delayLeaf = delayLeafFromTemplate(template);
   const toLocalOut = template.toLocalRef;
   const input = {

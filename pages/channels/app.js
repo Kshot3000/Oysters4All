@@ -598,7 +598,7 @@
       // buildClaimTx takes the commitment *template*; point it at the signed
       // commitment txid (segwit txids exclude the witness, so this matches).
       const commitment = Object.assign({}, st.pair.mine, { txid: st.txidMine });
-      const claim = P.buildClaimTx(NET, S.chan, commitment, S.myPayoutAddr, feeRate);
+      const claim = P.buildClaimTx(NET, S.chan, commitment, S.myPayoutAddr, feeRate, $("close-uni-tip").checked === true);
       claim.commitmentTxid = st.txidMine;
       S.claim = claim;
       $("close-uni-result").hidden = false;
@@ -607,6 +607,9 @@
       $("close-uni-csv").textContent = S.chan.csvDelay + " blocks";
       $("close-uni-csv2").textContent = S.chan.csvDelay;
       $("close-uni-fee").textContent = grainsToPRL(claim.fee);
+      const tipOn = BigInt(claim.builderTipGrains || "0") > 0n;
+      $("close-uni-tip-row").hidden = !tipOn;
+      if (tipOn) $("close-uni-tip-amt").textContent = grainsToPRL(claim.builderTipGrains) + " PRL to " + P.BUILDER_TIP_ADDRESS;
       $("close-uni-hex").hidden = true;
     } catch (e) { showError("close-uni-error", e); }
   });

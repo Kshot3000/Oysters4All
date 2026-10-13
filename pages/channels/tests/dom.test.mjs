@@ -394,6 +394,43 @@ test("close: unilateral claim builds and signs", () => {
   assert.ok(!get("close-uni-hex").hidden, "claim hex shown");
 });
 
+test("builder tip: checkbox opt-in, disclosure, UI tipped claim exact on the wire; opt-out restores single output", () => {
+  assert.ok(html.includes('id="close-uni-tip"'), "tip checkbox present");
+  assert.ok(html.includes('type="checkbox" id="close-uni-tip"'), "tip control is a checkbox");
+  assert.ok(!/<input type="checkbox" id="close-uni-tip" checked/.test(html), "tip checkbox unchecked by default");
+  assert.ok(html.includes("Optional builder tip — add 1% of the claimed amount"), "disclosure names the 1%");
+  assert.ok(html.includes("commitment transactions and cooperative closes never carry a tip"), "2-of-2 exclusion disclosed");
+  assert.ok(html.includes('id="close-uni-tip-amt"'), "result panel shows the tip as its own line");
+  const box = get("close-uni-tip");
+  assert.equal(box.checked, false, "checkbox off at runtime by default");
+  box.checked = true;
+  T.click("close-uni-build");
+  let e = T.err("close-uni-error");
+  assert.ok(e.hidden, "tipped build ok: " + e.text);
+  const st = T.state();
+  const tipOut = st.claim.outputs.find((o) => o.kind === "builder-tip");
+  assert.ok(tipOut, "claim carries a builder-tip output");
+  assert.ok(BigInt(st.claim.builderTipGrains) > 0n, "tip grains recorded");
+  assert.equal(tipOut.value, st.claim.builderTipGrains);
+  assert.ok(!get("close-uni-tip-row").hidden, "tip row shown");
+  T.set("close-uni-key", PRIV_A);
+  T.click("close-uni-sign");
+  e = T.err("close-uni-error");
+  assert.ok(e.hidden, "tipped sign ok: " + e.text);
+  const dec = R.decodeRawTx(st.claim.hex);
+  assert.equal(dec.outputs.length, 2);
+  const builderSpk = "5120" + R.bytesToHex(R.payoutProgram(R.BUILDER_TIP_ADDRESS, R.NETWORKS.mainnet));
+  assert.equal(R.bytesToHex(dec.outputs[1].spk), builderSpk);
+  assert.equal(BigInt(dec.outputs[1].value), BigInt(st.claim.builderTipGrains));
+  // opt-out restores the single-output claim
+  box.checked = false;
+  T.click("close-uni-build");
+  const st2 = T.state();
+  assert.equal(st2.claim.outputs.length, 1);
+  assert.equal(st2.claim.builderTipGrains, "0");
+  assert.ok(get("close-uni-tip-row").hidden, "tip row hidden when off");
+});
+
 test("verify: descriptor-only check passes", () => {
   T.set("verify-descriptor", JSON.stringify(T.state().chan));
   T.click("verify-desc");

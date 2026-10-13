@@ -22,7 +22,7 @@
 <meta name="twitter:image" content="https://kshot3000.github.io/Oysters4All/assets/og-card.png">
 <meta name="twitter:site" content="@kshot9000">
 <meta name="twitter:creator" content="@kshot9000">
-<link rel="stylesheet" href="styles.css?v=5">
+<link rel="stylesheet" href="styles.css?v=6">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Pearl Channels — Off-Chain PRL Payment Channels","description":"Pearl Channels: off-chain PRL payment channels with no smart contracts. Open a 2-of-2 Taproot channel, exchange signed commitment transactions off-chain, close cooperatively or unilaterally with a CSV delay. Keys never leave your browser.","url":"https://kshot3000.github.io/Oysters4All/pages/channels/","applicationCategory":"BrowserApplication","operatingSystem":"Any","isAccessibleForFree":true}</script>
 <link rel="stylesheet" href="../../visual-upgrade/theme.css?v=20261007">
 </head>
@@ -267,6 +267,7 @@
       <div class="closecard">
         <h3>Unilateral close</h3>
         <p class="lede">Broadcast your latest commitment, then claim after the CSV delay.</p>
+        <label class="check"><input type="checkbox" id="close-uni-tip"> Optional builder tip — add 1% of the claimed amount as its own output to the builder (prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d). You receive your to_local balance minus the claim fee and the tip. Off by default; commitment transactions and cooperative closes never carry a tip.</label>
         <div class="row"><button id="close-uni-build" class="primary">Build claim tx</button></div>
         <div id="close-uni-error" class="error" hidden role="alert"></div>
         <div id="close-uni-result" hidden aria-live="polite">
@@ -275,6 +276,7 @@
             <div><dt>Claim txid</dt><dd><code id="close-uni-txid" class="addr"></code></dd></div>
             <div><dt>CSV delay</dt><dd id="close-uni-csv"></dd></div>
             <div><dt>Claim fee</dt><dd id="close-uni-fee"></dd></div>
+            <div id="close-uni-tip-row" hidden><dt>Builder tip (optional)</dt><dd id="close-uni-tip-amt"></dd></div>
           </dl>
           <div class="row">
             <label class="inline">Signing key <input id="close-uni-key" type="password" autocomplete="off" spellcheck="false"></label>
@@ -354,6 +356,7 @@
       <li>The penalty model is opt-in training wheels: revocation secrets are exchanged by hand, and the claim delay is in blocks, not wall-clock time.</li>
       <li>Commitment fees are fixed when a state is signed; if chain fees spike, a unilateral close can get expensive.</li>
       <li>Broadcasting a revoked state lets your peer take your entire to_local output. Don't.</li>
+      <li>The optional builder tip on a unilateral claim is off by default, is never automatic, and is added before you sign — commitment transactions and cooperative closes never carry one.</li>
     </ul>
   </aside>
 </main>
@@ -364,7 +367,7 @@
   <button id="donate-copy" class="ghost">Copy</button></p>
 </footer>
 
-<script src="pearl-channels.bundle.js?v=6"></script>
-<script src="app.js?v=3"></script>
+<script src="pearl-channels.bundle.js?v=7"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

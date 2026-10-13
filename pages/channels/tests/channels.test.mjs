@@ -251,6 +251,79 @@ test("unilateral claim builds with CSV sequence and assembles", () => {
   assert.equal(dec.inputs[0].sequence, 72);
 });
 
+test("builder tip: amount math — opt-in only, mainnet only, sub-dust waived, exact dust floor charged", () => {
+  const M = C.NETWORKS.mainnet, T = C.NETWORKS.testnet;
+  assert.equal(C.builderTipGrainsFor(1_000_000_000, M, false), 0);
+  assert.equal(C.builderTipGrainsFor(1_000_000_000, M, undefined), 0);
+  assert.equal(C.builderTipGrainsFor(1_000_000_000, T, true), 0);
+  assert.equal(C.builderTipGrainsFor(50_000, M, true), 0); // 500 < 546 dust — waived, never rounded up
+  assert.equal(C.builderTipGrainsFor(54_600, M, true), 546); // exact dust floor is charged
+  assert.equal(C.builderTipGrainsFor(1_000_000_001, M, true), 10_000_000); // floor, BigInt-exact
+  assert.equal(C.BUILDER_TIP_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
+});
+
+test("builder tip: tipped unilateral claim pays the builder exactly 1% as its own output; opt-out builder-free", () => {
+  const chan = openTestChannel(72);
+  const state = testState(chan);
+  const pair = C.buildCommitmentPair("mainnet", chan, FUNDING_TXID, 0, state, FEE_RATE);
+  const toLocal = BigInt(pair.mine.outputs.find((o) => o.kind === "to_local").value);
+  const tip = C.builderTipGrainsFor(Number(toLocal), C.NETWORKS.mainnet, true);
+  assert.equal(tip, Number(toLocal / 100n)); // exactly floor(1% of the to_local value)
+  assert.ok(tip > 9_000_000, "to_local is ~10 PRL, tip ~0.1 PRL");
+  const claim = C.buildClaimTx("mainnet", chan, pair.mine, myPayout, FEE_RATE, true);
+  assert.equal(claim.builderTipGrains, String(tip));
+  assert.equal(claim.outputs.length, 2);
+  assert.equal(claim.outputs[1].kind, "builder-tip");
+  assert.equal(claim.outputs[1].value, String(tip));
+  const builderProg = C.bytesToHex(C.payoutProgram(C.BUILDER_TIP_ADDRESS, C.NETWORKS.mainnet));
+  assert.equal(claim.outputs[1].program, builderProg);
+  // conservation: claim + tip + fee == to_local, fee computed over 2 outputs
+  assert.equal(BigInt(claim.outputs[0].value) + BigInt(claim.outputs[1].value) + BigInt(claim.fee), toLocal);
+  const plain = C.buildClaimTx("mainnet", chan, pair.mine, myPayout, FEE_RATE);
+  assert.ok(BigInt(claim.fee) > BigInt(plain.fee), "tipped claim pays the 2-output fee");
+  // signed wire: tip is output 1 at the exact amount, CSV sequence survives
+  const sig = C.signChannelDigest(privA, claim.digest);
+  const assembled = C.assembleClaimTx("mainnet", chan, claim, sig);
+  const dec = C.decodeRawTx(assembled.hex);
+  assert.equal(dec.outputs.length, 2);
+  assert.equal(Number(dec.outputs[1].value), tip);
+  assert.equal(C.bytesToHex(dec.outputs[1].spk), "5120" + builderProg);
+  assert.equal(dec.inputs[0].sequence, 72);
+  // opt-out: exactly one output, no builder program anywhere
+  const plainSig = C.signChannelDigest(privA, plain.digest);
+  const plainAsm = C.assembleClaimTx("mainnet", chan, plain, plainSig);
+  const pdec = C.decodeRawTx(plainAsm.hex);
+  assert.equal(pdec.outputs.length, 1);
+  assert.equal(plain.builderTipGrains, "0");
+});
+
+test("builder tip: payout==builder and tip-dust refusals; assemble rejects a tampered tip; coop close carries no tip", () => {
+  const chan = openTestChannel(72);
+  const state = testState(chan);
+  const pair = C.buildCommitmentPair("mainnet", chan, FUNDING_TXID, 0, state, FEE_RATE);
+  assert.throws(
+    () => C.buildClaimTx("mainnet", chan, pair.mine, C.BUILDER_TIP_ADDRESS, FEE_RATE, true),
+    /builder tip would duplicate/,
+  );
+  // tip-dust: tiny to_local at a huge fee rate refuses naming the tip
+  const small = testState(chan, 0, 100_000n, BigInt(chan.capacity) - 100_000n);
+  const smallPair = C.buildCommitmentPair("mainnet", chan, FUNDING_TXID, 0, small, FEE_RATE);
+  assert.throws(
+    () => C.buildClaimTx("mainnet", chan, smallPair.mine, myPayout, 600, true),
+    /builder tip/,
+  );
+  // tampered template tip amount refuses at assemble (the last hop)
+  const claim = C.buildClaimTx("mainnet", chan, pair.mine, myPayout, FEE_RATE, true);
+  const tampered = { ...claim, builderTipGrains: "1" };
+  const sig = C.signChannelDigest(privA, claim.digest);
+  assert.throws(() => C.assembleClaimTx("mainnet", chan, tampered, sig), /does not match the computed tip/);
+  // cooperative close (2-of-2 agreed split) takes no tip parameter and
+  // carries no builder output — exclusion by construction
+  const close = C.buildCoopClose("mainnet", chan, FUNDING_TXID, 0, myPayout, state, FEE_RATE);
+  const builderProg = C.bytesToHex(C.payoutProgram(C.BUILDER_TIP_ADDRESS, C.NETWORKS.mainnet));
+  assert.ok(close.outputs.every((o) => o.program !== builderProg), "coop close builder-free");
+});
+
 test("state bundle export/import round-trips; tampered bundles rejected", () => {
   const chan = openTestChannel();
   const state = { ...testState(chan), revokedSecrets: { mine: [], theirs: [] } };

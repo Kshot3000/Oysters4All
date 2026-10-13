@@ -45,6 +45,21 @@ adapted to Pearl's `prl1` bech32m rails.
 - Descriptors re-derive byte-for-byte from the keys; tampered bundles are refused.
 - Broadcast actions require double confirmation.
 
+## Builder tip (optional, disclosed)
+
+A unilateral claim offers an **optional 1% builder tip**: check the box in
+the Unilateral close card and the claim adds the tip as its own second
+output to the builder address
+(`prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`)
+**before** signing — the script-path sighash commits to every output, so
+it cannot be added or skimmed afterwards. It is off by default, never
+automatic, mainnet only, and waived when 1% would fall below the 546-grain
+dust floor instead of being rounded up. The claimer receives the to_local
+balance minus the claim fee (computed over 2 outputs when tipped) and
+the tip. Commitment transactions and the cooperative close are 2-of-2
+spends whose outputs are the two parties' agreed balances — their
+builders take no tip parameter at all, so a tip is unbuildable there.
+
 ## Files
 
 - `index.html` — the six-step wizard
@@ -53,13 +68,13 @@ adapted to Pearl's `prl1` bech32m rails.
 - `pearl-channels.bundle.js` — built from `src/` via `node build.mjs` (esbuild)
 - `src/channels-core.js` — channel cryptography: NUMS funding output, commitment
   pairs, revocation/penalty leaves, cooperative close, CSV claims, state bundles
-- `tests/channels.test.mjs` — 16 core crypto tests (run with node)
+- `tests/channels.test.mjs` — 19 core crypto tests (run with node)
 - `tests/dom.test.mjs` — headless-Chromium UI tests
 
 ## Tests
 
 ```sh
-node --test tests/channels.test.mjs        # core, 16/16
+node --test tests/channels.test.mjs        # core, 19/19
 node tests/dom.test.mjs                    # UI in headless Chromium
 node build.mjs                             # rebuild the bundle after src changes
 ```

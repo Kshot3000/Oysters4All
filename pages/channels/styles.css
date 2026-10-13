@@ -60,6 +60,8 @@ h4 { color: var(--copper); }
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: .9rem; margin: 1rem 0; }
 label { display: flex; flex-direction: column; gap: .3rem; font-size: .9rem; }
 label.inline { flex-direction: row; align-items: center; gap: .5rem; }
+label.check { flex-direction: row; align-items: flex-start; gap: .5rem; font-weight: 400; margin: .8rem 0; cursor: pointer; }
+label.check input { width: auto; margin-top: .2rem; }
 .hint { color: var(--dim); font-size: .75rem; font-weight: normal; }
 input, select, textarea {
   background: #070d18; border: 1px solid var(--line); color: var(--ink);
