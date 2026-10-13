@@ -190,6 +190,50 @@ test("full service -> terms -> fund -> pre-sign -> verify flow in stub DOM", () 
   assert.ok($("vf-out").innerHTML.includes("Bundle invalid"), "tampered bundle rejected");
 });
 
+test("builder tip: unchecked by default + disclosure in page; opt-in seals and signs the on-top tip", () => {
+  assert.ok(!/<input type="checkbox" id="sub-builder-tip"[^>]*\schecked/.test(html), "tip checkbox must default off");
+  assert.ok(html.includes('id="sub-builder-tip"'), "tip checkbox present");
+  assert.ok(html.includes("ON TOP of the merchant amount"), "on-top disclosure in page");
+  const { ctx, $ } = boot();
+  const E = ctx.PearlSubscribe;
+  const NW = E.NETWORKS.mainnet;
+  $("network").value = "mainnet";
+  $("sub-period").value = "3118";
+  $("sub-merchant").value = E.subscriberKeyFromInput("22".repeat(32), NW).keypathAddress;
+  $("sub-anchor").value = E.subscriberKeyFromInput("11".repeat(32), NW).keypathAddress;
+  $("sub-amount").value = "1";
+  $("sub-periods").value = "3";
+  $("sub-start").value = "500000";
+  $("sub-feerate").value = "5";
+  $("sub-builder-tip").checked = true;
+  $("service-next").click();
+  assert.equal($("service-err").hidden, true, "service must not error: " + $("service-err").textContent);
+  assert.ok($("terms-builder-tip").textContent.includes("0.01 PRL per period"), "terms show per-period tip: " + $("terms-builder-tip").textContent);
+  assert.ok($("terms-builder-tip").textContent.includes("0.03 PRL total"), "terms show total tip");
+  const desc = JSON.parse($("terms-desc").value);
+  assert.equal(desc.builderTipEnabled, true);
+  assert.equal(desc.builderTipGrains, 1_000_000);
+  $("terms-next").click();
+  assert.ok($("fund-perout").textContent.includes("builder tip"), "fund plan names the tip: " + $("fund-perout").textContent);
+  $("fund-utxos").value = `${"aa".repeat(32)}:0:500000000`;
+  $("fund-key").value = "11".repeat(32);
+  $("fund-build").click();
+  assert.equal($("fund-err").hidden, true, "fund must not error: " + $("fund-err").textContent);
+  $("fund-next").click();
+  $("ps-key").value = "11".repeat(32);
+  $("ps-sign").click();
+  assert.equal($("ps-err").hidden, true, "pre-sign must not error: " + $("ps-err").textContent);
+  const bundleJson = $("ps-bundle").value;
+  const res = E.verifySignedBundle(bundleJson);
+  assert.ok(res.ok, "tipped bundle verifies in the live bundle: " + res.failures.join("; "));
+  // opting back out restores the untipped descriptor
+  $("sub-builder-tip").checked = false;
+  $("service-next").click();
+  const desc2 = JSON.parse($("terms-desc").value);
+  assert.equal(desc2.builderTipGrains, 0);
+  assert.equal($("terms-builder-tip").textContent, "off");
+});
+
 test("service refuses malformed integer terms, never truncates them into the descriptor", () => {
   const { ctx, $ } = boot();
   const E = ctx.PearlSubscribe;

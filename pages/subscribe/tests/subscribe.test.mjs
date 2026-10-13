@@ -69,6 +69,9 @@ import {
   verifySignedTxLocktime,
   buildCancelTx,
   periodStatuses,
+  BUILDER_TIP_ADDRESS,
+  builderTipGrainsFor,
+  descriptorBuilderTipGrains,
 } from "../src/subscribe-core.js";
 
 const NW = NETWORKS.mainnet;
@@ -338,6 +341,92 @@ test("verifySignedBundle rejects: tampered amount, swapped locktime, wrong seque
   r = verifySignedBundle(JSON.stringify(b3));
   assert.ok(!r.ok, "descriptor tamper must fail");
   assert.throws(() => parseSignedBundle('{"v":"nope"}'), /pearl-sub-bundle/);
+});
+
+/* ---------------- optional builder tip (on top, per period) ---------------- */
+
+const tippedTerms = () => makeDescriptor(goodTerms({ builderTipEnabled: true })).descriptor;
+
+test("builderTipGrainsFor: exactness and waivers", () => {
+  assert.equal(builderTipGrainsFor(100_000_000, NW, true), 1_000_000);
+  assert.equal(builderTipGrainsFor(100_000_000, NW, false), 0);
+  assert.equal(builderTipGrainsFor(100_000_000, NW, undefined), 0);
+  assert.equal(builderTipGrainsFor(100_000_000, NETWORKS.testnet, true), 0); // mainnet only
+  assert.equal(builderTipGrainsFor(54_599, NW, true), 0); // 1% = 545 < dust — waived, never rounded up
+  assert.equal(builderTipGrainsFor(54_600, NW, true), 546); // exactly at the dust floor — charged
+  assert.equal(BUILDER_TIP_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
+});
+
+test("builder tip is sealed in the descriptor and recomputed, never trusted", () => {
+  const d = makeDescriptor(goodTerms({ builderTipEnabled: true }));
+  assert.equal(d.descriptor.builderTipEnabled, true);
+  assert.equal(d.descriptor.builderTipGrains, 1_000_000);
+  const parsed = parseDescriptor(JSON.stringify(d.descriptor));
+  assert.equal(descriptorBuilderTipGrains(parsed.descriptor, NW), 1_000_000);
+  // changing the sealed amount breaks the fingerprint
+  assert.throws(() => parseDescriptor(JSON.stringify({ ...d.descriptor, builderTipGrains: 1 })), /TAMPERED/);
+  // a crafted descriptor with a self-consistent fingerprint but a tip that
+  // does not derive from amount+flag refuses at parse (recomputed tip leg)
+  const { fingerprint, ...rest } = d.descriptor;
+  const crafted = { ...rest, builderTipGrains: 999_999 };
+  crafted.fingerprint = fingerprintOf(canonicalJson({ v: DESCRIPTOR_VERSION, ...crafted }));
+  assert.throws(() => parseDescriptor(JSON.stringify(crafted)), /builder tip mismatch/);
+  // merchant == builder address refuses at descriptor time
+  assert.throws(() => makeDescriptor(goodTerms({ merchant: BUILDER_TIP_ADDRESS, builderTipEnabled: true })), /builder-tip address/);
+});
+
+test("legacy descriptors without tip fields still parse as untipped", () => {
+  const { fingerprint, builderTipEnabled, builderTipGrains, ...rest } = makeDescriptor(goodTerms()).descriptor;
+  const legacy = { ...rest };
+  legacy.fingerprint = fingerprintOf(canonicalJson({ v: DESCRIPTOR_VERSION, ...legacy }));
+  const parsed = parseDescriptor(JSON.stringify(legacy));
+  assert.equal(descriptorBuilderTipGrains(parsed.descriptor, NW), 0);
+  assert.equal(planFunding(parsed.descriptor).perOutputGrains, 100_000_770n);
+});
+
+test("tipped planFunding: tip funded ON TOP — merchant amount unchanged", () => {
+  const plan = planFunding(tippedTerms());
+  assert.equal(plan.builderTipGrains, 1_000_000);
+  assert.equal(plan.builderTipTotalGrains, 3_000_000n);
+  assert.equal(plan.perOutputGrains, 101_000_770n); // 1 PRL amount + 0.01 tip + 770 reserve
+  assert.equal(plan.totalGrains, 303_002_310n);
+  const p = paymentTxPlan(tippedTerms(), "bb".repeat(32), 0);
+  assert.equal(p.merchantValue, 100_000_000); // the promise never shrinks
+  assert.equal(p.builderTipGrains, 1_000_000);
+  assert.equal(p.inputValue, 101_000_770);
+  assert.deepEqual(p.outputs.map((o) => o.value), [100_000_000, 1_000_000]);
+  assert.equal(p.outputs[1].address, BUILDER_TIP_ADDRESS);
+});
+
+test("tipped payments sign, verify, and carry the tip exact on the wire", () => {
+  const terms = tippedTerms();
+  const { payments } = signPaymentTxs(terms, "bb".repeat(32), key1());
+  const builderSpk = bytesToHex(p2trScriptPubKey(decodeBech32m(BUILDER_TIP_ADDRESS, "prl").program));
+  for (const pay of payments) {
+    const dec = decodeRawTx(pay.hex);
+    assert.equal(dec.outputs.length, 2);
+    assert.equal(Number(dec.outputs[0].value), 100_000_000);
+    assert.equal(Number(dec.outputs[1].value), 1_000_000);
+    assert.equal(bytesToHex(dec.outputs[1].spk), builderSpk);
+  }
+  const { json } = makeSignedBundle(terms, "bb".repeat(32), payments);
+  const res = verifySignedBundle(json);
+  assert.ok(res.ok, "tipped bundle verifies: " + res.failures.join("; "));
+  assert.ok(res.checks.some((c) => c.includes("builder tip 0.01 PRL")), "verifier reports the tip leg: " + res.checks.join(" | "));
+  // unsealing the tip in the descriptor (self-consistent fingerprint) fails:
+  // the signed payments carry a builder output the untipped terms forbid
+  const b = JSON.parse(json);
+  b.descriptor.builderTipEnabled = false;
+  b.descriptor.builderTipGrains = 0;
+  const { fingerprint, ...rest } = b.descriptor;
+  b.descriptor.fingerprint = fingerprintOf(canonicalJson({ v: DESCRIPTOR_VERSION, ...rest }));
+  const r2 = verifySignedBundle(JSON.stringify(b));
+  assert.ok(!r2.ok, "tip-stripped descriptor must fail against tipped payments");
+});
+
+test("cancel reclaims a tipped period in full, tip included", () => {
+  const { reclaimedGrains } = buildCancelTx(tippedTerms(), "bb".repeat(32), 1, key1());
+  assert.equal(reclaimedGrains, 101_000_770 - cancelVBytes() * 5);
 });
 
 /* ---------------- cancel ---------------- */

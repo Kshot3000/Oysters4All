@@ -87,6 +87,7 @@
       periods: strictIntField("sub-periods", "periods"),
       startHeight: strictIntField("sub-start", "start height"),
       feeRate: strictIntField("sub-feerate", "fee rate"),
+      builderTipEnabled: $("sub-builder-tip").checked === true,
     };
   }
 
@@ -134,6 +135,9 @@
     $("terms-merchant-total").textContent = E.fmtPRL(BigInt(d.descriptor.amountGrains) * BigInt(d.descriptor.periods)) + " PRL";
     const plan = E.planFunding(d.descriptor);
     S.plans = plan;
+    $("terms-builder-tip").textContent = plan.builderTipGrains > 0
+      ? `${E.fmtPRL(BigInt(plan.builderTipGrains))} PRL per period (${E.fmtPRL(plan.builderTipTotalGrains)} PRL total, on top — the merchant still gets the full amount every period)`
+      : "off";
     $("terms-funding-total").textContent = E.fmtPRL(plan.totalGrains) + " PRL";
     $("terms-schedule-note").textContent = `${d.descriptor.periods} payments, every ${d.descriptor.periodBlocks} blocks`;
     $("terms-body").innerHTML = d.schedule.map((h, i) =>
@@ -151,7 +155,9 @@
   function renderFund() {
     const plan = S.plans;
     $("fund-nout").textContent = plan.outputs.length + " outputs → " + shortAddr(S.terms.anchor);
-    $("fund-perout").textContent = E.fmtPRL(plan.perOutputGrains) + ` PRL (amount + ${E.fmtPRL(plan.feeReserveGrains)} fee reserve)`;
+    $("fund-perout").textContent = E.fmtPRL(plan.perOutputGrains) + (plan.builderTipGrains > 0
+      ? ` PRL (amount + ${E.fmtPRL(BigInt(plan.builderTipGrains))} builder tip + ${E.fmtPRL(plan.feeReserveGrains)} fee reserve)`
+      : ` PRL (amount + ${E.fmtPRL(plan.feeReserveGrains)} fee reserve)`);
     $("fund-total").textContent = E.fmtPRL(plan.totalGrains) + " PRL";
     $("fund-body").innerHTML = plan.outputs.map((o, i) =>
       `<tr><td class="num">${o.vout}</td><td class="addr">${shortAddr(o.address)}</td>` +

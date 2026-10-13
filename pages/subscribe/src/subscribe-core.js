@@ -87,6 +87,46 @@ export const PERIOD_PRESETS = [
 ];
 // blocks/day = 86400/194 = 445.36 → weekly 3117.5→3118, biweekly 6235→6236, monthly(30d) 13360.8→13361
 
+/* ---------------- optional builder tip (profit mandate) ----------------
+ * Disclosed, opt-in (default off), ON TOP of the merchant amount: a
+ * subscription's per-period amount is a promise to the merchant, so —
+ * like Dividend's holder shares — it is never reduced. When the
+ * subscriber explicitly enables it, each period's funding output carries
+ * amount + tip + fee reserve, and each pre-signed payment pays the
+ * merchant the full amount plus the tip as its own output. The keypath
+ * sighash commits to every output, so the tip cannot be added or skimmed
+ * after signing; cancelling a period reclaims its tip with the rest of
+ * that period's funding output (the tip is only paid when a payment
+ * actually confirms). builderTipGrainsFor() is the single source. */
+export const BUILDER_TIP_BPS = 100; // 1%
+export const BUILDER_TIP_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+export const BUILDER_TIP_NAME = "Builder tip (optional)";
+
+/** Builder tip in grains for ONE period of totalGrains on network.
+ *  Returns 0 unless enabled === true, the network is mainnet, and the
+ *  1% floor reaches the dust floor (waived, never rounded up). */
+export function builderTipGrainsFor(totalGrains, network, enabled) {
+  if (enabled !== true) return 0;
+  if (!network || network.hrp !== "prl") return 0;
+  if (!Number.isSafeInteger(totalGrains) || totalGrains <= 0) throw new Error("bad total for builder tip");
+  const tip = Number((BigInt(totalGrains) * BigInt(BUILDER_TIP_BPS)) / 10000n);
+  return tip >= DUST_GRAIN ? tip : 0;
+}
+
+/** The per-period tip committed by a terms/descriptor object. Derives the
+ *  tip from amount + flag (never trusts a stored amount), and refuses when
+ *  a stored builderTipGrains disagrees with the derivation — the flag and
+ *  amount are fingerprint-sealed in the descriptor, and this recomputation
+ *  is the verifier's tip leg. Legacy descriptors without the fields are
+ *  untipped. */
+export function descriptorBuilderTipGrains(terms, network) {
+  const derived = builderTipGrainsFor(terms.amountGrains, network, terms.builderTipEnabled === true);
+  if (terms.builderTipGrains !== undefined && terms.builderTipGrains !== derived) {
+    throw new Error(`builder tip mismatch: descriptor seals ${terms.builderTipGrains} grains/period, terms derive ${derived} — refusing`);
+  }
+  return derived;
+}
+
 /* ---------------- canonical JSON + fingerprints (not crypto) ---------------- */
 
 export function canonicalJson(v) {
@@ -197,8 +237,14 @@ export function makeDescriptor(raw) {
     network: raw.network, merchant: raw.merchant, anchor: raw.anchor,
     amountGrains: raw.amountGrains, periodBlocks: raw.periodBlocks,
     periods: raw.periods, startHeight: raw.startHeight, feeRate: raw.feeRate,
+    builderTipEnabled: raw.builderTipEnabled === true,
+    builderTipGrains: 0,
   };
   const { network } = validateTerms(t);
+  t.builderTipGrains = builderTipGrainsFor(t.amountGrains, network, t.builderTipEnabled);
+  if (t.builderTipGrains > 0 && t.merchant === BUILDER_TIP_ADDRESS) {
+    throw new Error("merchant is the builder-tip address — the tip would duplicate the merchant output; leave the builder tip off for this subscription");
+  }
   const canonical = canonicalJson({ v: DESCRIPTOR_VERSION, ...t });
   const fingerprint = fingerprintOf(canonical);
   return {
@@ -219,6 +265,7 @@ export function parseDescriptor(input) {
     throw new Error("DESCRIPTOR TAMPERED: fingerprint mismatch — these terms were altered after signing");
   }
   const { network } = validateTerms(rest);
+  descriptorBuilderTipGrains(rest, network); // recomputed tip leg — a sealed tip that does not derive refuses
   return { descriptor: obj, canonical, fingerprint, network, schedule: periodLocktimes(rest.startHeight, rest.periodBlocks, rest.periods) };
 }
 
@@ -232,17 +279,22 @@ export function feeReserveGrains(feeRate) {
   return BigInt(paymentVBytes()) * BigInt(feeRate);
 }
 
-/** The N funding outputs: each = amount + fee reserve, all to the anchor. */
+/** The N funding outputs: each = amount (+ optional on-top builder tip)
+ *  + fee reserve, all to the anchor. The tip is funded IN ADDITION to the
+ *  merchant amount — the merchant's per-period amount never changes. */
 export function planFunding(terms) {
-  validateTerms(terms);
+  const { network } = validateTerms(terms);
+  const builderTip = descriptorBuilderTipGrains(terms, network);
   const reserve = feeReserveGrains(terms.feeRate);
-  const perOutput = BigInt(terms.amountGrains) + reserve;
+  const perOutput = BigInt(terms.amountGrains) + BigInt(builderTip) + reserve;
   const outputs = [];
   for (let i = 0; i < terms.periods; i++) outputs.push({ vout: i, address: terms.anchor, value: perOutput });
   return {
     outputs,
     perOutputGrains: perOutput,
     feeReserveGrains: reserve,
+    builderTipGrains: builderTip,
+    builderTipTotalGrains: BigInt(builderTip) * BigInt(terms.periods),
     paymentVBytes: paymentVBytes(),
     totalGrains: perOutput * BigInt(terms.periods),
   };
@@ -389,8 +441,13 @@ export function paymentTxPlan(terms, fundingTxid, i) {
   if (!/^[0-9a-f]{64}$/i.test(fundingTxid || "")) throw new Error("bad funding txid");
   if (!Number.isInteger(i) || i < 0 || i >= terms.periods) throw new Error("bad period index");
   const { network, merchantProg, anchorProg } = validateTerms(terms);
+  const builderTip = descriptorBuilderTipGrains(terms, network);
+  const builderTipProg = builderTip > 0 ? addressToProgram(BUILDER_TIP_ADDRESS, network) : null;
+  if (builderTipProg && bytesToHex(builderTipProg) === bytesToHex(merchantProg)) {
+    throw new Error("merchant is the builder-tip address — refusing a duplicate tip output");
+  }
   const reserve = feeReserveGrains(terms.feeRate);
-  const inputValue = Number(BigInt(terms.amountGrains) + reserve);
+  const inputValue = Number(BigInt(terms.amountGrains) + BigInt(builderTip) + reserve);
   const fee = paymentVBytes() * terms.feeRate;
   let change = Number(reserve) - fee;
   let dustAbsorbed = 0;
@@ -398,6 +455,7 @@ export function paymentTxPlan(terms, fundingTxid, i) {
   const locktime = terms.startHeight + i * terms.periodBlocks;
   validateLocktime(locktime);
   const outputs = [{ program: merchantProg, value: terms.amountGrains }];
+  if (builderTip > 0) outputs.push({ program: builderTipProg, value: builderTip });
   if (change > 0) outputs.push({ program: anchorProg, value: change });
   // witness-independent txid via the audited-shape preimage
   const core = [...u32le(network.txVersion), ...varint(1),
@@ -413,8 +471,9 @@ export function paymentTxPlan(terms, fundingTxid, i) {
     period: i + 1, vout: i, locktime, sequence: LOCKTIME_SEQ,
     inputValue, feeGrains: fee + dustAbsorbed, dustAbsorbedGrains: dustAbsorbed,
     merchantValue: terms.amountGrains, changeValue: change,
+    builderTipGrains: builderTip,
     txid,
-    outputs: outputs.map((o) => ({ address: o.program === merchantProg ? terms.merchant : terms.anchor, value: o.value })),
+    outputs: outputs.map((o) => ({ address: builderTipProg && o.program === builderTipProg ? BUILDER_TIP_ADDRESS : o.program === merchantProg ? terms.merchant : terms.anchor, value: o.value })),
   };
 }
 
@@ -428,6 +487,14 @@ export function signPaymentTxs(terms, fundingTxid, key) {
   for (let i = 0; i < terms.periods; i++) {
     const plan = paymentTxPlan(terms, fundingTxid, i);
     const outs = [{ program: merchantProg, value: plan.merchantValue }];
+    if (plan.builderTipGrains > 0) {
+      // Derived here from the builder address constant and asserted against
+      // the plan before it joins the outputs the sighash commits to.
+      const want = addressToProgram(BUILDER_TIP_ADDRESS, network);
+      const planned = plan.outputs.find((o) => o.address === BUILDER_TIP_ADDRESS);
+      if (!planned || planned.value !== plan.builderTipGrains) throw new Error(`period ${i + 1}: builder tip in the plan does not pay the builder address at the sealed amount — refusing`);
+      outs.push({ program: want, value: plan.builderTipGrains });
+    }
     if (plan.changeValue > 0) outs.push({ program: anchorProg, value: plan.changeValue });
     const built = buildKeypathTxLocktime(network, [{
       txid: fundingTxid, vout: i, value: plan.inputValue,
@@ -505,15 +572,25 @@ export function verifySignedBundle(input) {
     if (inp.sequence !== LOCKTIME_SEQ) { failures.push(`${tag}: sequence ${inp.sequence.toString(16)} != 0xfffffffe — locktime not enforced`); continue; }
     const vr = verifySignedTxLocktime(network, p.hex, [{ value: plan.inputValue, spk: anchorSpk }]);
     if (!vr.every((r) => r.ok)) { failures.push(`${tag}: signature invalid (${vr.map((r) => r.reason).join("; ")})`); continue; }
-    // outputs: merchant gets exactly the amount; change (if any) goes to anchor
+    // outputs: merchant gets exactly the amount; the sealed builder tip
+    // (if the descriptor enables one) is exactly one output of exactly the
+    // derived amount to the builder address; change (if any) goes to anchor
     const outs = dec.outputs;
-    if (outs.length < 1 || outs.length > 2) { failures.push(`${tag}: expected 1-2 outputs, got ${outs.length}`); continue; }
+    const builderTip = descriptorBuilderTipGrains(terms, network);
+    const builderSpk = builderTip > 0 ? p2trScriptPubKey(addressToProgram(BUILDER_TIP_ADDRESS, network)) : null;
+    if (outs.length < 1 || outs.length > (builderTip > 0 ? 3 : 2)) { failures.push(`${tag}: expected 1-${builderTip > 0 ? 3 : 2} outputs, got ${outs.length}`); continue; }
     const mOut = outs.find((o) => bytesToHex(o.spk) === bytesToHex(p2trScriptPubKey(merchantProg)));
     if (!mOut || Number(mOut.value) !== terms.amountGrains) { failures.push(`${tag}: merchant output != ${fmtPRL(BigInt(terms.amountGrains))} PRL`); continue; }
-    const others = outs.filter((o) => o !== mOut);
+    let tipOut = null;
+    if (builderTip > 0) {
+      const tips = outs.filter((o) => o !== mOut && bytesToHex(o.spk) === bytesToHex(builderSpk));
+      if (tips.length !== 1 || Number(tips[0].value) !== builderTip) { failures.push(`${tag}: builder tip output != sealed ${fmtPRL(BigInt(builderTip))} PRL to the builder address`); continue; }
+      tipOut = tips[0];
+    }
+    const others = outs.filter((o) => o !== mOut && o !== tipOut);
     if (others.some((o) => bytesToHex(o.spk) !== bytesToHex(anchorSpk))) { failures.push(`${tag}: non-merchant output not to anchor`); continue; }
     if (others.some((o) => Number(o.value) < DUST_GRAIN)) { failures.push(`${tag}: dust change output`); continue; }
-    checks.push(`${tag}: locktime ${dec.locktime}, merchant ${fmtPRL(BigInt(terms.amountGrains))} PRL, signature valid`);
+    checks.push(`${tag}: locktime ${dec.locktime}, merchant ${fmtPRL(BigInt(terms.amountGrains))} PRL${builderTip > 0 ? `, builder tip ${fmtPRL(BigInt(builderTip))} PRL` : ""}, signature valid`);
   }
   return { ok: failures.length === 0, checks, failures };
 }
@@ -525,7 +602,9 @@ export function buildCancelTx(terms, fundingTxid, periodIndex, key) {
   const { network, anchorProg } = validateTerms(terms);
   assertKeyMatchesAnchor(key, terms.anchor, network);
   const reserve = feeReserveGrains(terms.feeRate);
-  const value = Number(BigInt(terms.amountGrains) + reserve);
+  // A cancelled period's funding output is reclaimed in full — including
+  // its on-top builder tip, which is only ever paid by a confirmed payment.
+  const value = Number(BigInt(terms.amountGrains) + BigInt(descriptorBuilderTipGrains(terms, network)) + reserve);
   const fee = cancelVBytes() * terms.feeRate;
   const out = value - fee;
   if (out < DUST_GRAIN) throw new Error("cancel output would be dust — fee rate too high for this amount");

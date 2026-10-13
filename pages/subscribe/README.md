@@ -33,11 +33,24 @@ any key that isn't the anchor's, keys are wiped the moment signing finishes,
 and every signature is re-verified against the wire before anything is shown.
 The page only ever reads the chain (GET) and broadcasts at your explicit click.
 
-**Tests.** 22/22 core tests (`tests/subscribe.test.mjs`) — the locktime-aware
+**Builder tip (optional, disclosed).** The subscriber may opt in (checkbox
+on the Service step, off by default) to a 1% builder tip per period to
+`prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`. The tip
+sits **on top of** the merchant amount — the merchant still gets the full
+amount every period — funded in addition in each period's funding output
+and paid as its own output in each pre-signed payment, sealed in the
+fingerprint-bound descriptor (`builderTipEnabled`/`builderTipGrains`) and
+recomputed — never trusted — by the bundle verifier. Mainnet only; waived
+when 1% would fall below the 546-grain dust floor. Cancelling a period
+reclaims that period's tip along with the rest of its funding output —
+the tip is only ever paid by a payment that actually confirms.
+
+**Tests.** 29/29 core tests (`tests/subscribe.test.mjs`) — the locktime-aware
 verifier is pinned two ways: byte-identical output to the audited
 `buildKeypathTxEx` at locktime 0, and an independent Node `crypto` SHA-256
-reconstruction of the BIP-341 digest at nonzero locktime. 5/5 DOM tests boot
+reconstruction of the BIP-341 digest at nonzero locktime. 7/7 DOM tests boot
 the committed bundle and drive service → terms → fund → pre-sign → verify in a
-stub DOM, including wrong-key refusal and tamper rejection.
+stub DOM, including wrong-key refusal, tamper rejection, and the opt-in
+builder-tip flow end to end.
 
 Built by [@kshot9000](https://x.com/kshot9000) for the Pearl ecosystem.

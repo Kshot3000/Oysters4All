@@ -22,7 +22,7 @@
 <meta name="twitter:image" content="https://kshot3000.github.io/Oysters4All/assets/og-card.png">
 <meta name="twitter:site" content="@kshot9000">
 <meta name="twitter:creator" content="@kshot9000">
-<link rel="stylesheet" href="styles.css?v=6">
+<link rel="stylesheet" href="styles.css?v=7">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Pearl Subscribe — Standing Orders for PRL","description":"Pearl Subscribe: recurring PRL payments as pre-signed nLockTime Taproot transactions. Subscriber funds one tx with a per-period output; each period's payment is signed locally with a consensus-enforced locktime; cancel any not-yet-due period by double-spending it. Keys never leave your browser.","url":"https://kshot3000.github.io/Oysters4All/pages/subscribe/","applicationCategory":"BrowserApplication","operatingSystem":"Any","isAccessibleForFree":true}</script>
 <link rel="stylesheet" href="../../visual-upgrade/theme.css?v=20261007">
 </head>
@@ -97,6 +97,9 @@
         <span class="nonce-row"><input id="sub-start" inputmode="numeric" spellcheck="false" placeholder="e.g. 512340">
         <button id="sub-start-tip" class="btn ghost" type="button">tip + 144</button></span>
       </label>
+      <label class="wide check"><input type="checkbox" id="sub-builder-tip">
+        Add an optional 1% builder tip per period to <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code> — paid ON TOP of the merchant amount (the merchant still gets the full amount every period), sealed in the descriptor and added as its own output in each pre-signed payment before signing. Mainnet only; waived when 1% would be below the dust floor. Off by default.
+      </label>
     </div>
     <div id="service-err" class="err" hidden></div>
     <div class="row"><button id="service-next" class="btn primary">Review the terms →</button></div>
@@ -108,6 +111,7 @@
         <li><strong>The merchant holds the payments.</strong> You hand them signed transactions; they broadcast each one after its locktime. If they lose them, nothing is paid (your funds stay reclaimable).</li>
         <li><strong>Cancel = double-spend.</strong> Cancelling a period spends its funding output back to you. If the merchant's payment confirms first, that period is paid — there is a race, and the desk shows it honestly.</li>
         <li><strong>Locktimes are block heights.</strong> Period lengths are approximate (Pearl targets 194 s/block); the network enforces heights, not dates.</li>
+        <li><strong>Builder tip (optional, disclosed).</strong> If ticked, each period carries a 1% tip to the builder address ON TOP of the merchant amount — the merchant's amount never shrinks, the tip is sealed in the descriptor, and cancelling a period reclaims that period's tip along with the rest of its funding output.</li>
         <li><strong>Test on testnet first.</strong> Keys are wiped after signing and never stored, but verify the whole flow with tPRL before real money.</li>
       </ul>
     </aside>
@@ -122,6 +126,7 @@
     <dl class="kv">
       <div><dt>Descriptor fingerprint</dt><dd><code id="terms-fp"></code> <button id="terms-fp-copy" class="btn ghost">Copy</button></dd></div>
       <div><dt>Merchant total</dt><dd id="terms-merchant-total"></dd></div>
+      <div><dt>Builder tip (optional)</dt><dd id="terms-builder-tip"></dd></div>
       <div><dt>Funding total (incl. fee reserves)</dt><dd id="terms-funding-total"></dd></div>
       <div><dt>Schedule</dt><dd id="terms-schedule-note"></dd></div>
     </dl>
@@ -292,7 +297,7 @@
   <p class="hint">Experimental software. Pre-signed payments are consent, not enforcement — test the full flow on testnet before real PRL. Keys are wiped after signing and never stored.</p>
 </footer>
 
-<script src="pearl-subscribe.bundle.js?v=4"></script>
-<script src="app.js?v=3"></script>
+<script src="pearl-subscribe.bundle.js?v=5"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

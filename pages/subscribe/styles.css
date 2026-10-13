@@ -49,6 +49,8 @@ main { max-width: 980px; margin: 0 auto; padding: 1.5rem; }
 .form-grid .wide { grid-column: 1 / -1; }
 label { display: block; color: var(--muted); font-size: .92rem; }
 label.wide { margin: .8rem 0; }
+label.check { display: flex; flex-direction: row; align-items: flex-start; gap: .5em; border: 1px solid var(--line); border-radius: 8px; padding: .6em .8em; }
+label.check input { width: auto; margin-top: .2rem; flex: none; }
 input, select, textarea {
   width: 100%; margin-top: .3rem; padding: .55rem .7rem; border-radius: 8px;
   border: 1px solid var(--line); background: var(--code); color: var(--ink);
