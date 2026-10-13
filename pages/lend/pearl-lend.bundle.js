@@ -21,6 +21,9 @@ var PearlLend = (() => {
   // src/index.js
   var index_exports = {};
   __export(index_exports, {
+    BUILDER_TIP_ADDRESS: () => BUILDER_TIP_ADDRESS,
+    BUILDER_TIP_BPS: () => BUILDER_TIP_BPS,
+    BUILDER_TIP_NAME: () => BUILDER_TIP_NAME,
     DUST_GRAIN: () => DUST_GRAIN,
     GRAIN_PER_PRL: () => GRAIN_PER_PRL,
     NETWORKS: () => NETWORKS,
@@ -37,6 +40,7 @@ var PearlLend = (() => {
     buildRepayScript: () => buildRepayScript,
     buildRepayment: () => buildRepayment,
     buildScriptPathSpend: () => buildScriptPathSpend,
+    builderTipGrainsFor: () => builderTipGrainsFor,
     bytesToHex: () => bytesToHex,
     canonicalJson: () => canonicalJson,
     decodeBech32m: () => decodeBech32m,
@@ -6101,11 +6105,18 @@ zoo`.split("\n");
     const base = 4 + 1 + 41 + 1 + nOut * 43 + 4;
     return Math.ceil((base * 3 + (base + 2 + wit)) / 4);
   }
-  function planSpend({ inputValue, payments, feeRateGrainsPerVByte, scriptLen, controlLen, stackLens }) {
+  function planSpend({ inputValue, payments, feeRateGrainsPerVByte, scriptLen, controlLen, stackLens, serviceFeeGrains = 0, serviceFeeProgram = null }) {
     if (!Number.isSafeInteger(inputValue) || inputValue <= 0) throw new Error("bad input value");
     if (!Array.isArray(payments) || payments.length === 0) throw new Error("need at least one payment");
+    const serviceFee = Number(serviceFeeGrains);
+    if (!Number.isSafeInteger(serviceFee) || serviceFee < 0 || serviceFee > 0 && serviceFee < DUST_GRAIN)
+      throw new Error("bad service fee");
+    if (serviceFee > 0 && (!(serviceFeeProgram instanceof Uint8Array) || serviceFeeProgram.length !== 32))
+      throw new Error("service fee program must be 32 bytes");
+    const allPayments = payments.map((p) => ({ program: p.program, value: p.value }));
+    if (serviceFee > 0) allPayments.push({ program: serviceFeeProgram, value: serviceFee, serviceFee: true });
     let paySum = 0;
-    for (const p of payments) {
+    for (const p of allPayments) {
       if (!(p.program instanceof Uint8Array) || p.program.length !== 32) throw new Error("payment program must be 32 bytes");
       if (!Number.isSafeInteger(p.value) || p.value < DUST_GRAIN) throw new Error(`payment below dust (${DUST_GRAIN} grains)`);
       paySum += p.value;
@@ -6114,13 +6125,13 @@ zoo`.split("\n");
     const vbytes = (nOut) => spendVBytes({ nOut, scriptLen, controlLen, stackLens });
     const feeFor = (nOut) => Math.ceil(vbytes(nOut) * feeRateGrainsPerVByte);
     const need = (f) => paySum + f;
-    let fee = feeFor(payments.length + 1);
+    let fee = feeFor(allPayments.length + 1);
     let change = inputValue - need(fee);
-    let outputs = payments.map((p) => ({ program: p.program, value: p.value }));
+    let outputs = allPayments;
     if (change >= DUST_GRAIN) {
       outputs.push({ program: null, value: change, change: true });
     } else {
-      fee = feeFor(payments.length);
+      fee = feeFor(allPayments.length);
       change = inputValue - need(fee);
       if (change < 0) throw new Error(`insufficient funds: need ${need(fee)} grains, have ${inputValue}`);
       if (change > 0) {
@@ -6129,7 +6140,7 @@ zoo`.split("\n");
       }
     }
     if (change < 0) throw new Error(`insufficient funds: need ${need(fee)} grains, have ${inputValue}`);
-    return { outputs, fee, vBytes: vbytes(outputs.length), change };
+    return { outputs, fee, vBytes: vbytes(outputs.length), change, serviceFeeGrains: serviceFee };
   }
   function scriptAsm(script) {
     const names = { 82: "2", 117: "DROP", 135: "EQUAL", 136: "EQUALVERIFY", 168: "SHA256", 172: "CHECKSIG", 186: "CHECKSIGADD", 177: "CLTV" };
@@ -6750,7 +6761,18 @@ zoo`.split("\n");
     if (!v.ok) throw new Error("assembled repayment failed self-verification: " + v.errors.join("; "));
     return tx;
   }
-  function buildDefaultClaim(descriptor, lockTxid, lockVout, collateralValue, feeRateGrainsPerVByte, lenderPrivHex) {
+  var BUILDER_TIP_BPS = 100;
+  var BUILDER_TIP_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+  var BUILDER_TIP_NAME = "Builder tip (optional)";
+  function builderTipGrainsFor(totalGrains, network, enabled) {
+    if (enabled !== true) return 0n;
+    if (!network || network.hrp !== "prl") return 0n;
+    const total = BigInt(totalGrains);
+    if (total <= 0n) throw new Error("bad total for builder tip");
+    const tip = total * BigInt(BUILDER_TIP_BPS) / 10000n;
+    return tip >= BigInt(DUST_GRAIN) ? tip : 0n;
+  }
+  function buildDefaultClaim(descriptor, lockTxid, lockVout, collateralValue, feeRateGrainsPerVByte, lenderPrivHex, builderTipEnabled = false) {
     const feeRate = Number(feeRateGrainsPerVByte);
     if (!Number.isFinite(feeRate) || feeRate <= 0) throw new Error("fee rate must be positive");
     if (!/^[0-9a-f]{64}$/i.test(lenderPrivHex || "")) throw new Error("lender private key must be 32-byte hex");
@@ -6758,13 +6780,33 @@ zoo`.split("\n");
     const loan = loanScripts(descriptor);
     const network = input.network;
     const delay = Number(BigInt(descriptor.delayBlocks));
-    const vb = spendVBytes({ nOut: 1, scriptLen: loan.defaultScript.length, controlLen: 33, stackLens: [64] });
-    const fee = BigInt(Math.ceil(vb * feeRate));
     const collateral = BigInt(input.value);
-    const pay = collateral - fee;
-    if (pay < BigInt(DUST_GRAIN)) throw new Error("LEND REFUSED: collateral does not cover the claim fee");
+    const builderTip = builderTipGrainsFor(collateral, network, builderTipEnabled === true);
+    const builderTipProgram = builderTip > 0n ? addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet) : null;
     const lenderProgram = addressToProgram(descriptor.lenderPayout, network);
+    if (builderTip > 0n && constEq2(lenderProgram, builderTipProgram)) {
+      throw new Error("LEND REFUSED: lender payout is the builder address \u2014 the builder tip would duplicate the claim output; leave the builder tip off");
+    }
+    const vb = spendVBytes({ nOut: builderTip > 0n ? 2 : 1, scriptLen: loan.defaultScript.length, controlLen: 33, stackLens: [64] });
+    const fee = BigInt(Math.ceil(vb * feeRate));
+    const pay = collateral - fee - builderTip;
+    if (pay < BigInt(DUST_GRAIN)) {
+      if (builderTip > 0n) {
+        throw new Error(`LEND REFUSED: collateral leaves ${pay} grains for the lender after the claim fee and the ${builderTip}-grain builder tip \u2014 vault too small; leave the builder tip off`);
+      }
+      throw new Error("LEND REFUSED: collateral does not cover the claim fee");
+    }
     const outputs = [{ program: lenderProgram, value: Number(pay) }];
+    if (builderTip > 0n) outputs.push({ program: builderTipProgram, value: Number(builderTip), builderTip: true });
+    const flagged = outputs.filter((o) => o && o.builderTip);
+    if (builderTip > 0n) {
+      const want = addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet);
+      if (flagged.length !== 1 || !constEq2(flagged[0].program, want) || BigInt(flagged[0].value) !== builderTip) {
+        throw new Error("builder tip does not pay the builder address at the computed amount \u2014 refusing to build the claim");
+      }
+    } else if (flagged.length !== 0) {
+      throw new Error("untipped claim carries a flagged builder-tip output \u2014 refusing to build the claim");
+    }
     const digest = scriptPathSigDigestEx(network, input, outputs, loan.defaultScript, { sequence: delay });
     const sig = signForXOnly(hexToBytes(lenderPrivHex), digest);
     if (!verifySchnorrSig(sig, digest, hexToBytes(descriptor.lenderXOnly))) {
@@ -6799,6 +6841,7 @@ zoo`.split("\n");
       vbytes: vb,
       feeGrains: fee.toString(),
       paysLenderGrains: pay.toString(),
+      builderTipGrains: builderTip.toString(),
       delayBlocks: delay
     };
   }

@@ -157,6 +157,50 @@ test("default claim builds, self-verifies, and uses the CSV delay as sequence", 
   assert.equal(dec.witness[0][0].length, 64);
 });
 
+test("builder tip: exactness, waivers, mainnet-only, opt-in only", () => {
+  const collateral = 160n * 100000000n;
+  assert.equal(L.builderTipGrainsFor(collateral, NET, true), 160000000n, "1% floor of the collateral");
+  assert.equal(L.builderTipGrainsFor(collateral, NET, false), 0n, "off unless enabled === true");
+  assert.equal(L.builderTipGrainsFor(collateral, NET, undefined), 0n);
+  assert.equal(L.builderTipGrainsFor(collateral, L.NETWORKS.testnet, true), 0n, "mainnet only");
+  assert.equal(L.builderTipGrainsFor(50000n, NET, true), 0n, "1% below dust is waived, never rounded up");
+  assert.equal(L.builderTipGrainsFor(54600n, NET, true), 546n, "exact dust-floor tip is charged");
+  assert.equal(L.BUILDER_TIP_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
+});
+
+test("builder tip: tipped default claim pays the tip exact on the wire; repayment never carries one", () => {
+  const d = L.buildDescriptor(terms());
+  const collateral = BigInt(d.collateralGrains);
+  const claim = L.buildDefaultClaim(d, "bb".repeat(32), 1, collateral, 2, L_PRIV, true);
+  assert.equal(claim.builderTipGrains, "160000000", "1% of the 160 PRL collateral");
+  assert.equal(BigInt(claim.paysLenderGrains) + BigInt(claim.feeGrains) + BigInt(claim.builderTipGrains), collateral,
+    "lender + fee + tip = collateral exactly");
+  const dec = L.decodeRawTx(claim.hex);
+  assert.equal(dec.outputs.length, 2, "tipped claim has exactly 2 outputs");
+  assert.equal(BigInt(dec.outputs[1].value), 160000000n, "tip is output 1 at exactly the computed amount");
+  assert.equal(L.bytesToHex(dec.outputs[1].spk),
+    "5120" + L.bytesToHex(L.addressToProgram(L.BUILDER_TIP_ADDRESS, NET)), "tip pays the builder program");
+  assert.equal(dec.inputs[0].sequence, 10144, "CSV delay sequence survives the tip");
+  // untipped claim is the pre-tip shape
+  const plain = L.buildDefaultClaim(d, "bb".repeat(32), 1, collateral, 2, L_PRIV);
+  assert.equal(plain.builderTipGrains, "0");
+  assert.equal(L.decodeRawTx(plain.hex).outputs.length, 1, "untipped claim has exactly 1 output");
+  // repayment (2-of-2) takes no tip parameter: no output pays the builder
+  const p = L.buildRepayment(d, "aa".repeat(32), 0, collateral, 2);
+  assert.ok(p.outputs.every((o) => o.address !== L.BUILDER_TIP_ADDRESS), "repayment carries no builder output");
+});
+
+test("builder tip: payout==builder and tip-dust refusals name the tip", () => {
+  const dBuilder = L.buildDescriptor(terms({ lenderPayout: L.BUILDER_TIP_ADDRESS }));
+  assert.throws(() => L.buildDefaultClaim(dBuilder, "bb".repeat(32), 1, BigInt(dBuilder.collateralGrains), 2, L_PRIV, true),
+    /builder tip would duplicate/);
+  // the same descriptor claims fine with the tip off
+  assert.ok(L.buildDefaultClaim(dBuilder, "bb".repeat(32), 1, BigInt(dBuilder.collateralGrains), 2, L_PRIV).hex.length > 100);
+  const d = L.buildDescriptor(terms());
+  assert.throws(() => L.buildDefaultClaim(d, "bb".repeat(32), 1, 60000n, 600, L_PRIV, true),
+    /builder tip/, "refusal names the tip when the tip leaves the lender below dust");
+});
+
 test("mutual close requires splits + fee = vault value, assembles with both sigs", () => {
   const d = L.buildDescriptor(terms());
   const collateral = BigInt(d.collateralGrains);

@@ -292,12 +292,14 @@
             <input id="close-key" type="password" autocomplete="off" spellcheck="false" placeholder="private key or mnemonic"></label>
         </div>
         <label class="check"><input id="close-override" type="checkbox"> I know the loan is not mature — build the claim anyway (it will not confirm until the CSV delay passes)</label>
+        <label class="check"><input id="close-tip" type="checkbox"> <strong>Builder tip (optional):</strong> add a 1% tip for the builder, paid to <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code> as its own output of this claim. The lender receives the collateral minus the fee and the tip. Off by default; repayments and mutual closes never carry a tip.</label>
         <div class="row"><button id="close-buildclaim" class="primary">Build default claim</button></div>
         <div id="close-error" class="error" hidden role="alert"></div>
         <div id="close-claimbox" hidden>
           <dl class="kv">
             <div><dt>Lender receives</dt><dd id="close-claimgets"></dd></div>
             <div><dt>Fee</dt><dd id="close-claimfee"></dd></div>
+            <div><dt>Builder tip</dt><dd id="close-claimtip">none</dd></div>
             <div><dt>Claim txid</dt><dd><code id="close-claimtxid" class="addr"></code></dd></div>
           </dl>
           <pre id="close-claimhex" class="hex"></pre>
@@ -362,6 +364,9 @@
       unless you override explicitly.</li>
       <li><strong>Manual coordination.</strong> There is no messaging, no order book, no watchtower. Proposals and
       descriptors move by whatever channel you and your counterparty trust. The desk verifies, it does not vouch.</li>
+      <li><strong>The builder tip is optional and default-claim-only</strong>: 1% of the collateral, only when
+      the lender checks the box, paid as its own output to the builder address printed next to the checkbox.
+      Repayments and mutual closes never carry one — their outputs are the two parties' agreed amounts.</li>
       <li><strong>Keys.</strong> Nothing is stored: pasted keys live in memory only and are wiped after signing.
       Prefer signing in your own wallet and pasting only signatures and x-only pubkeys.</li>
     </ul>
@@ -374,7 +379,7 @@
   <p class="fine">Pearl has no smart contracts — every loan here is pure Taproot script, verified in your browser before anything is signed.</p>
 </footer>
 
-<script src="pearl-lend.bundle.js?v=5"></script>
-<script src="app.js?v=1"></script>
+<script src="pearl-lend.bundle.js?v=6"></script>
+<script src="app.js?v=2"></script>
 </body>
 </html>

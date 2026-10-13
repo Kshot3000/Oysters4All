@@ -383,6 +383,39 @@ test("close: default claim builds past maturity; mutual close assembles", () => 
   }, 50));
 });
 
+test("close: builder tip is opt-in, disclosed, and lands exact on the wire", () => {
+  assert.equal(get("close-tip").checked, false, "builder tip checkbox unchecked by default");
+  assert.ok(html.includes("Builder tip (optional)"), "disclosure heading in the claim form");
+  assert.ok(html.includes("The lender receives the collateral minus the fee and the tip"), "lender-pays disclosure in page");
+  assert.ok(html.includes("repayments and mutual closes never carry a tip"), "2-of-2 exclusion disclosed");
+  QA.height = 920000; // past default (910144)
+  get("close-tip").checked = true;
+  T.set("close-key", PRIV_L); // wiped after the previous build
+  get("close-buildclaim").fire("click");
+  return new Promise((resolve) => setTimeout(() => {
+    assert.ok(T.err("close-error").hidden, "tipped claim builds: " + T.err("close-error").text);
+    const claim = T.state().claim;
+    assert.equal(claim.builderTipGrains, "160000000", "tip is exactly 1% of the 160 PRL collateral");
+    const dec = R.decodeRawTx(claim.hex);
+    assert.equal(dec.outputs.length, 2, "tipped claim has exactly 2 outputs");
+    assert.equal(BigInt(dec.outputs[1].value), 160000000n, "tip output exact on the wire");
+    assert.equal(R.bytesToHex(dec.outputs[1].spk),
+      "5120" + R.bytesToHex(R.addressToProgram(R.BUILDER_TIP_ADDRESS, R.NETWORKS.mainnet)), "tip pays the builder program");
+    assert.ok(T.text("close-claimtip").includes("160000000"), "tip shown in the claim panel");
+    // opt back out: the single-output claim is restored
+    get("close-tip").checked = false;
+    T.set("close-key", PRIV_L);
+    get("close-buildclaim").fire("click");
+    setTimeout(() => {
+      assert.ok(T.err("close-error").hidden, "untipped claim builds: " + T.err("close-error").text);
+      assert.equal(T.state().claim.builderTipGrains, "0");
+      assert.equal(R.decodeRawTx(T.state().claim.hex).outputs.length, 1, "opt-out restores the single-output claim");
+      assert.equal(T.text("close-claimtip"), "none", "claim panel shows no tip");
+      resolve();
+    }, 50);
+  }, 50));
+});
+
 test("close: early default claim refused without override", () => {
   QA.height = 905000; // before default
   get("close-buildclaim").fire("click");

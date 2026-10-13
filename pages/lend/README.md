@@ -48,9 +48,22 @@ verified in `node/txscript/opcode.go`; CSV rules per BIP-68.
 - Manual coordination: no messaging, order book, or watchtower. The desk verifies; it does not vouch.
 - Keys live in memory only and are wiped after signing.
 
+## Builder tip (optional, disclosed)
+
+The default claim offers an **optional 1% builder tip**: only when the lender
+checks the box in the Close step, `buildDefaultClaim` adds the tip as its own
+second output — paid to `prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d` —
+*before* signing, so the script-path sighash commits to it and it cannot be
+added or skimmed afterwards. The lender receives the collateral minus the fee
+and the tip; the fee is computed over both outputs. The tip is mainnet-only,
+waived (never rounded up) when 1% falls below the 546-grain dust floor, and
+refused when the lender payout is the builder address itself. Repayments and
+mutual closes never carry a tip: both are 2-of-2 spends whose outputs are the
+two parties' agreed amounts, and their builders take no tip parameter.
+
 ## Tests
 
-- `node --no-warnings --loader ./tests/loader.mjs tests/lend.test.mjs` — 15 core tests.
+- `node --no-warnings --loader ./tests/loader.mjs tests/lend.test.mjs` — 18 core tests.
 - `node --no-warnings tests/dom.test.mjs` — full wizard flow in a stub DOM.
 - `node tests/lend.browser.qa.mjs` — real headless-Chromium QA (file:// + CDP).
 

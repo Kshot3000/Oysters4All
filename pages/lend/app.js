@@ -471,12 +471,15 @@
       }
       const k = signingKey($("close-key").value, d.lenderXOnly, network);
       const claim = P.buildDefaultClaim(d, $("close-txid").value.trim(), Number($("close-vout").value),
-        BigInt(P.parsePRL($("close-value").value || "0")), Number($("close-feerate").value), k.privHex);
+        BigInt(P.parsePRL($("close-value").value || "0")), Number($("close-feerate").value), k.privHex,
+        $("close-tip").checked);
       S.claim = claim;
       wipeInput("close-key");
       $("close-claimbox").hidden = false;
       $("close-claimgets").textContent = grainsToPRL(claim.paysLenderGrains);
       $("close-claimfee").textContent = grainsToPRL(claim.feeGrains);
+      $("close-claimtip").textContent = BigInt(claim.builderTipGrains) > 0n
+        ? grainsToPRL(claim.builderTipGrains) + " (" + claim.builderTipGrains + " grains)" : "none";
       $("close-claimtxid").textContent = claim.txid;
       $("close-claimhex").textContent = claim.hex;
     } catch (e) { showError("close-error", e); }

@@ -480,13 +480,43 @@ export function assembleRepayment(descriptor, proposal, borrowerSigHex, lenderSi
   return tx;
 }
 
+/* ---------------- builder tip (optional, disclosed, default-claim-only) ----------------
+ * Pearl Lend offers an OPTIONAL 1% builder tip on DEFAULT CLAIMS — never
+ * automatic, and only when the lender explicitly opts in. builderTipGrainsFor()
+ * is the single source; buildDefaultClaim() adds the tip as its own second
+ * output BEFORE signing, and the script-path sighash commits to every
+ * output — so it cannot be added or skimmed after signing. Off = claim
+ * identical to the pre-tip builder. Offered on the default claim only:
+ * repayment and mutual close are 2-of-2 spends whose outputs are the two
+ * parties' agreed amounts — buildRepayment/buildMutualClose take no tip
+ * parameter at all, so a tip output is excluded by construction. The
+ * recipient is the operator address published in every Lend footer. */
+export const BUILDER_TIP_BPS = 100; // 1%
+export const BUILDER_TIP_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
+export const BUILDER_TIP_NAME = "Builder tip (optional)";
+
+/** Builder tip in grains for a claim of totalGrains on network.
+ *  Returns 0n unless enabled === true, the network is mainnet, and the
+ *  1% floor reaches the dust floor (waived, never rounded up). BigInt
+ *  in, BigInt out — this core's claim math is BigInt throughout. */
+export function builderTipGrainsFor(totalGrains, network, enabled) {
+  if (enabled !== true) return 0n;
+  if (!network || network.hrp !== "prl") return 0n;
+  const total = BigInt(totalGrains);
+  if (total <= 0n) throw new Error("bad total for builder tip");
+  const tip = (total * BigInt(BUILDER_TIP_BPS)) / 10000n;
+  return tip >= BigInt(DUST_GRAIN) ? tip : 0n;
+}
+
 /**
  * Build the lender's DEFAULT claim (unilateral sweep after term + grace).
  * The input sequence equals the leaf's committed delay (BIP-68); the claim is
  * only consensus-valid once delayBlocks have passed since the lock confirmed.
+ * An OPTIONAL disclosed 1% builder tip (builderTipEnabled) is added as its
+ * own second output before signing — see the builder-tip section.
  * Returns { hex, txid, digest, vbytes, feeGrains } — unsigned until signed.
  */
-export function buildDefaultClaim(descriptor, lockTxid, lockVout, collateralValue, feeRateGrainsPerVByte, lenderPrivHex) {
+export function buildDefaultClaim(descriptor, lockTxid, lockVout, collateralValue, feeRateGrainsPerVByte, lenderPrivHex, builderTipEnabled = false) {
   const feeRate = Number(feeRateGrainsPerVByte);
   if (!Number.isFinite(feeRate) || feeRate <= 0) throw new Error("fee rate must be positive");
   if (!/^[0-9a-f]{64}$/i.test(lenderPrivHex || "")) throw new Error("lender private key must be 32-byte hex");
@@ -494,13 +524,41 @@ export function buildDefaultClaim(descriptor, lockTxid, lockVout, collateralValu
   const loan = loanScripts(descriptor);
   const network = input.network;
   const delay = Number(BigInt(descriptor.delayBlocks));
-  const vb = spendVBytes({ nOut: 1, scriptLen: loan.defaultScript.length, controlLen: 33, stackLens: [64] });
-  const fee = BigInt(Math.ceil(vb * feeRate));
   const collateral = BigInt(input.value);
-  const pay = collateral - fee;
-  if (pay < BigInt(DUST_GRAIN)) throw new Error("LEND REFUSED: collateral does not cover the claim fee");
+  const builderTip = builderTipGrainsFor(collateral, network, builderTipEnabled === true);
+  const builderTipProgram = builderTip > 0n ? addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet) : null;
   const lenderProgram = addressToProgram(descriptor.lenderPayout, network);
+  if (builderTip > 0n && constEq(lenderProgram, builderTipProgram)) {
+    throw new Error("LEND REFUSED: lender payout is the builder address — the builder tip would duplicate the claim output; leave the builder tip off");
+  }
+  const vb = spendVBytes({ nOut: builderTip > 0n ? 2 : 1, scriptLen: loan.defaultScript.length, controlLen: 33, stackLens: [64] });
+  const fee = BigInt(Math.ceil(vb * feeRate));
+  const pay = collateral - fee - builderTip;
+  if (pay < BigInt(DUST_GRAIN)) {
+    if (builderTip > 0n) {
+      throw new Error(`LEND REFUSED: collateral leaves ${pay} grains for the lender after the claim fee and the ${builderTip}-grain builder tip — vault too small; leave the builder tip off`);
+    }
+    throw new Error("LEND REFUSED: collateral does not cover the claim fee");
+  }
   const outputs = [{ program: lenderProgram, value: Number(pay) }];
+  if (builderTip > 0n) outputs.push({ program: builderTipProgram, value: Number(builderTip), builderTip: true });
+  // Last-hop builder-tip assertion: buildDefaultClaim is where the claim
+  // crosses from parameters to a signed transaction (Lend has no
+  // plan/assemble split for this leaf — the builder signs internally), so
+  // a flagged tip is a trust claim — the tip program is re-derived here
+  // from the builder address constant, never trusted from a caller-supplied
+  // value, and the flagged output must pay it at exactly the computed
+  // amount before the digest is signed. An untipped claim must carry no
+  // flagged output.
+  const flagged = outputs.filter((o) => o && o.builderTip);
+  if (builderTip > 0n) {
+    const want = addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet);
+    if (flagged.length !== 1 || !constEq(flagged[0].program, want) || BigInt(flagged[0].value) !== builderTip) {
+      throw new Error("builder tip does not pay the builder address at the computed amount — refusing to build the claim");
+    }
+  } else if (flagged.length !== 0) {
+    throw new Error("untipped claim carries a flagged builder-tip output — refusing to build the claim");
+  }
   const digest = scriptPathSigDigestEx(network, input, outputs, loan.defaultScript, { sequence: delay });
   const sig = signForXOnly(hexToBytes(lenderPrivHex), digest);
   if (!verifySchnorrSig(sig, digest, hexToBytes(descriptor.lenderXOnly))) {
@@ -527,6 +585,7 @@ export function buildDefaultClaim(descriptor, lockTxid, lockVout, collateralValu
     vbytes: vb,
     feeGrains: fee.toString(),
     paysLenderGrains: pay.toString(),
+    builderTipGrains: builderTip.toString(),
     delayBlocks: delay,
   };
 }
