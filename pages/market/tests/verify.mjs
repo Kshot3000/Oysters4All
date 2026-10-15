@@ -28,6 +28,7 @@ import {
   PLATFORM_FEE_BPS, PLATFORM_FEE_ADDRESS, platformFeeGrainsFor,
   encodeListing, decodeListing,
   selectCoinsSimple, planTransferLot,
+  decimalToRational, ceilFeeGrains,
   idxGetTokens, idxGetTransferLots, idxGetUtxos,
   fetchUtxos,
   loadBoard, saveBoard, boardAddListing, boardCancelListing, boardAddBid, boardCancelBid, boardAddTrade,
@@ -552,6 +553,32 @@ throws("selectCoinsSimple-duplicate-utxo", () => selectCoinsSimple([
   { txid: "aa".repeat(32), vout: 0, value: 100000 },
   { txid: "aa".repeat(32), vout: 0, value: 100000 },
 ], 150000, 5, 1));
+
+/* ============ 11. exact decimal fee pricing (float-ceil regression) ============
+ * Math.ceil(vBytes * rate) in floats priced a grain high whenever the float
+ * product of an exact-integer fee landed a hair above it. */
+{
+  ok("ceilFee-exact-1.1", ceilFeeGrains(370, 1.1) === 407, `got ${ceilFeeGrains(370, 1.1)}`);
+  ok("ceilFee-exact-2.2", ceilFeeGrains(370, 2.2) === 814, `got ${ceilFeeGrains(370, 2.2)}`);
+  ok("ceilFee-string-parity", ceilFeeGrains(370, "1.1") === 407);
+  ok("ceilFee-fractional-ceils", ceilFeeGrains(100, 1.005) === 101);
+  throws("ceilFee-garbage-refused", () => ceilFeeGrains(370, "abc"));
+  throws("ceilFee-zero-refused", () => ceilFeeGrains(370, 0));
+  ok("decimalToRational", (() => { const r = decimalToRational("2.2", "fee rate"); return r.num === 22n && r.den === 10n; })());
+  // plan level: a 3-UTXO fill (370 vB with change) at 1.1 g/vB pays exactly 407
+  const fillSel = selectFillCoins({
+    buyerUtxos: [50000, 30000, 21000].map((v, i) => ({ txid: String(i + 1).padStart(64, "0"), vout: 0, value: v })),
+    priceGrains: 100000, feeRate: 1.1,
+  });
+  ok("fill-exact-fee", fillSel.feeGrains === 407 && fillSel.changeGrains === 593,
+    `fee ${fillSel.feeGrains} change ${fillSel.changeGrains}`);
+  // plan level: a 4-UTXO simple selection (370 vB with change) at 1.1 pays 407
+  const simpleSel = selectCoinsSimple(
+    [40000, 30000, 20000, 11000].map((v, i) => ({ txid: String(i + 1).padStart(64, "0"), vout: 0, value: v })),
+    100000, 1.1, 2);
+  ok("simple-exact-fee", simpleSel.feeGrains === 407 && simpleSel.changeGrains === 593,
+    `fee ${simpleSel.feeGrains} change ${simpleSel.changeGrains}`);
+}
 
 console.log(`\n${pass} passed, ${fail} failed, ${skipped} skipped`);
 process.exit(fail ? 1 : 0);

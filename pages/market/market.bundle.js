@@ -50,9 +50,11 @@ var PearlMarket = (() => {
     buildRevealTx: () => buildRevealTx,
     buildTransferJson: () => buildTransferJson,
     bytesToHex: () => bytesToHex,
+    ceilFeeGrains: () => ceilFeeGrains,
     commitKeyInfo: () => commitKeyInfo,
     convertBits: () => convertBits,
     dblSha: () => dblSha,
+    decimalToRational: () => decimalToRational,
     decodeBech32m: () => decodeBech32m,
     decodeListing: () => decodeListing,
     demoBook: () => demoBook,
@@ -6255,6 +6257,28 @@ zoo`.split("\n");
     const fee = Number(BigInt(price) * BigInt(PLATFORM_FEE_BPS) / 10000n);
     return fee >= DUST_GRAIN ? fee : 0;
   }
+  function decimalToRational(x, name) {
+    const s = String(x ?? "").trim();
+    const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+    if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+    const [, sign, intPart, fracPart = "", expPart] = m;
+    let num2 = BigInt(intPart + fracPart);
+    let den = 10n ** BigInt(fracPart.length);
+    const exp = expPart ? BigInt(expPart) : 0n;
+    if (exp >= 0n) num2 *= 10n ** exp;
+    else den *= 10n ** -exp;
+    if (sign === "-") num2 = -num2;
+    return { num: num2, den };
+  }
+  function ceilFeeGrains(vBytes, rateGrainsPerVByte) {
+    if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("bad vBytes for fee");
+    const r = decimalToRational(rateGrainsPerVByte, "fee rate");
+    if (r.num <= 0n) throw new Error("fee rate must be positive");
+    const num2 = BigInt(vBytes) * r.num;
+    const grains = (num2 + r.den - 1n) / r.den;
+    if (grains > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("fee exceeds safe integer range");
+    return Number(grains);
+  }
   function fmtPRL(grains) {
     const g = typeof grains === "bigint" ? grains : BigInt(grains);
     const neg = g < 0n;
@@ -6455,21 +6479,21 @@ zoo`.split("\n");
     for (const u of sorted) {
       picked.push(u);
       total += u.value;
-      const feeChange = Math.ceil(fillTxVBytes(picked.length, nBase + 1) * feeRate);
+      const feeChange = ceilFeeGrains(fillTxVBytes(picked.length, nBase + 1), feeRate);
       if (total < target + feeChange) continue;
       const change = total - target - feeChange;
       if (change === 0) {
-        const feeNoChange2 = Math.ceil(fillTxVBytes(picked.length, nBase) * feeRate);
+        const feeNoChange2 = ceilFeeGrains(fillTxVBytes(picked.length, nBase), feeRate);
         return { inputs: picked, feeGrains: feeNoChange2, changeGrains: 0, totalIn: total, nOut: nBase, platformFeeGrains: platformFee };
       }
       if (change >= DUST_GRAIN)
         return { inputs: picked, feeGrains: feeChange, changeGrains: change, totalIn: total, nOut: nBase + 1, platformFeeGrains: platformFee };
-      const feeNoChange = Math.ceil(fillTxVBytes(picked.length, nBase) * feeRate);
+      const feeNoChange = ceilFeeGrains(fillTxVBytes(picked.length, nBase), feeRate);
       const fee = total - target;
       if (fee < feeNoChange) throw new Error("fee math error");
       return { inputs: picked, feeGrains: fee, changeGrains: 0, totalIn: total, nOut: nBase, platformFeeGrains: platformFee };
     }
-    const fee1 = Math.ceil(fillTxVBytes(sorted.length, nBase) * feeRate);
+    const fee1 = ceilFeeGrains(fillTxVBytes(sorted.length, nBase), feeRate);
     throw new Error(
       `insufficient buyer funds: need ${fmtPRL(target + fee1)} PRL (price + platform fee + network fee), have ${fmtPRL(total)} PRL`
     );
@@ -6600,7 +6624,7 @@ zoo`.split("\n");
     for (const u of sorted) {
       picked.push(u);
       total += u.value;
-      const feeChange = Math.ceil(keypathTxVBytes(picked.length, baseOuts + 1) * feeRate);
+      const feeChange = ceilFeeGrains(keypathTxVBytes(picked.length, baseOuts + 1), feeRate);
       if (total < targetGrains + feeChange) continue;
       let change = total - targetGrains - feeChange;
       let nOut = baseOuts + 1;
@@ -6621,7 +6645,7 @@ zoo`.split("\n");
     const ci = commitKeyInfo(network, wallet.internalXOnly, script);
     const ownerProg = tweakKeypath(wallet.internalXOnly).tweakedX;
     const lotValue = DUST_GRAIN;
-    const revealFee = Math.ceil(revealTxVBytes(script.length, 1) * feeRate);
+    const revealFee = ceilFeeGrains(revealTxVBytes(script.length, 1), feeRate);
     const sel = selectCoinsSimple(utxos, revealFee + lotValue, feeRate, 1);
     const commitInputs = sel.inputs.map((u) => ({
       txid: u.txid,
