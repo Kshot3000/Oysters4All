@@ -355,6 +355,39 @@ export function quorumSigDigest(network, inputs, idx, outputs, leafScript, opts 
   return taggedHash("TapSighash", msg);
 }
 
+/* ---------------- exact decimal fee pricing ---------------- */
+
+/* Exact decimal fee pricing (fleet pattern, first shipped in Pearl Fees):
+ * a fee rate is read through String(), whose shortest round-trip form
+ * recovers the decimal the user typed, then ceil(vBytes × rate) is computed
+ * in BigInt rational arithmetic. The old float form — Math.ceil(vB * rate)
+ * — overcharged whenever the float product of an exact-integer fee landed
+ * a hair above it: a 2-of-3 quorum spend of 335 vB (1 input, 4 payments +
+ * change) at 2.2 g/vB priced 738 grains instead of 737, and a 1-of-1 spend
+ * of 215 vB at 2.2 priced 474 instead of 473. */
+export function decimalToRational(x, name) {
+  const s = String(x ?? "").trim();
+  const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+  if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+  const [, sign, intPart, fracPart = "", expPart] = m;
+  let num = BigInt(intPart + fracPart);
+  let den = 10n ** BigInt(fracPart.length);
+  const exp = expPart ? BigInt(expPart) : 0n;
+  if (exp >= 0n) num *= 10n ** exp; else den *= 10n ** -exp;
+  if (sign === "-") num = -num;
+  return { num, den };
+}
+
+export function ceilFeeGrains(vBytes, rateGrainsPerVByte) {
+  if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("bad vBytes for fee");
+  const r = decimalToRational(rateGrainsPerVByte, "fee rate");
+  if (r.num <= 0n) throw new Error("fee rate must be positive");
+  const num = BigInt(vBytes) * r.num;
+  const grains = (num + r.den - 1n) / r.den;
+  if (grains > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("fee exceeds safe integer range");
+  return Number(grains);
+}
+
 /* ---------------- vBytes + fee planning ---------------- */
 
 const varintLen = (n) => (n < 0xfd ? 1 : n <= 0xffff ? 3 : n <= 0xffffffff ? 5 : 9);
@@ -423,7 +456,7 @@ export function planQuorumSpend({ vault, inputs, payments, feeRateGrainsPerVByte
   const scriptLen = hexToBytes(vault.scriptHex).length;
   // Candidate A: with a change output. Candidate B: without (dust absorbed).
   const vBytesC = quorumTxVBytes({ nIn: ins.length, nOut: outs.length + 1, scriptLen, m: vault.m, n: vault.n });
-  const feeC = Math.ceil(vBytesC * rate);
+  const feeC = ceilFeeGrains(vBytesC, rate);
   const inSum = ins.reduce((a, u) => a + u.value, 0);
   const paySum = outs.reduce((a, o) => a + o.value, 0);
   const changeA = inSum - paySum - feeC;
@@ -439,7 +472,7 @@ export function planQuorumSpend({ vault, inputs, payments, feeRateGrainsPerVByte
     // No change output: everything left after payments + the no-change fee is
     // absorbed into the fee. Disclosed exactly — never silently pocketed.
     const vBytesNC = quorumTxVBytes({ nIn: ins.length, nOut: outs.length, scriptLen, m: vault.m, n: vault.n });
-    const feeNC = Math.ceil(vBytesNC * rate);
+    const feeNC = ceilFeeGrains(vBytesNC, rate);
     const leftover = inSum - paySum - feeNC; // >= changeA >= 0
     finalOuts = outs.slice();
     vBytes = vBytesNC;

@@ -240,6 +240,38 @@ test("dust change is absorbed into the fee and disclosed", () => {
   assert.equal(inSum, p.outputs[0].grains + p.feeGrains);
 });
 
+test("ceilFeeGrains prices exact-integer products exactly (no float overcharge)", () => {
+  // 335 vB x 2.2 = 737 exactly; the old float form priced 738.
+  assert.equal(Q.ceilFeeGrains(335, 2.2), 737);
+  // 215 vB x 2.2 = 473 exactly; the old float form priced 474.
+  assert.equal(Q.ceilFeeGrains(215, 2.2), 473);
+  // String rates price identically to numeric rates.
+  assert.equal(Q.ceilFeeGrains(335, "2.2"), 737);
+  // Genuinely fractional products still ceil up.
+  assert.equal(Q.ceilFeeGrains(100, 1.005), 101);
+  assert.equal(Q.ceilFeeGrains(100, 1), 100);
+  // Garbage and non-positive rates refuse instead of pricing a NaN fee.
+  assert.throws(() => Q.ceilFeeGrains(100, "abc"), /finite decimal/);
+  assert.throws(() => Q.ceilFeeGrains(100, 0), /positive/);
+  assert.throws(() => Q.ceilFeeGrains(100, -1), /positive/);
+});
+
+test("plan at a decimal rate charges the exact fee (2-of-3, 1-in/4-pay @ 2.2)", () => {
+  const v = mkVault(2, 3);
+  const ins = [fakeUtxo(v, 0, 1000000000)];
+  const payments = [0, 1, 2, 3].map((i) => ({ address: destAddr(`exact${i}`), grains: 100000000 }));
+  const p = Q.planQuorumSpend({ vault: v, inputs: ins, payments, feeRateGrainsPerVByte: 2.2 });
+  assert.equal(p.vBytes, 335);
+  assert.equal(p.feeGrains, 737); // float form charged 738
+  const inSum = p.inputs.reduce((a, u) => a + u.value, 0);
+  const outSum = p.outputs.reduce((a, o) => a + o.grains, 0);
+  assert.equal(inSum, outSum + p.feeGrains);
+  // The bundle round-trip re-derives the fee through the same planner —
+  // it must accept the planner's own decimal-rate plan.
+  const b = Q.importUnsignedBundle(Q.exportUnsignedBundle(p));
+  assert.equal(b.feeGrains, 737);
+});
+
 test("plan refuses insufficient funds, dust payments, foreign inputs", () => {
   const v = mkVault(2, 3);
   const ins = [fakeUtxo(v, 0, 100000)];
