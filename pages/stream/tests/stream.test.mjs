@@ -8,7 +8,7 @@ import {
   bytesToHex, hexToBytes, schnorr, sha256,
   forgeTranche, forgeTick, planStream, descriptorForStream, parseDescriptor,
   scheduleFromDescriptor, streamState,
-  batchScriptPathSigDigest, batchClaimVBytes, planBatchClaim,
+  batchScriptPathSigDigest, batchClaimVBytes, planBatchClaim, ceilFeeGrains,
   buildBatchClaimTx, buildBatchScriptPathSpend, committedLeafKey, tickLeafFor,
   builderTipGrainsFor, BUILDER_TIP_ADDRESS, BUILDER_TIP_BPS,
   beneficiaryKeyFromInput, beneficiarySignerFor, isMature,
@@ -300,6 +300,35 @@ test("wrong-signer-key refusal for a mismatched leaf", () => {
     signerPriv: hexToBytes(B.priv), destinationProgram: hexToBytes(B.xonly),
     feeRateGrainsPerVByte: 10,
   }), /does not match the key committed in this leaf/);
+});
+
+test("planBatchClaim: decimal fee rates price in exact arithmetic (no float-ceil overcharge)", () => {
+  // Regression (2026-10-15, the Pearl Fees float-ceil class): the planner
+  // computed Math.ceil(vBytes * rate) in floats, so an exact-integer
+  // product that floats land a hair above priced a grain high — a
+  // 730-vB batch at 1.1 g/vB charged 804 grains instead of 803, and a
+  // 645-vB batch at 2.2 charged 1,420 instead of 1,419. Ordinary batch
+  // sizes (7-8 ticks) at ordinary decimal rates hit it.
+  const mk = (n) => ({
+    inputs: Array.from({ length: n }, () => ({ value: 10_000_000 })),
+    scriptLens: Array(n).fill(41), controlLens: Array(n).fill(65),
+  });
+  const p8 = planBatchClaim({ ...mk(8), feeRateGrainsPerVByte: 1.1 });
+  assert.equal(p8.vBytes, 730);
+  assert.equal(p8.fee, 803);
+  assert.equal(p8.payment, 80_000_000 - 803);
+  assert.equal(planBatchClaim({ ...mk(8), feeRateGrainsPerVByte: 2.2 }).fee, 1606);
+  const p7 = planBatchClaim({ ...mk(7), feeRateGrainsPerVByte: 2.2 });
+  assert.equal(p7.vBytes, 645);
+  assert.equal(p7.fee, 1419);
+  // ceilFeeGrains itself: exact-integer products stay exact, fractional
+  // products still ceil, string rates price identically, garbage refuses.
+  assert.equal(ceilFeeGrains(100, 1.1), 110);
+  assert.equal(ceilFeeGrains(200, 2.2), 440);
+  assert.equal(ceilFeeGrains(101, 1.1), 112);
+  assert.equal(ceilFeeGrains(730, "1.1"), 803);
+  assert.throws(() => ceilFeeGrains(100, "abc"), /finite decimal/);
+  assert.throws(() => planBatchClaim({ ...mk(2), feeRateGrainsPerVByte: NaN }), /bad fee rate/);
 });
 
 test("dust-payment refusal and fee cross-check (planner vBytes == serializer vBytes)", () => {

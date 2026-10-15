@@ -393,6 +393,37 @@ export function builderTipGrainsFor(totalGrains, network, enabled) {
   return tip >= DUST_GRAIN ? tip : 0;
 }
 
+/** Exact decimal fee ceiling. Math.ceil(vBytes * rate) in floats prices
+ *  a grain high whenever the float product of an exact-integer fee lands
+ *  a hair above it: a 730-vB batch claim at 1.1 g/vB charged 804 grains
+ *  instead of 803, and 645 vB at 2.2 charged 1,420 instead of 1,419
+ *  (both reproduced on pristine src). The rate is read through String(),
+ *  whose shortest round-trip form recovers the decimal typed, then the
+ *  ceiling is taken in BigInt rational arithmetic. (Same fix as Pearl
+ *  Fees, 2026-10-15.) */
+export function decimalToRational(x, name) {
+  const s = String(x ?? "").trim();
+  const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+  if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+  const [, sign, intPart, fracPart = "", expPart] = m;
+  let num = BigInt(intPart + fracPart);
+  let den = 10n ** BigInt(fracPart.length);
+  const exp = expPart ? BigInt(expPart) : 0n;
+  if (exp >= 0n) num *= 10n ** exp; else den *= 10n ** -exp;
+  if (sign === "-") num = -num;
+  return { num, den };
+}
+
+export function ceilFeeGrains(vBytes, rateGrainsPerVByte) {
+  if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("bad vBytes for fee");
+  const r = decimalToRational(rateGrainsPerVByte, "fee rate");
+  if (r.num <= 0n) throw new Error("bad fee rate");
+  const num = BigInt(vBytes) * r.num;
+  const grains = (num + r.den - 1n) / r.den;
+  if (grains > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("fee exceeds safe integer range");
+  return Number(grains);
+}
+
 /** Exact sweep plan for a batch claim: everything in, one output (plus the
  *  optional builder-tip output when builderTipEnabled is set — the fee is
  *  then computed over 2 outputs), fee from the real multi-input witness
@@ -419,7 +450,7 @@ export function planBatchClaim({ inputs, scriptLens, controlLens, feeRateGrainsP
   const builderTip = builderTipGrainsFor(sum, network, builderTipEnabled === true);
   const builderTipProgram = builderTip > 0 ? addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet) : null;
   const vBytes = batchClaimVBytes({ nIn: inputs.length, scriptLens, controlLens, nOut: builderTip > 0 ? 2 : 1 });
-  const fee = Math.ceil(vBytes * feeRateGrainsPerVByte);
+  const fee = ceilFeeGrains(vBytes, feeRateGrainsPerVByte);
   const payment = sum - fee - builderTip;
   if (payment < DUST_GRAIN) {
     if (builderTip > 0) {

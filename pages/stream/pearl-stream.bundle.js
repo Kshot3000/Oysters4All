@@ -39,9 +39,11 @@ var PearlStream = (() => {
     buildBatchScriptPathSpend: () => buildBatchScriptPathSpend,
     builderTipGrainsFor: () => builderTipGrainsFor,
     bytesToHex: () => bytesToHex,
+    ceilFeeGrains: () => ceilFeeGrains,
     committedLeafKey: () => committedLeafKey,
     convertBits: () => convertBits,
     dblSha: () => dblSha,
+    decimalToRational: () => decimalToRational,
     decodeBech32m: () => decodeBech32m,
     descriptorForStream: () => descriptorForStream,
     encodeBech32m: () => encodeBech32m,
@@ -6354,6 +6356,28 @@ zoo`.split("\n");
     const tip = Number(BigInt(totalGrains) * BigInt(BUILDER_TIP_BPS) / 10000n);
     return tip >= DUST_GRAIN ? tip : 0;
   }
+  function decimalToRational(x, name) {
+    const s = String(x ?? "").trim();
+    const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+    if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+    const [, sign, intPart, fracPart = "", expPart] = m;
+    let num2 = BigInt(intPart + fracPart);
+    let den = 10n ** BigInt(fracPart.length);
+    const exp = expPart ? BigInt(expPart) : 0n;
+    if (exp >= 0n) num2 *= 10n ** exp;
+    else den *= 10n ** -exp;
+    if (sign === "-") num2 = -num2;
+    return { num: num2, den };
+  }
+  function ceilFeeGrains(vBytes, rateGrainsPerVByte) {
+    if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("bad vBytes for fee");
+    const r = decimalToRational(rateGrainsPerVByte, "fee rate");
+    if (r.num <= 0n) throw new Error("bad fee rate");
+    const num2 = BigInt(vBytes) * r.num;
+    const grains = (num2 + r.den - 1n) / r.den;
+    if (grains > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("fee exceeds safe integer range");
+    return Number(grains);
+  }
   function planBatchClaim({ inputs, scriptLens, controlLens, feeRateGrainsPerVByte, network = NETWORKS.mainnet, builderTipEnabled = false }) {
     if (!Array.isArray(inputs) || inputs.length === 0) throw new Error("inputs required");
     if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) throw new Error("bad fee rate");
@@ -6371,7 +6395,7 @@ zoo`.split("\n");
     const builderTip = builderTipGrainsFor(sum, network, builderTipEnabled === true);
     const builderTipProgram = builderTip > 0 ? addressToProgram(BUILDER_TIP_ADDRESS, NETWORKS.mainnet) : null;
     const vBytes = batchClaimVBytes({ nIn: inputs.length, scriptLens, controlLens, nOut: builderTip > 0 ? 2 : 1 });
-    const fee = Math.ceil(vBytes * feeRateGrainsPerVByte);
+    const fee = ceilFeeGrains(vBytes, feeRateGrainsPerVByte);
     const payment = sum - fee - builderTip;
     if (payment < DUST_GRAIN) {
       if (builderTip > 0) {
