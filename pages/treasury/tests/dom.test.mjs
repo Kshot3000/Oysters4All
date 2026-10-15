@@ -426,13 +426,20 @@ test("schedules: add + next-due renders", async () => {
   const pid = createProposalDom($, vid);
   document.querySelector('#steps button[data-step="disburse"]').click();
   $("d-sched-proposal").value = pid;
-  $("d-sched-start").value = "2026-10-01";
+  // Anchor the fixture to today: a fixed start date made the old regex
+  // assertion a time bomb (it only passed while the next due date fell
+  // in its hard-coded window). Start 6 days ago, every 2 weeks -> the
+  // next due date is exactly start + 14 days, always 8 days out.
+  const startMs = Date.now() - 6 * 86400000;
+  const startISO = new Date(startMs).toISOString().slice(0, 10);
+  const expectedNext = new Date(startMs + 14 * 86400000).toISOString().slice(0, 10);
+  $("d-sched-start").value = startISO;
   $("d-sched-unit").value = "weeks";
   $("d-sched-every").value = "2";
   $("d-sched-add").click();
   await tick();
   assert.ok($("d-sched-rows").innerHTML.includes("every 2 weeks"), "schedule row");
-  assert.match($("d-sched-rows").innerHTML, /2026-10-1\d|2026-10-0\d/, "next due date shown");
+  assert.ok($("d-sched-rows").innerHTML.includes(expectedNext), "next due date shown: " + expectedNext);
 });
 
 test("honest limits + footer attribution always visible", () => {
