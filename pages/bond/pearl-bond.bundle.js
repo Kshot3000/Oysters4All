@@ -43,10 +43,12 @@ var PearlBond = (() => {
     buildTransferScript: () => buildTransferScript,
     builderTipGrainsFor: () => builderTipGrainsFor,
     bytesToHex: () => bytesToHex,
+    ceilFeeGrains: () => ceilFeeGrains2,
     classifyTranches: () => classifyTranches,
     couponGrains: () => couponGrains,
     couponSchedule: () => couponSchedule,
     dblSha: () => dblSha,
+    decimalToRational: () => decimalToRational2,
     decodeBech32m: () => decodeBech32m,
     decodeBondDescriptor: () => decodeBondDescriptor,
     encodeBech32m: () => encodeBech32m,
@@ -5906,6 +5908,8 @@ zoo`.split("\n");
     SIGHASH_SINGLE_ANYONECANPAY: () => SIGHASH_SINGLE_ANYONECANPAY,
     broadcastViaBlockbook: () => broadcastViaBlockbook,
     buildKeypathTxEx: () => buildKeypathTxEx,
+    ceilFeeGrains: () => ceilFeeGrains,
+    decimalToRational: () => decimalToRational,
     decodeRawTx: () => decodeRawTx,
     describeSpk: () => describeSpk,
     fetchFeeRate: () => fetchFeeRate,
@@ -6134,6 +6138,26 @@ zoo`.split("\n");
     }
     return results;
   }
+  function decimalToRational(x, name) {
+    const s = String(x ?? "").trim();
+    const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+    if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+    const [, sign, intPart, fracPart = "", expPart] = m;
+    let num2 = BigInt(intPart + fracPart);
+    let den = 10n ** BigInt(fracPart.length);
+    const exp = expPart ? BigInt(expPart) : 0n;
+    if (exp >= 0n) num2 *= 10n ** exp;
+    else den *= 10n ** -exp;
+    if (sign === "-") num2 = -num2;
+    return { num: num2, den };
+  }
+  function ceilFeeGrains(vBytes, rateGrainsPerVByte) {
+    if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("bad vBytes for fee");
+    const r = decimalToRational(rateGrainsPerVByte, "fee rate");
+    if (r.num <= 0n) throw new Error("bad fee rate");
+    const num2 = BigInt(vBytes) * r.num;
+    return (num2 + r.den - 1n) / r.den;
+  }
   function selectCoins(utxos, targetGrains, feeRateGrainsPerVByte, nOut) {
     if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) throw new Error("bad fee rate");
     const seenOutpoints = /* @__PURE__ */ new Set();
@@ -6150,13 +6174,13 @@ zoo`.split("\n");
       selected.push(u);
       total += BigInt(u.value);
       const withChange = keypathTxVBytes(selected.length, nOut + 1);
-      const feeWithChange = BigInt(Math.ceil(withChange * feeRateGrainsPerVByte));
+      const feeWithChange = ceilFeeGrains(withChange, feeRateGrainsPerVByte);
       const change = total - target - feeWithChange;
       if (change >= BigInt(DUST_GRAIN)) {
         return { selected, fee: feeWithChange, change };
       }
       const noChange = keypathTxVBytes(selected.length, nOut);
-      const feeNoChange = BigInt(Math.ceil(noChange * feeRateGrainsPerVByte));
+      const feeNoChange = ceilFeeGrains(noChange, feeRateGrainsPerVByte);
       if (total >= target + feeNoChange) {
         return { selected, fee: total - target, change: 0n };
       }
@@ -6552,6 +6576,28 @@ zoo`.split("\n");
   var SEQ_NONFINAL = 4294967294;
   var SEQ_FINAL = 4294967295;
   var DESCRIPTOR_PREFIX = "bond:v1";
+  function decimalToRational2(x, name) {
+    const s = String(x ?? "").trim();
+    const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+    if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+    const [, sign, intPart, fracPart = "", expPart] = m;
+    let num2 = BigInt(intPart + fracPart);
+    let den = 10n ** BigInt(fracPart.length);
+    const exp = expPart ? BigInt(expPart) : 0n;
+    if (exp >= 0n) num2 *= 10n ** exp;
+    else den *= 10n ** -exp;
+    if (sign === "-") num2 = -num2;
+    return { num: num2, den };
+  }
+  function ceilFeeGrains2(vBytes, rateGrainsPerVByte) {
+    if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("bad vBytes for fee");
+    const r = decimalToRational2(rateGrainsPerVByte, "fee rate");
+    if (r.num <= 0n) throw new Error("fee rate must be positive");
+    const num2 = BigInt(vBytes) * r.num;
+    const grains = (num2 + r.den - 1n) / r.den;
+    if (grains > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("fee exceeds safe integer range");
+    return Number(grains);
+  }
   var OP2 = { DROP: 117, CHECKSIG: 172, CLTV: 177 };
   var TAPLEAF_VERSION3 = 192;
   var LOCKTIME_THRESHOLD = 5e8;
@@ -6799,7 +6845,7 @@ zoo`.split("\n");
     }
     const nOut = bond.tranches.length;
     const vBytes = Math.ceil(10.5 + 57.25 * nFundingInputs + 43 * nOut);
-    const fee = Math.ceil(vBytes * feeRateGrainsPerVByte);
+    const fee = ceilFeeGrains2(vBytes, feeRateGrainsPerVByte);
     return {
       tranches: bond.tranches.map((t) => ({
         index: t.index,
@@ -6864,7 +6910,7 @@ zoo`.split("\n");
     const scriptLen = tranche.claimScript.length;
     const controlLen = tranche.claimControlBlock.length;
     const vBytes = spendVBytes({ nOut: builderTip > 0 ? 2 : 1, scriptLen, controlLen, stackLens: [64] });
-    const fee = Math.ceil(vBytes * feeRateGrainsPerVByte);
+    const fee = ceilFeeGrains2(vBytes, feeRateGrainsPerVByte);
     const payValue = input.value - fee - builderTip;
     if (payValue < DUST_GRAIN) {
       if (builderTip > 0) {
@@ -6947,7 +6993,7 @@ zoo`.split("\n");
     const txid = validOutpoint(outpoint.txid, outpoint.vout);
     if (!Number.isSafeInteger(outpoint.value) || outpoint.value <= 0) throw new Error("bad tranche value");
     const legVBytes = transferLegVBytes(tranche.transferScript.length, tranche.transferControlBlock.length);
-    const feeLeg = Math.ceil(legVBytes * feeRateGrainsPerVByte);
+    const feeLeg = ceilFeeGrains2(legVBytes, feeRateGrainsPerVByte);
     const outValue = outpoint.value - feeLeg;
     if (outValue < DUST_GRAIN) {
       throw new Error(`tranche value cannot cover the transfer leg fee (${feeLeg} grains)`);
@@ -6999,7 +7045,7 @@ zoo`.split("\n");
     if (bytesToHex(p2trScriptPubKey(tweakedX)) !== bytesToHex(input.spk)) {
       throw new Error("input spk does not match the package taptree");
     }
-    const expectFee = Math.ceil(transferLegVBytes(transferScript.length, controlBlock.length) * pkg.feeRateGrainsPerVByte);
+    const expectFee = ceilFeeGrains2(transferLegVBytes(transferScript.length, controlBlock.length), pkg.feeRateGrainsPerVByte);
     if (expectFee !== pkg.feeLegGrains) throw new Error("leg fee mismatch");
     if (pkg.output.value !== pkg.input.value - pkg.feeLegGrains) throw new Error("output value mismatch");
     const digest = scriptPathSigDigest83(network, input, output, transferScript, pkg.sequence);
@@ -7069,11 +7115,11 @@ zoo`.split("\n");
     };
     const totalIn = totalTrancheIn + bu.value;
     const trancheOut = outputs.reduce((a, o) => a + o.value, 0);
-    let fee = Math.ceil(vBytesFor(outputs.length + 1) * feeRateGrainsPerVByte);
+    let fee = ceilFeeGrains2(vBytesFor(outputs.length + 1), feeRateGrainsPerVByte);
     let change = totalIn - trancheOut - fee;
     let withChange = true;
     if (change < DUST_GRAIN) {
-      fee = Math.ceil(vBytesFor(outputs.length) * feeRateGrainsPerVByte);
+      fee = ceilFeeGrains2(vBytesFor(outputs.length), feeRateGrainsPerVByte);
       change = totalIn - trancheOut - fee;
       withChange = false;
       if (change > 0) {

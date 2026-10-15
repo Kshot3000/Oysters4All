@@ -13,6 +13,7 @@ import {
   builderTipGrainsFor, BUILDER_TIP_ADDRESS, addressToProgram,
   scriptPathSigDigest83, transferLegVBytes, presignTransferLeg,
   verifyTransferLeg, buildFillTx, classifyTranches,
+  ceilFeeGrains, decimalToRational,
   BLOCK_TIME_SEC, DUST_GRAIN, GRAIN_PER_PRL, NETWORKS,
   SIGHASH_SINGLE_ANYONECANPAY, SEQ_FINAL,
   schnorr, sha256, bytesToHex, hexToBytes, encodeBech32m,
@@ -417,4 +418,69 @@ test("scriptPathSigDigestEx SIGHASH_DEFAULT matches pearld consensus (Go-pinned)
     { sequence: 0xfffffffe, locktime: t.lockHeight });
   assert.equal(bytesToHex(d),
     "8f24f0320f668dc105a10abb02b200484b0d9b3431ec214f93c22d06e85c0186");
+});
+
+/* ---------- exact decimal fee pricing (float-ceil regression) ----------
+ * The float form Math.ceil(vBytes * rate) overcharged by a grain whenever
+ * the float product of an exact-integer fee landed a hair above it. All
+ * six fee sites in bond-core (fundingPlan, planClaim, presignTransferLeg,
+ * verifyTransferLeg's re-derivation, buildFillTx with/without change) now
+ * price through ceilFeeGrains. */
+test("ceilFeeGrains: exact decimal pricing, string parity, fractional ceil, garbage refusal", () => {
+  assert.equal(ceilFeeGrains(455, 2.2), 1001); // float form: 1002
+  assert.equal(ceilFeeGrains(455, "2.2"), 1001);
+  assert.equal(ceilFeeGrains(670, 1.1), 737); // float form: 738
+  assert.equal(ceilFeeGrains(910, 1.1), 1001); // float form: 1002
+  assert.equal(ceilFeeGrains(100, 1.005), 101); // fractional fee ceils up
+  assert.equal(ceilFeeGrains(340, 1.1), 374);
+  assert.deepEqual(decimalToRational(2.2, "fee rate"), { num: 22n, den: 10n });
+  assert.throws(() => ceilFeeGrains(100, 0), /positive/);
+  assert.throws(() => ceilFeeGrains(100, -1), /positive/);
+  assert.throws(() => ceilFeeGrains(100, NaN), /finite decimal/);
+  assert.throws(() => ceilFeeGrains(100, "abc"), /finite decimal/);
+});
+
+test("fundingPlan: decimal rates price exactly at UI shapes (nIn = 1)", () => {
+  const terms9 = parseBondTerms({ name: "T9", facePRL: "1000", annualBps: 500, frequency: 2, periods: 9, issueHeight: 200000 });
+  const bond9 = forgeBond(MAINNET, terms9, { key: sellerXOnly, mode: "raw" });
+  const p9 = fundingPlan(bond9, 2.2, 1);
+  assert.equal(p9.estVBytes, 455);
+  assert.equal(p9.estFeeGrains, 1001); // float form charged 1002
+  assert.equal(p9.grandTotalGrains, p9.totalGrains + 1001);
+  const terms14 = parseBondTerms({ name: "T14", facePRL: "1000", annualBps: 500, frequency: 2, periods: 14, issueHeight: 200000 });
+  const bond14 = forgeBond(MAINNET, terms14, { key: sellerXOnly, mode: "raw" });
+  const p14 = fundingPlan(bond14, 1.1, 1);
+  assert.equal(p14.estVBytes, 670);
+  assert.equal(p14.estFeeGrains, 737); // float form charged 738
+});
+
+test("transfer leg at a decimal rate: presign and verifier agree exactly", () => {
+  const seller = fixtureBond();
+  const buyer = buyerBond();
+  const t = seller.tranches[1];
+  const bt = buyer.tranches[1];
+  const pkg = presignTransferLeg(MAINNET, t,
+    { txid: "cc".repeat(32), vout: 2, value: t.amountGrains },
+    SELLER_PRIV, hexToBytes(bytesToHex(bt.tweakedX)), 1.1);
+  const v = verifyTransferLeg(MAINNET, pkg);
+  assert.equal(v.ok, true);
+  assert.equal(v.buyerReceives, t.amountGrains - pkg.feeLegGrains);
+});
+
+test("buildFillTx: 6-leg fill at 1.1 g/vB prices the fee exactly", () => {
+  const terms6 = parseBondTerms({ name: "T6", facePRL: "1000", annualBps: 500, frequency: 2, periods: 6, issueHeight: 200000 });
+  const seller = forgeBond(MAINNET, terms6, { key: sellerXOnly, mode: "raw" });
+  const buyer = forgeBond(MAINNET, terms6, { key: buyerXOnly, mode: "raw" });
+  const legs = seller.tranches.map((t, i) => presignTransferLeg(MAINNET, t,
+    { txid: "dd".repeat(32), vout: i, value: t.amountGrains },
+    SELLER_PRIV, hexToBytes(bytesToHex(buyer.tranches[i].tweakedX)), 2));
+  for (const l of legs) verifyTransferLeg(MAINNET, l);
+  const buyerUtxo = {
+    txid: "ee".repeat(32), vout: 0, value: 200_000_000_000,
+    spk: p2trScriptPubKey(tweak(BUYER_PRIV)), priv: BUYER_PRIV,
+  };
+  const fill = buildFillTx(MAINNET, legs, 50_000_000_000, buyerUtxo, sellerXOnly, buyerXOnly, 1.1);
+  assert.equal(fill.vBytes, 910);
+  assert.equal(fill.feeGrains, 1001); // float form charged 1002
+  assert.equal(fill.nLegs, 6);
 });

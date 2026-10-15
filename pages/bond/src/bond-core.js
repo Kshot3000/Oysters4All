@@ -70,6 +70,37 @@ export const SEQ_NONFINAL = 0xfffffffe; // CLTV-safe, RBF-opt-in
 export const SEQ_FINAL = 0xffffffff;
 export const DESCRIPTOR_PREFIX = "bond:v1";
 
+/* Exact decimal fee pricing (fleet pattern, first shipped in Pearl Fees):
+ * a fee rate is read through String(), whose shortest round-trip form
+ * recovers the decimal the user typed, then ceil(vBytes × rate) is computed
+ * in BigInt rational arithmetic. The old float form — Math.ceil(vB * rate)
+ * — overcharged whenever the float product of an exact-integer fee landed
+ * a hair above it: funding a 9-tranche bond (455 vB) at 2.2 g/vB charged
+ * 1,002 grains instead of 1,001, and a 6-leg fill (910 vB) at 1.1 charged
+ * 1,002 instead of 1,001. */
+export function decimalToRational(x, name) {
+  const s = String(x ?? "").trim();
+  const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+  if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+  const [, sign, intPart, fracPart = "", expPart] = m;
+  let num = BigInt(intPart + fracPart);
+  let den = 10n ** BigInt(fracPart.length);
+  const exp = expPart ? BigInt(expPart) : 0n;
+  if (exp >= 0n) num *= 10n ** exp; else den *= 10n ** -exp;
+  if (sign === "-") num = -num;
+  return { num, den };
+}
+
+export function ceilFeeGrains(vBytes, rateGrainsPerVByte) {
+  if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("bad vBytes for fee");
+  const r = decimalToRational(rateGrainsPerVByte, "fee rate");
+  if (r.num <= 0n) throw new Error("fee rate must be positive");
+  const num = BigInt(vBytes) * r.num;
+  const grains = (num + r.den - 1n) / r.den;
+  if (grains > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("fee exceeds safe integer range");
+  return Number(grains);
+}
+
 const OP = { DROP: 0x75, CHECKSIG: 0xac, CLTV: 0xb1 };
 const TAPLEAF_VERSION = 0xc0;
 const LOCKTIME_THRESHOLD = 500_000_000;
@@ -344,7 +375,7 @@ export function fundingPlan(bond, feeRateGrainsPerVByte, nFundingInputs = 1) {
   // vBytes = 10.5 + 57.25*nIn + 43*nOut (ceil), same formula the fee
   // estimator in Pearl Sign uses for keypath spends.
   const vBytes = Math.ceil(10.5 + 57.25 * nFundingInputs + 43 * nOut);
-  const fee = Math.ceil(vBytes * feeRateGrainsPerVByte);
+  const fee = ceilFeeGrains(vBytes, feeRateGrainsPerVByte);
   return {
     tranches: bond.tranches.map((t) => ({
       index: t.index, kind: t.kind, address: t.address,
@@ -433,7 +464,7 @@ export function planClaim(network, tranche, outpoint, destProgram, feeRateGrains
   const scriptLen = tranche.claimScript.length;
   const controlLen = tranche.claimControlBlock.length;
   const vBytes = spendVBytes({ nOut: builderTip > 0 ? 2 : 1, scriptLen, controlLen, stackLens: [64] });
-  const fee = Math.ceil(vBytes * feeRateGrainsPerVByte);
+  const fee = ceilFeeGrains(vBytes, feeRateGrainsPerVByte);
   const payValue = input.value - fee - builderTip;
   if (payValue < DUST_GRAIN) {
     if (builderTip > 0) {
@@ -539,7 +570,7 @@ export function presignTransferLeg(network, tranche, outpoint, sellerPriv, buyer
   const txid = validOutpoint(outpoint.txid, outpoint.vout);
   if (!Number.isSafeInteger(outpoint.value) || outpoint.value <= 0) throw new Error("bad tranche value");
   const legVBytes = transferLegVBytes(tranche.transferScript.length, tranche.transferControlBlock.length);
-  const feeLeg = Math.ceil(legVBytes * feeRateGrainsPerVByte);
+  const feeLeg = ceilFeeGrains(legVBytes, feeRateGrainsPerVByte);
   const outValue = outpoint.value - feeLeg;
   if (outValue < DUST_GRAIN) {
     throw new Error(`tranche value cannot cover the transfer leg fee (${feeLeg} grains)`);
@@ -591,7 +622,7 @@ export function verifyTransferLeg(network, pkg) {
     throw new Error("input spk does not match the package taptree");
   }
   // 3. fee math re-derived
-  const expectFee = Math.ceil(transferLegVBytes(transferScript.length, controlBlock.length) * pkg.feeRateGrainsPerVByte);
+  const expectFee = ceilFeeGrains(transferLegVBytes(transferScript.length, controlBlock.length), pkg.feeRateGrainsPerVByte);
   if (expectFee !== pkg.feeLegGrains) throw new Error("leg fee mismatch");
   if (pkg.output.value !== pkg.input.value - pkg.feeLegGrains) throw new Error("output value mismatch");
   // 4. digest recomputation + signature check
@@ -675,11 +706,11 @@ export function buildFillTx(network, legs, priceGrains, buyerUtxo, sellerPayProg
 
   const totalIn = totalTrancheIn + bu.value;
   const trancheOut = outputs.reduce((a, o) => a + o.value, 0);
-  let fee = Math.ceil(vBytesFor(outputs.length + 1) * feeRateGrainsPerVByte);
+  let fee = ceilFeeGrains(vBytesFor(outputs.length + 1), feeRateGrainsPerVByte);
   let change = totalIn - trancheOut - fee;
   let withChange = true;
   if (change < DUST_GRAIN) {
-    fee = Math.ceil(vBytesFor(outputs.length) * feeRateGrainsPerVByte);
+    fee = ceilFeeGrains(vBytesFor(outputs.length), feeRateGrainsPerVByte);
     change = totalIn - trancheOut - fee;
     withChange = false;
     if (change > 0) { fee += change; change = 0; }
