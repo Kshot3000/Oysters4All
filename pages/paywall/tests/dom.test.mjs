@@ -180,7 +180,14 @@ const localStorage = {
 /* ---------- fixtures ---------- */
 const MNEMONIC = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 const PW_ADDR = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d"; // paywall receiving address (pinned vector)
-const DESC_PIN = "pearl-paywall:v1:prl:d20d4c7652d8091d047c7f25ad4f04d457e60aa3f0c0b21b98490b44fd12b02f";
+// The create flow validates expiry against the REAL clock (must be future),
+// so the DOM fixture anchors expiry to today + 400 days and derives the
+// expected descriptor from the entered spec. The literal pinned descriptor
+// (expiry 2027-12-31) stays pinned byte-for-byte in the core suite, where
+// the pinned spec is constructed without the wall-clock check — a fixed
+// expiry date here was a time bomb (treasury class, detonates 2027-12-31).
+const FUTURE_EXPIRY = new Date(Date.now() + 400 * 86400000).toISOString().slice(0, 10);
+let DESC_LIVE = null; // descriptor of the paywall created by the create test
 const TOKEN_PUBKEY_PIN = "1e89c01f8a1968e908480b487c0673c07fef9c48268d403e3af0678a460a4f76";
 const FUND_TXID = "22".repeat(32);
 let stubTx = null; // set after the bundle loads (needs P for the funder address)
@@ -259,17 +266,22 @@ test("every el(id) target in app.js exists in index.html", () => {
   assert.deepEqual(missing, [], "missing ids: " + missing.join(","));
 });
 
-test("create: sealing renders the pinned descriptor, URI and QR", () => {
+test("create: sealing renders the descriptor for the entered spec, URI and QR", () => {
   goTab("create");
   $("c-hrp").value = "prl";
   $("c-title").value = "Backstage pass: studio session stems";
   $("c-price").value = "2.5";
   $("c-address").value = PW_ADDR;
   $("c-deliverable").value = "WAV stems + project file, delivered by email within 48h of payment.";
-  $("c-expiry").value = "2027-12-31";
+  $("c-expiry").value = FUTURE_EXPIRY;
   $("c-build").click();
   assert.equal($("c-err").textContent, "", "no create error: " + $("c-err").textContent);
-  assert.equal($("c-descriptor").textContent, DESC_PIN, "pinned descriptor");
+  DESC_LIVE = P.sealPaywall(P.validatePaywallSpec({
+    title: "Backstage pass: studio session stems", pricePRL: "2.5", address: PW_ADDR,
+    deliverable: "WAV stems + project file, delivered by email within 48h of payment.",
+    expiry: FUTURE_EXPIRY, hrp: "prl",
+  })).descriptor;
+  assert.equal($("c-descriptor").textContent, DESC_LIVE, "descriptor for the entered spec");
   assert.equal($("c-commit-card").hidden, false);
   assert.equal($("tab-pay").hidden, false, "desk advances to pay after sealing");
   assert.equal($("tab-create").hidden, true);
@@ -277,7 +289,7 @@ test("create: sealing renders the pinned descriptor, URI and QR", () => {
   assert.ok($("p-qr").innerHTML.includes("<svg"), "QR rendered");
   assert.ok($("p-price-line").textContent.includes("2.5 PRL"), "price line grain-exact");
   const saved = JSON.parse(localStorage.getItem("pearl-paywall-v1"));
-  assert.equal(saved.descriptor, DESC_PIN, "descriptor persisted (no keys persisted)");
+  assert.equal(saved.descriptor, DESC_LIVE, "descriptor persisted (no keys persisted)");
   assert.ok(!JSON.stringify(saved).includes("abandon"), "mnemonic never persisted");
 });
 
@@ -347,7 +359,7 @@ test("pay: recent-payments list with use buttons; auto-refresh ticks", async () 
 test("token: mint from funding key, wrong key refused, key wiped", async () => {
   goTab("token");
   $("t-load-pay").click();
-  assert.equal($("t-descriptor").value, DESC_PIN, "descriptor carried from pay tab");
+  assert.equal($("t-descriptor").value, DESC_LIVE, "descriptor carried from pay tab");
   assert.equal($("t-txid").value, FUND_TXID, "txid carried from pay tab");
   $("t-key").value = MNEMONIC;
   $("t-mint").click();
@@ -366,7 +378,7 @@ test("token: mint from funding key, wrong key refused, key wiped", async () => {
 
 test("verify: honest token PROVEN, tampered token NOT PROVEN", async () => {
   goTab("verify");
-  $("v-desc").value = DESC_PIN;
+  $("v-desc").value = DESC_LIVE;
   $("v-canonical").value = $("c-canonical").textContent;
   $("v-token").value = $("t-token").textContent;
   $("v-run").click();
@@ -388,7 +400,7 @@ test("snippet: generated + crypto self-test passes in-page", () => {
   assert.equal($("s-snippet-card").hidden, false);
   const snip = $("s-snippet").textContent;
   assert.ok(snip.includes("PearlPaywallGate"), "snippet defines the gate");
-  assert.ok(snip.includes(DESC_PIN), "snippet binds the paywall descriptor");
+  assert.ok(snip.includes(DESC_LIVE), "snippet binds the paywall descriptor");
   assert.ok(snip.includes("250000000"), "snippet binds the grain-exact price");
   $("s-test-snippet").click();
   assert.ok($("s-test-out").textContent.includes("PASS"), "snippet self-test: " + $("s-test-out").textContent);

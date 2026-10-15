@@ -20,16 +20,39 @@ const PIN_PUBKEY = "1e89c01f8a1968e908480b487c0673c07fef9c48268d403e3af0678a460a
 const PIN_SIG = "ab4283fe3f1912c3c3829b713dbf1e6e882492ae90e1396aaaac7d56b67e53d98c748480a1203552e199ecd0c2c473eaa9cf001490316441845cce99387afeb5";
 const PIN_FUNDER_ADDR = "prl1pr6yuq8u2r95wjzzgpdy8cpnncpl7l8zgy6x5q0367pnc53s2famqg7pt74";
 
+// Live-flow expiry is anchored to today (+400 days), never a fixed calendar
+// date: validatePaywallSpec requires a FUTURE expiry against the real clock,
+// so a hard-coded date is a time bomb (the 2027-12-31 fixture would have gone
+// red on 2027-12-31 — same class as the treasury DOM bomb fixed 2026-10-14).
+const FUTURE_EXPIRY = new Date(Date.now() + 400 * 86400000).toISOString().slice(0, 10);
+
 function goodSpec(over = {}) {
   return P.validatePaywallSpec({
     title: "Backstage pass: studio session stems",
     pricePRL: "2.5",
     address: PAYWALL_ADDR,
     deliverable: "WAV stems + project file, delivered by email within 48h of payment.",
-    expiry: "2027-12-31",
+    expiry: FUTURE_EXPIRY,
     hrp: "prl",
     ...over,
   });
+}
+
+// The PINNED vectors keep their literal 2027-12-31 expiry forever: they pin
+// the canonical JSON / hash / signature byte-for-byte, which must not depend
+// on the wall clock. sealPaywall only canonicalizes (no clock check), so the
+// pinned spec is constructed directly, bypassing validatePaywallSpec.
+function pinnedSpec() {
+  return {
+    v: 1,
+    title: "Backstage pass: studio session stems",
+    priceGrains: 250000000n,
+    address: PAYWALL_ADDR,
+    deliverable: "WAV stems + project file, delivered by email within 48h of payment.",
+    expiry: "2027-12-31",
+    hrp: "prl",
+    network: P.NETWORKS.mainnet,
+  };
 }
 
 function stubTxFunder(confirmations = 3, valueGrains = "250000000") {
@@ -47,7 +70,7 @@ const stubFetchTx = (tx) => async (url) => {
 const AUX = new Uint8Array(32).fill(7);
 
 async function mintPinned() {
-  const sealed = P.sealPaywall(goodSpec());
+  const sealed = P.sealPaywall(pinnedSpec());
   const { token } = await P.mintToken({
     descriptor: sealed.descriptor, txid: TXID, keyInput: MN,
     blockbookBase: "https://blockbook.pearlresearch.ai",
@@ -61,7 +84,7 @@ async function mintPinned() {
 test("validatePaywallSpec: good spec, grain-exact price", () => {
   const s = goodSpec();
   assert.equal(s.priceGrains, 250000000n);
-  assert.equal(s.expiry, "2027-12-31");
+  assert.equal(s.expiry, FUTURE_EXPIRY);
   assert.equal(FUNDER.address, PIN_FUNDER_ADDR);
 });
 
@@ -83,7 +106,7 @@ test("validatePaywallSpec: rejects bad inputs loudly", () => {
 });
 
 test("descriptor: pinned canonical/hash/descriptor, parse round-trip", () => {
-  const sealed = P.sealPaywall(goodSpec());
+  const sealed = P.sealPaywall(pinnedSpec());
   assert.equal(sealed.canonical, PIN_CANONICAL);
   assert.equal(sealed.hash, PIN_HASH);
   assert.equal(sealed.descriptor, PIN_DESC);
@@ -172,11 +195,16 @@ test("mintToken: KEY REFUSED on wrong key / non-P2TR inputs", async () => {
 
 /* ---------------- standalone verifier ---------------- */
 
+// The pinned paywall lives until 2027-12-31; tests verifying its token pin
+// the verification clock inside that lifetime, so the verdict never depends
+// on the real date the suite happens to run.
+const PINNED_NOW_MS = Date.parse("2027-06-01T00:00:00Z");
+
 test("verifyToken: PROVEN end-to-end", async () => {
   const { sealed, token } = await mintPinned();
   const v = await P.verifyToken({
     descriptor: sealed.descriptor, canonical: sealed.canonical,
-    token: JSON.stringify(token),
+    token: JSON.stringify(token), nowMs: PINNED_NOW_MS,
     blockbookBase: "https://blockbook.pearlresearch.ai", fetcher: stubFetchTx(stubTxFunder()),
   });
   assert.equal(v.proven, true);
@@ -186,7 +214,7 @@ test("verifyToken: PROVEN end-to-end", async () => {
 test("verifyToken: NOT PROVEN on tampering / mismatch / expiry / outage", async () => {
   const { sealed, token } = await mintPinned();
   const base = {
-    descriptor: sealed.descriptor, canonical: sealed.canonical,
+    descriptor: sealed.descriptor, canonical: sealed.canonical, nowMs: PINNED_NOW_MS,
     blockbookBase: "https://blockbook.pearlresearch.ai", fetcher: stubFetchTx(stubTxFunder()),
   };
   const evil = { ...token, sig: token.sig.slice(0, 126) + (token.sig.endsWith("b5") ? "b6" : "b5") };
@@ -206,10 +234,16 @@ test("verifyToken: NOT PROVEN on tampering / mismatch / expiry / outage", async 
   assert.equal(v.proven, false);
   assert.ok(v.reasons.join(" ").includes("insufficient"));
 
-  const expired = P.sealPaywall(goodSpec());
-  v = await P.verifyToken({ ...base, canonical: expired.canonical, descriptor: expired.descriptor, token: JSON.stringify(token), nowMs: new Date("2028-01-02T00:00:00Z").getTime() });
+  // Expiry judged against the INJECTED clock, derived from the pinned expiry
+  // itself (+1 day) — deterministic at any real date. This also pins the
+  // verifyToken fix: re-validating the canonical must not let the creator's
+  // future-expiry check pre-empt the "expired" verdict (previously, once the
+  // real clock passed the expiry, this returned "canonical … rejected:
+  // expiry must be in the future" instead of "paywall expired on …").
+  const expired = P.sealPaywall(pinnedSpec());
+  v = await P.verifyToken({ ...base, canonical: expired.canonical, descriptor: expired.descriptor, token: JSON.stringify(token), nowMs: Date.parse("2027-12-31T00:00:00Z") + 86400000 });
   assert.equal(v.proven, false);
-  assert.ok(v.reasons.join(" ").includes("expired"));
+  assert.ok(v.reasons.join(" ").includes("expired"), v.reasons.join(" "));
 
   const down = async () => { throw new Error("boom"); };
   v = await P.verifyToken({ ...base, token: JSON.stringify(token), fetcher: down });
@@ -218,6 +252,22 @@ test("verifyToken: NOT PROVEN on tampering / mismatch / expiry / outage", async 
 
   v = await P.verifyToken({ ...base, token: "not json" });
   assert.equal(v.proven, false);
+});
+
+test("verifyToken: already-expired paywall (real clock, no injection) says expired, not rejected", async () => {
+  // Regression for the verifyToken clock bug: a paywall whose expiry passed
+  // since creation must verify as "paywall expired on …". Before the fix,
+  // verifyToken's internal validatePaywallSpec call threw "expiry must be
+  // in the future" first, misreporting it as a malformed canonical.
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const sealed = P.sealPaywall({ ...pinnedSpec(), expiry: yesterday });
+  const tok = { v: 1, descriptor: sealed.descriptor, pubkey: PIN_PUBKEY, txid: TXID, sig: PIN_SIG };
+  const v = await P.verifyToken({
+    descriptor: sealed.descriptor, canonical: sealed.canonical, token: JSON.stringify(tok),
+    blockbookBase: "https://blockbook.pearlresearch.ai", fetcher: stubFetchTx(stubTxFunder()),
+  });
+  assert.equal(v.proven, false);
+  assert.ok(v.reasons.join(" ").includes(`paywall expired on ${yesterday}`), v.reasons.join(" "));
 });
 
 /* ---------------- snippet-crypto differentials ---------------- */
@@ -303,7 +353,7 @@ function extractSnippetFns(snippet) {
 test("buildEmbedSnippet: inlines the exact snippet-crypto sources", () => {
   const snip = P.buildEmbedSnippet({
     descriptor: PIN_DESC, address: PAYWALL_ADDR, priceGrains: "250000000",
-    expiry: "2027-12-31", blockbook: "https://blockbook.pearlresearch.ai",
+    expiry: FUTURE_EXPIRY, blockbook: "https://blockbook.pearlresearch.ai",
   });
   assert.ok(snip.startsWith("<script>") && snip.trimEnd().endsWith("</script>"));
   assert.ok(snip.includes(`"descriptor":"${PIN_DESC}"`));
@@ -342,7 +392,7 @@ test("buildEmbedSnippet: inlined functions evaluate + pass differentials", () =>
 test("embed snippet: verifyToken end-to-end in a page-like sandbox", async () => {
   const snip = P.buildEmbedSnippet({
     descriptor: PIN_DESC, address: PAYWALL_ADDR, priceGrains: "250000000",
-    expiry: "2027-12-31", blockbook: "https://blockbook.pearlresearch.ai",
+    expiry: FUTURE_EXPIRY, blockbook: "https://blockbook.pearlresearch.ai",
   });
   const js = snip.replace(/^<script>\n?/, "").replace(/\n?<\/script>\s*$/, "");
   const tx = stubTxFunder();

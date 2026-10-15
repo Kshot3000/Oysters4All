@@ -6000,7 +6000,7 @@ zoo`.split("\n");
     if (hrp === "tprl") return NETWORKS.testnet;
     throw new Error(`unsupported hrp "${hrp}" (want prl or tprl)`);
   }
-  function validatePaywallSpec(input) {
+  function validatePaywallSpec(input, opts = {}) {
     const title = String(input.title ?? "").trim();
     if (title.length < 1 || title.length > 120) throw new Error("title must be 1\u2013120 characters");
     const priceGrains = parsePRL(String(input.pricePRL ?? "").trim());
@@ -6031,7 +6031,7 @@ zoo`.split("\n");
       const d = /* @__PURE__ */ new Date(expRaw + "T00:00:00Z");
       if (Number.isNaN(d.getTime())) throw new Error("expiry is not a real date");
       if (d.toISOString().slice(0, 10) !== expRaw) throw new Error("expiry is not a real date");
-      if (d.getTime() <= Date.now()) throw new Error("expiry must be in the future");
+      if (opts.requireFutureExpiry !== false && d.getTime() <= (opts.nowMs ?? Date.now())) throw new Error("expiry must be in the future");
       expiry = expRaw;
     }
     return { v: PAYWALL_VERSION, title, priceGrains, address, deliverable, expiry, hrp, network };
@@ -6237,7 +6237,7 @@ ${txid.toLowerCase()}`;
         deliverable: parsed.deliverable,
         expiry: parsed.expiry ?? "",
         hrp: parsed.hrp
-      });
+      }, { requireFutureExpiry: false });
       if (spec.expiry && (/* @__PURE__ */ new Date(spec.expiry + "T00:00:00Z")).getTime() <= (nowMs ?? Date.now())) {
         return fail(`paywall expired on ${spec.expiry}`);
       }

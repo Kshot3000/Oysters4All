@@ -73,8 +73,12 @@ export function networkForHrp(hrp) {
  * Validate creator input into a normalized spec.
  * {title, pricePRL (decimal string), address (prl1…), deliverable, expiry
  *  ("" or YYYY-MM-DD, must be future), hrp}
+ * opts.nowMs overrides the clock for the future check (tests, audits).
+ * opts.requireFutureExpiry === false skips the future check — for callers
+ * re-validating an EXISTING paywall (verifyToken), where a since-passed
+ * expiry must surface as "expired", not as a creation-time rejection.
  */
-export function validatePaywallSpec(input) {
+export function validatePaywallSpec(input, opts = {}) {
   const title = String(input.title ?? "").trim();
   if (title.length < 1 || title.length > 120) throw new Error("title must be 1–120 characters");
   const priceGrains = parsePRL(String(input.pricePRL ?? "").trim()); // throws on bad input
@@ -106,7 +110,7 @@ export function validatePaywallSpec(input) {
     if (Number.isNaN(d.getTime())) throw new Error("expiry is not a real date");
     // round-trip guard: 2026-02-30 must not silently become 2026-03-02
     if (d.toISOString().slice(0, 10) !== expRaw) throw new Error("expiry is not a real date");
-    if (d.getTime() <= Date.now()) throw new Error("expiry must be in the future");
+    if (opts.requireFutureExpiry !== false && d.getTime() <= (opts.nowMs ?? Date.now())) throw new Error("expiry must be in the future");
     expiry = expRaw;
   }
   return { v: PAYWALL_VERSION, title, priceGrains, address, deliverable, expiry, hrp, network };
@@ -354,7 +358,7 @@ export async function verifyToken({ descriptor, canonical, token: tokenRaw, bloc
       deliverable: parsed.deliverable,
       expiry: parsed.expiry ?? "",
       hrp: parsed.hrp,
-    });
+    }, { requireFutureExpiry: false });
     // expiry was validated as future at creation; re-check against now for old paywalls
     if (spec.expiry && new Date(spec.expiry + "T00:00:00Z").getTime() <= (nowMs ?? Date.now())) {
       return fail(`paywall expired on ${spec.expiry}`);
