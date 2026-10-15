@@ -23,7 +23,9 @@
     buildRefundScript: () => buildRefundScript,
     bytesToHex: () => bytesToHex,
     canonicalMarketJSON: () => canonicalMarketJSON,
+    ceilFeeGrains: () => ceilFeeGrains,
     dblSha: () => dblSha,
+    decimalToRational: () => decimalToRational,
     decodeBech32m: () => decodeBech32m,
     encodeBech32m: () => encodeBech32m,
     feeForVBytes: () => feeForVBytes,
@@ -6122,11 +6124,33 @@ zoo`.split("\n");
     const base = 4 + 1 + nIn * 41 + 1 + nOut * 43 + 4;
     return Math.ceil((base * 3 + (base + 2 + wit)) / 4);
   }
+  function decimalToRational(x, name) {
+    const s = String(x ?? "").trim();
+    const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+    if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+    const [, sign, intPart, fracPart = "", expPart] = m;
+    let num2 = BigInt(intPart + fracPart);
+    let den = 10n ** BigInt(fracPart.length);
+    const exp = expPart ? BigInt(expPart) : 0n;
+    if (exp >= 0n) num2 *= 10n ** exp;
+    else den *= 10n ** -exp;
+    if (sign === "-") num2 = -num2;
+    return { num: num2, den };
+  }
+  function ceilFeeGrains(vBytes, rateGrainsPerVByte) {
+    if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("bad vBytes for fee");
+    const r = decimalToRational(rateGrainsPerVByte, "fee rate");
+    if (r.num <= 0n) throw new Error("fee rate must be positive");
+    const num2 = BigInt(vBytes) * r.num;
+    const grains = (num2 + r.den - 1n) / r.den;
+    if (grains > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("fee exceeds safe integer range");
+    return Number(grains);
+  }
   function feeForVBytes(vBytes, rateGrainsPerVByte) {
     if (!Number.isSafeInteger(vBytes) || vBytes <= 0) throw new Error("bad vBytes");
     const r = Number(rateGrainsPerVByte);
     if (!Number.isFinite(r) || r <= 0) throw new Error("fee rate must be positive");
-    return Math.ceil(vBytes * r);
+    return ceilFeeGrains(vBytes, rateGrainsPerVByte);
   }
   function validatePosition(norm, pos) {
     if (!pos || typeof pos !== "object") throw new Error("position must be an object");

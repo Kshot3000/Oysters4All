@@ -7,7 +7,7 @@ import {
   validateMarketSpec, canonicalMarketJSON, marketHashHex, marketDescriptor,
   parseMarketDescriptor, verifyMarketDescriptor,
   numsInternalKeyPredict, outcomeContract, allOutcomeContracts,
-  scriptPathVBytes, feeForVBytes, validatePosition, largestRemainder,
+  scriptPathVBytes, feeForVBytes, ceilFeeGrains, decimalToRational, validatePosition, largestRemainder,
   planAwardPayout, planVoidRefund, tapSighashMulti,
   buildMultiInputScriptPathSpend, signBundle, verifyBundle,
   fmtPRL, parsePRLToGrains, blocksToCountdown, impliedProbabilities,
@@ -233,6 +233,40 @@ test("void plan refunds stakes minus pro-rata fee, locktime = resolveH", () => {
     assert.ok(o.feeShare > 0);
   }
   assert.equal(plan.inputs[0].leafScript.length, contracts[0].leafB.length); // refund leaf
+});
+
+test("feeForVBytes prices exact-integer products exactly (no float-ceil grain)", () => {
+  // Exact-integer products that floats land a hair above: the old
+  // Math.ceil(vBytes * rate) charged one grain too many on each of these.
+  assert.equal(feeForVBytes(345, 2.2), 759); // the pinned award plan's vBytes
+  assert.equal(feeForVBytes(345, 4.4), 1518);
+  assert.equal(feeForVBytes(385, 2.2), 847);
+  assert.equal(feeForVBytes(100, 1.1), 110);
+  assert.equal(feeForVBytes(200, 2.2), 440);
+  // String rates price identically to numeric rates.
+  assert.equal(feeForVBytes(345, "2.2"), 759);
+  // Genuinely fractional products still ceil up.
+  assert.equal(feeForVBytes(345, 1.1), 380); // 379.5 -> 380
+  assert.equal(feeForVBytes(100, 2.5), 250);
+  assert.equal(ceilFeeGrains(101, 1.05), 107); // 106.05 -> 107
+  // Garbage rates refuse instead of pricing a NaN fee.
+  assert.throws(() => feeForVBytes(100, "abc"), /positive/);
+  assert.throws(() => ceilFeeGrains(100, "abc"), /finite decimal/);
+  assert.deepEqual(decimalToRational("2.20"), { num: 220n, den: 100n });
+});
+
+test("award plan at a decimal rate conserves the pot at the exact fee", () => {
+  const norm = fixtureSpec();
+  const contracts = allOutcomeContracts(norm);
+  const positions = [
+    { outcomeIndex: 0, txid: "11".repeat(32), vout: 0, value: 100_000_000, funderAddr: funderAddr("pf1") },
+    { outcomeIndex: 0, txid: "22".repeat(32), vout: 1, value: 50_000_000, funderAddr: funderAddr("pf2") },
+    { outcomeIndex: 1, txid: "33".repeat(32), vout: 0, value: 150_000_000, funderAddr: funderAddr("pf3") },
+  ];
+  const plan = planAwardPayout({ norm, contracts, positions, winIndex: 0, feeRateGrainsPerVByte: 2.2 });
+  assert.equal(plan.vBytes, 345);
+  assert.equal(plan.fee, 759); // 345 x 2.2 exactly — pristine src charged 760
+  assert.equal(plan.outputs.reduce((a, o) => a + o.value, 0), plan.totalPot - plan.fee);
 });
 
 test("feeForVBytes + scriptPathVBytes sanity", () => {

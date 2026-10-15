@@ -287,12 +287,43 @@ export function scriptPathVBytes({ nIn, nOut, scriptLen, controlLen = 65, stackL
   return Math.ceil((base * 3 + (base + 2 + wit)) / 4);
 }
 
+/** Exact decimal fee ceiling. Math.ceil(vBytes * rate) in floats prices
+ *  a grain high whenever the float product of an exact-integer fee lands
+ *  a hair above it: the pinned 345-vB award plan at 2.2 g/vB charged 760
+ *  grains instead of 759, and at 4.4 charged 1,519 instead of 1,518
+ *  (both reproduced on pristine src). The rate is read through String(),
+ *  whose shortest round-trip form recovers the decimal typed, then the
+ *  ceiling is taken in BigInt rational arithmetic. (Same fix as Pearl
+ *  Fees and Pearl Stream, 2026-10-15.) */
+export function decimalToRational(x, name) {
+  const s = String(x ?? "").trim();
+  const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+  if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+  const [, sign, intPart, fracPart = "", expPart] = m;
+  let num = BigInt(intPart + fracPart);
+  let den = 10n ** BigInt(fracPart.length);
+  const exp = expPart ? BigInt(expPart) : 0n;
+  if (exp >= 0n) num *= 10n ** exp; else den *= 10n ** -exp;
+  if (sign === "-") num = -num;
+  return { num, den };
+}
+
+export function ceilFeeGrains(vBytes, rateGrainsPerVByte) {
+  if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("bad vBytes for fee");
+  const r = decimalToRational(rateGrainsPerVByte, "fee rate");
+  if (r.num <= 0n) throw new Error("fee rate must be positive");
+  const num = BigInt(vBytes) * r.num;
+  const grains = (num + r.den - 1n) / r.den;
+  if (grains > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("fee exceeds safe integer range");
+  return Number(grains);
+}
+
 /** Fee in grains for vBytes at a (possibly fractional) grains/vB rate. */
 export function feeForVBytes(vBytes, rateGrainsPerVByte) {
   if (!Number.isSafeInteger(vBytes) || vBytes <= 0) throw new Error("bad vBytes");
   const r = Number(rateGrainsPerVByte);
   if (!Number.isFinite(r) || r <= 0) throw new Error("fee rate must be positive");
-  return Math.ceil(vBytes * r);
+  return ceilFeeGrains(vBytes, rateGrainsPerVByte);
 }
 
 /* ------------------------------------------------------------------ */

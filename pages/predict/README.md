@@ -73,7 +73,7 @@ node build.mjs   # rebuild pearl-predict.bundle.js after touching src/
 - `index.html`, `styles.css`, `app.js` — the desk (after-hours trading floor theme)
 - `src/predict-core.js` — pure-ESM core (node runs this directly in tests)
 - `src/index.js` — `window.PearlPredict` browser entry (plain IIFE, no `globalName`)
-- `pearl-predict.bundle.js` — committed esbuild bundle (`?v=1`)
+- `pearl-predict.bundle.js` — committed esbuild bundle (`?v=3`)
 - `build.mjs` — esbuild with the sign importmap plugin
 - `tests/` — core + DOM suites
 - real-browser QA (headless Chromium, file:// + CDP) — 32/32 checks green,
