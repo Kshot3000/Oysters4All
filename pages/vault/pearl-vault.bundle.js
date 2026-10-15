@@ -29,10 +29,12 @@ var PearlVault = (() => {
     buildUnsignedBundle: () => buildUnsignedBundle,
     buildVaultDescriptor: () => buildVaultDescriptor,
     bytesToHex: () => bytesToHex,
+    ceilFeeGrains: () => ceilFeeGrains,
     combineMultisigSigs: () => combineMultisigSigs,
     commitKeyInfo: () => commitKeyInfo,
     cosignerKeyFromInput: () => cosignerKeyFromInput,
     cosignerPrivFromHex: () => cosignerPrivFromHex,
+    decimalToRational: () => decimalToRational,
     decodeBech32m: () => decodeBech32m,
     encodeBech32m: () => encodeBech32m,
     fetchFeeRateGrainsPerVByte: () => fetchFeeRateGrainsPerVByte,
@@ -6081,6 +6083,26 @@ zoo`.split("\n");
     const perInputWitness = 1 + (nSigs * 65 + (nCosigners - nSigs) * 1) + (varintLen(scriptLen) + scriptLen) + (1 + 33);
     return Math.ceil((4 * base + 2 + nIn * perInputWitness) / 4);
   }
+  function decimalToRational(x, name) {
+    const s = String(x ?? "").trim();
+    const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+    if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+    const [, sign, intPart, fracPart = "", expPart] = m;
+    let num2 = BigInt(intPart + fracPart);
+    let den = 10n ** BigInt(fracPart.length);
+    const exp = expPart ? BigInt(expPart) : 0n;
+    if (exp >= 0n) num2 *= 10n ** exp;
+    else den *= 10n ** -exp;
+    if (sign === "-") num2 = -num2;
+    return { num: num2, den };
+  }
+  function ceilFeeGrains(vBytes, rateGrainsPerVByte) {
+    if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("VAULT REFUSED: bad vBytes for fee");
+    const r = decimalToRational(rateGrainsPerVByte, "fee rate");
+    if (r.num <= 0n) throw new Error("VAULT REFUSED: fee rate must be positive");
+    const num2 = BigInt(vBytes) * r.num;
+    return (num2 + r.den - 1n) / r.den;
+  }
   function planSpend({ network, descriptor, selectedUtxos, recipients, feeRateGrainsPerVByte, blockbookBase }) {
     if (!descriptor || !descriptor.address) throw new Error("VAULT REFUSED: no vault descriptor loaded");
     const utxos = (selectedUtxos || []).map((u) => ({
@@ -6112,7 +6134,7 @@ zoo`.split("\n");
     if (!Number.isFinite(rate) || rate <= 0) throw new Error("VAULT REFUSED: fee rate must be positive");
     const scriptLen = hexToBytes(descriptor.script).length;
     let vBytes = scriptPathVBytes(utxos.length, outs.length + 1, scriptLen, descriptor.n, descriptor.m);
-    let fee = BigInt(Math.ceil(vBytes * rate));
+    let fee = ceilFeeGrains(vBytes, rate);
     const inTotal = utxos.reduce((a, u) => a + u.value, 0n);
     const outTotal = outs.reduce((a, o) => a + o.grains, 0n);
     let change = inTotal - outTotal - fee;
@@ -6120,7 +6142,7 @@ zoo`.split("\n");
     if (change < 0n) throw new Error(`VAULT REFUSED: shortfall of ${grainsToPRL(-change)} PRL (inputs cover outputs + fee of ${grainsToPRL(fee)} PRL)`);
     if (change > 0n && change < BigInt(DUST_GRAIN)) {
       const vBytes2 = scriptPathVBytes(utxos.length, outs.length, scriptLen, descriptor.n, descriptor.m);
-      const fee2 = BigInt(Math.ceil(vBytes2 * rate));
+      const fee2 = ceilFeeGrains(vBytes2, rate);
       dustAbsorbed = inTotal - outTotal - fee2;
       if (dustAbsorbed < 0n) throw new Error(`VAULT REFUSED: shortfall of ${grainsToPRL(-dustAbsorbed)} PRL`);
       vBytes = vBytes2;
@@ -6281,7 +6303,7 @@ zoo`.split("\n");
     if (expectVBytes !== b.vBytes) {
       throw new Error(`VAULT REFUSED: bundle vBytes ${b.vBytes} != re-derived ${expectVBytes}`);
     }
-    const expectFee = BigInt(Math.ceil(expectVBytes * Number(b.feeRate)));
+    const expectFee = ceilFeeGrains(expectVBytes, b.feeRate);
     if (expectFee !== BigInt(b.feeGrains)) {
       throw new Error(`VAULT REFUSED: bundle fee ${b.feeGrains} != re-derived ${expectFee}`);
     }

@@ -47,7 +47,7 @@ cosigners, verify every signature locally, and broadcast via Blockbook.
 
 ## Tests
 
-- `node --no-warnings --loader ./tests/loader.mjs tests/vault.test.mjs` — 25/25 core tests
+- `node --no-warnings --loader ./tests/loader.mjs tests/vault.test.mjs` — 27/27 core tests
   (descriptor round-trip + tamper refusal, NUMS determinism, hand-rolled BIP-341 sighash
   vector, hand-computed vBytes, dust absorption, full 2-of-3 signing round with per-sig
   verification, witness ordering, odd-Y BIP-340 negation, bundle tamper refusal,

@@ -427,6 +427,37 @@ export function scriptPathVBytes(nIn, nOut, scriptLen, nCosigners, nSigs) {
   return Math.ceil((4 * base + 2 + nIn * perInputWitness) / 4);
 }
 
+/* ---------------- exact fee pricing ---------------- */
+
+/** Parse a user-typed decimal into an exact BigInt rational. A JS number is
+ *  read through String(), whose shortest round-trip form recovers the decimal
+ *  the user typed (2.2, not 2.2000000000000001776…). Same helper as Pearl
+ *  Fees / Stream / Predict. */
+export function decimalToRational(x, name) {
+  const s = String(x ?? "").trim();
+  const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+  if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+  const [, sign, intPart, fracPart = "", expPart] = m;
+  let num = BigInt(intPart + fracPart);
+  let den = 10n ** BigInt(fracPart.length);
+  const exp = expPart ? BigInt(expPart) : 0n;
+  if (exp >= 0n) num *= 10n ** exp; else den *= 10n ** -exp;
+  if (sign === "-") num = -num;
+  return { num, den };
+}
+
+/** ceil(vBytes × rate) in exact BigInt rational arithmetic, returned as
+ *  BigInt grains. Float Math.ceil(vBytes * rate) overcharges by a grain
+ *  whenever the exact product is an integer that binary floats land a hair
+ *  above (450 vB at 1.1 g/vB priced 496 instead of 495). */
+export function ceilFeeGrains(vBytes, rateGrainsPerVByte) {
+  if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("VAULT REFUSED: bad vBytes for fee");
+  const r = decimalToRational(rateGrainsPerVByte, "fee rate");
+  if (r.num <= 0n) throw new Error("VAULT REFUSED: fee rate must be positive");
+  const num = BigInt(vBytes) * r.num;
+  return (num + r.den - 1n) / r.den;
+}
+
 /* ---------------- spend planning ---------------- */
 
 /**
@@ -466,7 +497,7 @@ export function planSpend({ network, descriptor, selectedUtxos, recipients, feeR
   // vBytes depend on output count; change output may or may not exist. Plan
   // with change, then re-check without it if change would be dust.
   let vBytes = scriptPathVBytes(utxos.length, outs.length + 1, scriptLen, descriptor.n, descriptor.m);
-  let fee = BigInt(Math.ceil(vBytes * rate));
+  let fee = ceilFeeGrains(vBytes, rate);
   const inTotal = utxos.reduce((a, u) => a + u.value, 0n);
   const outTotal = outs.reduce((a, o) => a + o.grains, 0n);
   let change = inTotal - outTotal - fee;
@@ -475,7 +506,7 @@ export function planSpend({ network, descriptor, selectedUtxos, recipients, feeR
   if (change > 0n && change < BigInt(DUST_GRAIN)) {
     // Recompute without the change output: vBytes shrink, fee shrinks.
     const vBytes2 = scriptPathVBytes(utxos.length, outs.length, scriptLen, descriptor.n, descriptor.m);
-    const fee2 = BigInt(Math.ceil(vBytes2 * rate));
+    const fee2 = ceilFeeGrains(vBytes2, rate);
     dustAbsorbed = inTotal - outTotal - fee2;
     if (dustAbsorbed < 0n) throw new Error(`VAULT REFUSED: shortfall of ${grainsToPRL(-dustAbsorbed)} PRL`);
     vBytes = vBytes2; fee = fee2; change = 0n;
@@ -648,7 +679,7 @@ export function parseUnsignedBundle(json, descriptor) {
   if (expectVBytes !== b.vBytes) {
     throw new Error(`VAULT REFUSED: bundle vBytes ${b.vBytes} != re-derived ${expectVBytes}`);
   }
-  const expectFee = BigInt(Math.ceil(expectVBytes * Number(b.feeRate)));
+  const expectFee = ceilFeeGrains(expectVBytes, b.feeRate);
   if (expectFee !== BigInt(b.feeGrains)) {
     throw new Error(`VAULT REFUSED: bundle fee ${b.feeGrains} != re-derived ${expectFee}`);
   }

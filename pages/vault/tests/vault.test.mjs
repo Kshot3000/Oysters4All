@@ -9,7 +9,7 @@ import {
   buildMultisigScript, numsInternalKeyVault, vaultTaptree,
   buildVaultDescriptor, parseDescriptorString, verifyDescriptor,
   validateVaultAddress, prlToGrains, grainsToPRL,
-  scriptPathVBytes, planSpend,
+  scriptPathVBytes, planSpend, decimalToRational, ceilFeeGrains,
   scriptPathSigDigestMulti, signForXOnly, verifySchnorrSig,
   buildUnsignedBundle, parseUnsignedBundle, signBundle,
   verifyPartialSigs, combineMultisigSigs, serializeSpendTx, finalizeSpend,
@@ -198,6 +198,57 @@ test("scriptPathVBytes matches a hand-computed example", () => {
   assert.equal(scriptPathVBytes(1, 1, 71, 2, 1), 129);
   assert.throws(() => scriptPathVBytes(0, 1, 71, 2, 1), /nIn/);
   assert.throws(() => scriptPathVBytes(1, 1, 71, 2, 3), /more signatures/);
+});
+
+/* ---------------- exact fee pricing ---------------- */
+
+test("ceilFeeGrains prices exact-integer products exactly (no float-ceil grain)", () => {
+  // Float Math.ceil(450 * 1.1) = 496: the exact product 495 lands a hair
+  // above the integer in binary floating point. Exact rational ceil = 495.
+  assert.equal(ceilFeeGrains(450, 1.1), 495n);
+  assert.equal(ceilFeeGrains(450, 2.2), 990n);
+  assert.equal(ceilFeeGrains(450, 4.4), 1980n);
+  assert.equal(ceilFeeGrains(380, 1.1), 418n);
+  assert.equal(ceilFeeGrains(380, 2.2), 836n);
+  // String rates price identically to the number the user typed.
+  assert.equal(ceilFeeGrains(450, "1.1"), 495n);
+  // Fractional products still ceil up; integer rates are unchanged.
+  assert.equal(ceilFeeGrains(101, 1.1), 112n); // 111.1 -> 112
+  assert.equal(ceilFeeGrains(188, 10), 1880n);
+  assert.throws(() => ceilFeeGrains(100, "abc"), /finite decimal/);
+  assert.throws(() => ceilFeeGrains(100, 0), /must be positive/);
+  assert.throws(() => decimalToRational(Number.NaN, "fee rate"), /finite decimal/);
+});
+
+test("planSpend at decimal rates charges the exact fee (float-ceil regression)", () => {
+  // 1-of-2 vault, 4 UTXOs, 2 recipients (+change): vBytes 450 — at 1.1 g/vB
+  // the float formula charged 496 grains, one more than the exact 495.
+  const d12 = buildVaultDescriptor(N, XONLY.slice(0, 2), 1);
+  const utxos4 = ["aa", "bb", "cc", "dd"].map((c) => utxo(c.repeat(32), 0, 500000000n));
+  const plan = planSpend({
+    network: N, descriptor: d12, selectedUtxos: utxos4,
+    recipients: [
+      { address: d12.address, grains: 100000000n },
+      { address: d12.address, grains: 50000000n },
+    ],
+    feeRateGrainsPerVByte: 1.1,
+  });
+  assert.equal(plan.vBytes, 450);
+  assert.equal(plan.feeGrains, 495n);
+  assert.equal(plan.inTotal, plan.outTotal + plan.feeGrains + plan.changeGrains + plan.dustAbsorbedGrains);
+  // The coordinator bundle re-derives the fee in parseUnsignedBundle — it
+  // must agree with the planner at a decimal rate, or cosigners refuse it.
+  const parsed = parseUnsignedBundle(JSON.parse(JSON.stringify(buildUnsignedBundle(plan, d12))), d12);
+  assert.equal(BigInt(parsed.feeGrains), 495n);
+  // 2-of-2 vault, 3 UTXOs, 1 recipient (+change): vBytes 380, exact 836 at 2.2.
+  const d22 = buildVaultDescriptor(N, XONLY.slice(0, 2), 2);
+  const plan22 = planSpend({
+    network: N, descriptor: d22, selectedUtxos: utxos4.slice(0, 3),
+    recipients: [{ address: d22.address, grains: 100000000n }],
+    feeRateGrainsPerVByte: 2.2,
+  });
+  assert.equal(plan22.vBytes, 380);
+  assert.equal(plan22.feeGrains, 836n);
 });
 
 /* ---------------- BIP-341 sighash ---------------- */
