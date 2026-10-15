@@ -261,6 +261,38 @@ export function verifySignedTx(network, signedHex, prevouts) {
   return results;
 }
 
+/* ---------------- exact fee arithmetic ---------------- */
+
+/** Parse a user-typed decimal (number or string) into an exact BigInt
+ *  rational {num, den}. A number is read through String(), whose shortest
+ *  round-trip form recovers the decimal the user typed (String(1.1) is
+ *  "1.1"), so fee math is done on the typed value, not its binary
+ *  approximation. Throws on anything that is not a finite decimal. */
+export function decimalToRational(x, name) {
+  const s = String(x ?? "").trim();
+  const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+  if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+  const [, sign, intPart, fracPart = "", expPart] = m;
+  let num = BigInt(intPart + fracPart);
+  let den = 10n ** BigInt(fracPart.length);
+  const exp = expPart ? BigInt(expPart) : 0n;
+  if (exp >= 0n) num *= 10n ** exp; else den *= 10n ** -exp;
+  if (sign === "-") num = -num;
+  return { num, den };
+}
+
+/** ceil(vBytes × rate) in exact BigInt rational arithmetic, returned as
+ *  BigInt grains. Float Math.ceil(vBytes * rate) overcharges by a grain
+ *  whenever the exact product is an integer that binary floats land a hair
+ *  above (370 vB at 1.1 g/vB priced 408 instead of 407). */
+export function ceilFeeGrains(vBytes, rateGrainsPerVByte) {
+  if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("bad vBytes for fee");
+  const r = decimalToRational(rateGrainsPerVByte, "fee rate");
+  if (r.num <= 0n) throw new Error("bad fee rate");
+  const num = BigInt(vBytes) * r.num;
+  return (num + r.den - 1n) / r.den;
+}
+
 /* ---------------- coin selection ---------------- */
 
 /** Largest-first selection covering targetGrains + fee at feeRate (grains/vB).
@@ -282,13 +314,13 @@ export function selectCoins(utxos, targetGrains, feeRateGrainsPerVByte, nOut) {
     selected.push(u);
     total += BigInt(u.value);
     const withChange = keypathTxVBytes(selected.length, nOut + 1);
-    const feeWithChange = BigInt(Math.ceil(withChange * feeRateGrainsPerVByte));
+    const feeWithChange = ceilFeeGrains(withChange, feeRateGrainsPerVByte);
     const change = total - target - feeWithChange;
     if (change >= BigInt(DUST_GRAIN)) {
       return { selected, fee: feeWithChange, change };
     }
     const noChange = keypathTxVBytes(selected.length, nOut);
-    const feeNoChange = BigInt(Math.ceil(noChange * feeRateGrainsPerVByte));
+    const feeNoChange = ceilFeeGrains(noChange, feeRateGrainsPerVByte);
     if (total >= target + feeNoChange) {
       return { selected, fee: total - target, change: 0n }; // remainder to fee
     }

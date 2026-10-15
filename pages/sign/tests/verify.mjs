@@ -23,7 +23,7 @@ import {
   fmtPRL, parsePRL, grainsToNumber,
   decodeRawTx, describeSpk,
   buildKeypathTxEx, verifySignedTx,
-  selectCoins, parseUtxoList,
+  selectCoins, parseUtxoList, ceilFeeGrains, decimalToRational,
 } from "../src/sign-core.js";
 
 const MNEMONIC = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
@@ -170,6 +170,29 @@ test("coin selection covers target + exact fee, dust goes to fee", () => {
   for (const badRate of [-5, 0, NaN, Infinity]) {
     assert.throws(() => selectCoins(utxos, 50_000_000n, badRate, 1), /bad fee rate/);
   }
+});
+
+test("coin selection prices decimal rates in exact arithmetic (no float-ceil grain)", () => {
+  // 370 vB (4 inputs, 2 payments + change) at 1.1 g/vB is exactly 407
+  // grains; float Math.ceil(370 * 1.1) charged 408.
+  assert.equal(ceilFeeGrains(370, 1.1), 407n);
+  assert.equal(ceilFeeGrains(370, "1.1"), 407n); // string-rate parity
+  assert.equal(ceilFeeGrains(355, 2.2), 781n);
+  assert.equal(ceilFeeGrains(100, 1.15), 115n); // fractional product still ceils exactly
+  assert.equal(ceilFeeGrains(101, 1.15), 117n); // 116.15 -> 117
+  assert.throws(() => ceilFeeGrains(100, "garbage"), /finite decimal/);
+  assert.throws(() => ceilFeeGrains(100, 0), /bad fee rate/);
+  assert.deepEqual(decimalToRational(2.2), { num: 22n, den: 10n });
+  // Plan level: four 300,000-grain UTXOs funding a 1,000,000-grain target
+  // with 2 payments at 1.1 g/vB — fee is the exact 407, change keeps the grain.
+  const utxos = [0, 1, 2, 3].map((i) => ({ txid: String(i + 1).padStart(64, "0"), vout: 0, value: 300_000 }));
+  const r = selectCoins(utxos, 1_000_000n, 1.1, 2);
+  assert.equal(r.fee, 407n);
+  assert.equal(r.change, 1_200_000n - 1_000_000n - 407n);
+  // Three UTXOs, 3 payments at 2.2 g/vB: 355 vB with change -> exact 781.
+  const utxos3 = [0, 1, 2].map((i) => ({ txid: String(i + 5).padStart(64, "0"), vout: 0, value: 400_000 }));
+  const r3 = selectCoins(utxos3, 1_000_000n, 2.2, 3);
+  assert.equal(r3.fee, 781n);
 });
 
 test("PRL amount parse/format round-trip", () => {
@@ -319,7 +342,7 @@ test("app.js buildPlan guards recipient and change amounts with safeGrains", () 
   assert.ok(app.includes('safeGrains(pick.change, "Change amount")'), "change amount guarded");
   assert.ok(!app.includes("value: Number(grains)"), "no unguarded recipient conversion remains");
   assert.ok(!app.includes("value: Number(pick.change)"), "no unguarded change conversion remains");
-  assert.ok(html.includes('pearl-sign.bundle.js?v=7'), "bundle cache key bumped");
+  assert.ok(html.includes('pearl-sign.bundle.js?v=8'), "bundle cache key bumped");
 });
 
 
