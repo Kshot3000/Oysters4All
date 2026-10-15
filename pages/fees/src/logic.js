@@ -86,9 +86,44 @@ export function estimateVsize(nInputs, nOutputs) {
   return Math.ceil(TX_OVERHEAD_VSIZE + nIn * P2TR_INPUT_VSIZE + nOut * P2TR_OUTPUT_VSIZE);
 }
 
+/** Exact decimal -> BigInt rational { num, den } (den > 0). Accepts a
+ *  number or a string; a number is read through String(), whose shortest
+ *  round-trip form recovers the decimal the user typed (String(1.1) is
+ *  "1.1", not 1.100000000000000088…). Throws on anything that is not a
+ *  finite decimal — a NaN rate must never silently price a fee. */
+function decimalToRational(x, name) {
+  const s = String(x ?? "").trim();
+  const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+  if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+  const [, sign, intPart, fracPart = "", expPart] = m;
+  let num = BigInt(intPart + fracPart);
+  let den = 10n ** BigInt(fracPart.length);
+  const exp = expPart ? BigInt(expPart) : 0n;
+  if (exp >= 0n) num *= 10n ** exp; else den *= 10n ** -exp;
+  if (sign === "-") num = -num;
+  return { num, den };
+}
+
+/** ceil(vsize * rate) in exact decimal arithmetic. The old float form —
+ *  Math.ceil(vsize * rate) — overcharged whenever the float product of
+ *  an exact-integer result landed a hair above it: 100 vB at 1.1 g/vB
+ *  priced 111 grains instead of 110, and 200 vB at 2.2 g/vB priced 441
+ *  instead of 440. Negative rates clamp to 0 (the historical feeFor
+ *  behavior); the result is range-checked to a safe integer. */
+function ceilFeeGrains(vsize, rateGrainsPerVb) {
+  const v = decimalToRational(vsize, "vsize");
+  if (v.num < 0n) throw new Error("vsize must be non-negative");
+  const r = decimalToRational(rateGrainsPerVb, "fee rate");
+  if (r.num <= 0n) return 0;
+  const num = v.num * r.num, den = v.den * r.den;
+  const grains = (num + den - 1n) / den;
+  if (grains > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("fee exceeds safe integer range");
+  return Number(grains);
+}
+
 /** fee for a vsize at a rate; returns { grains, prl } */
 export function feeFor(vsize, rateGrainsPerVb) {
-  const grains = Math.ceil(vsize * Math.max(0, rateGrainsPerVb));
+  const grains = ceilFeeGrains(vsize, rateGrainsPerVb);
   return { grains, prl: grains / GRAINS_PER_PRL };
 }
 
@@ -259,7 +294,7 @@ export function parseTxVsize(hex) {
  */
 export function bumpPlan({ stuckVsize, stuckFeeGrains, targetRate }) {
   const currentRate = stuckVsize > 0 ? stuckFeeGrains / stuckVsize : 0;
-  const wantFeeGrains = Math.ceil(stuckVsize * targetRate);
+  const wantFeeGrains = ceilFeeGrains(stuckVsize, targetRate);
   const extraGrains = Math.max(0, wantFeeGrains - stuckFeeGrains);
   return {
     currentRate,

@@ -58,6 +58,19 @@ test("feeFor math", () => {
   assert.ok(Math.abs(f.prl - 0.000155) < 1e-12);
 });
 
+test("feeFor exact decimal rate (regression: float ceil overcharged by 1 grain)", () => {
+  // Math.ceil(100 * 1.1) === 111 in floats (product is 110.00000000000001);
+  // the exact fee is 110 grains. Same class at 200 vB / 2.2 g/vB: 441 vs 440.
+  assert.equal(feeFor(100, 1.1).grains, 110);
+  assert.equal(feeFor(200, 2.2).grains, 440);
+  assert.equal(feeFor(100, "1.1").grains, 110); // string rates price identically
+  assert.equal(feeFor(141, 0.5).grains, 71); // exact 70.5 still ceils up
+  assert.equal(feeFor(155, 0).grains, 0);
+  assert.equal(feeFor(155, -3).grains, 0); // negative rate clamps to 0, as before
+  assert.throws(() => feeFor(155, NaN), /finite decimal/);
+  assert.throws(() => feeFor(155, "abc"), /finite decimal/);
+});
+
 test("fmtGrains / fmtPRL / fmtDuration", () => {
   assert.equal(fmtGrains(15500), "15,500");
   assert.equal(fmtPRL(0.000155), "0.000155");
@@ -122,6 +135,12 @@ test("bumpPlan math", () => {
   assert.equal(plan.extraGrains, 13950);
   assert.ok(Math.abs(plan.extraPRL - 0.0001395) < 1e-12);
   assert.equal(plan.bumpX, 10);
+});
+
+test("bumpPlan exact decimal target rate (regression: float ceil overcharged)", () => {
+  const plan = bumpPlan({ stuckVsize: 200, stuckFeeGrains: 100, targetRate: 2.2 });
+  assert.equal(plan.wantFeeGrains, 440); // float Math.ceil(200 * 2.2) === 441
+  assert.equal(plan.extraGrains, 340);
 });
 
 test("demoMempool is labeled sample with sane rates", () => {

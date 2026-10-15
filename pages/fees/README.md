@@ -38,7 +38,7 @@ all math still work, and the badge always says which source you're looking at.
 
 ```sh
 node build.mjs                                  # esbuild -> pearl-fees.bundle.js
-node --test tests/logic.test.mjs                # 14/14 unit tests
+node --test tests/logic.test.mjs                # 20/20 unit tests
 node ../../hidden_files/qa-fees-browser.mjs     # real-browser QA (headless Chromium)
 ```
 

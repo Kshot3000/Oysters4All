@@ -188,7 +188,12 @@ function updateEstimator() {
   els["e-vsize"].value = vsize + " vB";
   const sel = document.querySelector('input[name="etarget"]:checked');
   let rate = 50;
-  if (sel) rate = sel.value === "custom" ? Math.max(1, parseFloat($("e-custom").value || "1")) : parseFloat(sel.value);
+  if (sel) {
+    if (sel.value === "custom") {
+      const p = parseFloat($("e-custom").value || "1");
+      rate = Number.isFinite(p) ? Math.max(1, p) : 1; // garbage custom rate falls back to 1, never NaN-priced
+    } else rate = parseFloat(sel.value);
+  }
   const fee = feeFor(vsize, rate);
   els["e-rate"].value = rate;
   els["e-fee"].innerHTML =

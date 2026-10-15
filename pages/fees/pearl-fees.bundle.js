@@ -57,8 +57,31 @@
     const nOut = Math.max(1, Math.floor(nOutputs));
     return Math.ceil(TX_OVERHEAD_VSIZE + nIn * P2TR_INPUT_VSIZE + nOut * P2TR_OUTPUT_VSIZE);
   }
+  function decimalToRational(x, name) {
+    const s = String(x ?? "").trim();
+    const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+    if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+    const [, sign, intPart, fracPart = "", expPart] = m;
+    let num = BigInt(intPart + fracPart);
+    let den = 10n ** BigInt(fracPart.length);
+    const exp = expPart ? BigInt(expPart) : 0n;
+    if (exp >= 0n) num *= 10n ** exp;
+    else den *= 10n ** -exp;
+    if (sign === "-") num = -num;
+    return { num, den };
+  }
+  function ceilFeeGrains(vsize, rateGrainsPerVb) {
+    const v = decimalToRational(vsize, "vsize");
+    if (v.num < 0n) throw new Error("vsize must be non-negative");
+    const r = decimalToRational(rateGrainsPerVb, "fee rate");
+    if (r.num <= 0n) return 0;
+    const num = v.num * r.num, den = v.den * r.den;
+    const grains = (num + den - 1n) / den;
+    if (grains > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("fee exceeds safe integer range");
+    return Number(grains);
+  }
   function feeFor(vsize, rateGrainsPerVb) {
-    const grains = Math.ceil(vsize * Math.max(0, rateGrainsPerVb));
+    const grains = ceilFeeGrains(vsize, rateGrainsPerVb);
     return { grains, prl: grains / GRAINS_PER_PRL };
   }
   function parsePRLToGrains(s) {
@@ -183,7 +206,7 @@
   }
   function bumpPlan({ stuckVsize, stuckFeeGrains, targetRate }) {
     const currentRate = stuckVsize > 0 ? stuckFeeGrains / stuckVsize : 0;
-    const wantFeeGrains = Math.ceil(stuckVsize * targetRate);
+    const wantFeeGrains = ceilFeeGrains(stuckVsize, targetRate);
     const extraGrains = Math.max(0, wantFeeGrains - stuckFeeGrains);
     return {
       currentRate,
@@ -392,7 +415,12 @@
     els["e-vsize"].value = vsize + " vB";
     const sel = document.querySelector('input[name="etarget"]:checked');
     let rate = 50;
-    if (sel) rate = sel.value === "custom" ? Math.max(1, parseFloat($("e-custom").value || "1")) : parseFloat(sel.value);
+    if (sel) {
+      if (sel.value === "custom") {
+        const p = parseFloat($("e-custom").value || "1");
+        rate = Number.isFinite(p) ? Math.max(1, p) : 1;
+      } else rate = parseFloat(sel.value);
+    }
     const fee = feeFor(vsize, rate);
     els["e-rate"].value = rate;
     els["e-fee"].innerHTML = `<div class="fee-big">${fmtGrains(fee.grains)} <span>grains</span></div>
