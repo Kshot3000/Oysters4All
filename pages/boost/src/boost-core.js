@@ -187,6 +187,39 @@ function hexToBytesLocal(hex) {
   return out;
 }
 
+/* ---------------- exact decimal fee pricing ---------------- */
+
+/* Exact decimal fee pricing (fleet pattern, first shipped in Pearl Fees):
+ * a fee rate is read through String(), whose shortest round-trip form
+ * recovers the decimal the user typed, then ceil(vBytes × rate) is computed
+ * in BigInt rational arithmetic. The old float form — Math.ceil(vB * rate)
+ * — overcharged whenever the float product of an exact-integer fee landed
+ * a hair above it: a CPFP package of 380 vB (269-vB parent + 111-vB child)
+ * at 2.2 g/vB priced 837 grains instead of 836, and an RBF replacement of
+ * a 200-vB stuck tx at 2.2 g/vB priced 441 instead of 440. */
+export function decimalToRational(x, name) {
+  const s = String(x ?? "").trim();
+  const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+  if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+  const [, sign, intPart, fracPart = "", expPart] = m;
+  let num = BigInt(intPart + fracPart);
+  let den = 10n ** BigInt(fracPart.length);
+  const exp = expPart ? BigInt(expPart) : 0n;
+  if (exp >= 0n) num *= 10n ** exp; else den *= 10n ** -exp;
+  if (sign === "-") num = -num;
+  return { num, den };
+}
+
+export function ceilFeeGrains(vBytes, rateGrainsPerVByte) {
+  if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("bad vBytes for fee");
+  const r = decimalToRational(rateGrainsPerVByte, "fee rate");
+  if (r.num <= 0n) throw new Error("fee rate must be positive");
+  const num = BigInt(vBytes) * r.num;
+  const grains = (num + r.den - 1n) / r.den;
+  if (grains > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("fee exceeds safe integer range");
+  return Number(grains);
+}
+
 /* ---------------- CPFP planning ---------------- */
 
 /** Plan a child-pays-for-parent transaction.
@@ -208,7 +241,7 @@ export function planCpfp({ parentFeeGrains, parentVBytes, targetRate, childVByte
     throw new Error("cpfp: fees/values must be whole grains");
   }
   const packageV = parentVBytes + childVBytes;
-  const packageFeeNeeded = Math.ceil(targetRate * packageV);
+  const packageFeeNeeded = ceilFeeGrains(packageV, targetRate);
   const childFee = packageFeeNeeded - parentFeeGrains;
   if (childFee <= 0) {
     throw new Error(
@@ -251,7 +284,7 @@ export function planRbf({ oldFeeGrains, oldVBytes, targetRate, feeSourceValue })
       `conflict's fee rate (node/mempool/mempool.go validateReplacement).`
     );
   }
-  const newFee = Math.ceil(targetRate * oldVBytes);
+  const newFee = ceilFeeGrains(oldVBytes, targetRate);
   const feeDelta = newFee - oldFeeGrains;
   const minRelay = estimateMinRelayFee(oldVBytes);
   if (newFee <= oldFeeGrains + minRelay) {

@@ -34,6 +34,8 @@ var PearlBoost = (() => {
     blockbookGet: () => blockbookGet,
     broadcastViaBlockbook: () => broadcastViaBlockbook,
     bytesToHex: () => bytesToHex,
+    ceilFeeGrains: () => ceilFeeGrains,
+    decimalToRational: () => decimalToRational,
     decodeBech32m: () => decodeBech32m,
     diagnoseTx: () => diagnoseTx,
     encodeBech32m: () => encodeBech32m,
@@ -201,6 +203,28 @@ var PearlBoost = (() => {
     for (let i = 0; i < out.length; i++) out[i] = parseInt(h.slice(i * 2, i * 2 + 2), 16);
     return out;
   }
+  function decimalToRational(x, name) {
+    const s = String(x ?? "").trim();
+    const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+    if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+    const [, sign, intPart, fracPart = "", expPart] = m;
+    let num2 = BigInt(intPart + fracPart);
+    let den = 10n ** BigInt(fracPart.length);
+    const exp = expPart ? BigInt(expPart) : 0n;
+    if (exp >= 0n) num2 *= 10n ** exp;
+    else den *= 10n ** -exp;
+    if (sign === "-") num2 = -num2;
+    return { num: num2, den };
+  }
+  function ceilFeeGrains(vBytes, rateGrainsPerVByte) {
+    if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("bad vBytes for fee");
+    const r = decimalToRational(rateGrainsPerVByte, "fee rate");
+    if (r.num <= 0n) throw new Error("fee rate must be positive");
+    const num2 = BigInt(vBytes) * r.num;
+    const grains = (num2 + r.den - 1n) / r.den;
+    if (grains > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("fee exceeds safe integer range");
+    return Number(grains);
+  }
   function planCpfp({ parentFeeGrains, parentVBytes, targetRate, childVBytes, spendValueGrains }) {
     for (const [k, v] of Object.entries({ parentFeeGrains, parentVBytes, targetRate, childVBytes, spendValueGrains })) {
       if (!Number.isFinite(v) || v <= 0) throw new Error(`cpfp: ${k} must be a positive number`);
@@ -209,7 +233,7 @@ var PearlBoost = (() => {
       throw new Error("cpfp: fees/values must be whole grains");
     }
     const packageV = parentVBytes + childVBytes;
-    const packageFeeNeeded = Math.ceil(targetRate * packageV);
+    const packageFeeNeeded = ceilFeeGrains(packageV, targetRate);
     const childFee = packageFeeNeeded - parentFeeGrains;
     if (childFee <= 0) {
       throw new Error(
@@ -245,7 +269,7 @@ var PearlBoost = (() => {
         `rbf refused: replacement feerate ${targetRate} gr/vB must be STRICTLY greater than the current ${oldRate.toFixed(3)} gr/vB \u2014 pearld rejects replacements that do not beat every conflict's fee rate (node/mempool/mempool.go validateReplacement).`
       );
     }
-    const newFee = Math.ceil(targetRate * oldVBytes);
+    const newFee = ceilFeeGrains(oldVBytes, targetRate);
     const feeDelta = newFee - oldFeeGrains;
     const minRelay = estimateMinRelayFee(oldVBytes);
     if (newFee <= oldFeeGrains + minRelay) {
@@ -333,6 +357,8 @@ var PearlBoost = (() => {
     SIGHASH_SINGLE_ANYONECANPAY: () => SIGHASH_SINGLE_ANYONECANPAY,
     broadcastViaBlockbook: () => broadcastViaBlockbook2,
     buildKeypathTxEx: () => buildKeypathTxEx,
+    ceilFeeGrains: () => ceilFeeGrains2,
+    decimalToRational: () => decimalToRational2,
     decodeRawTx: () => decodeRawTx,
     describeSpk: () => describeSpk,
     fetchFeeRate: () => fetchFeeRate,
@@ -5471,6 +5497,26 @@ zoo`.split("\n");
     }
     return results;
   }
+  function decimalToRational2(x, name) {
+    const s = String(x ?? "").trim();
+    const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+    if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+    const [, sign, intPart, fracPart = "", expPart] = m;
+    let num2 = BigInt(intPart + fracPart);
+    let den = 10n ** BigInt(fracPart.length);
+    const exp = expPart ? BigInt(expPart) : 0n;
+    if (exp >= 0n) num2 *= 10n ** exp;
+    else den *= 10n ** -exp;
+    if (sign === "-") num2 = -num2;
+    return { num: num2, den };
+  }
+  function ceilFeeGrains2(vBytes, rateGrainsPerVByte) {
+    if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("bad vBytes for fee");
+    const r = decimalToRational2(rateGrainsPerVByte, "fee rate");
+    if (r.num <= 0n) throw new Error("bad fee rate");
+    const num2 = BigInt(vBytes) * r.num;
+    return (num2 + r.den - 1n) / r.den;
+  }
   function selectCoins(utxos, targetGrains, feeRateGrainsPerVByte, nOut) {
     if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) throw new Error("bad fee rate");
     const seenOutpoints = /* @__PURE__ */ new Set();
@@ -5487,13 +5533,13 @@ zoo`.split("\n");
       selected.push(u);
       total += BigInt(u.value);
       const withChange = keypathTxVBytes(selected.length, nOut + 1);
-      const feeWithChange = BigInt(Math.ceil(withChange * feeRateGrainsPerVByte));
+      const feeWithChange = ceilFeeGrains2(withChange, feeRateGrainsPerVByte);
       const change = total - target - feeWithChange;
       if (change >= BigInt(DUST_GRAIN)) {
         return { selected, fee: feeWithChange, change };
       }
       const noChange = keypathTxVBytes(selected.length, nOut);
-      const feeNoChange = BigInt(Math.ceil(noChange * feeRateGrainsPerVByte));
+      const feeNoChange = ceilFeeGrains2(noChange, feeRateGrainsPerVByte);
       if (total >= target + feeNoChange) {
         return { selected, fee: total - target, change: 0n };
       }

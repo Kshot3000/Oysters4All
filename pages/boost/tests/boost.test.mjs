@@ -8,6 +8,7 @@ import {
   MIN_RELAY_PER_KB_GRAINS, DUST_GRAINS, MAX_REPLACEMENT_EVICTIONS,
   signalsRbf, estimateMinRelayFee, packageFeeRate, diagnoseTx,
   vSizeFromRawHex, planCpfp, planRbf, verifyPackageClaim,
+  decimalToRational, ceilFeeGrains,
   pearldBroadcastCmd,
   Sign,
 } from "../src/index.js";
@@ -136,6 +137,44 @@ test("planRbf refuses dust fee-source output", () => {
     () => planRbf({ oldFeeGrains: 1000, oldVBytes: 140, targetRate: 50, feeSourceValue: 6400 }),
     /dust/
   );
+});
+
+/* ---------- exact decimal fee pricing (float-ceil regression) ---------- */
+
+test("ceilFeeGrains prices exact-integer products exactly at decimal rates", () => {
+  // Float Math.ceil priced each of these a grain high (2.2 * 380 lands a
+  // hair above 836 in doubles; 2.2 * 200 above 440; 2.2 * 455 above 1001).
+  assert.equal(ceilFeeGrains(380, 2.2), 836);
+  assert.equal(ceilFeeGrains(200, 2.2), 440);
+  assert.equal(ceilFeeGrains(455, 2.2), 1001);
+  assert.equal(ceilFeeGrains(330, 1.1), 363);
+  assert.equal(ceilFeeGrains(380, "2.2"), 836); // string rate parity
+  assert.equal(ceilFeeGrains(101, 1.5), 152); // fractional product still ceils
+  assert.equal(ceilFeeGrains(140, 10), 1400); // integer rate unchanged
+  assert.throws(() => ceilFeeGrains(200, "abc"), /finite decimal/);
+  assert.throws(() => ceilFeeGrains(200, 0), /must be positive/);
+  assert.throws(() => ceilFeeGrains(200, -1.5), /must be positive/);
+  assert.deepEqual(decimalToRational(2.2, "rate"), { num: 22n, den: 10n });
+});
+
+test("planCpfp: decimal target prices the package exactly (380 vB at 2.2)", () => {
+  // Parent is a 269-vB keypath shape (3 in, 2 out) stuck at 1 gr/vB; the
+  // child is the pinned 111-vB keypath tx. Exact package fee is 836.
+  const plan = planCpfp({
+    parentFeeGrains: 269, parentVBytes: 269, targetRate: 2.2,
+    childVBytes: 111, spendValueGrains: 100000,
+  });
+  assert.equal(plan.childFee, 567); // 836 - 269, not the float 568
+  assert.equal(plan.childOutValue, 100000 - 567);
+  assert.equal(plan.packageFeeNum, 836n);
+  assert.equal(plan.packageFeeDen, 380n);
+});
+
+test("planRbf: decimal target prices the replacement exactly (200 vB at 2.2)", () => {
+  const plan = planRbf({ oldFeeGrains: 200, oldVBytes: 200, targetRate: 2.2, feeSourceValue: 50000 });
+  assert.equal(plan.newFee, 440); // not the float 441
+  assert.equal(plan.feeDelta, 240);
+  assert.equal(plan.newFeeSourceValue, 49760);
 });
 
 /* ---------- vSizeFromRawHex: pinned ---------- */
