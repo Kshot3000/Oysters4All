@@ -97,25 +97,35 @@ export const displayName = (name) => `${name}${NAME_SUFFIX}`;
  *  future time — it is the one timestamp allowed to point far ahead. */
 const MIN_TS = Date.UTC(2026, 0, 1) / 1000;
 
-function checkTimestamp(ts, field, allowFuture) {
+/** The clock a check is judged against: opts.nowSec when finite (tests,
+ *  replays, registry resolution at a pinned instant), else the real clock.
+ *  Same injectable-clock pattern as Pearl ID's verifyCredential (nowSec)
+ *  and Pearl Paywall's verifyToken (nowMs): a verify verdict must be a
+ *  function of the record and a stated instant, never of when the code
+ *  happens to run. */
+const clockSec = (opts) =>
+  Number.isFinite(opts?.nowSec) ? Math.floor(opts.nowSec) : Math.floor(Date.now() / 1000);
+
+function checkTimestamp(ts, field, allowFuture, opts) {
   if (!Number.isSafeInteger(ts)) throw new Error(`${field} must be an integer unix timestamp`);
   if (ts < MIN_TS) throw new Error(`${field} is before the Pearl Names epoch`);
-  if (!allowFuture && ts > Math.floor(Date.now() / 1000) + 600)
+  if (!allowFuture && ts > clockSec(opts) + 600)
     throw new Error(`${field} is more than 10 minutes in the future`);
 }
 
 /** Compose the canonical registration record. Throws on any rule violation.
  *  Field order is fixed and must never change: v, name, address, xonly,
- *  network, registered_at, expires_at. */
-export function composeBinding({ name, address, xonly, network, registeredAt, expiresAt }) {
+ *  network, registered_at, expires_at. opts: { nowSec } — the instant the
+ *  registered_at future check is judged against (default: real clock). */
+export function composeBinding({ name, address, xonly, network, registeredAt, expiresAt }, opts = {}) {
   const n = validateName(name);
   if (typeof address !== "string" || !address) throw new Error("address is required");
   if (typeof xonly !== "string" || !/^[0-9a-f]{64}$/i.test(xonly))
     throw new Error("xonly must be 64 lowercase hex chars");
   if (typeof network !== "string" || !network) throw new Error("network is required");
-  checkTimestamp(registeredAt, "registered_at", false);
+  checkTimestamp(registeredAt, "registered_at", false, opts);
   if (expiresAt !== null && expiresAt !== undefined) {
-    checkTimestamp(expiresAt, "expires_at", true); // expiry may point years ahead
+    checkTimestamp(expiresAt, "expires_at", true, opts); // expiry may point years ahead
     if (expiresAt <= registeredAt) throw new Error("expires_at must be after registered_at");
   }
   // Bind the address to the key: decode, re-encode with the SAME program and
@@ -138,14 +148,14 @@ export function composeBinding({ name, address, xonly, network, registeredAt, ex
 
 /** Validate a parsed record the same way the composer does (single source
  *  of truth for field rules). */
-export function validateNameRecord(obj) {
+export function validateNameRecord(obj, opts = {}) {
   if (!obj || typeof obj !== "object") throw new Error("record must be an object");
   if (obj.v !== NAME_VERSION) throw new Error("v must be 1");
   // Reuse the composer as the single source of truth for field rules.
   composeBinding({
     name: obj.name, address: obj.address, xonly: obj.xonly,
     network: obj.network, registeredAt: obj.registered_at, expiresAt: obj.expires_at,
-  });
+  }, opts);
   return obj;
 }
 
@@ -175,9 +185,11 @@ export function signBinding(priv32, { json, bytes, fields }, network) {
 }
 
 /** Verify a signed binding { json, sig } (sig: 64-byte hex or bytes).
- *  Returns { ok, checks[], id, fingerprint, address }. Never throws on bad
+ *  opts: { nowSec } — the instant expiry and the registered_at future
+ *  check are judged against (default: real clock). Returns
+ *  { ok, checks[], id, fingerprint, address }. Never throws on bad
  *  input — it rules INVALID instead. */
-export function verifySignedBinding(signed) {
+export function verifySignedBinding(signed, opts = {}) {
   const checks = [];
   const fail = (label, detail) => { checks.push({ label, detail, ok: false }); return null; };
   try {
@@ -185,7 +197,7 @@ export function verifySignedBinding(signed) {
     checks.push({ label: "record present", detail: "binding JSON supplied", ok: true });
     const obj = JSON.parse(signed.json);
     try {
-      validateNameRecord(obj);
+      validateNameRecord(obj, opts);
       checks.push({ label: "record valid", detail: `v${obj.v} · ${displayName(obj.name)} · network ${obj.network}`, ok: true });
     } catch (e) { fail("record valid", e.message); return { ok: false, checks, id: null }; }
     // Re-derive the address from the internal key and compare.
@@ -213,8 +225,8 @@ export function verifySignedBinding(signed) {
     const sigOk = schnorr.verify(sig, bytes, tweakedX);
     checks.push({ label: "signature valid", detail: sigOk ? "BIP-340 verification passed" : "signature does NOT verify against the binding", ok: sigOk });
     if (!sigOk) return { ok: false, checks, id: bindingId(bytes) };
-    // Expiry.
-    const now = Math.floor(Date.now() / 1000);
+    // Expiry — judged against the stated instant, not the wall clock.
+    const now = clockSec(opts);
     if (obj.expires_at != null) {
       if (obj.expires_at <= now) { fail("not expired", `expired at ${new Date(obj.expires_at * 1000).toISOString()}`); return { ok: false, checks, id: bindingId(bytes) }; }
       const warn = obj.expires_at - now < 30 * 86400;
@@ -321,7 +333,7 @@ export function planNameInscription({ network, internalXOnly, payload, ownerAddr
 /** Parse a reveal tx's witness, find the prl-name envelope, and verify the
  *  embedded registration. revealHex: serialized reveal tx.
  *  Returns { record, payload, verify }. Throws if no name envelope. */
-export function verifyNameWitness(revealHex) {
+export function verifyNameWitness(revealHex, opts = {}) {
   const envs = verifyRevealWitness(revealHex);
   const env = envs.find((e) => e.marker === NAME_MARKER);
   if (!env) throw new Error("no prl-name envelope in this reveal");
@@ -330,8 +342,8 @@ export function verifyNameWitness(revealHex) {
   const verify = verifySignedBinding({ json: JSON.stringify({
     v: payload.v, name: payload.name, address: payload.address, xonly: payload.xonly,
     network: payload.network, registered_at: payload.registered_at, expires_at: payload.expires_at,
-  }), sig: payload.sig });
-  return { record: validateNameRecord(payload), payload, verify, marker: env.marker };
+  }), sig: payload.sig }, opts);
+  return { record: validateNameRecord(payload, opts), payload, verify, marker: env.marker };
 }
 
 /** Fetch a reveal tx from blockbook and verify the embedded registration.
@@ -352,13 +364,13 @@ export async function verifyNameOnChain(blockbookUrl, revealTxid) {
 /** Resolve a set of registration records into a name → winner map.
  *  First-seen (lowest registered_at) wins; later same-name records are
  *  listed as contested. Invalid records are listed as rejected. */
-export function resolveRegistry(records) {
+export function resolveRegistry(records, opts = {}) {
   const winners = new Map();
   const contested = [];
   const rejected = [];
   const sorted = [...records].sort((a, b) => (a.fields?.registered_at ?? 0) - (b.fields?.registered_at ?? 0));
   for (const rec of sorted) {
-    const v = verifySignedBinding(rec);
+    const v = verifySignedBinding(rec, opts);
     if (!v.ok) { rejected.push({ rec, checks: v.checks }); continue; }
     const name = v.name;
     if (!winners.has(name)) winners.set(name, { rec, id: v.id, fingerprint: v.fingerprint });

@@ -6248,21 +6248,22 @@ zoo`.split("\n");
   }
   var displayName = (name) => `${name}${NAME_SUFFIX}`;
   var MIN_TS = Date.UTC(2026, 0, 1) / 1e3;
-  function checkTimestamp(ts, field, allowFuture) {
+  var clockSec = (opts) => Number.isFinite(opts?.nowSec) ? Math.floor(opts.nowSec) : Math.floor(Date.now() / 1e3);
+  function checkTimestamp(ts, field, allowFuture, opts) {
     if (!Number.isSafeInteger(ts)) throw new Error(`${field} must be an integer unix timestamp`);
     if (ts < MIN_TS) throw new Error(`${field} is before the Pearl Names epoch`);
-    if (!allowFuture && ts > Math.floor(Date.now() / 1e3) + 600)
+    if (!allowFuture && ts > clockSec(opts) + 600)
       throw new Error(`${field} is more than 10 minutes in the future`);
   }
-  function composeBinding({ name, address, xonly, network, registeredAt, expiresAt }) {
+  function composeBinding({ name, address, xonly, network, registeredAt, expiresAt }, opts = {}) {
     const n = validateName(name);
     if (typeof address !== "string" || !address) throw new Error("address is required");
     if (typeof xonly !== "string" || !/^[0-9a-f]{64}$/i.test(xonly))
       throw new Error("xonly must be 64 lowercase hex chars");
     if (typeof network !== "string" || !network) throw new Error("network is required");
-    checkTimestamp(registeredAt, "registered_at", false);
+    checkTimestamp(registeredAt, "registered_at", false, opts);
     if (expiresAt !== null && expiresAt !== void 0) {
-      checkTimestamp(expiresAt, "expires_at", true);
+      checkTimestamp(expiresAt, "expires_at", true, opts);
       if (expiresAt <= registeredAt) throw new Error("expires_at must be after registered_at");
     }
     const d = decodeBech32m(address, network === "mainnet" ? "prl" : network === "testnet" ? "tprl" : "rprl");
@@ -6280,7 +6281,7 @@ zoo`.split("\n");
     const json = JSON.stringify(fields);
     return { json, bytes: utf8ToBytes(json), fields };
   }
-  function validateNameRecord(obj) {
+  function validateNameRecord(obj, opts = {}) {
     if (!obj || typeof obj !== "object") throw new Error("record must be an object");
     if (obj.v !== NAME_VERSION) throw new Error("v must be 1");
     composeBinding({
@@ -6290,7 +6291,7 @@ zoo`.split("\n");
       network: obj.network,
       registeredAt: obj.registered_at,
       expiresAt: obj.expires_at
-    });
+    }, opts);
     return obj;
   }
   var bindingId = (bytes) => bytesToHex(sha2562(bytes));
@@ -6306,7 +6307,7 @@ zoo`.split("\n");
       throw new Error("WRONG KEY: this private key controls " + expectAddr + ", not the claimed " + fields.address);
     return schnorr.sign(bytes, tweakedPriv);
   }
-  function verifySignedBinding(signed) {
+  function verifySignedBinding(signed, opts = {}) {
     const checks = [];
     const fail = (label, detail) => {
       checks.push({ label, detail, ok: false });
@@ -6317,7 +6318,7 @@ zoo`.split("\n");
       checks.push({ label: "record present", detail: "binding JSON supplied", ok: true });
       const obj = JSON.parse(signed.json);
       try {
-        validateNameRecord(obj);
+        validateNameRecord(obj, opts);
         checks.push({ label: "record valid", detail: `v${obj.v} \xB7 ${displayName(obj.name)} \xB7 network ${obj.network}`, ok: true });
       } catch (e) {
         fail("record valid", e.message);
@@ -6352,7 +6353,7 @@ zoo`.split("\n");
       const sigOk = schnorr.verify(sig, bytes, tweakedX);
       checks.push({ label: "signature valid", detail: sigOk ? "BIP-340 verification passed" : "signature does NOT verify against the binding", ok: sigOk });
       if (!sigOk) return { ok: false, checks, id: bindingId(bytes) };
-      const now = Math.floor(Date.now() / 1e3);
+      const now = clockSec(opts);
       if (obj.expires_at != null) {
         if (obj.expires_at <= now) {
           fail("not expired", `expired at ${new Date(obj.expires_at * 1e3).toISOString()}`);
@@ -6448,7 +6449,7 @@ zoo`.split("\n");
       feeRate: rate
     };
   }
-  function verifyNameWitness(revealHex) {
+  function verifyNameWitness(revealHex, opts = {}) {
     const envs = verifyRevealWitness(revealHex);
     const env = envs.find((e) => e.marker === NAME_MARKER);
     if (!env) throw new Error("no prl-name envelope in this reveal");
@@ -6462,8 +6463,8 @@ zoo`.split("\n");
       network: payload.network,
       registered_at: payload.registered_at,
       expires_at: payload.expires_at
-    }), sig: payload.sig });
-    return { record: validateNameRecord(payload), payload, verify, marker: env.marker };
+    }), sig: payload.sig }, opts);
+    return { record: validateNameRecord(payload, opts), payload, verify, marker: env.marker };
   }
   async function verifyNameOnChain(blockbookUrl, revealTxid) {
     if (!/^[0-9a-f]{64}$/i.test(revealTxid || "")) throw new Error("bad reveal txid");
@@ -6475,13 +6476,13 @@ zoo`.split("\n");
     const v = verifyNameWitness(tx.hex);
     return { ...v, txid: tx.txid, blockHeight: tx.blockHeight ?? null, blockTime: tx.blockTime ?? null, confirmations: tx.confirmations ?? 0 };
   }
-  function resolveRegistry(records) {
+  function resolveRegistry(records, opts = {}) {
     const winners = /* @__PURE__ */ new Map();
     const contested = [];
     const rejected = [];
     const sorted = [...records].sort((a, b) => (a.fields?.registered_at ?? 0) - (b.fields?.registered_at ?? 0));
     for (const rec of sorted) {
-      const v = verifySignedBinding(rec);
+      const v = verifySignedBinding(rec, opts);
       if (!v.ok) {
         rejected.push({ rec, checks: v.checks });
         continue;

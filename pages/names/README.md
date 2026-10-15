@@ -66,9 +66,11 @@ registry resolver, and the standalone verifier.
 
 ## Tests
 
-- `node --no-warnings --loader ./tests/loader.mjs tests/names.test.mjs` — 25/25
+- `node --no-warnings --loader ./tests/loader.mjs tests/names.test.mjs` — 26/26
   (name rules, canonical order, wrong-key refusal, tamper rejection, fee math,
-  full commit→reveal→envelope→verify round-trip, first-seen resolution).
+  full commit→reveal→envelope→verify round-trip, first-seen resolution,
+  verifier clock injection: expiry and the registered_at future check are
+  judged against `opts.nowSec` when given, never the wall clock alone).
 - `node tests/dom.test.mjs` — boots the committed bundle in a VM and drives
   the register wizard + verifier DOM flows.
 - Real-browser QA (`hidden_files/qa-names-browser.mjs`): headless Chromium via

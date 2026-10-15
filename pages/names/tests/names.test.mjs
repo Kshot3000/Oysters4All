@@ -130,8 +130,30 @@ t("verify flags expired binding", () => {
   const b = composeBinding({ name: "alice", address: W.address, xonly: bytesToHex(W.internalXOnly), network: NET, registeredAt: 1788000000, expiresAt: 1788003600 });
   const sig = signBinding(W.priv, b, NETWORKS[NET]);
   const v = verifySignedBinding({ json: b.json, sig: bytesToHex(sig) });
-  // registered_at 1788000000 is in the future; verify still rules on signature+expiry
-  assert.ok(v.checks.some((c) => c.label === "not expired"));
+  // The pinned lifetime (2026-08-29 10:40–11:40 UTC) is in the past, so the
+  // real-clock verdict is expired — assert the verdict itself, not merely
+  // that an expiry check exists.
+  assert.equal(v.ok, false);
+  const exp = v.checks.find((c) => c.label === "not expired");
+  assert.ok(exp && exp.ok === false && exp.detail.includes("expired at 2026-08-29T11:40:00.000Z"), JSON.stringify(exp));
+});
+t("verify judges expiry against opts.nowSec, not the wall clock", () => {
+  // Same pinned binding as above: judged inside its lifetime it verifies,
+  // judged past expiry it does not — the verdict is a function of the
+  // record and the stated instant. On the pre-fix core (no clock
+  // injection) the first assertion fails: the real clock rules instead.
+  const b = composeBinding({ name: "alice", address: W.address, xonly: bytesToHex(W.internalXOnly), network: NET, registeredAt: 1788000000, expiresAt: 1788003600 });
+  const sig = signBinding(W.priv, b, NETWORKS[NET]);
+  const signed = { json: b.json, sig: bytesToHex(sig) };
+  const live = verifySignedBinding(signed, { nowSec: 1788001800 });
+  assert.equal(live.ok, true, JSON.stringify(live.checks.filter((c) => !c.ok)));
+  const dead = verifySignedBinding(signed, { nowSec: 1788003601 });
+  assert.equal(dead.ok, false);
+  // The registered_at future check is judged against the same instant:
+  // two hours before registration the record is future-dated and invalid.
+  const early = verifySignedBinding(signed, { nowSec: 1788000000 - 7200 });
+  assert.equal(early.ok, false);
+  assert.ok(early.checks.some((c) => c.label === "record valid" && !c.ok && /future/.test(c.detail)), JSON.stringify(early.checks));
 });
 
 /* ---- envelope ---- */
