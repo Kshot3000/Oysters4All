@@ -354,7 +354,7 @@ export async function fetchUtxosBig(blockbookBase, address) {
       txid: String(u.txid).toLowerCase(),
       vout: u.vout,
       valueGrains: BigInt(String(u.value)),
-      confirmations: u.confirmations ?? 0,
+      confirmations: Number.isSafeInteger(Number(u.confirmations)) && Number(u.confirmations) >= 0 ? Number(u.confirmations) : 0,
     }))
     .filter((u) => u.valueGrains > 0n);
 }

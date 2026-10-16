@@ -50,7 +50,7 @@ signature and re-add the on-chain balances.
 
 ## Verification
 
-- 16/16 core tests (`node --loader ./tests/loader.mjs --test tests/solvency.test.mjs`):
+- 17/17 core tests (`node --loader ./tests/loader.mjs --test tests/solvency.test.mjs`):
   challenge canonicalization, key parsing, address-match guard, sign/verify
   round-trips, known-answer vector, bundle tamper-evidence, air-gap
   round-trips, grain-exact PRL math, script byte-comparison, verdict math,

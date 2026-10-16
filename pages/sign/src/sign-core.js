@@ -386,7 +386,7 @@ export async function fetchUtxos(blockbookBase, address) {
   const list = await res.json();
   if (!Array.isArray(list)) throw new Error("unexpected utxo response");
   return list
-    .map((u) => ({ txid: u.txid, vout: u.vout, value: grainsToNumber(BigInt(u.value), "UTXO value"), confirmations: u.confirmations ?? 0 }))
+    .map((u) => { const conf = Number(u.confirmations); return { txid: u.txid, vout: u.vout, value: grainsToNumber(BigInt(u.value), "UTXO value"), confirmations: Number.isSafeInteger(conf) && conf >= 0 ? conf : 0 }; })
     .filter((u) => u.value > 0 && /^[0-9a-f]{64}$/i.test(u.txid || ""));
 }
 

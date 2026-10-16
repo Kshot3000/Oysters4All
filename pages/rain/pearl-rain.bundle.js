@@ -6058,7 +6058,10 @@ zoo`.split("\n");
     if (!res.ok) throw new Error(`blockbook ${res.status} on /api/v2/utxo`);
     const list = await res.json();
     if (!Array.isArray(list)) throw new Error("unexpected utxo response");
-    return list.map((u) => ({ txid: u.txid, vout: u.vout, value: grainsToNumber(BigInt(u.value), "UTXO value"), confirmations: u.confirmations ?? 0 })).filter((u) => u.value > 0 && /^[0-9a-f]{64}$/i.test(u.txid || ""));
+    return list.map((u) => {
+      const conf = Number(u.confirmations);
+      return { txid: u.txid, vout: u.vout, value: grainsToNumber(BigInt(u.value), "UTXO value"), confirmations: Number.isSafeInteger(conf) && conf >= 0 ? conf : 0 };
+    }).filter((u) => u.value > 0 && /^[0-9a-f]{64}$/i.test(u.txid || ""));
   }
   async function fetchFeeRate(blockbookBase, blocks = 2) {
     const base = blockbookBase.replace(/\/$/, "");

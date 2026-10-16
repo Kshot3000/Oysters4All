@@ -105,7 +105,7 @@ hex keys are never stored, never leave the page, and are wiped on reload.
 ```bash
 cd pages/market
 node build.mjs                                   # rebuild market.bundle.js
-node --no-warnings --loader ./tests/loader.mjs ./tests/verify.mjs   # 124 core tests
+node --no-warnings --loader ./tests/loader.mjs ./tests/verify.mjs   # 125 core tests
 node --no-warnings tests/smoke.mjs              # 50 headless UI tests (jsdom)
 ```
 

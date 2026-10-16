@@ -946,8 +946,13 @@ export async function findFunding({ blockbookUrl, escrow, stakeGrains }) {
   const stake = BigInt(stakeGrains);
   const hits = [];
   for (const tx of data.transactions || []) {
+    // The endpoint is user-configurable and hits are rendered via innerHTML:
+    // a funding txid must be real 32-byte hex and confirmations a safe
+    // non-negative integer — anything else is not a funding hit at all.
+    if (!/^[0-9a-f]{64}$/i.test(tx?.txid || "")) continue;
     const vout = (tx.vout || []).findIndex((o) => o?.addresses?.includes(escrow.address) && BigInt(o.value || 0) === stake);
-    if (vout >= 0) hits.push({ txid: tx.txid, vout, value: stake.toString(), confirmations: tx.confirmations ?? 0 });
+    const conf = Number(tx.confirmations);
+    if (vout >= 0) hits.push({ txid: String(tx.txid).toLowerCase(), vout, value: stake.toString(), confirmations: Number.isSafeInteger(conf) && conf >= 0 ? conf : 0 });
   }
   return hits;
 }

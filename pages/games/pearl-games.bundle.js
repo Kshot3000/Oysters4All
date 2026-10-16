@@ -5800,7 +5800,8 @@ zoo`.split("\n");
     return list.map((u) => {
       const value = Number(u.value);
       if (!Number.isSafeInteger(value)) throw new Error("UTXO value too large to handle exactly");
-      return { txid: u.txid, vout: u.vout, value, confirmations: u.confirmations ?? 0 };
+      const conf = Number(u.confirmations);
+      return { txid: u.txid, vout: u.vout, value, confirmations: Number.isSafeInteger(conf) && conf >= 0 ? conf : 0 };
     }).filter((u) => u.value > 0 && /^[0-9a-f]{64}$/i.test(u.txid));
   }
   async function fetchFeeRateGrainsPerVByte(blockbookBase, blocks = 2) {
@@ -6932,8 +6933,10 @@ zoo`.split("\n");
     const stake = BigInt(stakeGrains);
     const hits = [];
     for (const tx of data.transactions || []) {
+      if (!/^[0-9a-f]{64}$/i.test(tx?.txid || "")) continue;
       const vout = (tx.vout || []).findIndex((o) => o?.addresses?.includes(escrow.address) && BigInt(o.value || 0) === stake);
-      if (vout >= 0) hits.push({ txid: tx.txid, vout, value: stake.toString(), confirmations: tx.confirmations ?? 0 });
+      const conf = Number(tx.confirmations);
+      if (vout >= 0) hits.push({ txid: String(tx.txid).toLowerCase(), vout, value: stake.toString(), confirmations: Number.isSafeInteger(conf) && conf >= 0 ? conf : 0 });
     }
     return hits;
   }

@@ -12,7 +12,7 @@ import {
   buildSettleBundle, parseSettleBundle, signSettleBundle, settleBundleStatus,
   buildSettleSpend, settleBundleFingerprint,
   refundSpendVBytes, buildRefundTx,
-  practiceRound, verifyGameTranscript,
+  practiceRound, verifyGameTranscript, findFunding,
   prlToGrains, grainsToPRL, pubkeyFromPriv, gameKeyFromInput,
   NETWORKS, DUST_GRAIN, bytesToHex, hexToBytes, sha256,
   encodeBech32m, walletFromMnemonic, signForXOnly, verifySchnorrSig,
@@ -427,4 +427,30 @@ test("refund UI parses the funding vout strictly (parseInt truncation class)", (
   const app = readFileSync(new URL("../app.js", import.meta.url), "utf8");
   assert.ok(!app.includes("parseInt(els.in_refund_vout"), "no parseInt on the refund vout field");
   assert.ok(app.includes("funding vout must be a non-negative integer"), "strict vout gate present");
+});
+
+// Regression pin (white-hat): findFunding renders through innerHTML in
+// app.js, and the Blockbook endpoint is user-configurable — a hostile
+// endpoint returning a non-hex txid or string confirmations must not
+// reach the page. Non-hex txids are skipped; confirmations coerce to 0.
+test("findFunding drops non-hex txids and coerces string confirmations", async () => {
+  const realFetch = globalThis.fetch;
+  const addr = "prl1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq0qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
+  try {
+    globalThis.fetch = async () => ({
+      ok: true, status: 200,
+      json: async () => ({ transactions: [
+        { txid: "<svg onload=alert(2)>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", vout: [{ addresses: [addr], value: "100000" }], confirmations: "<svg onload=alert(1)>" },
+        { txid: "AB".repeat(32), vout: [{ addresses: [addr], value: "100000" }], confirmations: "<svg onload=alert(1)>" },
+        { txid: "cd".repeat(32), vout: [{ addresses: [addr], value: "100000" }], confirmations: 5 },
+      ]}),
+    });
+    const hits = await findFunding({ blockbookUrl: "https://evil.example", escrow: { address: addr }, stakeGrains: 100000n });
+    assert.equal(hits.length, 2);
+    assert.equal(hits[0].txid, "ab".repeat(32));
+    assert.equal(hits[0].confirmations, 0);
+    assert.equal(hits[1].confirmations, 5);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });

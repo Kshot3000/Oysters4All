@@ -464,6 +464,11 @@ function signedListing(over = {}) {
     stubUtxos([{ txid: "ab".repeat(32), vout: 1, value: "250000000", confirmations: 2 }]);
     const good = await fetchUtxos("https://bb.example", "prl1xyz");
     ok("fetch-utxos-exact", good.length === 1 && good[0].value === 250000000 && good[0].vout === 1);
+    // String confirmations from a hostile/broken endpoint are coerced to 0,
+    // never passed through into innerHTML renders.
+    stubUtxos([{ txid: "ab".repeat(32), vout: 1, value: "250000000", confirmations: "<svg onload=alert(1)>" }]);
+    const coerced = await fetchUtxos("https://bb.example", "prl1xyz");
+    ok("fetch-utxos-conf-coerced", coerced.length === 1 && coerced[0].confirmations === 0);
     // Past MAX_SAFE_INTEGER a bare Number() rounds (…993 -> …992, …995 -> …996):
     // the fetch must refuse loudly instead of returning a rounded funding UTXO.
     for (const raw of ["9007199254740993", "9007199254740995"]) {

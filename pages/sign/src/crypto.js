@@ -631,7 +631,11 @@ export async function fetchUtxos(blockbookBase, address) {
     const value = Number(u.value); // grains (satoshis field)
     // Refuse values past MAX_SAFE_INTEGER instead of silently rounding them.
     if (!Number.isSafeInteger(value)) throw new Error("UTXO value too large to handle exactly");
-    return { txid: u.txid, vout: u.vout, value, confirmations: u.confirmations ?? 0 };
+    // Confirmations are rendered into pages via innerHTML by callers, so a
+    // hostile or broken Blockbook endpoint must never pass a string through:
+    // coerce to a safe non-negative integer, anything else becomes 0.
+    const conf = Number(u.confirmations);
+    return { txid: u.txid, vout: u.vout, value, confirmations: Number.isSafeInteger(conf) && conf >= 0 ? conf : 0 };
   }).filter((u) => u.value > 0 && /^[0-9a-f]{64}$/i.test(u.txid));
 }
 /** Fee rate in grains/vByte. Blockbook estimatefee returns PRL/kB (like BTC/kB). */

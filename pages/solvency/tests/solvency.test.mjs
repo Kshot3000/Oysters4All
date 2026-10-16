@@ -309,3 +309,22 @@ test("sumAddressReserves counts confirmed only, excludes foreign scripts (stubbe
     globalThis.fetch = realFetch;
   }
 });
+
+test("fetchUtxosBig coerces string confirmations from the backend to 0", async () => {
+  const { fetchUtxosBig } = await import("../src/solvency-core.js");
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: true,
+    text: async () => JSON.stringify([
+      { txid: "aa".repeat(32), vout: 0, value: "5000", confirmations: "<svg onload=alert(1)>" },
+      { txid: "bb".repeat(32), vout: 1, value: "6000", confirmations: 4 },
+    ]),
+  });
+  try {
+    const list = await fetchUtxosBig("https://evil.example", "prl1pabc");
+    assert.equal(list[0].confirmations, 0);
+    assert.equal(list[1].confirmations, 4);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
