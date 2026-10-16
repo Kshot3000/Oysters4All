@@ -12,6 +12,7 @@ import {
   canonicalSetupJson, circleSetupHash, encodeCircleDescriptor, decodeCircleDescriptor,
   verifyDescriptor, fundingPlan, planClaim, signClaim,
   builderTipGrainsFor, BUILDER_TIP_ADDRESS, addressToProgram, p2trScriptPubKey,
+  decimalToRational, ceilFeeGrains,
   planRefund, signRefund, finalizeRefund, classifyRounds,
   BLOCK_TIME_SEC, DUST_GRAIN, GRAIN_PER_PRL, NETWORKS,
   SEQ_NONFINAL, SEQ_FINAL, DESCRIPTOR_PREFIX,
@@ -350,4 +351,74 @@ test("classifyRounds: lifecycle statuses", () => {
     info: { [c.rounds[0].address]: { balance: 0, txs: 4 } },
   });
   assert.equal(spent[0].status, "spent");
+});
+
+/* ---------- exact decimal fee pricing (float-ceil regression) ---------- */
+
+test("ceilFeeGrains: exact decimal pricing, no float overcharge", () => {
+  // exact-integer products the float form priced a grain high
+  assert.equal(ceilFeeGrains(410, 1.1), 451);
+  assert.equal(ceilFeeGrains(410, 2.2), 902);
+  assert.equal(ceilFeeGrains(430, 1.1), 473);
+  assert.equal(ceilFeeGrains(180, 1.1), 198);
+  assert.equal(ceilFeeGrains(180, 2.2), 396);
+  assert.equal(ceilFeeGrains(180, 4.4), 792);
+  // string rates price identically to numeric rates
+  assert.equal(ceilFeeGrains(410, "1.1"), 451);
+  assert.deepEqual(decimalToRational("2.2", "fee rate"), { num: 22n, den: 10n });
+  // genuine fractions still ceil up
+  assert.equal(ceilFeeGrains(137, 1.1), 151); // 150.7 -> 151
+  assert.equal(ceilFeeGrains(111, 0.5), 56); // 55.5 -> 56
+  assert.equal(ceilFeeGrains(258, 2), 516); // integer rate unchanged
+  // garbage and non-positive rates are refused
+  assert.throws(() => ceilFeeGrains(100, "abc"), /finite decimal/);
+  assert.throws(() => ceilFeeGrains(100, 0), /must be positive/);
+  assert.throws(() => ceilFeeGrains(100, -1.1), /must be positive/);
+});
+
+function forgeSizedCircle(n, m, tag) {
+  const members = Array.from({ length: n }, (_, i) => ({ name: `M${i}`, input: keyFor(`${tag}-${n}-${m}-${i}`) }));
+  const terms = parseCircleTerms({
+    name: "Sized Circle", contributionPRL: "10", roundBlocks: 2160,
+    startHeight: 800000, graceBlocks: 144, m, members,
+  }, MAINNET);
+  const setupHash = circleSetupHash(terms);
+  const secrets = members.map((_, i) => bytesToHex(sha(`${tag}-secret-${n}-${m}-${i}`)));
+  const order = payoutOrderFor({
+    setupHash,
+    commitments: secrets.map((s, i) => ({ memberIndex: i, commitment: commitmentFor(s) })),
+    reveals: secrets.map((s, i) => ({ memberIndex: i, secretHex: s })),
+    n,
+  });
+  return { circle: forgeCircle(MAINNET, terms, order), terms };
+}
+
+test("plan-level: refund and tipped claim price exact fees at decimal rates", () => {
+  // 5-of-5 refund: 410 vB at 1.1 g/vB is exactly 451 grains (float: 452)
+  const five = forgeSizedCircle(5, 5, "exactfee");
+  const r5 = five.circle.rounds[0];
+  const pot5 = five.terms.contributionGrains * 5;
+  const refund5 = planRefund(MAINNET, five.circle, r5,
+    { txid: "ab".repeat(32), vout: 0, value: pot5 }, 1.1, r5.lockHeight);
+  assert.equal(refund5.vBytes, 410);
+  assert.equal(refund5.fee, 451);
+  assert.equal(refund5.outputs.reduce((a, o) => a + o.value, 0), pot5 - 451);
+  // 6-member m=3 refund: 430 vB at 1.1 g/vB is exactly 473 grains (float: 474)
+  const six = forgeSizedCircle(6, 3, "exactfee");
+  const r6 = six.circle.rounds[0];
+  const pot6 = six.terms.contributionGrains * 6;
+  const refund6 = planRefund(MAINNET, six.circle, r6,
+    { txid: "ab".repeat(32), vout: 0, value: pot6 }, 1.1, r6.lockHeight);
+  assert.equal(refund6.vBytes, 430);
+  assert.equal(refund6.fee, 473);
+  // tipped winner claim on the pinned 3-member circle: the tip's second
+  // output makes it 180 vB — exactly 198 grains at 1.1 (float: 199)
+  const { c, r } = claimFixture();
+  const op = { txid: "ab".repeat(32), vout: 0, value: r.potGrains };
+  const dest = hexToBytes(r.winnerXOnly);
+  const tipped = planClaim(MAINNET, r, op, dest, 1.1, true);
+  assert.equal(tipped.vBytes, 180);
+  assert.equal(tipped.fee, 198);
+  assert.equal(tipped.outputs[0].value + tipped.outputs[1].value + tipped.fee, r.potGrains);
+  assert.ok(c, "fixture sanity");
 });

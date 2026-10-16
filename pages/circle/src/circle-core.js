@@ -400,6 +400,45 @@ export function verifyDescriptor(desc, order) {
   };
 }
 
+/* ---------------- exact decimal fee pricing ---------------- */
+
+/* Exact decimal fee pricing (fleet pattern, first shipped in Pearl Fees):
+ * a fee rate is read through String(), whose shortest round-trip form
+ * recovers the decimal the user typed, then ceil(vBytes × rate) is computed
+ * in BigInt rational arithmetic. The old float form — Math.ceil(vB * rate)
+ * — overcharged whenever the float product of an exact-integer fee landed
+ * a hair above it: a 5-of-5 timeout refund of 410 vB at 1.1 g/vB priced
+ * 452 grains instead of 451, a 6-member (m=3) refund of 430 vB at 1.1
+ * priced 474 instead of 473, and a tipped winner claim of 180 vB (the tip
+ * adds a second output) at 1.1/2.2/4.4 priced 199/397/793 instead of
+ * 198/396/792. The refund vBytes sweep with the member count and the
+ * multisig threshold (37 overcharges across 810 realistic refund plans at
+ * the standard rates); the untipped claim (137 vB) and the funding
+ * estimate (111 vB) sit on fixed shapes that do not trigger at those
+ * rates, but they price through this helper too so no float site remains. */
+export function decimalToRational(x, name) {
+  const s = String(x ?? "").trim();
+  const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+  if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+  const [, sign, intPart, fracPart = "", expPart] = m;
+  let num = BigInt(intPart + fracPart);
+  let den = 10n ** BigInt(fracPart.length);
+  const exp = expPart ? BigInt(expPart) : 0n;
+  if (exp >= 0n) num *= 10n ** exp; else den *= 10n ** -exp;
+  if (sign === "-") num = -num;
+  return { num, den };
+}
+
+export function ceilFeeGrains(vBytes, rateGrainsPerVByte) {
+  if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("bad vBytes for fee");
+  const r = decimalToRational(rateGrainsPerVByte, "fee rate");
+  if (r.num <= 0n) throw new Error("fee rate must be positive");
+  const num = BigInt(vBytes) * r.num;
+  const grains = (num + r.den - 1n) / r.den;
+  if (grains > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("fee exceeds safe integer range");
+  return Number(grains);
+}
+
 /* ---------------- funding plan ---------------- */
 
 /** Per-member funding checklist: N rounds x C, plus a fee estimate.
@@ -411,7 +450,7 @@ export function fundingPlan(circle, feeRateGrainsPerVByte) {
   }
   const n = circle.terms.members.length;
   const fundVBytes = Math.ceil(10.5 + 57.25 + 43); // 1 keypath in, 1 P2TR out
-  const fundFee = Math.ceil(fundVBytes * feeRateGrainsPerVByte);
+  const fundFee = ceilFeeGrains(fundVBytes, feeRateGrainsPerVByte);
   return {
     rounds: circle.rounds.map((r) => ({
       index: r.index, address: r.address, amountGrains: circle.terms.contributionGrains,
@@ -500,7 +539,7 @@ export function planClaim(network, round, outpoint, destProgram, feeRateGrainsPe
     nOut: builderTip > 0 ? 2 : 1, scriptLen: round.claimScript.length,
     controlLen: round.claimControlBlock.length, stackLens: [64],
   });
-  const fee = Math.ceil(vBytes * feeRateGrainsPerVByte);
+  const fee = ceilFeeGrains(vBytes, feeRateGrainsPerVByte);
   const payValue = value - fee - builderTip;
   if (payValue < DUST_GRAIN) {
     if (builderTip > 0) {
@@ -574,7 +613,7 @@ export function planRefund(network, circle, round, outpoint, feeRateGrainsPerVBy
     nOut: n, scriptLen: round.refundScript.length,
     controlLen: round.refundControlBlock.length, stackLens,
   });
-  const fee = Math.ceil(vBytes * feeRateGrainsPerVByte);
+  const fee = ceilFeeGrains(vBytes, feeRateGrainsPerVByte);
   const c = circle.terms.contributionGrains;
   const feeEach = Math.floor(fee / n);
   const feeRem = fee - feeEach * n;
