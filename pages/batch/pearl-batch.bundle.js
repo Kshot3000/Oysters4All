@@ -6636,12 +6636,15 @@ zoo`.split("\n");
       if (got < BigInt(r.amount)) missingRecipients.push({ address: r.address, expected: r.amount.toString(), found: got.toString() });
     }
     const fee = vinSum - voutSum;
-    const conf = Number(txJson?.confirmations ?? 0);
+    const confRaw = Number(txJson?.confirmations);
+    const conf = Number.isSafeInteger(confRaw) && confRaw >= 0 ? confRaw : 0;
+    const bhRaw = txJson?.blockHeight;
+    const blockHeight = Number.isSafeInteger(bhRaw) && bhRaw >= 0 ? bhRaw : null;
     const ok = notes.length === 0 && missingRecipients.length === 0 && fee >= 0n;
     return {
       ok,
       confirmations: conf,
-      blockHeight: txJson?.blockHeight ?? null,
+      blockHeight,
       fee,
       feePRL: fmtPRL(fee),
       nIn: vin.length,

@@ -658,10 +658,16 @@ export function auditBatchTx(txJson, expected, network = NETWORKS.mainnet) {
     if (got < BigInt(r.amount)) missingRecipients.push({ address: r.address, expected: r.amount.toString(), found: got.toString() });
   }
   const fee = vinSum - voutSum;
-  const conf = Number(txJson?.confirmations ?? 0);
+  // confirmations/blockHeight are rendered via innerHTML by the page —
+  // never let an endpoint-supplied string reach the audit result: coerce
+  // both to safe integers (anything else becomes 0 / null, i.e. mempool).
+  const confRaw = Number(txJson?.confirmations);
+  const conf = Number.isSafeInteger(confRaw) && confRaw >= 0 ? confRaw : 0;
+  const bhRaw = txJson?.blockHeight;
+  const blockHeight = Number.isSafeInteger(bhRaw) && bhRaw >= 0 ? bhRaw : null;
   const ok = notes.length === 0 && missingRecipients.length === 0 && fee >= 0n;
   return {
-    ok, confirmations: conf, blockHeight: txJson?.blockHeight ?? null,
+    ok, confirmations: conf, blockHeight,
     fee, feePRL: fmtPRL(fee), nIn: vin.length, nOut: vout.length,
     missingRecipients, notes,
     verdict: ok ? "BATCH VERIFIED — every recipient output is on-chain for the exact amount" : "BATCH NOT VERIFIED — see notes",

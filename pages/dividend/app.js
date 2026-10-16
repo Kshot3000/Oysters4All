@@ -434,7 +434,11 @@
         const base = $("bcast-blockbook").value.trim();
         const r = await P.fetchPayoutTx(fetch, base, S.bcast[i].txid);
         if (!r.ok) throw new Error(`tracking failed (${r.error || "not found"})`);
-        S.bcast[i].confirmations = (r.data && r.data.confirmations) || 0;
+        // confirmations is rendered via innerHTML by renderBroadcastList —
+        // never let an endpoint-supplied string reach it: coerce to a safe
+        // non-negative integer, anything else becomes 0.
+        const confRaw = Number(r.data && r.data.confirmations);
+        S.bcast[i].confirmations = Number.isSafeInteger(confRaw) && confRaw >= 0 ? confRaw : 0;
         renderBroadcastList();
       } catch (e) { err("bcast-error", e.message); }
     }));

@@ -367,6 +367,24 @@ test("auditBatchTx: clean batch verifies with exact fee", () => {
   assert.match(r.verdict, /BATCH VERIFIED/);
 });
 
+test("auditBatchTx: endpoint strings never pass through confirmations/blockHeight", () => {
+  const recipients = threeRecipients();
+  const txid = "ab".repeat(32);
+  const tx = fakeBlockbookTx(txid, SENDER, recipients, 7880n);
+  const evil = "<svg onload=alert(1)>";
+  tx.confirmations = evil;
+  tx.blockHeight = evil;
+  const r = auditBatchTx(tx, { txid, senderAddress: SENDER, recipients }, N);
+  assert.equal(r.confirmations, 0);
+  assert.equal(r.blockHeight, null);
+  // a numeric-string height is not a safe integer either — mempool, not markup
+  tx.blockHeight = "900001";
+  assert.equal(auditBatchTx(tx, { txid, senderAddress: SENDER, recipients }, N).blockHeight, null);
+  // negative (unconfirmed) height also reads as mempool
+  tx.blockHeight = -1;
+  assert.equal(auditBatchTx(tx, { txid, senderAddress: SENDER, recipients }, N).blockHeight, null);
+});
+
 test("auditBatchTx: shorted recipient -> NOT VERIFIED", () => {
   const recipients = threeRecipients();
   const txid = "ab".repeat(32);
