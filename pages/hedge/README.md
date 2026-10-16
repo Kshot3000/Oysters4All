@@ -71,7 +71,7 @@ commitment).
 ## Verification
 
 - `node --no-warnings --loader ./tests/loader.mjs tests/hedge.test.mjs` —
-  22/22 core tests: pinned canonical vector (descriptor → address → sealed
+  23/23 core tests: pinned canonical vector (descriptor → address → sealed
   hash), refund leaf byte-identical to the audited escrow
   `buildRefundScript`, exercise leaf byte-shape + parser round-trip, control
   blocks verified against the tweaked key, descriptor tamper semantics

@@ -6649,8 +6649,8 @@ zoo`.split("\n");
       fetchUtxos(blockbookBase, address),
       fetch(`${base}/api/v2/address/${address}`).then((r) => r.json())
     ]);
-    const txCount = Number(info && info.txApperances != null ? info.txApperances : info.transactions);
-    return { utxos, txCount: Number.isInteger(txCount) ? txCount : Array.isArray(info.transactions) ? info.transactions.length : 0 };
+    const txCount = info && Number.isSafeInteger(info.txs) && info.txs >= 0 ? info.txs : info && Array.isArray(info.transactions) ? info.transactions.length : info && Array.isArray(info.txids) ? info.txids.length : 0;
+    return { utxos, txCount };
   }
   function wipeSecrets(...secrets) {
     for (const s of secrets) {

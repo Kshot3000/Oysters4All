@@ -103,7 +103,7 @@ test("deal warnings are fully escaped, not just '<' (XSS audit latent queue)", (
   assert.match(appSrc, /function esc\(s\)/);
   assert.ok(appSrc.includes("warns.map((x) => `<li>${esc(x)}</li>`)"), "warnings escaped");
   assert.ok(!appSrc.includes("warns.map((x) => `<li>${x.replace"), "warnings no longer use partial escaping");
-  assert.ok(html.includes('app.js?v=4'), "cache key bumped");
+  assert.ok(html.includes('app.js?v=5'), "cache key bumped");
 });
 
 test("builder tip: claim checkbox off by default, disclosure in page, bundle API exact", () => {

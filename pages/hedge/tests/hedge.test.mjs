@@ -10,7 +10,7 @@ import {
   numsInternalKeyHedge, taptreeHedge, forgeOption, counterpartyKeyFromInput,
   descriptorFor, sealedDescriptor, parseDescriptor, optionFromDescriptor,
   verifyStrikePayment, planOptionSpend, buyerSignerFor, writerSignerFor,
-  buildExerciseTx, buildRefundTx, classifyLifecycle, expectedAddress,
+  buildExerciseTx, buildRefundTx, classifyLifecycle, fetchAddressSummary, expectedAddress,
   builderTipGrainsFor, BUILDER_TIP_BPS, BUILDER_TIP_ADDRESS, BUILDER_TIP_NAME,
   addressToProgram,
   partyKeyFromInput, scriptAsm, parseXOnlyKey, wipeSecrets,
@@ -428,4 +428,33 @@ test("script asm renders both leaves human-readably", () => {
   const o = forgePin();
   assert.match(scriptAsm(o.exerciseScript), /EQUALVERIFY/);
   assert.match(scriptAsm(o.refundScript), /CLTV/);
+});
+
+test("fetchAddressSummary: txCount comes from Blockbook's integer `txs` field (real wire shape)", async () => {
+  // Real /api/v2/address shape (blockbook api/types.go Address; no details
+  // param -> TxidHistory): integer `txs` count + `txids`, NO `transactions`
+  // array and NO btcd-style `txApperances`. The old reader consulted only
+  // those two absent fields, so txCount was always 0 and a spent vault
+  // classified "unfunded" forever.
+  const realFetch = globalThis.fetch;
+  const shape = {
+    address: "prl1phedge", balance: "0", unconfirmedBalance: "0", unconfirmedTxs: 0,
+    txs: 3, txids: ["a".repeat(64), "b".repeat(64), "c".repeat(64)],
+    page: 1, totalPages: 1, itemsOnPage: 3,
+  };
+  globalThis.fetch = async (url) => String(url).includes("/api/v2/utxo/")
+    ? { ok: true, json: async () => [], text: async () => "[]" }
+    : { ok: true, json: async () => shape, text: async () => JSON.stringify(shape) };
+  try {
+    const sum = await fetchAddressSummary("https://bb.example", "prl1phedge");
+    assert.equal(sum.txCount, 3);
+    assert.equal(classifyLifecycle({ utxos: sum.utxos, txCount: sum.txCount, tip: 100, expiry: 800_000 }), "spent");
+    // A genuinely fresh address still reads unfunded.
+    globalThis.fetch = async (url) => String(url).includes("/api/v2/utxo/")
+      ? { ok: true, json: async () => [], text: async () => "[]" }
+      : { ok: true, json: async () => ({ ...shape, txs: 0, txids: [] }), text: async () => "{}" };
+    const fresh = await fetchAddressSummary("https://bb.example", "prl1phedge");
+    assert.equal(fresh.txCount, 0);
+    assert.equal(classifyLifecycle({ utxos: fresh.utxos, txCount: fresh.txCount, tip: 100, expiry: 800_000 }), "unfunded");
+  } finally { globalThis.fetch = realFetch; }
 });

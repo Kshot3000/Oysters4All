@@ -476,3 +476,24 @@ test("parsePRLToGrains: exact parser rejects the float-parse class (offline tall
   assert.throws(() => W.parsePRLToGrains("90071992.54740992"), /out of range/);
   assert.throws(() => W.parsePRLToGrains(1.5), /must be a string/);
 });
+
+test("fetchVaultStatus: txCount comes from Blockbook's integer `txs` field (real wire shape)", async () => {
+  // Real /api/v2/address shape (blockbook api/types.go Address; no details
+  // param -> TxidHistory): integer `txs` count + `txids`, NO `transactions`
+  // array and NO btcd-style `txApperances`. The old reader consulted only
+  // `txApperances ?? transactions.length`, so txCount was always 0 and the
+  // page's SPENT verdict (txCount>0 && balance===0) could never fire.
+  const realFetch = globalThis.fetch;
+  const shape = {
+    address: "prl1pwill", balance: "0", unconfirmedBalance: "0", unconfirmedTxs: 0,
+    txs: 2, txids: ["d".repeat(64), "e".repeat(64)],
+    page: 1, totalPages: 1, itemsOnPage: 2,
+  };
+  globalThis.fetch = async () => ({ ok: true, json: async () => shape, text: async () => JSON.stringify(shape) });
+  try {
+    const st = await W.fetchVaultStatus("https://bb.example", "prl1pwill");
+    assert.equal(st.txCount, 2);
+    assert.equal(st.balance, 0);
+    assert.ok(st.txCount > 0 && st.balance === 0 && st.unconfirmed === 0, "emptied vault must satisfy the SPENT verdict");
+  } finally { globalThis.fetch = realFetch; }
+});

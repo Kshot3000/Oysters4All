@@ -104,9 +104,12 @@
       const r = await fetch(S.blockbook.replace(/\/$/, "") + "/api/v2");
       if (!r.ok) throw new Error("HTTP " + r.status);
       const j = await r.json();
-      if (!Number.isFinite(j.blockHeight)) throw new Error("no blockHeight in response");
-      S.chainHeight = j.blockHeight;
-      $("chain-height").value = j.blockHeight;
+      // GET /api/v2 returns SystemInfo — the tip is blockbook.bestHeight
+      // (backend.blocks mirrors it); there is no top-level blockHeight.
+      const h = j.blockbook?.bestHeight ?? j.backend?.blocks;
+      if (!Number.isSafeInteger(h)) throw new Error("no tip height in response");
+      S.chainHeight = h;
+      $("chain-height").value = h;
     } catch (e) { err("parties-error", "Could not fetch chain height: " + e.message); }
   });
   $("lock-plus-week").addEventListener("click", () => {

@@ -667,8 +667,16 @@ export async function fetchAddressSummary(blockbookBase, address) {
     fetchUtxos(blockbookBase, address),
     fetch(`${base}/api/v2/address/${address}`).then((r) => r.json()),
   ]);
-  const txCount = Number(info && info.txApperances != null ? info.txApperances : info.transactions);
-  return { utxos, txCount: Number.isInteger(txCount) ? txCount : (Array.isArray(info.transactions) ? info.transactions.length : 0) };
+  // Blockbook v2's address count is the integer `txs` field (api/types.go
+  // Address); this fetch sends no details param, so the response carries
+  // `txids`, never a `transactions` array — and `txApperances` is a btcd
+  // RPC field Blockbook never sends. Reading either made txCount always 0,
+  // so classifyLifecycle could never report a spent vault.
+  const txCount = info && Number.isSafeInteger(info.txs) && info.txs >= 0
+    ? info.txs
+    : info && Array.isArray(info.transactions) ? info.transactions.length
+    : info && Array.isArray(info.txids) ? info.txids.length : 0;
+  return { utxos, txCount };
 }
 
 /** Securely wipe a secret: zero every byte of each Uint8Array passed. */

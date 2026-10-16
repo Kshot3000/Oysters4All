@@ -732,7 +732,7 @@
       }
       const a = await fetch(bb + "/api/v2/address/" + S.chan.address).then((r) => r.json()).catch(() => null);
       $("track-addr").textContent = a
-        ? `${a.txApperances || 0} tx(s) · ${a.balance || "0"} grains balance`
+        ? `${a.txs ?? a.txApperances ?? 0} tx(s) · ${a.balance || "0"} grains balance`
         : "unavailable";
       const st = activeState();
       $("track-state").textContent = st

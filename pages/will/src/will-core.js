@@ -563,7 +563,11 @@ export async function fetchVaultStatus(blockbookUrl, address) {
   return {
     balance: confirmed,
     unconfirmed: Number(j.unconfirmedBalance || 0),
-    txCount: j.txApperances ?? txs.length,
+    // Blockbook v2's address count is the integer `txs` field; with no
+    // details param the response carries `txids`, never `transactions`,
+    // and `txApperances` is a btcd RPC field Blockbook never sends —
+    // reading it made txCount always 0, so a spent vault never read SPENT.
+    txCount: Number.isSafeInteger(j.txs) && j.txs >= 0 ? j.txs : txs.length,
     txs: txs.slice(0, 8).map((t) => ({
       txid: t.txid, confirmations: t.confirmations ?? 0,
       valueIn: t.valueIn, fees: t.fees,
