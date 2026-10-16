@@ -448,6 +448,22 @@ test("1-of-1 heir vault works end to end", () => {
   assert.equal(rv.ok, true); assert.equal(rv.sigs, 1);
 });
 
+test("ceilFeeGrains: the plan estimator prices fees in exact decimal arithmetic", () => {
+  // The f-plan panel's vBytes sweep with the output count the user types:
+  // an owner spend at 7 outputs is 395 vB and a 4-of-4 heir spend at 5
+  // outputs is 385 vB. Float Math.ceil(vB * 2.2) displayed 870 / 848 —
+  // one grain above the 869 / 847 the claims actually charge through
+  // planSpend's exact helper.
+  assert.equal(W.ceilFeeGrains(395, 2.2), 869);
+  assert.equal(W.ceilFeeGrains(385, 2.2), 847);
+  assert.equal(W.ceilFeeGrains(395, "2.2"), 869); // string-rate parity
+  assert.equal(W.ceilFeeGrains(111, 1.1), 123); // fractional ceiling still ceils
+  assert.equal(W.ceilFeeGrains(154, 20), 3080); // integer rates price as before
+  for (const bad of ["abc", 0, -1, NaN, Infinity]) {
+    assert.throws(() => W.ceilFeeGrains(154, bad), /fee rate/, String(bad));
+  }
+});
+
 test("parsePRLToGrains: exact parser rejects the float-parse class (offline tally)", () => {
   assert.equal(W.parsePRLToGrains("1.50000000"), 150_000_000);
   assert.equal(W.parsePRLToGrains("0.00000001"), 1);

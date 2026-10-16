@@ -44,7 +44,7 @@ import {
 import {
   partyKeyFromInput, parseXOnlyKey, scriptPathSigDigestEx,
   signForXOnly, verifySchnorrSig, buildScriptPathSpend,
-  spendVBytes, planSpend, addressToProgram, scriptAsm,
+  spendVBytes, planSpend, ceilFeeGrains, addressToProgram, scriptAsm,
   encodeScriptNum, pushData, taptree2, verifyControlBlock,
 } from "../../escrow/src/escrow-core.js";
 import { decodeRawTx } from "../../sign/src/sign-core.js";
@@ -60,7 +60,7 @@ export {
   encodeBech32m, decodeBech32m, p2trScriptPubKey, txidLE,
   partyKeyFromInput, parseXOnlyKey, scriptAsm, addressToProgram,
   verifySchnorrSig, signForXOnly, scriptPathSigDigestEx,
-  encodeScriptNum, pushData, spendVBytes, planSpend,
+  encodeScriptNum, pushData, spendVBytes, planSpend, ceilFeeGrains,
   buildScriptPathSpend, verifyControlBlock, decodeRawTx,
 };
 

@@ -276,8 +276,8 @@
       const m = state.spec ? state.spec.m : 1;
       const ownerVB = W.spendVBytes({ nOut, scriptLen: v.ownerScript.length, controlLen: v.controlBlocks[0].length, stackLens: [64] });
       const heirVB = W.spendVBytes({ nOut, scriptLen: v.heirScript.length, controlLen: v.controlBlocks[1].length, stackLens: Array(n).fill(64) });
-      $("f-plan-owner").textContent = ownerVB + " vB ≈ " + fmtPRL(Math.ceil(ownerVB * rate)) + " fee";
-      $("f-plan-heir").textContent = heirVB + " vB ≈ " + fmtPRL(Math.ceil(heirVB * rate)) + " fee (" + m + "-of-" + n + " witness)";
+      $("f-plan-owner").textContent = ownerVB + " vB ≈ " + fmtPRL(W.ceilFeeGrains(ownerVB, rate)) + " fee";
+      $("f-plan-heir").textContent = heirVB + " vB ≈ " + fmtPRL(W.ceilFeeGrains(heirVB, rate)) + " fee (" + m + "-of-" + n + " witness)";
       $("f-plan-out").hidden = false;
     } catch (e) { showErr("f-err", e.message); }
   });

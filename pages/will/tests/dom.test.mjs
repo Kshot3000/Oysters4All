@@ -109,8 +109,8 @@ test("offline tally uses the exact core parser (float-parse class closed)", () =
   assert.ok(js.includes("W.parsePRLToGrains(parts[1])"), "tally delegates to the core exact parser");
   assert.ok(!js.includes("Math.round(amt * 1e8)"), "no float tally parse left");
   const html = readFileSync(P(appDir, "index.html"), "utf8");
-  assert.ok(html.includes("pearl-will.bundle.js?v=5"), "bundle cache key bumped");
-  assert.ok(html.includes('src="app.js?v=4"'), "app cache key bumped");
+  assert.ok(html.includes("pearl-will.bundle.js?v=6"), "bundle cache key bumped");
+  assert.ok(html.includes('src="app.js?v=5"'), "app cache key bumped");
 });
 
 test("builder tip: checkbox opt-in, disclosure, bundle tipped owner claim exact on the wire", () => {

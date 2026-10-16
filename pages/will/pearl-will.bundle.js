@@ -30,6 +30,7 @@
     buildWillVault: () => buildWillVault,
     builderTipGrainsFor: () => builderTipGrainsFor,
     bytesToHex: () => bytesToHex,
+    ceilFeeGrains: () => ceilFeeGrains,
     convertBits: () => convertBits,
     decodeBech32m: () => decodeBech32m,
     decodeRawTx: () => decodeRawTx,
