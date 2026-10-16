@@ -66,7 +66,7 @@ registry resolver, and the standalone verifier.
 
 ## Tests
 
-- `node --no-warnings --loader ./tests/loader.mjs tests/names.test.mjs` — 26/26
+- `node --no-warnings --loader ./tests/loader.mjs tests/names.test.mjs` — 28/28
   (name rules, canonical order, wrong-key refusal, tamper rejection, fee math,
   full commit→reveal→envelope→verify round-trip, first-seen resolution,
   verifier clock injection: expiry and the registered_at future check are

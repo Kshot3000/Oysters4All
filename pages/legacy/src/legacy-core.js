@@ -973,7 +973,10 @@ export async function fetchLegacyUtxos(blockbookBase, vault) {
         fundingHeight = txj.blockHeight;
       }
     } catch { /* tx lookup failed: scriptOk stays false */ }
-    out.push({ txid, vout, value, fundingHeight, confirmations: u.confirmations ?? 0, scriptOk });
+    // confirmations must never be an endpoint-supplied string (the page
+    // renders chain fields via innerHTML) — coerce like the shared fetchUtxos.
+    const conf = Number(u.confirmations);
+    out.push({ txid, vout, value, fundingHeight, confirmations: Number.isSafeInteger(conf) && conf >= 0 ? conf : 0, scriptOk });
   }
   return out;
 }

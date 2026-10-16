@@ -6781,7 +6781,8 @@ zoo`.split("\n");
         }
       } catch {
       }
-      out.push({ txid, vout, value, fundingHeight, confirmations: u.confirmations ?? 0, scriptOk });
+      const conf = Number(u.confirmations);
+      out.push({ txid, vout, value, fundingHeight, confirmations: Number.isSafeInteger(conf) && conf >= 0 ? conf : 0, scriptOk });
     }
     return out;
   }

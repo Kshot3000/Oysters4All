@@ -6308,7 +6308,14 @@ zoo`.split("\n");
     const tx = await r.json();
     if (!tx.hex) throw new Error("blockbook did not return raw tx hex");
     const v = verifyNotarizationWitness(tx.hex, documentBytes);
-    return { ...v, txid: tx.txid, blockHeight: tx.blockHeight ?? null, blockTime: tx.blockTime ?? null, confirmations: tx.confirmations ?? 0 };
+    const conf = Number(tx.confirmations);
+    return {
+      ...v,
+      txid: String(revealTxid).toLowerCase(),
+      blockHeight: Number.isSafeInteger(tx.blockHeight) ? tx.blockHeight : null,
+      blockTime: Number.isSafeInteger(tx.blockTime) ? tx.blockTime : null,
+      confirmations: Number.isSafeInteger(conf) && conf >= 0 ? conf : 0
+    };
   }
   function buildSealCertificate({ plan, commitTxid, revealTxid, blockHeight, blockTime }) {
     const rec = plan.envelope.fields || validateNotaryRecord(JSON.parse(plan.envelope.json));

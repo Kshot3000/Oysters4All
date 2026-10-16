@@ -41,7 +41,7 @@ blockbook, parses its witness, and returns a match/mismatch verdict.
 
 ## Tests
 
-- `tests/notary.test.mjs` — 16/16: SHA-256 vectors, record validation
+- `tests/notary.test.mjs` — 18/18: SHA-256 vectors, record validation
   matrix, envelope structure (marker ≠ prl-20), 520-byte chunking,
   commit/reveal planning + exact fee accounting, full sign cycle with
   Schnorr verification, indexer-style witness round-trip, match/mismatch

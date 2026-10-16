@@ -6442,10 +6442,11 @@ zoo`.split("\n");
     }
     if (!res.ok) throw new Error(`VAULT REFUSED: blockbook ${res.status} on tx lookup`);
     const data = JSON.parse(await res.text());
+    const conf = Number(data.confirmations);
     return {
       txid: String(txid).toLowerCase(),
-      confirmations: Number(data.confirmations ?? 0),
-      blockHeight: data.blockHeight ?? null
+      confirmations: Number.isSafeInteger(conf) && conf >= 0 ? conf : 0,
+      blockHeight: Number.isSafeInteger(data.blockHeight) ? data.blockHeight : null
     };
   }
   return __toCommonJS(index_exports);

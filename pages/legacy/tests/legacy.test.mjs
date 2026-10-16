@@ -19,6 +19,7 @@ import {
   parseTx, parseXOnlyKey, addressToProgram,
   verifySchnorrSig, signForXOnly, scriptPathSigDigestEx, buildScriptPathSpend,
   spendVBytes, encodeScriptNum, decodeBech32m,
+  fetchLegacyUtxos,
   walletFromMnemonic, walletToWIF,
   LEGACY_KIND, LEGACY_VERSION, PEARL_BLOCK_SECS,
   MIN_CSV_BLOCKS, MAX_CSV_BLOCKS, FINAL_SEQUENCE,
@@ -607,4 +608,30 @@ test("constants: block time from pearl-knowledge.md", () => {
   // ~1 day / ~30 day presets land where the UI claims
   assert.ok(Math.abs(blocksToDays(445) - 1.0) < 0.01);
   assert.ok(Math.abs(blocksToDays(13361) - 30.0) < 0.02);
+});
+
+test("fetchLegacyUtxos never passes an endpoint-supplied string confirmations through", async () => {
+  // Same fetcher shape as bounty's: confirmations must be coerced at the
+  // data layer, never passed through as an endpoint-supplied string.
+  const vault = makeVault();
+  const realFetch = globalThis.fetch;
+  const stub = (payload) => ({ ok: true, status: 200, text: async () => JSON.stringify(payload), json: async () => payload });
+  globalThis.fetch = async (url) => {
+    if (String(url).includes("/api/v2/utxo/")) return stub([{ txid: "ab".repeat(32), vout: 0, value: "5000", confirmations: "<svg onload=alert(1)>" }]);
+    if (String(url).includes("/api/v2/tx/")) return stub({ vout: [{ scriptPubKey: { hex: vault.spkHex } }], blockHeight: 900000 });
+    throw new Error("unexpected " + url);
+  };
+  try {
+    const bad = await fetchLegacyUtxos("https://evil.example", vault);
+    assert.equal(bad.length, 1);
+    assert.equal(bad[0].confirmations, 0);
+    globalThis.fetch = async (url) => {
+      if (String(url).includes("/api/v2/utxo/")) return stub([{ txid: "ab".repeat(32), vout: 0, value: "5000", confirmations: 3 }]);
+      if (String(url).includes("/api/v2/tx/")) return stub({ vout: [{ scriptPubKey: { hex: vault.spkHex } }], blockHeight: 900000 });
+      throw new Error("unexpected " + url);
+    };
+    const good = await fetchLegacyUtxos("https://ok.example", vault);
+    assert.equal(good[0].confirmations, 3);
+    assert.equal(good[0].fundingHeight, 900000);
+  } finally { globalThis.fetch = realFetch; }
 });

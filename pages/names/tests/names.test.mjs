@@ -7,7 +7,7 @@ import {
   signBinding, verifySignedBinding,
   buildNameScript, planNameInscription, composeNamePayload,
   addressToProgram, verifyNameWitness, buildCommitTx, buildRevealTxSigned,
-  resolveRegistry, buildNameCertificate,
+  resolveRegistry, buildNameCertificate, verifyNameOnChain,
   NAME_MARKER, NAME_VERSION, NAME_SUFFIX,
   newMnemonic, walletFromMnemonic,
 } from "../src/names-core.js";
@@ -258,6 +258,43 @@ t("newMnemonic wallet pipeline", () => {
   assert.ok(w.address.startsWith("prl1"));
   assert.equal(w.internalXOnly.length, 32);
 });
+
+/* ---- on-chain verify: endpoint strings never pass through ---- */
+await (async () => {
+  // The verify result's chain fields are rendered by callers — a hostile
+  // user-configured Blockbook returning string blockHeight/blockTime/
+  // confirmations (or a forged response txid) must not pass through raw.
+  const b = composeBinding({ name: "alice", address: W.address, xonly: bytesToHex(W.internalXOnly), network: NET, registeredAt: 1788000000, expiresAt: null });
+  const sig = signBinding(W.priv, b, NETWORKS[NET]);
+  const payload = composeNamePayload({ binding: b, sigHex: bytesToHex(sig) });
+  const plan = planNameInscription({ network: NETWORKS[NET], internalXOnly: W.internalXOnly, payload, ownerAddress: W.address, changeAddress: W.address, feeRate: 2 });
+  const commit = buildCommitTx({
+    network: NETWORKS[NET],
+    fundingInputs: [{ txid: "00".repeat(32), vout: 0, value: plan.commitValue + 20000, program: plan.changeProgram, priv: W.priv, internalXOnly: W.internalXOnly }],
+    commitProgram: plan.commitProgram, commitValue: plan.commitValue,
+    changeProgram: plan.changeProgram, feeRate: 2,
+  });
+  const reveal = buildRevealTxSigned({ plan, commitTxid: commit.txid, commitVout: 0, internalPriv: W.priv, changeAddress: W.address });
+  const EVIL = "<svg onload=alert(1)>";
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ hex: reveal.hex, txid: EVIL, blockHeight: EVIL, blockTime: EVIL, confirmations: EVIL }) });
+  try {
+    const v = await verifyNameOnChain("https://evil.example", "ab".repeat(32));
+    t("verifyNameOnChain coerces endpoint-supplied chain fields", () => {
+      assert.equal(v.confirmations, 0);
+      assert.equal(v.blockHeight, null);
+      assert.equal(v.blockTime, null);
+      assert.equal(v.txid, "ab".repeat(32)); // the validated request txid, not the response's
+    });
+    globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ hex: reveal.hex, txid: "ab".repeat(32), blockHeight: 900000, blockTime: 1760000000, confirmations: 9 }) });
+    const good = await verifyNameOnChain("https://ok.example", "ab".repeat(32));
+    t("verifyNameOnChain keeps real numeric chain fields", () => {
+      assert.equal(good.confirmations, 9);
+      assert.equal(good.blockHeight, 900000);
+      assert.equal(good.blockTime, 1760000000);
+    });
+  } finally { globalThis.fetch = realFetch; }
+})();
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

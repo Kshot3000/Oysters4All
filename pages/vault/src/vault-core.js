@@ -848,9 +848,12 @@ export async function fetchTxConfirmations(blockbookBase, txid) {
   }
   if (!res.ok) throw new Error(`VAULT REFUSED: blockbook ${res.status} on tx lookup`);
   const data = JSON.parse(await res.text());
+  // Both fields are rendered via innerHTML by the page — a hostile or broken
+  // endpoint must not smuggle strings through them; numbers or nothing.
+  const conf = Number(data.confirmations);
   return {
     txid: String(txid).toLowerCase(),
-    confirmations: Number(data.confirmations ?? 0),
-    blockHeight: data.blockHeight ?? null,
+    confirmations: Number.isSafeInteger(conf) && conf >= 0 ? conf : 0,
+    blockHeight: Number.isSafeInteger(data.blockHeight) ? data.blockHeight : null,
   };
 }

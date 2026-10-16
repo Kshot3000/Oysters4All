@@ -216,7 +216,14 @@ export async function verifyNotarizationOnChain(blockbookUrl, revealTxid, docume
   const tx = await r.json();
   if (!tx.hex) throw new Error("blockbook did not return raw tx hex");
   const v = verifyNotarizationWitness(tx.hex, documentBytes);
-  return { ...v, txid: tx.txid, blockHeight: tx.blockHeight ?? null, blockTime: tx.blockTime ?? null, confirmations: tx.confirmations ?? 0 };
+  // blockHeight/confirmations are rendered via innerHTML by the page — never
+  // pass endpoint-supplied strings through; the txid is the validated request
+  // txid, not whatever the response claims.
+  const conf = Number(tx.confirmations);
+  return { ...v, txid: String(revealTxid).toLowerCase(),
+    blockHeight: Number.isSafeInteger(tx.blockHeight) ? tx.blockHeight : null,
+    blockTime: Number.isSafeInteger(tx.blockTime) ? tx.blockTime : null,
+    confirmations: Number.isSafeInteger(conf) && conf >= 0 ? conf : 0 };
 }
 
 /* ---------------- seal certificate ---------------- */

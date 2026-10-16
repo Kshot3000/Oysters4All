@@ -13,6 +13,7 @@ import {
   submissionCommitment, verifySubmissionReveal, newSalt,
   planAward, buildAwardTx, planReclaim, buildReclaimTx,
   classifyBounty, verifyBountyTx, checkRewardGrains, checkDeadlineHeight,
+  fetchBountyUtxos,
   parsePRLToGrains, fmtPRL, pubkeyFromPriv,
   buildRefundScript, verifyControlBlock,
   builderTipGrainsFor, BUILDER_TIP_ADDRESS,
@@ -376,4 +377,31 @@ test("award signature is a real BIP-340 signature over the BIP-341 digest", () =
   assert.ok(verifyBountyTx(tx.hex, b).ok);
   // Cross-check the leaf hashes independently.
   assert.equal(bytesToHex(tapLeafHash(hexToBytes(b.awardScriptHex))).length, 64);
+});
+
+test("fetchBountyUtxos never passes an endpoint-supplied string confirmations through", async () => {
+  // The page renders confirmations via innerHTML and the Blockbook base is
+  // user-configurable — a hostile endpoint must not smuggle markup in a
+  // "numeric" field (same class as the shared fetchUtxos fix).
+  const b = forge();
+  const realFetch = globalThis.fetch;
+  const stub = (payload) => ({ ok: true, status: 200, text: async () => JSON.stringify(payload), json: async () => payload });
+  globalThis.fetch = async (url) => {
+    if (String(url).includes("/api/v2/utxo/")) return stub([{ txid: "ab".repeat(32), vout: 0, value: "2500000000", confirmations: "<svg onload=alert(1)>" }]);
+    if (String(url).includes("/api/v2/tx/")) return stub({ vout: [{ scriptPubKey: { hex: b.spkHex } }], blockHeight: 900000 });
+    throw new Error("unexpected " + url);
+  };
+  try {
+    const bad = await fetchBountyUtxos("https://evil.example", b);
+    assert.equal(bad.length, 1);
+    assert.equal(bad[0].confirmations, 0);
+    globalThis.fetch = async (url) => {
+      if (String(url).includes("/api/v2/utxo/")) return stub([{ txid: "ab".repeat(32), vout: 0, value: "2500000000", confirmations: 7 }]);
+      if (String(url).includes("/api/v2/tx/")) return stub({ vout: [{ scriptPubKey: { hex: b.spkHex } }], blockHeight: 900000 });
+      throw new Error("unexpected " + url);
+    };
+    const good = await fetchBountyUtxos("https://ok.example", b);
+    assert.equal(good[0].confirmations, 7);
+    assert.equal(good[0].fundingHeight, 900000);
+  } finally { globalThis.fetch = realFetch; }
 });

@@ -14,6 +14,7 @@ import {
   buildUnsignedBundle, parseUnsignedBundle, signBundle,
   verifyPartialSigs, combineMultisigSigs, serializeSpendTx, finalizeSpend,
   bytesToHex, hexToBytes, sha256,
+  fetchTxConfirmations,
 } from "../src/vault-core.js";
 import {
   schnorr, taggedHash, tapLeafHash, encodeBech32m, decodeBech32m,
@@ -505,4 +506,21 @@ test("multi-input spend: digests differ per input, all verify", () => {
   const p1 = signBundle(parsed, d, 1, hexToBytes(PRIVS[1]));
   const fin = finalizeSpend(parsed, d, [p0, p1]);
   assert.match(fin.txid, /^[0-9a-f]{64}$/);
+});
+
+test("fetchTxConfirmations never passes endpoint-supplied strings through", async () => {
+  // The Track tab renders confirmations and blockHeight via innerHTML and
+  // the Blockbook base is user-configurable — strings must become 0 / null.
+  const realFetch = globalThis.fetch;
+  const stub = (payload) => ({ ok: true, status: 200, text: async () => JSON.stringify(payload), json: async () => payload });
+  try {
+    globalThis.fetch = async () => stub({ confirmations: "<svg onload=alert(1)>", blockHeight: "<svg onload=alert(1)>" });
+    const bad = await fetchTxConfirmations("https://evil.example", "ab".repeat(32));
+    assert.equal(bad.confirmations, 0);
+    assert.equal(bad.blockHeight, null);
+    globalThis.fetch = async () => stub({ confirmations: 5, blockHeight: 900000 });
+    const good = await fetchTxConfirmations("https://ok.example", "ab".repeat(32));
+    assert.equal(good.confirmations, 5);
+    assert.equal(good.blockHeight, 900000);
+  } finally { globalThis.fetch = realFetch; }
 });

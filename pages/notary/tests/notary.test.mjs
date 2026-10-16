@@ -13,7 +13,7 @@ import {
   buildNotaryScript, planNotarization,
   buildCommitTx, buildRevealTxSigned,
   extractEnvelopes, verifyRevealWitness, verifyNotarizationWitness,
-  buildSealCertificate, addressToProgram,
+  buildSealCertificate, addressToProgram, verifyNotarizationOnChain,
   newMnemonic, walletFromMnemonic, bytesToHex, hexToBytes, schnorr,
 } from "../src/notary-core.js";
 import {
@@ -229,4 +229,32 @@ test("seal certificate carries the full audit trail", () => {
   assert.equal(cert.reveal.blockHeight, 120200);
   assert.equal(cert.envelope.marker, "prl-notary");
   assert.ok(JSON.parse(JSON.stringify(cert))); // JSON-serializable
+});
+
+test("verifyNotarizationOnChain never passes endpoint-supplied strings through", async () => {
+  // The page renders blockHeight/confirmations via innerHTML and the
+  // Blockbook base is user-configurable — a hostile endpoint returning
+  // string chain fields (or a forged response txid) must not reach the page.
+  const realFetch = globalThis.fetch;
+  const EVIL = "<svg onload=alert(1)>";
+  globalThis.fetch = async () => ({
+    ok: true, status: 200,
+    json: async () => ({ hex: reveal.hex, txid: EVIL, blockHeight: EVIL, blockTime: EVIL, confirmations: EVIL }),
+  });
+  try {
+    const v = await verifyNotarizationOnChain("https://evil.example", commit.txid, "test");
+    assert.equal(v.match, true);
+    assert.equal(v.confirmations, 0);
+    assert.equal(v.blockHeight, null);
+    assert.equal(v.blockTime, null);
+    assert.equal(v.txid, commit.txid); // the validated request txid, not the response's
+    globalThis.fetch = async () => ({
+      ok: true, status: 200,
+      json: async () => ({ hex: reveal.hex, txid: commit.txid, blockHeight: 900000, blockTime: 1760000000, confirmations: 12 }),
+    });
+    const good = await verifyNotarizationOnChain("https://ok.example", commit.txid, "test");
+    assert.equal(good.confirmations, 12);
+    assert.equal(good.blockHeight, 900000);
+    assert.equal(good.blockTime, 1760000000);
+  } finally { globalThis.fetch = realFetch; }
 });

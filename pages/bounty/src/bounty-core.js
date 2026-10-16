@@ -693,7 +693,10 @@ export async function fetchBountyUtxos(blockbookBase, bounty) {
         fundingHeight = txj.blockHeight;
       }
     } catch { /* tx lookup failed: scriptOk stays false */ }
-    out.push({ txid, vout, value, fundingHeight, confirmations: u.confirmations ?? 0, scriptOk });
+    // confirmations is rendered via innerHTML by the page — never let an
+    // endpoint-supplied string through; coerce like the shared fetchUtxos.
+    const conf = Number(u.confirmations);
+    out.push({ txid, vout, value, fundingHeight, confirmations: Number.isSafeInteger(conf) && conf >= 0 ? conf : 0, scriptOk });
   }
   return out;
 }
