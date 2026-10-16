@@ -405,3 +405,31 @@ test("fetchBountyUtxos never passes an endpoint-supplied string confirmations th
     assert.equal(good[0].fundingHeight, 900000);
   } finally { globalThis.fetch = realFetch; }
 });
+
+test("fetchBountyUtxos reads the script from Blockbook's FLAT vout.hex", async () => {
+  // Blockbook v2 Vout carries the script hex FLAT as `hex` (api/types.go);
+  // `scriptPubKey.hex` is btcd's nested shape. The pre-fix reader looked
+  // only under scriptPubKey, so scriptOk was false for EVERY real UTXO and
+  // a funded bounty always classified as awaiting-funding. Nested-only
+  // payloads still work via the fallback; a flat hex that differs is a
+  // real mismatch.
+  const b = forge();
+  const realFetch = globalThis.fetch;
+  const stub = (payload) => ({ ok: true, status: 200, text: async () => JSON.stringify(payload), json: async () => payload });
+  const run = async (vout) => {
+    globalThis.fetch = async (url) => {
+      if (String(url).includes("/api/v2/utxo/")) return stub([{ txid: "ab".repeat(32), vout: 0, value: "2500000000", confirmations: 7 }]);
+      if (String(url).includes("/api/v2/tx/")) return stub({ vout: [vout], blockHeight: 900000 });
+      throw new Error("unexpected " + url);
+    };
+    return fetchBountyUtxos("https://ok.example", b);
+  };
+  try {
+    const flat = await run({ value: "2500000000", n: 0, hex: b.spkHex, addresses: [b.address] });
+    assert.equal(flat[0].scriptOk, true, "flat Blockbook hex matches");
+    const wrong = await run({ value: "2500000000", n: 0, hex: "5120" + "ff".repeat(32), addresses: [b.address] });
+    assert.equal(wrong[0].scriptOk, false, "a different flat hex is a real mismatch");
+    const nested = await run({ value: "2500000000", n: 0, scriptPubKey: { hex: b.spkHex } });
+    assert.equal(nested[0].scriptOk, true, "btcd-nested fallback still accepted");
+  } finally { globalThis.fetch = realFetch; }
+});

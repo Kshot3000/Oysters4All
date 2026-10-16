@@ -172,7 +172,7 @@ async function main() {
       window.__qaLockTx = {
         txid: "${"aa".repeat(32)}",
         blockHeight: 900000, confirmations: 1234,
-        vout: [{ value: d.collateralGrains, scriptPubKey: { hex: d.vaultSpk } }],
+        vout: [{ value: d.collateralGrains, n: 0, hex: d.vaultSpk, addresses: [] }],
       };
       const T = __lendTest;
       T.set("lock-txid", "${"aa".repeat(32)}");

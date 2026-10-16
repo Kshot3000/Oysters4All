@@ -189,7 +189,7 @@ const stubTx = {
   txid: FUND_TXID,
   confirmations: 3,
   vin: [{ addresses: ["prl1pfunderplaceholder0000000000000000000000"] }],
-  vout: [{ n: 0, value: "150000000", scriptPubKey: { hex: "__OUTCOME0_SPK__", addresses: [] } }],
+  vout: [{ n: 0, value: "150000000", hex: "__OUTCOME0_SPK__", addresses: [] }],
 };
 async function stubFetch(url) {
   const u = String(url);

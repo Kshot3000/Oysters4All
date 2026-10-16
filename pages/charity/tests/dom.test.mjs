@@ -157,7 +157,7 @@ function bootApp() {
         if (txid === sandbox.__txid) {
           return resp({
             txid, blockHeight: 900040, confirmations: 10,
-            vout: [{ value: String(5 * 100000000), scriptPubKey: { addresses: [recip] } }],
+            vout: [{ value: String(5 * 100000000), n: 0, hex: "5120" + "00".repeat(32), addresses: [recip] }],
           });
         }
         return { ok: false, status: 404, text: async () => "{}" };
@@ -166,10 +166,11 @@ function bootApp() {
         return resp({
           address: recip,
           totalReceived: String(50 * 100000000),
-          txs: [{
+          txs: 1,
+          transactions: [{
             txid: sandbox.__txid || "ab".repeat(32),
             blockHeight: 900040, confirmations: 10,
-            vout: [{ value: String(50 * 100000000), scriptPubKey: { addresses: [recip] } }],
+            vout: [{ value: String(50 * 100000000), n: 0, hex: "5120" + "00".repeat(32), addresses: [recip] }],
           }],
         });
       }

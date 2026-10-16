@@ -472,6 +472,19 @@ export async function fetchTipHeight(blockbookBase) {
 }
 
 /**
+ * Addresses a Blockbook vout pays. Blockbook v2 puts them FLAT on the vout
+ * (`addresses`, api/types.go Vout) — there is no scriptPubKey object in
+ * Blockbook JSON; that nesting is btcd's getrawtransaction shape. The nested
+ * form is kept only as a fallback for endpoints that mimic it.
+ */
+export function voutAddresses(vo) {
+  if (!vo || typeof vo !== "object") return [];
+  if (Array.isArray(vo.addresses)) return vo.addresses;
+  const spk = vo.scriptPubKey || {};
+  return Array.isArray(spk.addresses) ? spk.addresses : [];
+}
+
+/**
  * GET-only campaign stats: address info + recent incoming payments.
  * Returns { address, receivedGrains, txCount, donations: [{ txid,
  * valueGrains, blockHeight, confirmations }] } — donations are the
@@ -493,7 +506,7 @@ export async function fetchCampaignStats(blockbookBase, address, pageSize = 20) 
     if (!/^[0-9a-f]{64}$/.test(txid)) continue;
     let valueGrains = 0;
     for (const vo of (tx.vout || [])) {
-      const addrs = (vo.scriptPubKey && vo.scriptPubKey.addresses) || [];
+      const addrs = voutAddresses(vo);
       if (addrs.map(String).some((a) => a.toLowerCase() === addr.toLowerCase())) {
         const v = Number(vo.value);
         if (Number.isSafeInteger(v) && v > 0) valueGrains += v;
@@ -542,7 +555,7 @@ export async function crossCheckReceipt(blockbookBase, receipt, campaign) {
   }
   let paidGrains = 0;
   for (const vo of (tx.vout || [])) {
-    const addrs = (vo.scriptPubKey && vo.scriptPubKey.addresses) || [];
+    const addrs = voutAddresses(vo);
     if (addrs.map(String).some((a) => a.toLowerCase() === campaign.recipient.toLowerCase())) {
       const v = Number(vo.value);
       if (Number.isSafeInteger(v) && v > 0) paidGrains += v;

@@ -13,7 +13,7 @@ import {
   classifyCampaign, formatDeadlineCountdown, countDonors,
   checkGoalGrains, checkRecipientAddress, checkDeadlineHeight,
   parsePRLToGrains, fmtPRL, organizerKeyFromInput,
-  fetchCampaignStats, fetchTipHeight,
+  fetchCampaignStats, fetchTipHeight, voutAddresses,
   DUST_GRAIN, GRAIN_PER_PRL, NETWORKS, PEARL_BLOCK_SECS,
   sha256, bytesToHex, hexToBytes, encodeBech32m, schnorr,
   signForXOnly, verifySchnorrSig,
@@ -295,8 +295,8 @@ test("fetchCampaignStats parses Blockbook address+txs (stubbed fetch)", async ()
             blockHeight: 900100,
             confirmations: 5,
             vout: [
-              { value: String(5 * GRAIN_PER_PRL), scriptPubKey: { addresses: [addr] } },
-              { value: String(2 * GRAIN_PER_PRL), scriptPubKey: { addresses: ["prl1p" + "00".repeat(30)] } },
+              { value: String(5 * GRAIN_PER_PRL), n: 0, hex: "5120" + "00".repeat(32), addresses: [addr] },
+              { value: String(2 * GRAIN_PER_PRL), n: 1, hex: "5120" + "11".repeat(32), addresses: ["prl1p" + "00".repeat(30)] },
             ],
           },
           {
@@ -304,7 +304,7 @@ test("fetchCampaignStats parses Blockbook address+txs (stubbed fetch)", async ()
             blockHeight: -1,
             confirmations: 0,
             vout: [
-              { value: String(2 * GRAIN_PER_PRL), scriptPubKey: { addresses: [addr] } },
+              { value: String(2 * GRAIN_PER_PRL), n: 0, hex: "5120" + "00".repeat(32), addresses: [addr] },
             ],
           },
           {
@@ -312,7 +312,7 @@ test("fetchCampaignStats parses Blockbook address+txs (stubbed fetch)", async ()
             blockHeight: 900101,
             confirmations: 4,
             vout: [
-              { value: String(9 * GRAIN_PER_PRL), scriptPubKey: { addresses: ["prl1p" + "11".repeat(30)] } },
+              { value: String(9 * GRAIN_PER_PRL), n: 0, hex: "5120" + "22".repeat(32), addresses: ["prl1p" + "11".repeat(30)] },
             ],
           },
         ],
@@ -344,7 +344,7 @@ test("crossCheckReceipt: proven / not proven reasons", async () => {
         txid: "ab".repeat(32),
         blockHeight: 900100,
         confirmations: 6,
-        vout: [{ value: String(5 * GRAIN_PER_PRL), scriptPubKey: { addresses: [c.recipient] } }],
+        vout: [{ value: String(5 * GRAIN_PER_PRL), n: 0, hex: "5120" + "00".repeat(32), addresses: [c.recipient] }],
       }), { status: 200 });
     }
     return new Response("{}", { status: 404 });
@@ -389,11 +389,22 @@ test("fetchCampaignStats reads the real Blockbook shape (txs is a count, array i
   globalThis.fetch = async () => new Response(JSON.stringify({
     address: addr, totalReceived: String(5 * GRAIN_PER_PRL), txs: 1,
     transactions: [{ txid: "ab".repeat(32), blockHeight: 900100, confirmations: 5,
-      vout: [{ value: String(5 * GRAIN_PER_PRL), scriptPubKey: { addresses: [addr] } }] }],
+      vout: [{ value: String(5 * GRAIN_PER_PRL), n: 0, hex: "5120" + "00".repeat(32), addresses: [addr] }] }],
   }), { status: 200 });
   try {
     const s = await fetchCampaignStats("https://x", addr);
     assert.equal(s.donations.length, 1);
     assert.equal(s.donations[0].valueGrains, 5 * GRAIN_PER_PRL);
   } finally { globalThis.fetch = realFetch; }
+});
+
+test("voutAddresses reads Blockbook's FLAT vout.addresses (scriptPubKey nesting is btcd's shape)", () => {
+  // api/types.go Vout: addresses is a flat field; there is no scriptPubKey
+  // object in Blockbook JSON. The pre-fix readers looked only under
+  // scriptPubKey, so donations/receipts never matched a real payload.
+  assert.deepEqual(voutAddresses({ addresses: ["prl1pa"], hex: "5120" }), ["prl1pa"]);
+  assert.deepEqual(voutAddresses({ scriptPubKey: { addresses: ["prl1pb"] } }), ["prl1pb"], "nested fallback kept");
+  assert.deepEqual(voutAddresses({ addresses: "nope" }), []);
+  assert.deepEqual(voutAddresses(null), []);
+  assert.deepEqual(voutAddresses({}), []);
 });

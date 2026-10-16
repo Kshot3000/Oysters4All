@@ -309,7 +309,7 @@
       const spkHex = S.contracts.map((c) => P.bytesToHex(c.spk));
       const found = [];
       for (const vout of tx.vout || []) {
-        const hex = vout.scriptPubKey && vout.scriptPubKey.hex;
+        const hex = vout.hex || (vout.scriptPubKey && vout.scriptPubKey.hex);
         const oi = spkHex.indexOf(hex);
         if (oi >= 0) {
           const val = Number(vout.value);

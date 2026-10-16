@@ -6791,7 +6791,7 @@ zoo`.split("\n");
       try {
         const txj = await bountyGet(blockbookBase, `/api/v2/tx/${txid}`);
         const vo = txj && Array.isArray(txj.vout) ? txj.vout[vout] : null;
-        const spk = vo && vo.scriptPubKey && vo.scriptPubKey.hex ? String(vo.scriptPubKey.hex).toLowerCase() : "";
+        const spk = vo && typeof vo.hex === "string" && vo.hex ? vo.hex.toLowerCase() : vo && vo.scriptPubKey && vo.scriptPubKey.hex ? String(vo.scriptPubKey.hex).toLowerCase() : "";
         scriptOk = spk === want;
         if (txj && typeof txj.blockHeight === "number" && txj.blockHeight >= 0) {
           fundingHeight = txj.blockHeight;

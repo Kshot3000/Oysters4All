@@ -225,7 +225,7 @@
       const tx = await P.fetchTxStatus(bb(), txid);
       const out = (tx.vout || [])[vout];
       if (!out) throw new Error("vout " + vout + " not found in tx");
-      const hex = (out.scriptPubKey && out.scriptPubKey.hex || "").toLowerCase();
+      const hex = (out.hex || (out.scriptPubKey && out.scriptPubKey.hex) || "").toLowerCase();
       if (hex !== d.vaultSpk.toLowerCase()) {
         throw new Error("that output does not pay the vault script — expected the collateral vault, found something else");
       }

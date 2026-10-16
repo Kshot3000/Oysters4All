@@ -242,7 +242,7 @@ test("lock: on-chain scan verifies the vault output", () => {
     txid: LOCK_TXID,
     blockHeight: 900000,
     confirmations: 1234,
-    vout: [{ value: d.collateralGrains, scriptPubKey: { hex: d.vaultSpk } }],
+    vout: [{ value: d.collateralGrains, n: 0, hex: d.vaultSpk, addresses: [] }],
   };
   T.set("lock-blockbook", "https://bb.example");
   T.set("lock-txid", LOCK_TXID);

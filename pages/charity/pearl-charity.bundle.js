@@ -73,6 +73,7 @@ var PearlCharity = (() => {
     verifyDescriptor: () => verifyDescriptor,
     verifyReceiptHash: () => verifyReceiptHash,
     verifySchnorrSig: () => verifySchnorrSig,
+    voutAddresses: () => voutAddresses,
     walletFromMnemonic: () => walletFromMnemonic,
     walletFromPriv: () => walletFromPriv,
     walletFromWIF: () => walletFromWIF,
@@ -6184,6 +6185,12 @@ zoo`.split("\n");
     if (!Number.isSafeInteger(h) || h < 0) throw new Error("blockbook returned a bad tip height");
     return h;
   }
+  function voutAddresses(vo) {
+    if (!vo || typeof vo !== "object") return [];
+    if (Array.isArray(vo.addresses)) return vo.addresses;
+    const spk = vo.scriptPubKey || {};
+    return Array.isArray(spk.addresses) ? spk.addresses : [];
+  }
   async function fetchCampaignStats(blockbookBase, address, pageSize = 20) {
     const addr = String(address || "").trim();
     if (!addr) throw new Error("bad address");
@@ -6198,7 +6205,7 @@ zoo`.split("\n");
       if (!/^[0-9a-f]{64}$/.test(txid)) continue;
       let valueGrains = 0;
       for (const vo of tx.vout || []) {
-        const addrs = vo.scriptPubKey && vo.scriptPubKey.addresses || [];
+        const addrs = voutAddresses(vo);
         if (addrs.map(String).some((a) => a.toLowerCase() === addr.toLowerCase())) {
           const v = Number(vo.value);
           if (Number.isSafeInteger(v) && v > 0) valueGrains += v;
@@ -6238,7 +6245,7 @@ zoo`.split("\n");
     }
     let paidGrains = 0;
     for (const vo of tx.vout || []) {
-      const addrs = vo.scriptPubKey && vo.scriptPubKey.addresses || [];
+      const addrs = voutAddresses(vo);
       if (addrs.map(String).some((a) => a.toLowerCase() === campaign.recipient.toLowerCase())) {
         const v = Number(vo.value);
         if (Number.isSafeInteger(v) && v > 0) paidGrains += v;
