@@ -46,7 +46,7 @@ the script assembler/disassembler, and witness construction.
 
 ## Tests
 
-39 tests, 158 assertions — run from this directory:
+45 tests — run from this directory:
 
 ```sh
 node --no-warnings --loader ./tests/loader.mjs --test \

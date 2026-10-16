@@ -88,6 +88,14 @@ test("validatePaywallSpec: good spec, grain-exact price", () => {
   assert.equal(FUNDER.address, PIN_FUNDER_ADDR);
 });
 
+test("validatePaywallSpec: price cap is Pearl's real 2.1B PRL supply, not Bitcoin's 21M", () => {
+  // Upstream node/btcutil/const.go: MaxGrain = 21e9 * GrainPerPearl.
+  assert.equal(P.MAX_PRICE_PRL, 2_100_000_000);
+  const s = goodSpec({ pricePRL: "100000000" }); // 100M PRL — valid on Pearl
+  assert.equal(s.priceGrains, 10_000_000_000_000_000n);
+  assert.throws(() => goodSpec({ pricePRL: "2100000001" }), /sanity cap/);
+});
+
 test("validatePaywallSpec: rejects bad inputs loudly", () => {
   assert.throws(() => goodSpec({ pricePRL: "0" }), /positive/);
   assert.throws(() => goodSpec({ pricePRL: "-1" }), /invalid PRL amount/);

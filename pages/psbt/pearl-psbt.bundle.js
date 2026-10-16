@@ -5050,7 +5050,7 @@ zoo`.split("\n");
     if (!/^\d+$/.test(t)) throw new Error("amount must be a whole number of grains (no decimals)");
     const v = BigInt(t.replace(/^0+(?=\d)/, ""));
     if (v <= 0n) throw new Error("amount must be > 0 grains");
-    if (v > 21000000n * BigInt(GRAIN_PER_PRL)) throw new Error("amount exceeds max PRL supply");
+    if (v > 2100000000n * BigInt(GRAIN_PER_PRL)) throw new Error("amount exceeds max PRL supply");
     return v;
   }
   function grainsToPrl(g) {

@@ -61,7 +61,7 @@ node build.mjs   # -> pearl-payjoin.bundle.js (committed; plain IIFE, no globalN
 node --no-warnings --loader ./tests/loader.mjs --test 'tests/*.test.mjs'
 ```
 
-- `tests/payjoin.test.mjs` — 43 tests: amount/rate parsing, `prl1` handling,
+- `tests/payjoin.test.mjs` — 47 tests: amount/rate parsing, `prl1` handling,
   offer + template validation, the full lab E2E with fixed test keys (fee math
   pinned to the grain: 308 → 510, deduction 0/148 cases), every tamper case
   failing its exact expected check, and the sign flow with per-input witness

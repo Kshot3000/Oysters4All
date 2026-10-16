@@ -5991,7 +5991,7 @@ zoo`.split("\n");
   // src/paywall-core.js
   var PAYWALL_VERSION = 1;
   var TOKEN_DOMAIN = "PearlPaywallToken/v1";
-  var MAX_PRICE_PRL = 21e6;
+  var MAX_PRICE_PRL = 21e8;
   var DEFAULT_BLOCKBOOK = "https://blockbook.pearlresearch.ai";
   var HEX64 = /^[0-9a-fA-F]{64}$/;
   var HEX128 = /^[0-9a-fA-F]{128}$/;

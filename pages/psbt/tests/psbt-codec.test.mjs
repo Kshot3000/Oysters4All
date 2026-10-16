@@ -195,6 +195,13 @@ test("parseGrains is exact", () => {
   assert.throws(() => C.parseGrains("abc"), /whole number/);
 });
 
+test("parseGrains caps at Pearl's real 2.1B PRL supply, not Bitcoin's 21M", () => {
+  // Upstream node/btcutil/const.go: MaxGrain = 21e9 * GrainPerPearl.
+  assert.equal(C.parseGrains("10000000000000000"), 10_000_000_000_000_000n); // 100M PRL
+  assert.equal(C.parseGrains("210000000000000000"), 210_000_000_000_000_000n); // exactly 2.1B PRL
+  assert.throws(() => C.parseGrains("210000000100000000"), /max PRL supply/);
+});
+
 /* ---------- script assembler ---------- */
 
 test("asm templates assemble correctly", () => {

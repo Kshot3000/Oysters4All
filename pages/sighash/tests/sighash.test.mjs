@@ -8,6 +8,7 @@ import {
   SIGHASH_FLAGS, taggedHash, sha256, bytesToHex, hexToBytes, concat, u64le, varint,
   bip340Sign, bip340Verify, bip340Pubkey, parseUnsignedTx,
   sealScenario, verifySealed, demoScenario, p2trSpk, grainsToPRL, SEAL_DOMAIN,
+  parseGrains, MAX_GRAINS,
 } from "../src/sighash-core.js";
 import { BIP341_KEYPATH as V341 } from "../src/vectors-bip341.js";
 import { BIP340_VECTORS as V340 } from "../src/vectors-bip340.js";
@@ -328,5 +329,12 @@ describe("helpers", () => {
     assert.equal(d.inputs.length, 2);
     assert.equal(d.outputs.length, 2);
     assert.equal(d.hashType, 0x00);
+  });
+  it("parseGrains caps at Pearl's real 2.1B PRL supply, not Bitcoin's 21M", () => {
+    // Upstream node/btcutil/const.go: MaxGrain = 21e9 * GrainPerPearl.
+    assert.equal(MAX_GRAINS, 2_100_000_000n * 100_000_000n);
+    assert.equal(parseGrains("10000000000000000", "amt"), 10_000_000_000_000_000n); // 100M PRL
+    assert.equal(parseGrains(MAX_GRAINS.toString(), "amt"), MAX_GRAINS);
+    assert.throws(() => parseGrains((MAX_GRAINS + 1n).toString(), "amt"), /money supply/);
   });
 });

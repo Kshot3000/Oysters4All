@@ -402,6 +402,12 @@ describe("primitives", () => {
     assert.equal(H.parseGrains("123", "x").toString(), "123");
     assert.throws(() => H.parseGrains("1.5", "x"), /grains/);
   });
+  it("parseGrains caps at Pearl's real 2.1B PRL supply, not Bitcoin's 21M", () => {
+    // Upstream node/btcutil/const.go: MaxGrain = 21e9 * GrainPerPearl.
+    assert.equal(H.MAX_GRAINS, 2_100_000_000n * 100_000_000n);
+    assert.equal(H.parseGrains("10000000000000000", "x").toString(), "10000000000000000"); // 100M PRL
+    assert.throws(() => H.parseGrains("210000000100000000", "x"), /max supply/);
+  });
   it("tapTweakPrivkey matches BIP-341 key-path tweak", () => {
     const t = H.tapTweakPrivkey("11".repeat(32));
     assert.match(t.tweakedPrivHex, /^[0-9a-f]{64}$/);

@@ -54,7 +54,9 @@ export const VERSION = 1;
 export { bytesToHex, hexToBytes }; // re-exported for the desk UI + tests
 export const K_MAX = 2323; // per-group recipient limit (BIP-352 v1.1.0)
 export const GRAIN_PER_PRL = 100_000_000n;
-export const MAX_GRAINS = 21_000_000n * GRAIN_PER_PRL;
+// Pearl's max money is 2.1B PRL, not Bitcoin's 21M: upstream
+// node/btcutil/const.go MaxGrain = 21e9 * GrainPerPearl.
+export const MAX_GRAINS = 2_100_000_000n * GRAIN_PER_PRL;
 export const SP_HRP_MAIN = "sp";
 export const SP_HRP_TEST = "tsp";
 // NUMS point H x-coordinate (BIP-341): inputs using H as internal key are skipped.

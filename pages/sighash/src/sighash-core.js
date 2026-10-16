@@ -37,7 +37,10 @@ import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 export const VERSION = 1;
 export const SEAL_DOMAIN = "pearl-sighash:v1";
 export const GRAIN_PER_PRL = 100_000_000n;
-export const MAX_GRAINS = 21_000_000n * GRAIN_PER_PRL;
+// Pearl's max money is 2.1B PRL, not Bitcoin's 21M: upstream
+// node/btcutil/const.go MaxGrain = 21e9 * GrainPerPearl (totalSupply in
+// node/blockchain/validate.go is likewise 2100000000 * GrainPerPearl).
+export const MAX_GRAINS = 2_100_000_000n * GRAIN_PER_PRL;
 export const ATTRIBUTION = {
   x: "@kshot9000",
   xUrl: "https://x.com/kshot9000",
@@ -115,7 +118,7 @@ export function parseGrains(v, what) {
   let g;
   try { g = BigInt(String(v).trim()); } catch { throw new Error(`bad ${what}: not an integer number of grains`); }
   if (g < 0n) throw new Error(`bad ${what}: negative amount`);
-  if (g > MAX_GRAINS) throw new Error(`bad ${what}: exceeds 21M PRL money supply`);
+  if (g > MAX_GRAINS) throw new Error(`bad ${what}: exceeds the 2,100,000,000 PRL money supply`);
   return g;
 }
 /** txid in display (big-endian) hex -> little-endian bytes for the outpoint. */

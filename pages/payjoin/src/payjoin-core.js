@@ -78,7 +78,9 @@ export const PAYJOIN_V = 2; // lab query-string version per desk convention
 export const DUST = DUST_GRAIN; // 546 grains — P2TR dust floor
 export const SEQ = 0xffffffff;
 export const TX_VERSION = 1;
-export const MAX_MONEY = 21_000_000n * BigInt(GRAIN_PER_PRL);
+// Pearl's max money is 2.1B PRL, not Bitcoin's 21M: upstream
+// node/btcutil/const.go MaxGrain = 21e9 * GrainPerPearl.
+export const MAX_MONEY = 2_100_000_000n * BigInt(GRAIN_PER_PRL);
 export const ATTRIBUTION = Object.freeze({
   x: "@kshot9000",
   prl: "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d",
@@ -152,7 +154,7 @@ export function parseGrains(str) {
     g = BigInt(m[2]);
   }
   if (g <= 0n) fail("bad-amount", "amount must be positive");
-  if (g > MAX_MONEY) fail("bad-amount", "amount exceeds 21,000,000 PRL");
+  if (g > MAX_MONEY) fail("bad-amount", "amount exceeds 2,100,000,000 PRL");
   return g;
 }
 

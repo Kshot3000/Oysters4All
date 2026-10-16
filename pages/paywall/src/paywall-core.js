@@ -55,7 +55,7 @@ export {
 
 export const PAYWALL_VERSION = 1;
 export const TOKEN_DOMAIN = "PearlPaywallToken/v1";
-export const MAX_PRICE_PRL = 21_000_000; // sanity cap, whole supply
+export const MAX_PRICE_PRL = 2_100_000_000; // sanity cap, whole supply (upstream MaxGrain = 21e9 * GrainPerPearl)
 export const DEFAULT_BLOCKBOOK = "https://blockbook.pearlresearch.ai";
 
 const HEX64 = /^[0-9a-fA-F]{64}$/;

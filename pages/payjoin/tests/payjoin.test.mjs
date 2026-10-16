@@ -99,8 +99,15 @@ describe("amounts & rates", () => {
     refused(() => P.parseGrains("0"), "bad-amount");
     refused(() => P.parseGrains("1.123456789 PRL"), "bad-amount");
     refused(() => P.parseGrains("1.5"), "bad-amount"); // grains path: no decimals
-    refused(() => P.parseGrains("99999999 PRL"), "bad-amount"); // > 21M
+    refused(() => P.parseGrains("2100000001 PRL"), "bad-amount"); // > 2.1B PRL supply
     refused(() => P.parseGrains("abc"), "bad-amount");
+  });
+  it("parseGrains accepts amounts up to Pearl's real 2.1B PRL supply", () => {
+    // Upstream node/btcutil/const.go: MaxGrain = 21e9 * GrainPerPearl — the
+    // old 21M cap was Bitcoin's, and refused valid Pearl amounts.
+    assert.equal(P.parseGrains("99999999 PRL"), 9_999_999_900_000_000n);
+    assert.equal(P.parseGrains("2100000000 PRL"), 210_000_000_000_000_000n);
+    assert.equal(P.MAX_MONEY, 210_000_000_000_000_000n);
   });
   it("parseRate", () => {
     assert.deepEqual(P.parseRate("2"), { num: 2n, den: 1n });
