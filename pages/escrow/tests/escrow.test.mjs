@@ -16,6 +16,7 @@ import {
   scriptPathSigDigestEx, signForXOnly, verifySchnorrSig,
   combineReleaseSigs, buildScriptPathSpend, planSpend, spendVBytes,
   serviceFeeGrainsFor, SERVICE_FEE_BPS, SERVICE_FEE_ADDRESS,
+  decimalToRational, ceilFeeGrains,
   addressToProgram,
   bytesToHex, hexToBytes, schnorr, sha256, dblSha, convertBits,
   encodeBech32m, decodeBech32m, p2trScriptPubKey, txidLE,
@@ -544,3 +545,41 @@ function txidOfBase(hex) {
   const base = Uint8Array.from([...b.slice(0, 4), ...b.slice(witStart, witEnd), ...b.slice(o, o + 4)]);
   return bytesToHex(dblSha(base).reverse());
 }
+
+/* ---------- exact decimal fee pricing (float-ceil regression) ---------- */
+
+test("ceilFeeGrains: exact decimal pricing, no float overcharge", () => {
+  // covenant-leaf shapes the float form priced a grain high
+  assert.equal(ceilFeeGrains(190, 1.1), 209);
+  assert.equal(ceilFeeGrains(190, 2.2), 418);
+  assert.equal(ceilFeeGrains(190, 4.4), 836);
+  assert.equal(ceilFeeGrains(180, 1.1), 198);
+  assert.equal(ceilFeeGrains(205, 2.2), 451);
+  // string rates price identically to numeric rates
+  assert.equal(ceilFeeGrains(190, "1.1"), 209);
+  assert.deepEqual(decimalToRational("2.2", "fee rate"), { num: 22n, den: 10n });
+  // genuine fractions still ceil up; integer rates unchanged
+  assert.equal(ceilFeeGrains(137, 1.1), 151); // 150.7 -> 151
+  assert.equal(ceilFeeGrains(258, 2), 516);
+  // garbage and non-positive rates are refused
+  assert.throws(() => ceilFeeGrains(100, "abc"), /finite decimal/);
+  assert.throws(() => ceilFeeGrains(100, 0), /must be positive/);
+  assert.throws(() => ceilFeeGrains(100, -1.1), /must be positive/);
+});
+
+test("planSpend: a 1-of-3 covenant leaf at 1.1 g/vB pays the exact 209-grain fee", () => {
+  // planSpend is the shared planner: a covenant signing round passes its
+  // own leaf (scriptLen 105, worst-case stack [64,0,0], control 33), whose
+  // payment + change shape is 190 vB — the float fee priced it 210.
+  const program = new Uint8Array(32).fill(7);
+  const plan = planSpend({
+    inputValue: 100_000 + 209 + 10_000,
+    payments: [{ program, value: 100_000 }],
+    feeRateGrainsPerVByte: 1.1,
+    scriptLen: 105, controlLen: 33, stackLens: [64, 0, 0],
+  });
+  assert.equal(plan.vBytes, 190);
+  assert.equal(plan.fee, 209);
+  assert.equal(plan.outputs.length, 2); // payment + change
+  assert.equal(100_000 + plan.fee + plan.change, 100_000 + 209 + 10_000);
+});

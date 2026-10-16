@@ -6074,26 +6074,55 @@ zoo`.split("\n");
     const base = 4 + 1 + 41 + 1 + nOut * 43 + 4;
     return Math.ceil((base * 3 + (base + 2 + wit)) / 4);
   }
-  function planSpend({ inputValue, payments, feeRateGrainsPerVByte, scriptLen, controlLen, stackLens }) {
+  function decimalToRational(x, name) {
+    const s = String(x ?? "").trim();
+    const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+    if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+    const [, sign, intPart, fracPart = "", expPart] = m;
+    let num2 = BigInt(intPart + fracPart);
+    let den = 10n ** BigInt(fracPart.length);
+    const exp = expPart ? BigInt(expPart) : 0n;
+    if (exp >= 0n) num2 *= 10n ** exp;
+    else den *= 10n ** -exp;
+    if (sign === "-") num2 = -num2;
+    return { num: num2, den };
+  }
+  function ceilFeeGrains(vBytes, rateGrainsPerVByte) {
+    if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("bad vBytes for fee");
+    const r = decimalToRational(rateGrainsPerVByte, "fee rate");
+    if (r.num <= 0n) throw new Error("fee rate must be positive");
+    const num2 = BigInt(vBytes) * r.num;
+    const grains = (num2 + r.den - 1n) / r.den;
+    if (grains > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("fee exceeds safe integer range");
+    return Number(grains);
+  }
+  function planSpend({ inputValue, payments, feeRateGrainsPerVByte, scriptLen, controlLen, stackLens, serviceFeeGrains = 0, serviceFeeProgram = null }) {
     if (!Number.isSafeInteger(inputValue) || inputValue <= 0) throw new Error("bad input value");
     if (!Array.isArray(payments) || payments.length === 0) throw new Error("need at least one payment");
+    const serviceFee = Number(serviceFeeGrains);
+    if (!Number.isSafeInteger(serviceFee) || serviceFee < 0 || serviceFee > 0 && serviceFee < DUST_GRAIN)
+      throw new Error("bad service fee");
+    if (serviceFee > 0 && (!(serviceFeeProgram instanceof Uint8Array) || serviceFeeProgram.length !== 32))
+      throw new Error("service fee program must be 32 bytes");
+    const allPayments = payments.map((p) => ({ program: p.program, value: p.value }));
+    if (serviceFee > 0) allPayments.push({ program: serviceFeeProgram, value: serviceFee, serviceFee: true });
     let paySum = 0;
-    for (const p of payments) {
+    for (const p of allPayments) {
       if (!(p.program instanceof Uint8Array) || p.program.length !== 32) throw new Error("payment program must be 32 bytes");
       if (!Number.isSafeInteger(p.value) || p.value < DUST_GRAIN) throw new Error(`payment below dust (${DUST_GRAIN} grains)`);
       paySum += p.value;
     }
     if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) throw new Error("bad fee rate");
     const vbytes = (nOut) => spendVBytes({ nOut, scriptLen, controlLen, stackLens });
-    const feeFor = (nOut) => Math.ceil(vbytes(nOut) * feeRateGrainsPerVByte);
+    const feeFor = (nOut) => ceilFeeGrains(vbytes(nOut), feeRateGrainsPerVByte);
     const need = (f) => paySum + f;
-    let fee = feeFor(payments.length + 1);
+    let fee = feeFor(allPayments.length + 1);
     let change = inputValue - need(fee);
-    let outputs = payments.map((p) => ({ program: p.program, value: p.value }));
+    let outputs = allPayments;
     if (change >= DUST_GRAIN) {
       outputs.push({ program: null, value: change, change: true });
     } else {
-      fee = feeFor(payments.length);
+      fee = feeFor(allPayments.length);
       change = inputValue - need(fee);
       if (change < 0) throw new Error(`insufficient funds: need ${need(fee)} grains, have ${inputValue}`);
       if (change > 0) {
@@ -6102,7 +6131,7 @@ zoo`.split("\n");
       }
     }
     if (change < 0) throw new Error(`insufficient funds: need ${need(fee)} grains, have ${inputValue}`);
-    return { outputs, fee, vBytes: vbytes(outputs.length), change };
+    return { outputs, fee, vBytes: vbytes(outputs.length), change, serviceFeeGrains: serviceFee };
   }
   function scriptAsm(script) {
     const names = { 82: "2", 117: "DROP", 135: "EQUAL", 136: "EQUALVERIFY", 168: "SHA256", 172: "CHECKSIG", 186: "CHECKSIGADD", 177: "CLTV" };

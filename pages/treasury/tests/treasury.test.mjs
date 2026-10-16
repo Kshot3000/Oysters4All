@@ -298,3 +298,32 @@ test("audit CSV: spreadsheet formula-injection guard (CWE-1236)", () => {
   assert.ok(c.includes("'@SUM(1+1)"), "detail formula cell prefixed");
   assert.ok(!/,=2\+2/.test(c), "no raw formula cell");
 });
+
+/* ---------- exact decimal fee pricing (float-ceil regression) ---------- */
+
+test("ceilFeeGrains: exact decimal pricing, no float overcharge", () => {
+  assert.equal(T.ceilFeeGrains(190, 1.1), 209);
+  assert.equal(T.ceilFeeGrains(190, 2.2), 418);
+  assert.equal(T.ceilFeeGrains(180, 1.1), 198);
+  assert.equal(T.ceilFeeGrains(205, 2.2), 451);
+  assert.equal(T.ceilFeeGrains(190, "1.1"), 209);
+  assert.deepEqual(T.decimalToRational("2.2", "fee rate"), { num: 22n, den: 10n });
+  assert.equal(T.ceilFeeGrains(137, 1.1), 151); // genuine fraction ceils up
+  assert.throws(() => T.ceilFeeGrains(100, "abc"), /finite decimal/);
+  assert.throws(() => T.ceilFeeGrains(100, 0), /must be positive/);
+});
+
+test("selectUtxoForProposal: 1-of-3 vault at 1.1 g/vB prices the exact 209-grain fee, matching the round", () => {
+  const { covenant } = T.createCovenant({ m: 1, keyInputs: XONLY, network: NET });
+  const amount = 100_000;
+  const utxo = { txid: "cd".repeat(32), vout: 0, value: amount + 209 + 5_000 };
+  const sel = T.selectUtxoForProposal(covenant, [utxo], amount, 1.1);
+  assert.equal(sel.vBytes, 190);
+  assert.equal(sel.fee, 209); // float Math.ceil(190 * 1.1) priced 210
+  // The charged round fee (escrow planSpend) agrees with the selector exactly.
+  const round = T.buildSigningRound(covenant, NET, {
+    utxo, payments: [{ address: PAYEE, valueGrains: amount }], feeRateGrainsPerVByte: 1.1,
+  });
+  assert.equal(round.feeGrains, sel.fee);
+  assert.equal(round.vBytes, sel.vBytes);
+});

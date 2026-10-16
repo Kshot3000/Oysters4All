@@ -394,6 +394,48 @@ export function serviceFeeGrainsFor(releasedGrains, network) {
   return fee >= DUST_GRAIN ? fee : 0;
 }
 
+
+/* ---------------- exact decimal fee pricing ---------------- */
+
+/* Exact decimal fee pricing (fleet pattern, first shipped in Pearl Fees):
+ * a fee rate is read through String(), whose shortest round-trip form
+ * recovers the decimal the user typed, then ceil(vBytes x rate) is
+ * computed in BigInt rational arithmetic. The old float form in planSpend
+ * — Math.ceil(vBytes * rate) — overcharged whenever the float product of
+ * an exact-integer fee landed a hair above it. Escrow's own 2-of-3 leaf
+ * is near-fixed and does not trigger at the standard rates, but planSpend
+ * is the shared planner for covenant leaves, whose script size sweeps
+ * with the cosigner count: a 1-of-3 covenant signing round (190 vB,
+ * payment + change) at 1.1 g/vB priced 210 grains instead of 209, a
+ * 2-of-5 no-change round (180 vB) at 1.1 priced 199 instead of 198, and
+ * a 3-of-6 no-change round (205 vB) at 2.2 priced 452 instead of 451
+ * (75 overcharges across 1,632 realistic covenant shapes — every m-of-n
+ * with n <= 16, 1-2 outputs, at 1.1/2.2/4.4/1.5/3.3/0.5). Treasury's
+ * proposal selector prices the same covenant vBytes and carries the
+ * same helper, so selector and planner agree exactly. */
+export function decimalToRational(x, name) {
+  const s = String(x ?? "").trim();
+  const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+  if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+  const [, sign, intPart, fracPart = "", expPart] = m;
+  let num = BigInt(intPart + fracPart);
+  let den = 10n ** BigInt(fracPart.length);
+  const exp = expPart ? BigInt(expPart) : 0n;
+  if (exp >= 0n) num *= 10n ** exp; else den *= 10n ** -exp;
+  if (sign === "-") num = -num;
+  return { num, den };
+}
+
+export function ceilFeeGrains(vBytes, rateGrainsPerVByte) {
+  if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("bad vBytes for fee");
+  const r = decimalToRational(rateGrainsPerVByte, "fee rate");
+  if (r.num <= 0n) throw new Error("fee rate must be positive");
+  const num = BigInt(vBytes) * r.num;
+  const grains = (num + r.den - 1n) / r.den;
+  if (grains > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("fee exceeds safe integer range");
+  return Number(grains);
+}
+
 /** Plan a spend: pick outputs, compute fee from the real witness size, and
  *  fold dust change into the fee. Throws on insufficient funds.
  *  serviceFeeGrains / serviceFeeProgram (optional): the disclosed release
@@ -420,7 +462,7 @@ export function planSpend({ inputValue, payments, feeRateGrainsPerVByte, scriptL
   }
   if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) throw new Error("bad fee rate");
   const vbytes = (nOut) => spendVBytes({ nOut, scriptLen, controlLen, stackLens });
-  const feeFor = (nOut) => Math.ceil(vbytes(nOut) * feeRateGrainsPerVByte);
+  const feeFor = (nOut) => ceilFeeGrains(vbytes(nOut), feeRateGrainsPerVByte);
   const need = (f) => paySum + f;
   // Try with a change output first.
   let fee = feeFor(allPayments.length + 1);

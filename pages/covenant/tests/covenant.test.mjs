@@ -258,3 +258,31 @@ test("round JSON round-trips; tampering with outputs is caught", () => {
   assert.throws(() => parseRound("{not json", net), /not valid JSON/);
   assert.throws(() => parseRound(JSON.stringify({ kind: "nope" }), net), /not a Pearl Covenant/);
 });
+
+/* ---------- exact decimal fee pricing (float-ceil regression) ---------- */
+
+test("signing round: 1-of-3 payment + change at 1.1 g/vB pays the exact 209-grain fee", () => {
+  const { covenant } = makeCovenant(1, [0, 1, 2]);
+  const amount = 100_000;
+  const round = buildSigningRound(covenant, net, {
+    utxo: { txid: "aa".repeat(32), vout: 0, value: amount + 209 + 10_000 },
+    payments: [{ address: covenant.address, valueGrains: amount }],
+    feeRateGrainsPerVByte: 1.1,
+  });
+  assert.equal(round.vBytes, 190);
+  assert.equal(round.feeGrains, 209); // float Math.ceil(190 * 1.1) priced 210
+  assert.equal(round.outputs.length, 2);
+});
+
+test("signing round: 2-of-5 no-change at 1.1 g/vB pays the exact 198-grain fee", () => {
+  const { covenant } = makeCovenant(2, [0, 1, 2, 3, 4]);
+  const amount = 100_000;
+  const round = buildSigningRound(covenant, net, {
+    utxo: { txid: "bb".repeat(32), vout: 0, value: amount + 198 },
+    payments: [{ address: covenant.address, valueGrains: amount }],
+    feeRateGrainsPerVByte: 1.1,
+  });
+  assert.equal(round.vBytes, 180);
+  assert.equal(round.feeGrains, 198); // float Math.ceil(180 * 1.1) priced 199
+  assert.equal(round.outputs.length, 1);
+});

@@ -270,6 +270,43 @@ export function parseProposal(json, network) {
 
 /* ---------------- proposal -> covenant signing round bridge ---------------- */
 
+
+/* ---------------- exact decimal fee pricing ---------------- */
+
+/* Exact decimal fee pricing (fleet pattern, first shipped in Pearl Fees):
+ * a fee rate is read through String(), whose shortest round-trip form
+ * recovers the decimal the user typed, then ceil(vBytes x rate) is
+ * computed in BigInt rational arithmetic. The old float form in
+ * selectUtxoForProposal — Math.ceil(vBytes * rate) — overcharged
+ * whenever the float product of an exact-integer fee landed a hair
+ * above it: a 1-of-3 covenant vault (190 vB, payment + change) at
+ * 1.1 g/vB priced 210 grains instead of 209 (75 overcharges across
+ * 1,632 realistic covenant shapes). The signing round itself prices
+ * through escrow-core's planSpend, which carries the same helper, so
+ * the selector's fee and the round's charged fee agree exactly. */
+export function decimalToRational(x, name) {
+  const s = String(x ?? "").trim();
+  const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+  if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+  const [, sign, intPart, fracPart = "", expPart] = m;
+  let num = BigInt(intPart + fracPart);
+  let den = 10n ** BigInt(fracPart.length);
+  const exp = expPart ? BigInt(expPart) : 0n;
+  if (exp >= 0n) num *= 10n ** exp; else den *= 10n ** -exp;
+  if (sign === "-") num = -num;
+  return { num, den };
+}
+
+export function ceilFeeGrains(vBytes, rateGrainsPerVByte) {
+  if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("bad vBytes for fee");
+  const r = decimalToRational(rateGrainsPerVByte, "fee rate");
+  if (r.num <= 0n) throw new Error("fee rate must be positive");
+  const num = BigInt(vBytes) * r.num;
+  const grains = (num + r.den - 1n) / r.den;
+  if (grains > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("fee exceeds safe integer range");
+  return Number(grains);
+}
+
 /**
  * Pick the smallest vault UTXO that covers amount + exact planned fee.
  * Uses covenantSpendVBytes (worst-case witness: m sigs + n-m empties) for
@@ -281,8 +318,8 @@ export function selectUtxoForProposal(covenant, utxos, amountGrains, feeRateGrai
   }
   const vBytes2 = covenantSpendVBytes(covenant, 2); // payment + change
   const vBytes1 = covenantSpendVBytes(covenant, 1); // payment, no change
-  const fee2 = Math.ceil(vBytes2 * feeRateGrainsPerVByte);
-  const fee1 = Math.ceil(vBytes1 * feeRateGrainsPerVByte);
+  const fee2 = ceilFeeGrains(vBytes2, feeRateGrainsPerVByte);
+  const fee1 = ceilFeeGrains(vBytes1, feeRateGrainsPerVByte);
   const cand = (utxos || [])
     .filter((u) => Number.isSafeInteger(u.value) && u.value > 0 && /^[0-9a-f]{64}$/i.test(u.txid || ""))
     .sort((a, b) => a.value - b.value);

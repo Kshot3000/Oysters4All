@@ -37,10 +37,10 @@ var PearlQuorum = (() => {
     buildQuorumScript: () => buildQuorumScript,
     bytesToHex: () => bytesToHex,
     canonicalJson: () => canonicalJson,
-    ceilFeeGrains: () => ceilFeeGrains2,
+    ceilFeeGrains: () => ceilFeeGrains3,
     collectSigs: () => collectSigs,
     createVault: () => createVault,
-    decimalToRational: () => decimalToRational2,
+    decimalToRational: () => decimalToRational3,
     decodeBech32m: () => decodeBech32m,
     descriptorFingerprint: () => descriptorFingerprint,
     encodeBech32m: () => encodeBech32m,
@@ -6341,9 +6341,11 @@ zoo`.split("\n");
     buildRevealTx: () => buildRevealTx,
     buildScriptPathSpend: () => buildScriptPathSpend,
     bytesToHex: () => bytesToHex,
+    ceilFeeGrains: () => ceilFeeGrains2,
     combineReleaseSigs: () => combineReleaseSigs,
     convertBits: () => convertBits,
     dblSha: () => dblSha,
+    decimalToRational: () => decimalToRational2,
     decodeBech32m: () => decodeBech32m,
     encodeBech32m: () => encodeBech32m,
     encodeScriptNum: () => encodeScriptNum,
@@ -6667,6 +6669,28 @@ zoo`.split("\n");
     const fee = Number(BigInt(released) * BigInt(SERVICE_FEE_BPS) / 10000n);
     return fee >= DUST_GRAIN ? fee : 0;
   }
+  function decimalToRational2(x, name) {
+    const s = String(x ?? "").trim();
+    const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+    if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+    const [, sign, intPart, fracPart = "", expPart] = m;
+    let num2 = BigInt(intPart + fracPart);
+    let den = 10n ** BigInt(fracPart.length);
+    const exp = expPart ? BigInt(expPart) : 0n;
+    if (exp >= 0n) num2 *= 10n ** exp;
+    else den *= 10n ** -exp;
+    if (sign === "-") num2 = -num2;
+    return { num: num2, den };
+  }
+  function ceilFeeGrains2(vBytes, rateGrainsPerVByte) {
+    if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("bad vBytes for fee");
+    const r = decimalToRational2(rateGrainsPerVByte, "fee rate");
+    if (r.num <= 0n) throw new Error("fee rate must be positive");
+    const num2 = BigInt(vBytes) * r.num;
+    const grains = (num2 + r.den - 1n) / r.den;
+    if (grains > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("fee exceeds safe integer range");
+    return Number(grains);
+  }
   function planSpend({ inputValue, payments, feeRateGrainsPerVByte, scriptLen, controlLen, stackLens, serviceFeeGrains = 0, serviceFeeProgram = null }) {
     if (!Number.isSafeInteger(inputValue) || inputValue <= 0) throw new Error("bad input value");
     if (!Array.isArray(payments) || payments.length === 0) throw new Error("need at least one payment");
@@ -6685,7 +6709,7 @@ zoo`.split("\n");
     }
     if (!Number.isFinite(feeRateGrainsPerVByte) || feeRateGrainsPerVByte <= 0) throw new Error("bad fee rate");
     const vbytes = (nOut) => spendVBytes({ nOut, scriptLen, controlLen, stackLens });
-    const feeFor = (nOut) => Math.ceil(vbytes(nOut) * feeRateGrainsPerVByte);
+    const feeFor = (nOut) => ceilFeeGrains2(vbytes(nOut), feeRateGrainsPerVByte);
     const need = (f) => paySum + f;
     let fee = feeFor(allPayments.length + 1);
     let change = inputValue - need(fee);
@@ -7020,7 +7044,7 @@ zoo`.split("\n");
     ]);
     return taggedHash2("TapSighash", msg);
   }
-  function decimalToRational2(x, name) {
+  function decimalToRational3(x, name) {
     const s = String(x ?? "").trim();
     const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
     if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
@@ -7033,9 +7057,9 @@ zoo`.split("\n");
     if (sign === "-") num2 = -num2;
     return { num: num2, den };
   }
-  function ceilFeeGrains2(vBytes, rateGrainsPerVByte) {
+  function ceilFeeGrains3(vBytes, rateGrainsPerVByte) {
     if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("bad vBytes for fee");
-    const r = decimalToRational2(rateGrainsPerVByte, "fee rate");
+    const r = decimalToRational3(rateGrainsPerVByte, "fee rate");
     if (r.num <= 0n) throw new Error("fee rate must be positive");
     const num2 = BigInt(vBytes) * r.num;
     const grains = (num2 + r.den - 1n) / r.den;
@@ -7098,7 +7122,7 @@ zoo`.split("\n");
     });
     const scriptLen = hexToBytes(vault.scriptHex).length;
     const vBytesC = quorumTxVBytes({ nIn: ins.length, nOut: outs.length + 1, scriptLen, m: vault.m, n: vault.n });
-    const feeC = ceilFeeGrains2(vBytesC, rate);
+    const feeC = ceilFeeGrains3(vBytesC, rate);
     const inSum = ins.reduce((a, u) => a + u.value, 0);
     const paySum = outs.reduce((a, o) => a + o.value, 0);
     const changeA = inSum - paySum - feeC;
@@ -7112,7 +7136,7 @@ zoo`.split("\n");
       change = changeA;
     } else {
       const vBytesNC = quorumTxVBytes({ nIn: ins.length, nOut: outs.length, scriptLen, m: vault.m, n: vault.n });
-      const feeNC = ceilFeeGrains2(vBytesNC, rate);
+      const feeNC = ceilFeeGrains3(vBytesNC, rate);
       const leftover = inSum - paySum - feeNC;
       finalOuts = outs.slice();
       vBytes = vBytesNC;

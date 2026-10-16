@@ -54,7 +54,7 @@ This page adds only multisig composition + the coordinator — no new cryptograp
 - `src/index.js` — bundle entry (`window.PearlCovenant`)
 - `pearl-covenant.bundle.js` — committed esbuild IIFE bundle (rebuild: `node build.mjs`)
 - `qrcode.min.js` — vendored QR library (offline)
-- `tests/covenant.test.mjs` — 11 core tests ·
+- `tests/covenant.test.mjs` — 13 core tests ·
   `tests/dom.test.mjs` — 6 DOM integration tests ·
   `tests/loader.mjs` — import-map loader
 
