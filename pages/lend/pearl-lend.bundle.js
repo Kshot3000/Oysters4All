@@ -43,6 +43,8 @@ var PearlLend = (() => {
     builderTipGrainsFor: () => builderTipGrainsFor,
     bytesToHex: () => bytesToHex,
     canonicalJson: () => canonicalJson,
+    ceilFeeGrains: () => ceilFeeGrains3,
+    decimalToRational: () => decimalToRational3,
     decodeBech32m: () => decodeBech32m,
     decodeRawTx: () => decodeRawTx,
     deriveLoan: () => deriveLoan,
@@ -6712,6 +6714,26 @@ zoo`.split("\n");
       stackLens: kind === "repay" ? [64, 64] : [64]
     });
   }
+  function decimalToRational3(x, name) {
+    const s = String(x ?? "").trim();
+    const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+    if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+    const [, sign, intPart, fracPart = "", expPart] = m;
+    let num2 = BigInt(intPart + fracPart);
+    let den = 10n ** BigInt(fracPart.length);
+    const exp = expPart ? BigInt(expPart) : 0n;
+    if (exp >= 0n) num2 *= 10n ** exp;
+    else den *= 10n ** -exp;
+    if (sign === "-") num2 = -num2;
+    return { num: num2, den };
+  }
+  function ceilFeeGrains3(vBytes, rateGrainsPerVByte) {
+    if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("LEND REFUSED: bad vBytes for fee");
+    const r = decimalToRational3(rateGrainsPerVByte, "fee rate");
+    if (r.num <= 0n) throw new Error("LEND REFUSED: fee rate must be positive");
+    const num2 = BigInt(vBytes) * r.num;
+    return (num2 + r.den - 1n) / r.den;
+  }
   function buildRepayment(descriptor, lockTxid, lockVout, collateralValue, feeRateGrainsPerVByte) {
     const feeRate = Number(feeRateGrainsPerVByte);
     if (!Number.isFinite(feeRate) || feeRate <= 0) throw new Error("fee rate must be positive");
@@ -6724,7 +6746,7 @@ zoo`.split("\n");
     const lenderProgram = addressToProgram(descriptor.lenderPayout, network);
     const borrowerProgram = addressToProgram(descriptor.borrowerPayout, network);
     const vb2 = spendVBytes({ nOut: 2, scriptLen: loan.repayScript.length, controlLen: 33, stackLens: [64, 64] });
-    const fee2 = BigInt(Math.ceil(vb2 * feeRate));
+    const fee2 = ceilFeeGrains3(vb2, feeRate);
     let outputs, feeGrains, vbytes;
     const change2 = collateral - repayment - fee2;
     if (change2 >= BigInt(DUST_GRAIN)) {
@@ -6736,7 +6758,7 @@ zoo`.split("\n");
       vbytes = vb2;
     } else {
       const vb1 = spendVBytes({ nOut: 1, scriptLen: loan.repayScript.length, controlLen: 33, stackLens: [64, 64] });
-      const fee1 = BigInt(Math.ceil(vb1 * feeRate));
+      const fee1 = ceilFeeGrains3(vb1, feeRate);
       if (collateral < repayment + fee1) {
         throw new Error(`LEND REFUSED: collateral ${fmtPRL(collateral)} covers repayment but not the claim fee (${fmtPRL(repayment + fee1)} needed)`);
       }
@@ -6830,7 +6852,7 @@ zoo`.split("\n");
       throw new Error("LEND REFUSED: lender payout is the builder address \u2014 the builder tip would duplicate the claim output; leave the builder tip off");
     }
     const vb = spendVBytes({ nOut: builderTip > 0n ? 2 : 1, scriptLen: loan.defaultScript.length, controlLen: 33, stackLens: [64] });
-    const fee = BigInt(Math.ceil(vb * feeRate));
+    const fee = ceilFeeGrains3(vb, feeRate);
     const pay = collateral - fee - builderTip;
     if (pay < BigInt(DUST_GRAIN)) {
       if (builderTip > 0n) {
@@ -6895,7 +6917,7 @@ zoo`.split("\n");
     const loan = loanScripts(descriptor);
     const network = input.network;
     const vb = spendVBytes({ nOut: splits.length, scriptLen: loan.repayScript.length, controlLen: 33, stackLens: [64, 64] });
-    const fee = BigInt(Math.ceil(vb * feeRate));
+    const fee = ceilFeeGrains3(vb, feeRate);
     const outputs = splits.map((s) => {
       const program = addressToProgram(s.address, network);
       const value = BigInt(s.valueGrains);

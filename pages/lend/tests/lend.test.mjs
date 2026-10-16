@@ -219,6 +219,45 @@ test("mutual close requires splits + fee = vault value, assembles with both sigs
     [{ address: lPay, valueGrains: "1000" }], 2), /must equal vault value/);
 });
 
+test("ceilFeeGrains prices in exact decimal arithmetic", () => {
+  // 325 vB is the 5-split mutual-close shape: 325 × 2.2 is exactly 715,
+  // but the float product lands a hair above and the old code charged 716.
+  assert.equal(L.ceilFeeGrains(325, 2.2), 715n);
+  assert.equal(L.ceilFeeGrains(325, 4.4), 1430n);
+  assert.equal(L.ceilFeeGrains(325, "2.2"), 715n, "string rate parity");
+  assert.equal(L.ceilFeeGrains(111, 1.1), 123n, "fractional product still ceils up (122.1 -> 123)");
+  assert.equal(L.ceilFeeGrains(196, 2), 392n, "integer rates price exactly as before");
+  assert.throws(() => L.ceilFeeGrains(325, "abc"), /finite decimal/);
+  assert.throws(() => L.ceilFeeGrains(325, 0), /must be positive/);
+  assert.throws(() => L.ceilFeeGrains(325, -1.5), /must be positive/);
+});
+
+test("mutual close at a decimal rate charges the exact fee (5 splits, 2.2 g/vB)", () => {
+  const d = L.buildDescriptor(terms());
+  const collateral = BigInt(d.collateralGrains);
+  const vb = L.spendVBytes({ nOut: 5, scriptLen: L.buildRepayScript(BX, LX).length, controlLen: 33, stackLens: [64, 64] });
+  assert.equal(vb, 325, "5-split close is a 325-vB spend");
+  const total = collateral - 715n;
+  const per = total / 5n;
+  const splits = Array.from({ length: 5 }, (_, i) => ({
+    address: i % 2 ? bPay : lPay,
+    valueGrains: (i === 4 ? total - per * 4n : per).toString(),
+  }));
+  const m = L.buildMutualClose(d, "cc".repeat(32), 0, collateral, splits, 2.2);
+  assert.equal(m.feeGrains, "715", "exact ceiling, not the float 716");
+  const tx = L.assembleMutualClose(d, m, L.signRepaymentDigest(B_PRIV, m.digest), L.signRepaymentDigest(L_PRIV, m.digest));
+  assert.ok(tx.hex.length > 100, "exact-fee close assembles with both signatures");
+  // splits leaving room for the old float fee are now refused: they would
+  // underpay the recipients by a grain against the exact fee.
+  const total2 = collateral - 716n;
+  const per2 = total2 / 5n;
+  const splits2 = Array.from({ length: 5 }, (_, i) => ({
+    address: i % 2 ? bPay : lPay,
+    valueGrains: (i === 4 ? total2 - per2 * 4n : per2).toString(),
+  }));
+  assert.throws(() => L.buildMutualClose(d, "cc".repeat(32), 0, collateral, splits2, 2.2), /must equal vault value/);
+});
+
 test("standalone verifier: PROVEN for a real repayment, NOT PROVEN for garbage", () => {
   const d = L.buildDescriptor(terms());
   const collateral = BigInt(d.collateralGrains);

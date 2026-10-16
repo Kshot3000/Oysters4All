@@ -378,6 +378,39 @@ export function vaultSpendVBytes(kind, descriptor) {
   });
 }
 
+/* ---------------- exact fee pricing ---------------- */
+
+/** Parse a user-typed decimal into an exact BigInt rational. A JS number is
+ *  read through String(), whose shortest round-trip form recovers the decimal
+ *  the user typed (2.2, not 2.2000000000000001776…). Same helper as Pearl
+ *  Fees / Stream / Predict / Vault / Legacy. */
+export function decimalToRational(x, name) {
+  const s = String(x ?? "").trim();
+  const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+  if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+  const [, sign, intPart, fracPart = "", expPart] = m;
+  let num = BigInt(intPart + fracPart);
+  let den = 10n ** BigInt(fracPart.length);
+  const exp = expPart ? BigInt(expPart) : 0n;
+  if (exp >= 0n) num *= 10n ** exp; else den *= 10n ** -exp;
+  if (sign === "-") num = -num;
+  return { num, den };
+}
+
+/** ceil(vBytes × rate) in exact BigInt rational arithmetic, returned as
+ *  BigInt grains. The old float form — BigInt(Math.ceil(vB * rate)) —
+ *  overcharged whenever the exact product is an integer that binary floats
+ *  land a hair above: a 5-split mutual close is 325 vB, and 325 × 2.2
+ *  priced 716 grains instead of 715 (and splits summing to the exact fee
+ *  were refused, because splits + fee must equal the vault value). */
+export function ceilFeeGrains(vBytes, rateGrainsPerVByte) {
+  if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("LEND REFUSED: bad vBytes for fee");
+  const r = decimalToRational(rateGrainsPerVByte, "fee rate");
+  if (r.num <= 0n) throw new Error("LEND REFUSED: fee rate must be positive");
+  const num = BigInt(vBytes) * r.num;
+  return (num + r.den - 1n) / r.den;
+}
+
 /**
  * Build the UNSIGNED repayment transaction template.
  * Input: the collateral vault UTXO. Outputs: lender gets exactly
@@ -400,7 +433,7 @@ export function buildRepayment(descriptor, lockTxid, lockVout, collateralValue, 
 
   // Try 2 outputs first (lender + borrower change).
   const vb2 = spendVBytes({ nOut: 2, scriptLen: loan.repayScript.length, controlLen: 33, stackLens: [64, 64] });
-  const fee2 = BigInt(Math.ceil(vb2 * feeRate));
+  const fee2 = ceilFeeGrains(vb2, feeRate);
   let outputs, feeGrains, vbytes;
   const change2 = collateral - repayment - fee2;
   if (change2 >= BigInt(DUST_GRAIN)) {
@@ -412,7 +445,7 @@ export function buildRepayment(descriptor, lockTxid, lockVout, collateralValue, 
   } else {
     // Change below dust: single lender output; leftover becomes fee (disclosed).
     const vb1 = spendVBytes({ nOut: 1, scriptLen: loan.repayScript.length, controlLen: 33, stackLens: [64, 64] });
-    const fee1 = BigInt(Math.ceil(vb1 * feeRate));
+    const fee1 = ceilFeeGrains(vb1, feeRate);
     if (collateral < repayment + fee1) {
       throw new Error(`LEND REFUSED: collateral ${fmtPRL(collateral)} covers repayment but not the claim fee (${fmtPRL(repayment + fee1)} needed)`);
     }
@@ -532,7 +565,7 @@ export function buildDefaultClaim(descriptor, lockTxid, lockVout, collateralValu
     throw new Error("LEND REFUSED: lender payout is the builder address — the builder tip would duplicate the claim output; leave the builder tip off");
   }
   const vb = spendVBytes({ nOut: builderTip > 0n ? 2 : 1, scriptLen: loan.defaultScript.length, controlLen: 33, stackLens: [64] });
-  const fee = BigInt(Math.ceil(vb * feeRate));
+  const fee = ceilFeeGrains(vb, feeRate);
   const pay = collateral - fee - builderTip;
   if (pay < BigInt(DUST_GRAIN)) {
     if (builderTip > 0n) {
@@ -603,7 +636,7 @@ export function buildMutualClose(descriptor, lockTxid, lockVout, collateralValue
   const loan = loanScripts(descriptor);
   const network = input.network;
   const vb = spendVBytes({ nOut: splits.length, scriptLen: loan.repayScript.length, controlLen: 33, stackLens: [64, 64] });
-  const fee = BigInt(Math.ceil(vb * feeRate));
+  const fee = ceilFeeGrains(vb, feeRate);
   const outputs = splits.map((s) => {
     const program = addressToProgram(s.address, network);
     const value = BigInt(s.valueGrains);
