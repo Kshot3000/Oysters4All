@@ -110,7 +110,7 @@ test("offline tally uses the exact core parser (float-parse class closed)", () =
   assert.ok(!js.includes("Math.round(amt * 1e8)"), "no float tally parse left");
   const html = readFileSync(P(appDir, "index.html"), "utf8");
   assert.ok(html.includes("pearl-will.bundle.js?v=6"), "bundle cache key bumped");
-  assert.ok(html.includes('src="app.js?v=5"'), "app cache key bumped");
+  assert.ok(html.includes('src="app.js?v=6"'), "app cache key bumped");
 });
 
 test("builder tip: checkbox opt-in, disclosure, bundle tipped owner claim exact on the wire", () => {
@@ -140,6 +140,33 @@ test("builder tip: checkbox opt-in, disclosure, bundle tipped owner claim exact 
   const tipOuts = dec.outputs.filter((o) => W.bytesToHex(o.spk) === builderSpk);
   assert.equal(tipOuts.length, 1);
   assert.equal(Number(tipOuts[0].value), 200_000_000);
+});
+
+test("claim-tab fee estimates use the exact ceiling (float-ceil class, app.js sites)", () => {
+  const js = readFileSync(P(appDir, "app.js"), "utf8");
+  // The Claim tab sized its payments as input − feeEst, and planSpend folds
+  // the remainder into the fee — so a float-inflated feeEst IS the fee paid.
+  // The no-tip owner reclaim estimates over 180 vB, where 180 × 2.2 float-ceils
+  // to 397 instead of the exact 396 (also 1.1 → 199/198, 4.4 → 793/792).
+  assert.ok(!js.includes("Math.ceil(W.spendVBytes"), "no float fee estimate left in app.js");
+  assert.ok(js.includes("W.ceilFeeGrains(W.spendVBytes({ nOut: tip > 0 ? 3 : 2"), "owner reclaim estimate is exact");
+  assert.ok(js.includes("W.ceilFeeGrains(W.spendVBytes({ nOut: 2"), "heir digest estimate is exact");
+  // Bundle-level flow, replicating the app.js owner-reclaim computation at
+  // 2.2 g/vB: payment = input − exact fee, and the signed claim pays 396.
+  const priv = new Uint8Array(32).fill(0x11);
+  const ownerX = W.bytesToHex(W.schnorr.getPublicKey(priv));
+  const heirX = W.bytesToHex(W.schnorr.getPublicKey(new Uint8Array(32).fill(0x22)));
+  const v = W.buildWillVault({ network: "mainnet", owner: ownerX, heirs: [heirX], m: 1, unlockHeight: 240000 });
+  const dest = W.encodeBech32m("prl", 1, W.tweakKeypath(W.hexToBytes(ownerX)).tweakedX);
+  const input = { txid: "ab".repeat(32), vout: 0, value: 100_000_000 };
+  const feeEst = W.ceilFeeGrains(W.spendVBytes({ nOut: 2, scriptLen: v.ownerScript.length, controlLen: v.controlBlocks[0].length, stackLens: [64] }), 2.2);
+  assert.equal(feeEst, 396, "180 vB at 2.2 g/vB prices exactly 396 grains");
+  const built = W.buildOwnerClaim(v, {
+    input, payments: [{ address: dest, value: input.value - feeEst }],
+    changeAddress: dest, feeRateGrainsPerVByte: 2.2,
+    privOwner: priv, signerXOnly: ownerX, builderTipEnabled: false,
+  });
+  assert.equal(built.fee, 396, "signed owner reclaim pays the exact fee");
 });
 
 test("app.js grain formatter is BigInt-exact (pool float-format class)", async () => {

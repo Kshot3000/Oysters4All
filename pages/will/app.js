@@ -413,7 +413,11 @@
       // payment is reduced by the tip so the reclaim conserves exactly.
       const tipEnabled = $("co-tip").checked === true;
       const tip = W.builderTipGrainsFor(input.value, net, tipEnabled);
-      const feeEst = Math.ceil(W.spendVBytes({ nOut: tip > 0 ? 3 : 2, scriptLen: v.ownerScript.length, controlLen: v.controlBlocks[0].length, stackLens: [64] }) * feeRate);
+      // Exact ceiling (ceilFeeGrains): the float form priced the no-tip
+      // reclaim's 180 vB at 397 grains at 2.2 g/vB instead of 396 — and
+      // because the payment is sized as input − feeEst and planSpend folds
+      // the remainder into the fee, the signed claim paid the inflated fee.
+      const feeEst = W.ceilFeeGrains(W.spendVBytes({ nOut: tip > 0 ? 3 : 2, scriptLen: v.ownerScript.length, controlLen: v.controlBlocks[0].length, stackLens: [64] }), feeRate);
       const value = input.value - feeEst - tip;
       if (value < W.DUST_GRAIN) throw new Error("WILL REFUSED: UTXO value " + input.value + " grains cannot cover the ~" + feeEst + "-grain fee" + (tip > 0 ? " and the " + tip + "-grain builder tip — leave the tip off" : ""));
       payments[0].value = value;
@@ -458,7 +462,7 @@
       const feeRate = Number($("ch-feerate").value);
       W.addressToProgram(dest, net);
       W.addressToProgram(changeAddress, net);
-      const feeEst = Math.ceil(W.spendVBytes({ nOut: 2, scriptLen: v.heirScript.length, controlLen: v.controlBlocks[1].length, stackLens: Array(spec.n).fill(64) }) * feeRate);
+      const feeEst = W.ceilFeeGrains(W.spendVBytes({ nOut: 2, scriptLen: v.heirScript.length, controlLen: v.controlBlocks[1].length, stackLens: Array(spec.n).fill(64) }), feeRate);
       const value = input.value - feeEst;
       if (value < W.DUST_GRAIN) throw new Error("WILL REFUSED: UTXO value cannot cover the ~" + feeEst + "-grain fee");
       const payments = [{ program: W.addressToProgram(dest, net), value }];
