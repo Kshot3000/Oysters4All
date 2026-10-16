@@ -37,7 +37,7 @@ import {
   parseBatchSecret, assertKeyControlsAddress, canonicalAddress,
   autoSelectUtxos, planDispatch, buildBatchTx, auditBatchTx,
   builderTipGrainsFor, BUILDER_TIP_ADDRESS, BUILDER_TIP_BPS, BUILDER_TIP_NAME,
-  BATCH_MAX_OUTPUTS,
+  BATCH_MAX_OUTPUTS, ceilFeeGrains,
 } from "../../batch/src/batch-core.js";
 import {
   selectCoins, buildKeypathTxEx, verifySignedTx, decodeRawTx,
@@ -57,7 +57,7 @@ export {
   DUST_GRAIN, GRAIN_PER_PRL, NETWORKS, fmtPRL, parsePRL,
   canonicalJson, descriptorFingerprint, buildUnsignedTx,
   parseBatchSecret, assertKeyControlsAddress, canonicalAddress,
-  autoSelectUtxos, planDispatch, buildBatchTx, auditBatchTx,
+  autoSelectUtxos, planDispatch, buildBatchTx, auditBatchTx, ceilFeeGrains,
   builderTipGrainsFor, BUILDER_TIP_ADDRESS, BUILDER_TIP_BPS, BUILDER_TIP_NAME,
   selectCoins, buildKeypathTxEx, verifySignedTx, decodeRawTx,
   walletFromMnemonic, walletFromPriv, walletFromWIF,
@@ -439,7 +439,12 @@ export function planDividend({
     }
     void extraOut;
     const outputsGrains = outs.reduce((a, o) => a + BigInt(o.shareGrains), 0n);
-    const estFee = BigInt(Math.ceil(keypathTxVBytes(1, outs.length + 1) * rate));
+    // Exact decimal ceiling (batch core's ceilFeeGrains): the old float
+    // Math.ceil(vBytes * rate) sealed 738 grains for a 670-vB chunk at
+    // 1.1 g/vB whose exact fee is 737 — and funding, which re-plans
+    // through the same batch planner, now prices at this same rate, so
+    // the sealed estimate and the charged fee use one arithmetic.
+    const estFee = ceilFeeGrains(keypathTxVBytes(1, outs.length + 1), rate);
     chunks.push({
       index: chunks.length,
       recipients: outs,

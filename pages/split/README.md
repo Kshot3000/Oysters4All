@@ -85,7 +85,7 @@ minimal-transfer computation, the dust policy, per-debtor planning,
 ## Tests
 
 - `node --no-warnings --loader ./tests/loader.mjs tests/split.test.mjs`
-  — 29/29: member validation (v0/non-v1/bad-HRP rejection), equal/shares/
+  — 30/30: member validation (v0/non-v1/bad-HRP rejection), equal/shares/
   percent split math with remainder distribution, grain-exactness,
   balance computation, greedy minimal-transfer optimality on fixtures
   (minimal transfer count), dust refusal, per-debtor funding

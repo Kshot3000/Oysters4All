@@ -214,6 +214,28 @@ test("funding is grain-exact: inputs == outputs + fee + change", () => {
   assert.equal(recipients[0].address, A[1]);
 });
 
+test("funding at a decimal rate charges that rate, not the next integer", () => {
+  // Regression: Split's UI accepts decimal rates (step="any") but the
+  // shared batch planner used to ceil the RATE itself (1.1 -> 2), so this
+  // 154-vB settlement was charged 308 grains instead of the exact 170.
+  const debtorSecret = S.parseBatchSecret(DEBTOR_PRIV, NET);
+  const members2 = [
+    { name: "Deb", address: debtorSecret.address },
+    { name: "Cred", address: A[1] },
+  ];
+  const transfers = [{ from: 0, to: 1, grains: String(G("0.01")) }];
+  const plans = S.debtorPlans(transfers, members2, NET);
+  const utxos = [{ txid: "ab".repeat(32), vout: 0, value: Number(G("0.05")), confirmations: 3 }];
+  const plan = S.fundSettlement({ network: NET, debtorPlan: plans[0], utxos, feeRateGrainsPerVByte: 1.1 });
+  assert.equal(plan.vBytes, 154);
+  assert.equal(plan.feeRate, 1.1);
+  assert.equal(plan.fee, 170n); // ceil(154 * 1.1) exact
+  assert.equal(plan.total, plan.sumOut + plan.fee + plan.change);
+  assert.equal(S.ceilFeeGrains(154, 1.1), 170n);
+  assert.equal(S.ceilFeeGrains(154, "1.1"), 170n);
+  assert.throws(() => S.ceilFeeGrains(154, "abc"), /finite decimal/);
+});
+
 test("funding refuses loudly on short funds", () => {
   const debtorSecret = S.parseBatchSecret(DEBTOR_PRIV, NET);
   const plans = S.debtorPlans(

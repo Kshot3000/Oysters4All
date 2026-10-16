@@ -38,7 +38,7 @@ import {
   canonicalJson, descriptorFingerprint,
   parseBatchSecret, assertKeyControlsAddress, canonicalAddress,
   planDispatch, buildUnsignedTx, buildBatchTx, autoSelectUtxos,
-  assertUtxos,
+  assertUtxos, ceilFeeGrains,
 } from "../../batch/src/batch-core.js";
 import {
   fmtPRL, parsePRL, fetchUtxos, broadcastViaBlockbook, parseUtxoList,
@@ -457,7 +457,7 @@ export {
   fmtPRL, parsePRL, fetchUtxos, broadcastViaBlockbook, parseUtxoList,
   decodeRawTx, verifySignedTx, decodeBech32m, encodeBech32m,
   canonicalJson, descriptorFingerprint,
-  parseBatchSecret, assertKeyControlsAddress, autoSelectUtxos,
+  parseBatchSecret, assertKeyControlsAddress, autoSelectUtxos, ceilFeeGrains,
   sha256, bytesToHex, hexToBytes, convertBits, schnorr,
   DUST_GRAIN, NETWORKS,
 };

@@ -199,6 +199,32 @@ test("planDividend chunks and seals the plan", () => {
   );
 });
 
+test("decimal fee rate: sealed estimate is exact and funding charges that same rate", () => {
+  // Regression (two layers): the sealed estimate used float
+  // Math.ceil(670 * 1.1) = 738 where the exact fee is 737, and funding —
+  // which re-plans through the batch planner — used to ceil the RATE
+  // itself (1.1 -> 2) and charge 1340 for the same chunk.
+  assert.equal(D.ceilFeeGrains(670, 1.1), 737n);
+  assert.equal(D.ceilFeeGrains(670, "1.1"), 737n);
+  assert.throws(() => D.ceilFeeGrains(670, "abc"), /finite decimal/);
+  const holders = Array.from({ length: 13 }, (_, i) => [addr("div-dec-" + i), 100n * 100_000_000n]);
+  const s = snapshot(holders);
+  const p = D.planDividend({
+    network: NET, snapshot: s, snapshotFingerprint: s.fingerprint,
+    poolPRL: "1", rule: "equal", feeRate: 1.1,
+  });
+  assert.equal(p.chunks.length, 1);
+  assert.equal(p.chunks[0].recipientCount, 13);
+  assert.equal(p.chunks[0].estFeeGrains, "737"); // keypathTxVBytes(1, 14) = 670 vB at 1.1 g/vB
+  assert.equal(p.descriptor.totals.estFeesGrains, "737");
+  const funded = D.fundDividend({ network: NET, plan: p, utxos: utxos(1, 200000000), funderAddress: FUNDER });
+  const fc = funded.fundedChunks[0];
+  assert.equal(fc.plan.vBytes, 670);
+  assert.equal(fc.plan.feeRate, 1.1);
+  assert.equal(fc.plan.fee, 737n); // estimate and charge agree, at the typed rate
+  assert.equal(fc.plan.total, fc.plan.sumOut + fc.plan.fee + fc.plan.change);
+});
+
 test("planDividend emits an explicit remainder output when >= dust", () => {
   const p = plan({ rule: "fixed", fixedPRL: "0.3" }); // 3 holders x 0.3 PRL, pool 1 PRL -> remainder 0.1 PRL
   assert.equal(p.descriptor.remainderGrains, "10000000");

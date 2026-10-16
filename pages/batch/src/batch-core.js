@@ -305,12 +305,46 @@ export function assertUtxos(utxos) {
   }
 }
 
+/* ---------------- exact decimal fee pricing ---------------- */
+
+/* Exact decimal fee pricing (fleet pattern, first shipped in Pearl Fees):
+ * a fee rate is read through String(), whose shortest round-trip form
+ * recovers the decimal the user typed, then ceil(vBytes × rate) is computed
+ * in BigInt rational arithmetic and returned as BigInt grains.
+ * This core previously CEILED THE RATE ITSELF (Math.ceil(Number(rate))),
+ * which Batch's own integer-step UI sheltered — but Split and Dividend
+ * expose decimal rates (step="any") and pass them straight through this
+ * planner: a 240-vB dispatch at 1.1 g/vB was charged 480 grains (the fee
+ * for 2 g/vB) instead of the exact 264, and a Dividend plan sealed an
+ * estimate at 1.1 g/vB that funding then charged at 2 g/vB. Integer rates
+ * price exactly as before: ceilFeeGrains(vB, 20) === vB * 20n. */
+export function decimalToRational(x, name) {
+  const s = String(x ?? "").trim();
+  const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+  if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+  const [, sign, intPart, fracPart = "", expPart] = m;
+  let num = BigInt(intPart + fracPart);
+  let den = 10n ** BigInt(fracPart.length);
+  const exp = expPart ? BigInt(expPart) : 0n;
+  if (exp >= 0n) num *= 10n ** exp; else den *= 10n ** -exp;
+  if (sign === "-") num = -num;
+  return { num, den };
+}
+
+export function ceilFeeGrains(vBytes, rateGrainsPerVByte) {
+  if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("bad vBytes for fee");
+  const r = decimalToRational(rateGrainsPerVByte, "fee rate");
+  if (r.num <= 0n) throw new Error("fee rate must be a positive number of grains/vB");
+  const num = BigInt(vBytes) * r.num;
+  return (num + r.den - 1n) / r.den;
+}
+
 /** Largest-first auto-selection covering sumOut + fee at feeRate grains/vB.
  *  Returns { selected, fee (BigInt), change (BigInt), changeDropped, vBytes }.
  *  Change below dust is absorbed into the fee (disclosed, never silent). */
 export function autoSelectUtxos(utxos, sumOut, feeRateGrainsPerVByte, nOut) {
   assertUtxos(utxos);
-  const rate = Math.ceil(Number(feeRateGrainsPerVByte));
+  const rate = Number(feeRateGrainsPerVByte);
   if (!Number.isFinite(rate) || rate <= 0) throw new Error("fee rate must be a positive number of grains/vB");
   const sorted = [...utxos].sort((a, b) => b.value - a.value);
   const selected = [];
@@ -319,12 +353,12 @@ export function autoSelectUtxos(utxos, sumOut, feeRateGrainsPerVByte, nOut) {
     selected.push(u);
     total += BigInt(u.value);
     const withChange = keypathTxVBytes(selected.length, nOut + 1);
-    const feeWithChange = BigInt(withChange) * BigInt(rate);
+    const feeWithChange = ceilFeeGrains(withChange, rate);
     if (total - sumOut - feeWithChange >= BigInt(DUST_GRAIN)) {
       return { selected, fee: feeWithChange, change: total - sumOut - feeWithChange, changeDropped: false, vBytes: withChange };
     }
     const noChange = keypathTxVBytes(selected.length, nOut);
-    const feeNoChange = BigInt(noChange) * BigInt(rate);
+    const feeNoChange = ceilFeeGrains(noChange, rate);
     if (total >= sumOut + feeNoChange) {
       return { selected, fee: total - sumOut, change: 0n, changeDropped: true, vBytes: noChange };
     }
@@ -332,12 +366,13 @@ export function autoSelectUtxos(utxos, sumOut, feeRateGrainsPerVByte, nOut) {
   const best = keypathTxVBytes(selected.length, nOut);
   throw new Error(
     `insufficient funds: have ${fmtPRL(total)} PRL, need ${fmtPRL(sumOut)} PRL for recipients ` +
-    `+ ~${fmtPRL(BigInt(best) * BigInt(rate))} PRL fee. Add inputs or reduce recipients.`
+    `+ ~${fmtPRL(ceilFeeGrains(best, rate))} PRL fee. Add inputs or reduce recipients.`
   );
 }
 
 /** Plan the dispatch from an EXPLICITLY selected input set (manual control).
- *  Fee = keypathTxVBytes(nIn, nOut[+1]) * rate, grain-exact BigInt.
+ *  Fee = ceil(keypathTxVBytes(nIn, nOut[+1]) × rate) in exact decimal
+ *  arithmetic (ceilFeeGrains), grain-exact BigInt.
  *  When the change output would be dust it is dropped and absorbed into the
  *  fee: plan.fee is then the ACTUAL fee (total - sumOut), plan.nominalFee the
  *  vBytes*rate figure, and plan.changeBump = actual - nominal, disclosed.
@@ -349,7 +384,7 @@ export function planDispatch({ utxos, recipients, senderProgram, feeRateGrainsPe
   if (!Array.isArray(recipients) || recipients.length === 0) throw new Error("no recipients in the manifest");
   if (recipients.length > BATCH_MAX_OUTPUTS) throw new Error(`too many recipients (max ${BATCH_MAX_OUTPUTS})`);
   if (!(senderProgram instanceof Uint8Array) || senderProgram.length !== 32) throw new Error("bad sender program");
-  const rate = Math.ceil(Number(feeRateGrainsPerVByte));
+  const rate = Number(feeRateGrainsPerVByte);
   if (!Number.isFinite(rate) || rate <= 0) throw new Error("fee rate must be a positive number of grains/vB");
   for (const r of recipients) {
     if (r.amount < BigInt(DUST_GRAIN)) throw new Error(`recipient ${r.address.slice(0, 18)}… is below dust — re-validate the manifest`);
@@ -360,7 +395,7 @@ export function planDispatch({ utxos, recipients, senderProgram, feeRateGrainsPe
   const nIn = utxos.length, n = recipients.length;
 
   let vBytes = keypathTxVBytes(nIn, n + 1);
-  let fee = BigInt(vBytes) * BigInt(rate);
+  let fee = ceilFeeGrains(vBytes, rate);
   let change = total - sumOut - fee;
   let changeDropped = false;
   if (change >= BigInt(DUST_GRAIN)) {
@@ -368,7 +403,7 @@ export function planDispatch({ utxos, recipients, senderProgram, feeRateGrainsPe
   } else {
     changeDropped = true; // dust change -> absorbed into the fee, disclosed loudly
     vBytes = keypathTxVBytes(nIn, n);
-    fee = BigInt(vBytes) * BigInt(rate);
+    fee = ceilFeeGrains(vBytes, rate);
     change = 0n;
   }
   if (vBytes > BATCH_MAX_VBYTES) {

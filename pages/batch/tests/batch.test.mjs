@@ -13,7 +13,7 @@ import {
   parseBatchSecret, assertKeyControlsAddress, canonicalAddress,
   parseRecipients, sampleManifest, planDispatch, autoSelectUtxos,
   buildUnsignedTx, buildDescriptor, exportUnsignedBundle, importUnsignedBundle,
-  buildBatchTx, auditBatchTx, canonicalJson, descriptorFingerprint,
+  buildBatchTx, auditBatchTx, canonicalJson, descriptorFingerprint, ceilFeeGrains,
   BATCH_MAX_OUTPUTS, BATCH_DESCRIPTOR_KIND, BATCH_BUNDLE_KIND,
   builderTipGrainsFor, applyBuilderTip,
   BUILDER_TIP_BPS, BUILDER_TIP_ADDRESS, BUILDER_TIP_NAME,
@@ -180,6 +180,32 @@ test("planDispatch: exact fee math (keypathTxVBytes, grain-exact BigInt)", () =>
   assert.equal(plan.total, plan.sumOut + plan.fee + plan.change);
   assert.equal(plan.sumOut, 600000000n);
   assert.ok(plan.change >= BigInt(DUST_GRAIN));
+});
+
+test("ceilFeeGrains: exact decimal ceiling, BigInt grains", () => {
+  assert.equal(ceilFeeGrains(240, 1.1), 264n); // 240 * 1.1 = 264 exactly
+  assert.equal(ceilFeeGrains(670, 1.1), 737n); // dividend's 13-recipient chunk shape
+  assert.equal(ceilFeeGrains(240, "1.1"), 264n); // string-rate parity
+  assert.equal(ceilFeeGrains(240, 20), 4800n); // integer rates price as before
+  assert.equal(ceilFeeGrains(100, 1.005), 101n); // fractional product still ceils up
+  assert.equal(ceilFeeGrains(100, 0.5), 50n);
+  assert.throws(() => ceilFeeGrains(100, "abc"), /finite decimal/);
+  assert.throws(() => ceilFeeGrains(100, 0), /positive/);
+  assert.throws(() => ceilFeeGrains(100, -1.1), /positive/);
+});
+
+test("planDispatch + autoSelectUtxos: a decimal rate is charged at that rate, not the next integer", () => {
+  // Regression: the planner used to ceil the RATE itself (1.1 -> 2), so a
+  // 240-vB dispatch was charged 480 grains instead of the exact 264.
+  const one = [utxo("d".repeat(64), 0, 700000000)];
+  const plan = planDispatch({ utxos: one, recipients: threeRecipients(), senderProgram: SENDER_PROGRAM, feeRateGrainsPerVByte: 1.1, network: N });
+  assert.equal(plan.vBytes, 240);
+  assert.equal(plan.feeRate, 1.1);
+  assert.equal(plan.fee, 264n);
+  assert.equal(plan.total, plan.sumOut + plan.fee + plan.change);
+  const sel = autoSelectUtxos(one, 600000000n, 1.1, 3);
+  assert.equal(sel.vBytes, 240);
+  assert.equal(sel.fee, 264n);
 });
 
 test("planDispatch: dust change absorbed into the fee, disclosed", () => {

@@ -47,6 +47,8 @@ var PearlBatch = (() => {
     bytesToHex: () => bytesToHex,
     canonicalAddress: () => canonicalAddress,
     canonicalJson: () => canonicalJson,
+    ceilFeeGrains: () => ceilFeeGrains,
+    decimalToRational: () => decimalToRational,
     decodeBech32m: () => decodeBech32m,
     decodeRawTx: () => decodeRawTx,
     descriptorFingerprint: () => descriptorFingerprint,
@@ -6326,9 +6328,29 @@ zoo`.split("\n");
       if (!Number.isSafeInteger(u.value) || u.value <= 0) throw new Error("bad utxo value (grains, positive safe int)");
     }
   }
+  function decimalToRational(x, name) {
+    const s = String(x ?? "").trim();
+    const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+    if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+    const [, sign, intPart, fracPart = "", expPart] = m;
+    let num2 = BigInt(intPart + fracPart);
+    let den = 10n ** BigInt(fracPart.length);
+    const exp = expPart ? BigInt(expPart) : 0n;
+    if (exp >= 0n) num2 *= 10n ** exp;
+    else den *= 10n ** -exp;
+    if (sign === "-") num2 = -num2;
+    return { num: num2, den };
+  }
+  function ceilFeeGrains(vBytes, rateGrainsPerVByte) {
+    if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("bad vBytes for fee");
+    const r = decimalToRational(rateGrainsPerVByte, "fee rate");
+    if (r.num <= 0n) throw new Error("fee rate must be a positive number of grains/vB");
+    const num2 = BigInt(vBytes) * r.num;
+    return (num2 + r.den - 1n) / r.den;
+  }
   function autoSelectUtxos(utxos, sumOut, feeRateGrainsPerVByte, nOut) {
     assertUtxos(utxos);
-    const rate = Math.ceil(Number(feeRateGrainsPerVByte));
+    const rate = Number(feeRateGrainsPerVByte);
     if (!Number.isFinite(rate) || rate <= 0) throw new Error("fee rate must be a positive number of grains/vB");
     const sorted = [...utxos].sort((a, b) => b.value - a.value);
     const selected = [];
@@ -6337,19 +6359,19 @@ zoo`.split("\n");
       selected.push(u);
       total += BigInt(u.value);
       const withChange = keypathTxVBytes(selected.length, nOut + 1);
-      const feeWithChange = BigInt(withChange) * BigInt(rate);
+      const feeWithChange = ceilFeeGrains(withChange, rate);
       if (total - sumOut - feeWithChange >= BigInt(DUST_GRAIN)) {
         return { selected, fee: feeWithChange, change: total - sumOut - feeWithChange, changeDropped: false, vBytes: withChange };
       }
       const noChange = keypathTxVBytes(selected.length, nOut);
-      const feeNoChange = BigInt(noChange) * BigInt(rate);
+      const feeNoChange = ceilFeeGrains(noChange, rate);
       if (total >= sumOut + feeNoChange) {
         return { selected, fee: total - sumOut, change: 0n, changeDropped: true, vBytes: noChange };
       }
     }
     const best = keypathTxVBytes(selected.length, nOut);
     throw new Error(
-      `insufficient funds: have ${fmtPRL(total)} PRL, need ${fmtPRL(sumOut)} PRL for recipients + ~${fmtPRL(BigInt(best) * BigInt(rate))} PRL fee. Add inputs or reduce recipients.`
+      `insufficient funds: have ${fmtPRL(total)} PRL, need ${fmtPRL(sumOut)} PRL for recipients + ~${fmtPRL(ceilFeeGrains(best, rate))} PRL fee. Add inputs or reduce recipients.`
     );
   }
   function planDispatch({ utxos, recipients, senderProgram, feeRateGrainsPerVByte, network = NETWORKS.mainnet }) {
@@ -6357,7 +6379,7 @@ zoo`.split("\n");
     if (!Array.isArray(recipients) || recipients.length === 0) throw new Error("no recipients in the manifest");
     if (recipients.length > BATCH_MAX_OUTPUTS) throw new Error(`too many recipients (max ${BATCH_MAX_OUTPUTS})`);
     if (!(senderProgram instanceof Uint8Array) || senderProgram.length !== 32) throw new Error("bad sender program");
-    const rate = Math.ceil(Number(feeRateGrainsPerVByte));
+    const rate = Number(feeRateGrainsPerVByte);
     if (!Number.isFinite(rate) || rate <= 0) throw new Error("fee rate must be a positive number of grains/vB");
     for (const r of recipients) {
       if (r.amount < BigInt(DUST_GRAIN)) throw new Error(`recipient ${r.address.slice(0, 18)}\u2026 is below dust \u2014 re-validate the manifest`);
@@ -6367,14 +6389,14 @@ zoo`.split("\n");
     const sumOut = recipients.reduce((a, r) => a + BigInt(r.amount), 0n);
     const nIn = utxos.length, n = recipients.length;
     let vBytes = keypathTxVBytes(nIn, n + 1);
-    let fee = BigInt(vBytes) * BigInt(rate);
+    let fee = ceilFeeGrains(vBytes, rate);
     let change = total - sumOut - fee;
     let changeDropped = false;
     if (change >= BigInt(DUST_GRAIN)) {
     } else {
       changeDropped = true;
       vBytes = keypathTxVBytes(nIn, n);
-      fee = BigInt(vBytes) * BigInt(rate);
+      fee = ceilFeeGrains(vBytes, rate);
       change = 0n;
     }
     if (vBytes > BATCH_MAX_VBYTES) {
