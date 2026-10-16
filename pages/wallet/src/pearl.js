@@ -96,7 +96,7 @@ export const PEARL = {
   hrp: "prl",
   coinType: 808276,
   txVersion: 1,
-  dust: 546,
+  dust: 333,
   blockbook: "https://blockbook.pearlresearch.ai",
 };
 

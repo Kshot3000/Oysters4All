@@ -41,9 +41,9 @@ const utxo = (txid, vout, value) => ({ txid, vout, value, confirmations: 6 });
 
 test("fmtPRL/parsePRL grain-exact round-trip", () => {
   assert.equal(parsePRL("1.25"), 125000000n);
-  assert.equal(parsePRL("0.00000546"), 546n);
+  assert.equal(parsePRL("0.00000333"), 333n);
   assert.equal(fmtPRL(1125000005n), "11.25000005");
-  assert.equal(fmtPRL(546n), "0.00000546");
+  assert.equal(fmtPRL(333n), "0.00000333");
   assert.throws(() => parsePRL("1.123456789"), /invalid PRL amount/);
   assert.throws(() => parsePRL("-1"), /invalid PRL amount/);
 });
@@ -54,10 +54,10 @@ test("parseRecipients: sample manifest exact totals", () => {
   const { recipients, merged, total } = parseRecipients(sampleManifest(), N);
   assert.equal(recipients.length, 3);
   assert.equal(merged, 0);
-  // 1.25 PRL + 546 grains + 10 PRL
-  assert.equal(total, 125000000n + 546n + 1000000000n);
+  // 1.25 PRL + 333 grains + 10 PRL
+  assert.equal(total, 125000000n + 333n + 1000000000n);
   assert.equal(recipients[0].memo, "Q3 vendor payout");
-  assert.equal(recipients[1].amount, 546n); // grains unit parsed (dust boundary)
+  assert.equal(recipients[1].amount, 333n); // grains unit parsed (dust boundary)
   assert.equal(recipients[2].memo, "contractor bonus");
   for (const r of recipients) assert.ok(r.program instanceof Uint8Array && r.program.length === 32);
 });
@@ -70,10 +70,10 @@ test("parseRecipients: whitespace format + memos with spaces", () => {
 });
 
 test("parseRecipients: dust refused loudly, boundary accepted", () => {
-  assert.throws(() => parseRecipients(`${A1}, 0.00000545`, N), /dust floor/);
-  assert.throws(() => parseRecipients(`${A1}, 545 grains`, N), /dust floor/);
-  const ok = parseRecipients(`${A1}, 546 grains`, N);
-  assert.equal(ok.recipients[0].amount, 546n);
+  assert.throws(() => parseRecipients(`${A1}, 0.00000332`, N), /dust floor/);
+  assert.throws(() => parseRecipients(`${A1}, 332 grains`, N), /dust floor/);
+  const ok = parseRecipients(`${A1}, 333 grains`, N);
+  assert.equal(ok.recipients[0].amount, 333n);
 });
 
 test("parseRecipients: bad addresses refused", () => {
@@ -399,7 +399,7 @@ test("builderTipGrainsFor: 1% floor exact, waivers never rounded up", () => {
   assert.equal(builderTipGrainsFor(1125000546n, N, undefined), 0n);
   assert.equal(builderTipGrainsFor(1125000546n, NETWORKS.testnet, true), 0n); // testnet waived
   assert.equal(builderTipGrainsFor(10000n, N, true), 0n); // 100 grains < dust -> waived
-  assert.equal(builderTipGrainsFor(54600n, N, true), 546n); // exactly at the dust floor -> charged
+  assert.equal(builderTipGrainsFor(33300n, N, true), 333n); // exactly at the dust floor -> charged
   assert.throws(() => builderTipGrainsFor(0n, N, true), /bad total/);
 });
 

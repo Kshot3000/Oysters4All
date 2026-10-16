@@ -472,7 +472,7 @@ const CONTROL_LEN = 65;
  * the tip on or off, and if the pot cannot cover award + tip + fee the
  * award refuses rather than shorting the winner. builderTipGrainsFor()
  * is the single source: 1% floor in BigInt, mainnet only, waived below
- * the 546-grain dust floor instead of rounded up, 0 unless enabled ===
+ * the 333-grain dust floor instead of rounded up, 0 unless enabled ===
  * true. The tip joins the plan BEFORE the poster signs and the
  * script-path sighash commits to every output, so it cannot be added or
  * skimmed after signing. Reclaims never carry it: planReclaim /

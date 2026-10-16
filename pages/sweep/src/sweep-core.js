@@ -5,7 +5,7 @@
  * node runs this file directly for the verification suite.
  *
  * Model: analyze one prl1…/tprl1… address (GET-only Blockbook reads),
- * classify every UTXO (dust <546 grains / uneconomic / healthy), plan a
+ * classify every UTXO (dust <333 grains / uneconomic / healthy), plan a
  * keypath consolidation under a user-set fee rate with loud breakeven
  * refusal, sign locally (WIF or xprv, in-memory only, address-match guard),
  * re-verify every Schnorr signature, track the consolidation txid, and
@@ -216,8 +216,8 @@ export async function broadcastSweepTx(fetcher = defaultFetcher, blockbookBase, 
 /* ---------------- classification ---------------- */
 
 export const BUCKETS = [
-  { label: "< 546 (dust)", min: 0n, max: 545n },
-  { label: "546 – 999", min: 546n, max: 999n },
+  { label: "< 333 (dust)", min: 0n, max: 332n },
+  { label: "333 – 999", min: 333n, max: 999n },
   { label: "1k – 9,999", min: 1000n, max: 9999n },
   { label: "10k – 99,999", min: 10000n, max: 99999n },
   { label: "100k – 999,999", min: 100000n, max: 999999n },
@@ -225,7 +225,7 @@ export const BUCKETS = [
 ];
 
 /** Classify each UTXO at the given fee rate.
- *  dust: value < 546 grains (unspendable as an output — protocol floor).
+ *  dust: value < 333 grains (unspendable as an output — protocol floor).
  *  uneconomic: value < solo-spend cost (spending it alone loses money).
  *  healthy: everything else.
  *  Also flags net-negative inclusions (value < marginal input cost). */

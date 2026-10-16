@@ -28,7 +28,7 @@ builder address) and `builderTipGrainsFor()` computes the tip as its own
 output in the plan, before signing: the keypath sighash commits to every
 output, so the tip cannot be added or skimmed after signing, and the plan
 shows it as its own labeled line. It is waived on testnet and when 1% of
-the swept total would fall below the 546-grain dust floor (never rounded
+the swept total would fall below the 333-grain dust floor (never rounded
 up). With the box off, the plan is identical to the pre-tip planner.
 Recipient: `prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`
 (the same operator address in every Gift footer).

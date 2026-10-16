@@ -33,7 +33,7 @@
 //     only becomes valid after its nLockTime.
 //
 // Protocol facts (verified against upstream, not from memory):
-//   - P2TR dust 546 grains, tx version 1, bech32m HRPs prl/tprl,
+//   - P2TR dust 333 grains, tx version 1, bech32m HRPs prl/tprl,
 //     BIP-86 coin types 808276 (mainnet) / 1 (testnet).
 //   - TapLeaf/TapBranch/TapTweak tags: BIP-341.
 import {

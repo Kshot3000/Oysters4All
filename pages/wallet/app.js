@@ -773,7 +773,7 @@ $("send-max").addEventListener("click", function () {
   if (!total) { toast("No confirmed funds to send"); return; }
   var fee = W.feeFor(Math.max(1, session.utxos.length), 1, feeRate()); // 1 output, no change
   var max = total - fee;
-  if (max <= 546) { toast("Balance too small to cover the fee"); return; }
+  if (max <= 333) { toast("Balance too small to cover the fee"); return; }
   $("send-amt").value = W.fmtPRL(max);
   updateSendFiat(); updateFeeNote();
   toast("Max set — fee deducted");
@@ -790,7 +790,7 @@ $("btn-review").addEventListener("click", async function () {
   var amountGrains = 0;
   try {
     amountGrains = W.prlToGrains(amtStr);
-    if (amountGrains < 546) throw new Error("below dust (546 grains)");
+    if (amountGrains < 333) throw new Error("below dust (333 grains)");
     $("send-amt-err").textContent = "";
   } catch (e) { $("send-amt-err").textContent = "Invalid amount: " + e.message; bad = true; }
   if (bad) return;

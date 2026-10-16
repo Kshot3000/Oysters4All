@@ -3513,7 +3513,7 @@ var PearlWallet = (() => {
     hrp: "prl",
     coinType: 808276,
     txVersion: 1,
-    dust: 546,
+    dust: 333,
     blockbook: "https://blockbook.pearlresearch.ai"
   };
   function taggedHash2(tag, msg) {
@@ -5843,7 +5843,7 @@ zoo`.split("\n");
 
   // src/pearl-wallet-core.js
   var GRAIN_PER_PRL = 1e8;
-  var DUST_GRAIN = 546;
+  var DUST_GRAIN = 333;
   var NETWORKS = {
     mainnet: {
       id: "mainnet",

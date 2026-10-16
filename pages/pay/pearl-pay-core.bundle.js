@@ -3291,7 +3291,7 @@ var PearlPayCore = (() => {
 
   // pearl-pay-core.js
   var GRAIN_PER_PRL = 1e8;
-  var DUST_GRAIN = 546;
+  var DUST_GRAIN = 333;
   var GAP_LIMIT_DEFAULT = 20;
   var COINGECKO_PRICE_URL = "https://api.coingecko.com/api/v3/simple/price?ids=pearl-2&vs_currencies=usd&include_24hr_change=true";
   var NETWORKS = {

@@ -12,7 +12,7 @@
  *   3. SETTLE: net balances are derived, then the minimal transfer set is
  *      computed with greedy largest-debtor / largest-creditor matching (which
  *      is count-minimal for this matching problem). Any transfer below the
- *      546-grain dust floor is REFUSED loudly — it cannot exist on-chain —
+ *      333-grain dust floor is REFUSED loudly — it cannot exist on-chain —
  *      and the desk says exactly whose debt is unpayable and how to fix it
  *      (settle it off-ledger, or fold it into another transfer).
  *   4. PAY: each debtor pays their own settlement transaction: fetch their
@@ -60,7 +60,7 @@ export const MAX_MEMBERS = 100;
  * they owe, as its own output in their settlement transaction, to the
  * operator address published in every Split page footer. The checkbox in
  * the Pay step is unchecked by default; with it off (or on testnet, or
- * when 1% would fall below the 546-grain dust floor) the plan is
+ * when 1% would fall below the 333-grain dust floor) the plan is
  * byte-identical to the pre-tip planner — no tip output exists at all.
  * When on, the tip is just another recipient in the debtor's plan BEFORE
  * signing: the debtor is the sole signer and the keypath sighash commits

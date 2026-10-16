@@ -51,7 +51,7 @@
  * BIP-68; leaf version 0xc0 per BIP-341. No new cryptography.
  *
  * Protocol facts (verified, not from memory):
- *  - P2TR dust 546 grains; tx version from network.txVersion (pearld = 1);
+ *  - P2TR dust 333 grains; tx version from network.txVersion (pearld = 1);
  *    bech32m HRPs prl/tprl/rprl; BIP-86 coin type 808276/1.
  *  - TargetTimePerBlock = 3m14s = 194s (node/chaincfg/params.go).
  *  - BIP-68 CSV block delays use sequences 1..65535 with the type flag

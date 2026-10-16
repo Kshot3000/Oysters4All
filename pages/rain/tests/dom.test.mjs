@@ -143,7 +143,7 @@ test("flow: recipients -> plan -> sign (committed bundle)", () => {
   assert.ok(getEl("recip-summary").innerHTML.includes("merged"));
 
   // dust line refused
-  setVal("recip-list", `${R1} 545 grains`);
+  setVal("recip-list", `${R1} 332 grains`);
   click("recip-parse");
   assert.equal(getEl("recip-error").hidden, false);
   assert.match(getEl("recip-error").textContent, /dust/);

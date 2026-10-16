@@ -98,8 +98,8 @@ function buildTerms(networkId = "mainnet") {
     oracleName: "O", oraclePubkey: xonly(ORACLE),
     eventId, oracleCommits: commits,
     outcomes: [
-      { label: "alice wins", aliceGrains: distributable - 546, bobGrains: 546 },
-      { label: "bob wins", aliceGrains: 546, bobGrains: distributable - 546 },
+      { label: "alice wins", aliceGrains: distributable - 333, bobGrains: 333 },
+      { label: "bob wins", aliceGrains: 333, bobGrains: distributable - 333 },
     ],
     collateralAlice: 100_000_000, collateralBob: 100_000_000,
     fundingFeeRate: 5, cetFeeRate: 5, refundFeeRate: 5,
@@ -125,7 +125,7 @@ test("draft: descriptor seals and re-verifies; tampering is caught", () => {
     bobName: "B", bobKey: ALICE, bobKind: "priv",
     oracleName: "O", oraclePubkey: xonly(ORACLE), eventId: "e",
     oracleCommits: P.oracleAnnouncements(ORACLE, "e", 2).map((a) => a.pointXHex),
-    outcomes: [{ label: "a", aliceGrains: 100000000 - 546 - 300, bobGrains: 546 }, { label: "b", aliceGrains: 546, bobGrains: 100000000 - 546 - 300 }],
+    outcomes: [{ label: "a", aliceGrains: 100000000 - 333 - 300, bobGrains: 333 }, { label: "b", aliceGrains: 333, bobGrains: 100000000 - 333 - 300 }],
     collateralAlice: 50000000, collateralBob: 50000000,
     fundingFeeRate: 5, cetFeeRate: 5, refundFeeRate: 5, refundLockHeight: 900000,
   }), /different keys/);

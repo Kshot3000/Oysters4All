@@ -131,7 +131,7 @@
       if (!items.length) { hint.textContent = ""; return; }
       let total = 0n;
       for (const it of items) total += R.parsePRLToGrains(it.amountPRL);
-      const dust = total < R.MIN_TOTAL_GRAINS ? " — below the 546-grain dust floor ⚠" : "";
+      const dust = total < R.MIN_TOTAL_GRAINS ? " — below the 333-grain dust floor ⚠" : "";
       hint.textContent = "Running total: " + R.formatPRL(total) + " PRL (" + total.toString() + " grains)" + dust;
       hint.classList.toggle("warn", total < R.MIN_TOTAL_GRAINS);
     } catch {

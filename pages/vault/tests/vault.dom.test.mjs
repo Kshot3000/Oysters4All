@@ -237,7 +237,7 @@ test("plan: bundle builds with exact fee math", async () => {
 
 test("plan: dust output refused loudly", () => {
   const d = T.state().descriptor;
-  T.addRecip(d.address, "0.000001"); // 100 grains < 546 dust
+  T.addRecip(d.address, "0.000001"); // 100 grains < 333 dust
   get("plan-build").click();
   assert.match(T.err().text, /dust/);
 });

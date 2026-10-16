@@ -37,7 +37,7 @@ the fill dialog before signing; the seller always receives the exact listed
 price (the seller's 0x83 presignature commits only to output 0, so the
 buyer-added fee output cannot alter the seller's terms). Testnet fills carry
 no platform fee, and the fee is waived when 1% of the price would fall below
-the 546-grain dust floor instead of being rounded up.
+the 333-grain dust floor instead of being rounded up.
 
 ## The 0x83 signature model
 

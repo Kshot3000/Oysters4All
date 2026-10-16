@@ -30,7 +30,7 @@ Five steps: **Tab → Expenses → Settle → Pay → Ledger**.
    clears the tab. The settlement is sealed in a tamper-evident
    `pearlsplit:v1:` descriptor with a 64-bit fingerprint (deterministic —
    the same tab always seals to the same fingerprint). Transfers below the
-   546-grain dust floor **cannot** be chain outputs; they are refused
+   333-grain dust floor **cannot** be chain outputs; they are refused
    loudly, with the fix spelled out (settle in person, or fold into another
    transfer).
 4. **Pay** — each debtor settles their own debt in one transaction: UTXOs
@@ -50,7 +50,7 @@ Five steps: **Tab → Expenses → Settle → Pay → Ledger**.
 - Pearl has no smart contracts and no on-chain expense state. The desk
   knows only what you type: member addresses, expense amounts, and UTXOs
   are your word. A settlement is only as fair as the expenses you chalk up.
-- Dust is real: a debt under 546 grains cannot be paid on-chain. The desk
+- Dust is real: a debt under 333 grains cannot be paid on-chain. The desk
   refuses it loudly and tells you how to clear it.
 - Fees are estimates at signing time; a broadcast tx can linger if the
   mempool is hot.
@@ -65,7 +65,7 @@ builder address published in the page footer
 (`prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`).
 It is **off by default** — with the box unticked the plan is byte-identical
 to the pre-tip planner and no tip output exists. Mainnet only; when 1%
-would fall below the 546-grain dust floor the tip is waived, never rounded
+would fall below the 333-grain dust floor the tip is waived, never rounded
 up. The tip is part of the plan before signing (the debtor is the sole
 signer and the sighash commits to every output), it is shown as its own
 labeled line in the funding plan, and it travels inside the air-gapped

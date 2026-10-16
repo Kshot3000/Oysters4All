@@ -113,7 +113,7 @@
     <p class="lede">Net balances are derived from every expense, then the desk matches the largest debtor
     against the largest creditor, greedily — each transfer zeroes at least one party, so the set is the
     <strong>minimal number of transfers</strong> that clears the tab. Transfers below the
-    <strong>546-grain dust floor</strong> cannot be chain outputs; they are refused loudly, never rounded away,
+    <strong>333-grain dust floor</strong> cannot be chain outputs; they are refused loudly, never rounded away,
     with the fix spelled out.</p>
     <div class="row">
       <button id="st-compute" class="primary">Compute settlement</button>
@@ -152,7 +152,7 @@
     <div class="form-grid">
       <label>Debtor <select id="pay-debtor"></select></label>
       <label>Fee rate (grains/vB) <input id="pay-feerate" type="number" min="1" step="any" value="2"></label>
-      <label class="wide"><input type="checkbox" id="pay-tip"> Optional builder tip — add 1% of what this debtor owes as its own output to the builder (<code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>). <span class="hint">Off by default. Mainnet only; waived when 1% would fall below the 546-grain dust floor. Shown in the funding plan before you sign — never added after signing.</span></label>
+      <label class="wide"><input type="checkbox" id="pay-tip"> Optional builder tip — add 1% of what this debtor owes as its own output to the builder (<code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>). <span class="hint">Off by default. Mainnet only; waived when 1% would fall below the 333-grain dust floor. Shown in the funding plan before you sign — never added after signing.</span></label>
       <label>Blockbook base URL <span class="hint">GET-only reads.</span>
         <input id="pay-blockbook" autocomplete="off" spellcheck="false" placeholder="https://…"></label>
       <label class="wide">…or paste UTXOs (JSON) <span class="hint">[{"txid":"…","vout":0,"value":grains}]</span>
@@ -230,7 +230,7 @@
       <li><strong>The desk knows only what you type.</strong> Member addresses, expense amounts, and UTXOs are
       your word — Pearl has no smart contracts and no on-chain expense state. A settlement is only as fair as
       the expenses you chalk up.</li>
-      <li><strong>Dust is real.</strong> A debt under 546 grains cannot be paid on-chain; the desk refuses it
+      <li><strong>Dust is real.</strong> A debt under 333 grains cannot be paid on-chain; the desk refuses it
       loudly and tells you how to clear it. Tiny tabs may settle best over the bar counter.</li>
       <li><strong>Keys.</strong> Pasted secrets live in memory only and are wiped after signing. Prefer the
       air-gapped bundle flow for mainnet money.</li>
@@ -249,7 +249,7 @@
   <p class="fine">Pearl has no smart contracts — every settlement here is plain Taproot keypath spends, planned grain-exact and signed in your browser.</p>
 </footer>
 
-<script src="pearl-split.bundle.js?v=6"></script>
+<script src="pearl-split.bundle.js?v=7"></script>
 <script src="app.js?v=4"></script>
 </body>
 </html>

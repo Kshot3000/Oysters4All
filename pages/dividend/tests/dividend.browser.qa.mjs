@@ -146,7 +146,7 @@ async function main() {
       const funder = P.parseBatchSecret('99'.repeat(32), P.NETWORKS.mainnet).address;
       window.__qaFunder = funder;
       T.set('plan-pool', '1'); T.set('plan-rule', 'proportional');
-      T.set('plan-dust', '0.00000546'); T.set('plan-feerate', '2');
+      T.set('plan-dust', '0.00000333'); T.set('plan-feerate', '2');
       T.set('plan-funder', funder);
       T.click('plan-build');
     })()`);

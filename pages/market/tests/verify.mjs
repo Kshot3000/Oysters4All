@@ -58,7 +58,7 @@ const sellerSpkHex = bytesToHex(p2trScriptPubKey(sellerProg));
 function mkListing(over = {}) {
   return makeListing({
     tick: "prls", amt: "100000",
-    lotTxid: "ab".repeat(32), lotVout: 0, lotValue: 546, lotSpkHex: sellerSpkHex,
+    lotTxid: "ab".repeat(32), lotVout: 0, lotValue: 333, lotSpkHex: sellerSpkHex,
     priceGrains: "250000000", seller: seller.address,
     expiry: Date.now() + 86400000,
     ...over,
@@ -80,22 +80,22 @@ function signedListing(over = {}) {
     0x00, 0x83, ...u32le(NW.txVersion), ...u32le(0), // epoch, hash_type, version, locktime
     0x00, // spend_type: keypath, no annex
     ...txidLE(lotTxid), ...u32le(0), // outpoint
-    ...u64le(546), ...varint(spk.length), ...spk, // prev txout (amount+spk)
+    ...u64le(333), ...varint(spk.length), ...spk, // prev txout (amount+spk)
     ...u32le(0xffffffff), // sequence
     ...sha256(Uint8Array.from([...u64le(price), ...varint(p2trScriptPubKey(priceProg).length), ...p2trScriptPubKey(priceProg)])), // sha_single_output
   ];
   const expected = taggedHash("TapSighash", Uint8Array.from(msg));
   const got = keypathSigDigestEx(NW,
-    [{ txid: lotTxid, vout: 0, value: 546, spk }],
+    [{ txid: lotTxid, vout: 0, value: 333, spk }],
     [{ program: priceProg, value: price }],
     0xffffffff, 0, 0x83);
   ok("sighash-0x83-matches-consensus-layout", bytesToHex(got) === bytesToHex(expected));
   ok("sighash-0x83-differs-from-default",
     bytesToHex(got) !== bytesToHex(keypathSigDigestEx(NW,
-      [{ txid: lotTxid, vout: 0, value: 546, spk }],
+      [{ txid: lotTxid, vout: 0, value: 333, spk }],
       [{ program: priceProg, value: price }], 0xffffffff, 0, 0x00)));
   throws("sighash-rejects-bad-hashtype", () =>
-    keypathSigDigestEx(NW, [{ txid: lotTxid, vout: 0, value: 546, spk }],
+    keypathSigDigestEx(NW, [{ txid: lotTxid, vout: 0, value: 333, spk }],
       [{ program: priceProg, value: price }], 0xffffffff, 0, 0x01));
 }
 
@@ -167,7 +167,7 @@ function signedListing(over = {}) {
   ok("platform-fee-1pct-of-price", fill.platformFeeGrains === 2_500_000, `got ${fill.platformFeeGrains}`);
   ok("platform-fee-fn-matches", platformFeeGrainsFor(250_000_000, NW) === 2_500_000);
   ok("platform-fee-testnet-waived", platformFeeGrainsFor(250_000_000, NETWORKS.testnet) === 0);
-  ok("platform-fee-subdust-waived", platformFeeGrainsFor(50_000, NW) === 0); // 1% = 500 < 546 dust
+  ok("platform-fee-subdust-waived", platformFeeGrainsFor(25_000, NW) === 0); // 1% = 250 < 333 dust
   throws("platform-fee-bad-price", () => platformFeeGrainsFor(0, NW));
   throws("select-rejects-subdust-platform-fee", () => selectFillCoins({
     buyerUtxos, priceGrains: 250_000_000, feeRate: 5, platformFeeGrains: 100,
@@ -176,8 +176,8 @@ function signedListing(over = {}) {
     buyerUtxos, priceGrains: 250_000_000, feeRate: 5, platformFeeGrains: -5,
   }));
   // fee math: inputs == outputs + network fee (outputs include platform fee)
-  const totalIn = 546 + 400_000_000;
-  const totalOut = 250_000_000 + 546 + fill.platformFeeGrains + fill.changeGrains;
+  const totalIn = 333 + 400_000_000;
+  const totalOut = 250_000_000 + 333 + fill.platformFeeGrains + fill.changeGrains;
   ok("fill-conservation", totalIn - totalOut === fill.feeGrains, `${totalIn - totalOut} vs ${fill.feeGrains}`);
   ok("fill-vbytes-sane", fillTxVBytes(1, fill.nOut) >= 100 && fillTxVBytes(1, fill.nOut) < 1000);
 
@@ -185,13 +185,13 @@ function signedListing(over = {}) {
   const buyerProg = tweakKeypath(buyer.internalXOnly).tweakedX;
   const lotSpk = hexToBytes(sellerSpkHex);
   const dInputs = [
-    { txid: l.lotTxid, vout: 0, value: 546, spk: lotSpk },
+    { txid: l.lotTxid, vout: 0, value: 333, spk: lotSpk },
     { txid: "11".repeat(32), vout: 0, value: 400_000_000, spk: p2trScriptPubKey(buyerProg) },
   ];
   const platformProg = decodeBech32m(PLATFORM_FEE_ADDRESS, "prl").program;
   const dOutputs = [
     { program: sellerProg, value: 250_000_000 },
-    { program: buyerProg, value: 546 },
+    { program: buyerProg, value: 333 },
     { program: platformProg, value: 2_500_000 },
     ...(fill.changeGrains > 0 ? [{ program: buyerProg, value: fill.changeGrains }] : []),
   ];
@@ -255,7 +255,7 @@ function signedListing(over = {}) {
   const tSpkHex = bytesToHex(p2trScriptPubKey(tweakKeypath(tSeller.internalXOnly).tweakedX));
   const tListing = signListing(makeListing({
     tick: "prls", amt: "100000",
-    lotTxid: "ab".repeat(32), lotVout: 0, lotValue: 546, lotSpkHex: tSpkHex,
+    lotTxid: "ab".repeat(32), lotVout: 0, lotValue: 333, lotSpkHex: tSpkHex,
     priceGrains: "250000000", seller: tSeller.address,
     expiry: Date.now() + 86400000,
   }), tSeller, TN);
@@ -264,7 +264,7 @@ function signedListing(over = {}) {
     buyerUtxos: [{ txid: "88".repeat(32), vout: 0, value: 400_000_000, priv: tBuyer.priv, internalXOnly: tBuyer.internalXOnly }],
   });
   ok("fill-testnet-no-platform-fee", tFill.platformFeeGrains === 0 &&
-    (400_000_546 - (250_000_000 + 546 + tFill.changeGrains)) === tFill.feeGrains);
+    (400_000_333 - (250_000_000 + 333 + tFill.changeGrains)) === tFill.feeGrains);
 }
 
 /* ============ 4. matching engine ============ */
@@ -439,7 +439,7 @@ function signedListing(over = {}) {
     calls.push(url);
     const body = url.endsWith("/tokens") ? { tokens: [{ ticker: "prls" }], total: 1 }
       : url.includes("/transfer-lots") ? { transferLots: [{ id: "l1", ticker: "prls", amount: "100", currentOutpoint: `${"ab".repeat(32)}:0` }], tokens: {}, total: 1 }
-      : url.includes("/utxos") ? { utxos: [{ outpoint: `${"ab".repeat(32)}:0`, valueGrain: "546", protected: true }] }
+      : url.includes("/utxos") ? { utxos: [{ outpoint: `${"ab".repeat(32)}:0`, valueGrain: "333", protected: true }] }
       : {};
     return { ok: true, json: async () => body };
   };

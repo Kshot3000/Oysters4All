@@ -31,7 +31,7 @@
  * addresses (minus an equal fee share).
  *
  * Money math: grain-exact BigInt-free integer grains (safe-integer checked),
- * dust floor 546, block target 194 s (node/chaincfg/params.go TargetTimePerBlock).
+ * dust floor 333, block target 194 s (node/chaincfg/params.go TargetTimePerBlock).
  * Cryptography: the audited Sign/Escrow/Games/Bond/Covenant lineage —
  * taggedHash, tapLeafHash, taptree2, BIP-341 script-path sighash (SIGHASH_DEFAULT),
  * BIP-340 Schnorr, bech32m, BIP-86 wallets. The ONLY local construction is

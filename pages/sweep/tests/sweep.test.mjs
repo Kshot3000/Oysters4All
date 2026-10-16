@@ -131,7 +131,7 @@ test("classifyUtxos: dust / uneconomic / healthy at a fixed rate", () => {
   assert.equal(s.healthyCount, 1);
   assert.equal(s.buckets[0].count, 1); // 100 -> dust bucket
   assert.equal(s.buckets[0].value, 100n);
-  assert.equal(s.buckets[1].count, 1); // 600 -> 546–999
+  assert.equal(s.buckets[1].count, 1); // 600 -> 333–999
   assert.equal(s.buckets[1].value, 600n);
 });
 
@@ -214,10 +214,10 @@ test("planSweep: refusal on dust output and on empty selection", () => {
   const { cs, rateMp } = classifiedFixture();
   // 3 inputs at 10000 gr/vB: fee = 227*10000 = 2,270,000 >> 1400 -> fee refusal already
   const dustCase = planSweep({
-    classified: classifyUtxos([utxo(9, 500n)], 1000n), strategy: "uneconomic",
+    classified: classifyUtxos([utxo(9, 300n)], 1000n), strategy: "uneconomic",
     nOutputs: 1, targetProgram: PROGRAM, rateMp: 1000n, network: NET,
   });
-  // 500 is dust; 500 - 111 = 389 < 546 dust floor -> dust-output refusal
+  // 300 is dust; 300 - 111 = 189 < 333 dust floor -> dust-output refusal
   assert.equal(dustCase.refused, true);
   assert.match(dustCase.refusal, /dust output/i);
 
@@ -430,7 +430,7 @@ test("builderTipGrainsFor: 1% floor, mainnet only, opt-in only, sub-dust waived"
   assert.equal(builderTipGrainsFor(258950n, NET, undefined), 0n);
   assert.equal(builderTipGrainsFor(258950n, NETWORKS.testnet, true), 0n);
   assert.equal(builderTipGrainsFor(8950n, NET, true), 0n); // 89 grains < dust — waived, never rounded up
-  assert.equal(builderTipGrainsFor(54600n, NET, true), 546n); // exactly at the dust floor
+  assert.equal(builderTipGrainsFor(33300n, NET, true), 333n); // exactly at the dust floor
 });
 
 test("planSweep builder tip: own flagged output, fee covers it, off = identical plan", () => {

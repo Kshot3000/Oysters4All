@@ -55,7 +55,7 @@ const confirmedTx = { ...structuredClone(parentTx), txid: CONFIRMED_TXID, confir
 const dustyTx = {
   txid: DUSTY_TXID, confirmations: 0, fees: "1000", vsize: 140,
   vin: [{ n: 0, txid: PREV_TXID, vout: 0, sequence: 0xfffffffd, value: "110000", addresses: [FIX1.address] }],
-  vout: [{ n: 0, value: "2000", spent: false, hex: FIX1.spkHex, addresses: [FIX1.address] }],
+  vout: [{ n: 0, value: "1800", spent: false, hex: FIX1.spkHex, addresses: [FIX1.address] }],
 };
 
 const fetchCalls = [];

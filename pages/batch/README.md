@@ -13,7 +13,7 @@ Five steps — **Recipients → Fund → Review → Sign → Broadcast**:
 
 1. **Recipients** — paste one `<address>, <amount>` per line (or import a CSV).
    Every address is bech32m/Taproot-validated (`prl1…`/`tprl1…`), every amount is
-   dust-checked (546-grain floor, refused — never rounded), memos are off-chain
+   dust-checked (333-grain floor, refused — never rounded), memos are off-chain
    labels only. Duplicate addresses merge into one output when merging is on;
    with merging off, duplicates refuse loudly.
 2. **Fund** — fetch the sender's UTXOs over GET-only Blockbook
@@ -45,7 +45,7 @@ the builder address published in the page footer
 (`prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`).
 It is **off by default** — with the box unticked the recipient list is
 byte-identical to the pre-tip planner and no tip output exists. Mainnet
-only; when 1% would fall below the 546-grain dust floor the tip is
+only; when 1% would fall below the 333-grain dust floor the tip is
 waived, never rounded up. The sender is the sole signer and the tip
 joins the plan before signing, so the keypath sighash commits to it —
 it cannot be added or skimmed afterwards. It travels inside the
@@ -58,7 +58,7 @@ identical amount.
 ## Honest limits (always on screen)
 
 - No smart contracts on Pearl — one plain P2TR transaction, max 250 recipients.
-- Dust (< 546 grains) is refused everywhere; dust change becomes miner fee, disclosed.
+- Dust (< 333 grains) is refused everywhere; dust change becomes miner fee, disclosed.
 - Blockbook reads are GET-only and trust-minimized: every signed tx is locally verified.
 - Keys never leave the browser; there is no server, no account, no recovery.
 - Estimates only: fee rate is a guess until the tx confirms.

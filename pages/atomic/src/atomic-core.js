@@ -26,7 +26,7 @@
  * Protocol facts (verified, not from memory):
  *  - TapLeaf/TapBranch/TapTweak tags + branch sort order: BIP-341, and the
  *    single/double-leaf cases match commitKeyInfo()/taptree2 in the audited cores.
- *  - P2TR dust 546 grains, tx version 1, bech32m HRPs prl/tprl/rprl,
+ *  - P2TR dust 333 grains, tx version 1, bech32m HRPs prl/tprl/rprl,
  *    BIP-86 coin type 808276/1: pearl-knowledge.md (from node/chaincfg).
  *  - CLTV lock heights < 500000000 are block heights (BIP-65); the refund
  *    leaf needs tx locktime >= timeout and input sequence < 0xffffffff.

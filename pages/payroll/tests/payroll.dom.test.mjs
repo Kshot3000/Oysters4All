@@ -206,8 +206,8 @@ test("roster: sample validates — exact totals, 3 rows, labels", async () => {
   const m = T.state().roster;
   assert.ok(m, "roster accepted");
   assert.equal(get("r-tbody").children.length, 3);
-  assert.equal(m.total, "1125000546n");
-  assert.match(get("r-total").textContent, /11\.25000546 PRL/);
+  assert.equal(m.total, "1125000333n");
+  assert.match(get("r-total").textContent, /11\.25000333 PRL/);
   assert.match(get("r-merged").textContent, /none/);
   assert.match(get("r-tbody").children[0].textContent, /Alice/);
   assert.match(get("r-tbody").children[1].textContent, /Bob/);
@@ -219,7 +219,7 @@ test("roster: sample validates — exact totals, 3 rows, labels", async () => {
 test("roster: dust line refused, duplicates merge, merge-off refuses", async () => {
   get("st-roster").click();
   await tick();
-  get("r-text").value = `${A1}, 1\n${A2}, 545 grains`;
+  get("r-text").value = `${A1}, 1\n${A2}, 332 grains`;
   get("r-parse").click();
   await tick();
   assert.match(get("r-err").textContent, /dust floor/);
@@ -234,7 +234,7 @@ test("roster: dust line refused, duplicates merge, merge-off refuses", async () 
   assert.equal(get("r-tbody").children.length, 2);
   assert.match(get("r-merged").textContent, /1 duplicate/);
   // restore the full sample for the rest of the flow
-  get("r-text").value = `${A1}, 1.25, Alice\n${A2}, 546 grains, Bob\n${A3}, 10, Carol`;
+  get("r-text").value = `${A1}, 1.25, Alice\n${A2}, 333 grains, Bob\n${A3}, 10, Carol`;
   get("r-parse").click();
   await tick();
   assert.equal(get("r-tbody").children.length, 3);
@@ -268,12 +268,12 @@ test("roster: add / edit / remove rows, duplicates refused loudly", async () => 
   get("a-add").click();
   await tick();
   assert.match(get("a-msg").textContent, /Payee updated/);
-  assert.match(get("r-total").textContent, /12\.00000546 PRL/);
+  assert.match(get("r-total").textContent, /12\.00000333 PRL/);
   // remove row 4 through its Remove button: back to the 3-line roster
   rowBtns(3).remove.click();
   await tick();
   assert.equal(get("r-tbody").children.length, 3);
-  assert.match(get("r-total").textContent, /11\.25000546 PRL/);
+  assert.match(get("r-total").textContent, /11\.25000333 PRL/);
 });
 
 test("schedule: 12 biweekly paydays planned, countdown, per-run total", async () => {
@@ -290,7 +290,7 @@ test("schedule: 12 biweekly paydays planned, countdown, per-run total", async ()
   assert.equal(sch.runLabel, "October payroll");
   assert.equal(get("p-tbody").children.length, 12);
   assert.match(get("p-countdown").textContent, new RegExp(anchor));
-  assert.match(get("p-total-out").textContent, /11\.25000546 PRL/);
+  assert.match(get("p-total-out").textContent, /11\.25000333 PRL/);
   assert.ok(get("p-skip-warn").hidden, "no skip warning for a current anchor");
   // past anchor: the desk must say so, naming the skipped payday
   get("p-anchor").value = yesterdayIso();
@@ -380,9 +380,9 @@ test("fund: builder tip is off by default and opt-in shows its own labeled line"
   get("f-tip").checked = true;
   get("f-tip").fire("change");
   await tick();
-  // roster total 1,125,000,546 grains -> 1% tip = 11,250,005 grains = 0.11250005 PRL
+  // roster total 1,125,000,333 grains -> 1% tip = 11,250,003 grains = 0.11250003 PRL
   assert.match(get("f-totals").textContent, /Builder tip/);
-  assert.match(get("f-totals").textContent, /0\.11250005 PRL to builder \(optional, disclosed\)/);
+  assert.match(get("f-totals").textContent, /0\.11250003 PRL to builder \(optional, disclosed\)/);
   assert.match(get("f-totals").textContent, /OK — inputs = payees \+ fee \+ change/, "tipped run still balances");
   // restore the no-tip state for the review/sign flow below
   get("f-tip").checked = false;
@@ -511,5 +511,5 @@ test("address/txid title attributes are escaped (XSS audit latent queue)", () =>
   const src = fs.readFileSync(resolvePath(dir, "app.js"), "utf8");
   assert.ok(!/title="\$\{(r\.address|u\.txid|r\.txid|state\.senderAddress|e\.address)\}"/.test(src), "no raw title interpolation");
   assert.equal((src.match(/title="\$\{escapeHtml\(/g) || []).length, 7, "all seven titles escaped");
-  assert.ok(html.includes('app.js?v=5'), "cache key bumped");
+  assert.ok(html.includes('app.js?v=6'), "cache key bumped");
 });

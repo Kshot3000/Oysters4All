@@ -24,7 +24,7 @@ export const MAX_RBF_SEQUENCE = 0xfffffffd; // pearld MaxRBFSequence
 export const NON_RBF_SEQUENCE = 0xfffffffe; // "no RBF signal" opt-out
 export const FINAL_SEQUENCE = 0xffffffff;
 export const MIN_RELAY_PER_KB_GRAINS = 1000; // pearld DefaultMinRelayTxFee
-export const DUST_GRAINS = 546; // P2TR dust, matches upstream txrules / pearlpurse
+export const DUST_GRAINS = 333; // P2TR dust at pearld's default relay fee (node/mempool/policy.go GetDustThreshold: 3 x (43B output + 41 + CalcVsize(0,107)=27) = 333 grains; 546 was btcd's P2PKH figure)
 export const MAX_REPLACEMENT_EVICTIONS = 100; // pearld MaxReplacementEvictions
 
 export const BLOCKBOOK_MAINNET = "https://blockbook.pearlresearch.ai";

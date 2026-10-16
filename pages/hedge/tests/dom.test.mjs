@@ -240,7 +240,7 @@ test("write: full covered-call flow renders descriptor + vault address", () => {
 });
 
 test("write rejects dust collateral honestly", () => {
-  $("w-qty").value = "0.000001"; // 100 grains < 546 dust
+  $("w-qty").value = "0.000001"; // 100 grains < 333 dust
   $("w-write").click();
   assert.equal($("w-err").hidden, false);
   assert.ok(/dust/.test($("w-err").textContent), "error text: " + $("w-err").textContent);

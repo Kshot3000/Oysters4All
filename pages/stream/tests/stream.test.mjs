@@ -59,7 +59,7 @@ test("planStream: tick-lock math, rate*N total, validation errors", () => {
   assert.equal(schedule.tickSeconds, 86_400);
   assert.ok(schedule.descriptor.startsWith("stream:v1:prl:"));
   const base = { network: net, beneficiaryXOnly: B.xonly, funderXOnly: F.xonly, tickSeconds: 60, startTime: NOW, tickCount: 4 };
-  assert.throws(() => planStream({ ...base, rateGrainsPerTick: 545 }), /dust/);
+  assert.throws(() => planStream({ ...base, rateGrainsPerTick: 332 }), /dust/);
   assert.throws(() => planStream({ ...base, rateGrainsPerTick: 1.5 }), /integer/);
   assert.throws(() => planStream({ ...base, rateGrainsPerTick: 1000, tickCount: 0 }), /1\.\.256/);
   assert.throws(() => planStream({ ...base, rateGrainsPerTick: 1000, tickCount: 257 }), /1\.\.256/);
@@ -472,8 +472,8 @@ test("builderTipGrainsFor: exact 1%, mainnet only, opt-in only, sub-dust waived"
   assert.equal(builderTipGrainsFor(180_000_000, net, false), 0);
   assert.equal(builderTipGrainsFor(180_000_000, net, undefined), 0);
   assert.equal(builderTipGrainsFor(180_000_000, NETWORKS.testnet, true), 0);
-  assert.equal(builderTipGrainsFor(54_599, net, true), 0); // 1% = 545 grains < dust -> waived
-  assert.equal(builderTipGrainsFor(54_600, net, true), 546); // exactly at dust -> kept
+  assert.equal(builderTipGrainsFor(33_299, net, true), 0); // 1% = 332 grains < dust -> waived
+  assert.equal(builderTipGrainsFor(33_300, net, true), 333); // exactly at dust -> kept
 });
 
 function parseWireOutputs(hex, nIn) {

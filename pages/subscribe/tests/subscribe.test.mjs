@@ -108,7 +108,7 @@ test("validateTerms accepts good terms", () => {
 test("validateTerms refuses loudly: bad merchant / same address / dust / bounds", () => {
   assert.throws(() => validateTerms(goodTerms({ merchant: "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4" })), /merchant address/);
   assert.throws(() => validateTerms(goodTerms({ merchant: ANCHOR })), /same address/);
-  assert.throws(() => validateTerms(goodTerms({ amountGrains: 545 })), /dust/);
+  assert.throws(() => validateTerms(goodTerms({ amountGrains: 332 })), /dust/);
   assert.throws(() => validateTerms(goodTerms({ periods: 0 })), /periods/);
   assert.throws(() => validateTerms(goodTerms({ periods: 61 })), /periods/);
   assert.throws(() => validateTerms(goodTerms({ periodBlocks: 143 })), /period/);
@@ -352,8 +352,8 @@ test("builderTipGrainsFor: exactness and waivers", () => {
   assert.equal(builderTipGrainsFor(100_000_000, NW, false), 0);
   assert.equal(builderTipGrainsFor(100_000_000, NW, undefined), 0);
   assert.equal(builderTipGrainsFor(100_000_000, NETWORKS.testnet, true), 0); // mainnet only
-  assert.equal(builderTipGrainsFor(54_599, NW, true), 0); // 1% = 545 < dust — waived, never rounded up
-  assert.equal(builderTipGrainsFor(54_600, NW, true), 546); // exactly at the dust floor — charged
+  assert.equal(builderTipGrainsFor(33_299, NW, true), 0); // 1% = 332 < dust — waived, never rounded up
+  assert.equal(builderTipGrainsFor(33_300, NW, true), 333); // exactly at the dust floor — charged
   assert.equal(BUILDER_TIP_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
 });
 

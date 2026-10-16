@@ -148,8 +148,8 @@ test("deriveShares fixed refuses an oversized promise", () => {
 
 test("dust shares are dropped loudly and accounted", () => {
   const s = snapshot(H());
-  // pool 1000 grains, proportional: A1 gets 100, A2 300, A3 600; floor 546 drops A1+A2
-  const r = D.deriveShares({ snapshot: s, poolGrains: 1000n, rule: "proportional", dustFloorGrains: 546n });
+  // pool 1000 grains, proportional: A1 gets 100, A2 300, A3 600; floor 333 drops A1+A2
+  const r = D.deriveShares({ snapshot: s, poolGrains: 1000n, rule: "proportional", dustFloorGrains: 333n });
   assert.equal(r.paid.length, 1);
   assert.equal(r.paid[0].address, A3);
   assert.equal(r.droppedDust.count, 2);
@@ -378,8 +378,8 @@ test("builderTipGrainsFor: exactness and waivers", () => {
   assert.equal(D.builderTipGrainsFor(100_000_000n, NET, false), 0n); // off
   assert.equal(D.builderTipGrainsFor(100_000_000n, NET, "yes"), 0n); // only === true counts
   assert.equal(D.builderTipGrainsFor(100_000_000n, D.NETWORKS.testnet, true), 0n); // testnet waived
-  assert.equal(D.builderTipGrainsFor(50_000n, NET, true), 0n); // 500 grains < dust — waived, never rounded up
-  assert.equal(D.builderTipGrainsFor(54_600n, NET, true), 546n); // exactly at the dust floor — charged
+  assert.equal(D.builderTipGrainsFor(25_000n, NET, true), 0n); // 250 grains < dust — waived, never rounded up
+  assert.equal(D.builderTipGrainsFor(33_300n, NET, true), 333n); // exactly at the dust floor — charged
 });
 
 test("builder tip sits ON TOP of the pool — holder shares unchanged", () => {

@@ -50,7 +50,7 @@ Live: https://kshot3000.github.io/Oysters4All/pages/charity/
 
 - **No new cryptography.** Everything cryptographic comes from the audited
   Sign lineage: bech32m, SHA-256, BIP-340 Schnorr, BIP-86 key derivation,
-  dust constants (`DUST_GRAIN = 546`), `GRAIN_PER_PRL` — reused from
+  dust constants (`DUST_GRAIN = 333`), `GRAIN_PER_PRL` — reused from
   `../sign/src/crypto.js` and `../escrow/src/escrow-core.js`. New in this app:
   only the canonical-JSON hashing, descriptor shaping, receipt records,
   lifecycle classification, and GET-only Blockbook readers.

@@ -60,7 +60,7 @@
     <ul>
       <li><strong>No auto-pay — ever.</strong> The schedule is a planner, not automation. Every payday is a separate manual signed dispatch you approve on the Review step. Pearl has no smart contracts; nothing can move PRL on a timer.</li>
       <li><strong>One sender key per run.</strong> Every input of a pay run must be spendable by the single key you sign with. Multi-key payrolls are not supported — split them.</li>
-      <li><strong>Dust is refused, never rounded.</strong> Any payee under 546 grains stops the roster with a loud error. Change under 546 grains is absorbed into the miner fee and disclosed on the review screen — never silently dropped.</li>
+      <li><strong>Dust is refused, never rounded.</strong> Any payee under 333 grains stops the roster with a loud error. Change under 333 grains is absorbed into the miner fee and disclosed on the review screen — never silently dropped.</li>
       <li><strong>Labels are off-chain bookkeeping.</strong> Payee names ride along in the unsigned bundle and the local history for your records — they never appear on-chain. Pearl transactions carry no memo field.</li>
       <li><strong>Builder tip is optional.</strong> The Fund step offers an opt-in 1% builder tip, off by default. It is never charged unless you tick the box, it appears as its own labeled payee line in the running totals and on the pay slip before signing, and testnet runs never carry it.</li>
       <li><strong>Blockbook is read-only until the single broadcast POST.</strong> UTXO scans and fee estimates are GET-only against the endpoint you configure. If it is unreachable, the page says so loudly — it never guesses.</li>
@@ -91,7 +91,7 @@
   <!-- STEP 1: ROSTER -->
   <section id="step-roster" class="panel active" aria-label="Roster">
     <h2>Roster <span class="sub">the payroll ledger — who gets paid, and how much</span></h2>
-    <p class="lede">Paste one payee per line — <code>&lt;address&gt;, &lt;amount&gt;, [label]</code> — or import a CSV. Every address is bech32m-validated, every amount is dust-checked (546-grain floor, refused — never rounded), duplicates merge into one payee when merging is on. Labels are your bookkeeping only. Nothing moves on this step.</p>
+    <p class="lede">Paste one payee per line — <code>&lt;address&gt;, &lt;amount&gt;, [label]</code> — or import a CSV. Every address is bech32m-validated, every amount is dust-checked (333-grain floor, refused — never rounded), duplicates merge into one payee when merging is on. Labels are your bookkeeping only. Nothing moves on this step.</p>
     <label class="wide">Payee roster
       <textarea id="r-text" rows="8" spellcheck="false" placeholder="prl1p…, 1.25, Alice — senior dev&#10;prl1p…, 500000 grains, Bob — bug bounty"></textarea>
     </label>
@@ -209,7 +209,7 @@
         <button class="btn ghost" id="f-none" type="button">Select none</button>
       </div>
       <div class="rowbtns">
-        <label class="check"><input type="checkbox" id="f-tip"> Optional builder tip — add 1% of this run's total as its own payee output to the builder (<code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>). Off by default. Mainnet only; waived when 1% would fall below the 546-grain dust floor. Shown in the running totals and on the pay slip before you sign — never added after signing.</label>
+        <label class="check"><input type="checkbox" id="f-tip"> Optional builder tip — add 1% of this run's total as its own payee output to the builder (<code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>). Off by default. Mainnet only; waived when 1% would fall below the 333-grain dust floor. Shown in the running totals and on the pay slip before you sign — never added after signing.</label>
       </div>
       <div class="tablewrap"><table class="ledger">
         <thead><tr><th></th><th>#</th><th>TXID</th><th>vout</th><th>Value</th><th>Conf</th></tr></thead>
@@ -377,7 +377,7 @@
   </div>
 </footer>
 
-<script src="pearl-payroll.bundle.js?v=6"></script>
-<script src="app.js?v=5"></script>
+<script src="pearl-payroll.bundle.js?v=7"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>

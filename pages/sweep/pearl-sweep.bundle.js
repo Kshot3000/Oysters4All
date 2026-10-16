@@ -4746,7 +4746,7 @@ zoo`.split("\n");
 
   // ../sign/src/crypto.js
   var GRAIN_PER_PRL = 1e8;
-  var DUST_GRAIN = 546;
+  var DUST_GRAIN = 333;
   var NETWORKS = {
     mainnet: {
       id: "mainnet",
@@ -5306,8 +5306,8 @@ zoo`.split("\n");
     return txid;
   }
   var BUCKETS = [
-    { label: "< 546 (dust)", min: 0n, max: 545n },
-    { label: "546 \u2013 999", min: 546n, max: 999n },
+    { label: "< 333 (dust)", min: 0n, max: 332n },
+    { label: "333 \u2013 999", min: 333n, max: 999n },
     { label: "1k \u2013 9,999", min: 1000n, max: 9999n },
     { label: "10k \u2013 99,999", min: 10000n, max: 99999n },
     { label: "100k \u2013 999,999", min: 100000n, max: 999999n },

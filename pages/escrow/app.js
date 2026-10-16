@@ -223,7 +223,7 @@
     list.innerHTML = `<div class="form-grid">
       <label class="wide">Funding txid<input id="mu-txid" spellcheck="false" placeholder="64 hex chars"></label>
       <label>vout<input id="mu-vout" type="number" min="0" value="0"></label>
-      <label>Value (grains)<input id="mu-value" type="number" min="546" placeholder="e.g. 500000000"></label>
+      <label>Value (grains)<input id="mu-value" type="number" min="333" placeholder="e.g. 500000000"></label>
     </div><div class="row"><button id="mu-use" class="btn primary">Use this UTXO</button></div>
     <p class="hint">Only use a confirmed funding output you control. The app cannot verify confirmation here — double-check in an explorer.</p>`;
     $("mu-use").addEventListener("click", () => {
@@ -233,7 +233,7 @@
         if (!/^[0-9a-f]{64}$/.test(txid)) throw new Error("bad txid");
         const vout = Number($("mu-vout").value), value = Number($("mu-value").value);
         if (!Number.isSafeInteger(vout) || vout < 0) throw new Error("bad vout");
-        if (!Number.isSafeInteger(value) || value < 546) throw new Error("value must be ≥ 546 grains");
+        if (!Number.isSafeInteger(value) || value < 333) throw new Error("value must be ≥ 333 grains");
         S.utxo = { txid, vout, value, confirmations: 0 };
         $("funding-status").textContent = `manual UTXO ${fmtPRL(value)} (unverified — confirm it yourself)`;
         $("to-spend").disabled = false;
@@ -294,7 +294,7 @@
     const g = BigInt(m[1]) * BigInt(E.GRAIN_PER_PRL) + BigInt((m[2] || "").padEnd(8, "0"));
     if (g <= 0n) throw new Error("amount must be a positive number");
     if (g > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("amount out of range");
-    if (g < 546n) throw new Error("amount below dust (546 grains)");
+    if (g < 333n) throw new Error("amount below dust (333 grains)");
     return Number(g);
   };
 
@@ -343,7 +343,7 @@
         const vB = E.spendVBytes({ nOut: 1, scriptLen: refundScript.length, controlLen: 65, stackLens: [64] });
         const fee = Math.ceil(vB * feeRate);
         const payVal = S.utxo.value - fee;
-        if (payVal < 546) throw new Error("insufficient funds for the refund fee");
+        if (payVal < 333) throw new Error("insufficient funds for the refund fee");
         plan = { outputs: [{ program: destProg, value: payVal }], fee, vBytes: vB, change: 0 };
         leafScript = refundScript; controlBlock = tree.controlBlocks[1];
         stackLens = [64]; sequence = 0xfffffffe; locktime = S.lockHeight;

@@ -157,7 +157,7 @@ test("builder tip: exactness, waivers, opt-in only", () => {
   assert.equal(builderTipGrainsFor(350_000_000n, NETWORKS.mainnet, undefined), 0n);
   assert.equal(builderTipGrainsFor(350_000_000n, NETWORKS.testnet, true), 0n, "testnet waived");
   assert.equal(builderTipGrainsFor(10_000n, NETWORKS.mainnet, true), 0n, "sub-dust 1% waived, never rounded up");
-  assert.equal(builderTipGrainsFor(54_600n, NETWORKS.mainnet, true), 546n, "exactly dust is charged");
+  assert.equal(builderTipGrainsFor(33_300n, NETWORKS.mainnet, true), 333n, "exactly dust is charged");
 });
 
 test("builder tip: tipped plan + signed tx carry the tip exact; off = pre-tip plan", () => {

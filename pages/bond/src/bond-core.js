@@ -26,7 +26,7 @@
  * Its consensus byte-equality is checked in tests/ against pearld's
  * txscript.CalcTaprootSignatureHash via a Go harness (see README).
  *
- * Money math: 30/360 day count, coupons rounded to grains, dust floor 546,
+ * Money math: 30/360 day count, coupons rounded to grains, dust floor 333,
  * block target 194 s (node/chaincfg/params.go TargetTimePerBlock).
  */
 

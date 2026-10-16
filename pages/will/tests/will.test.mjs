@@ -218,8 +218,8 @@ test("builder tip: exactness, opt-in gate, mainnet-only, dust waiver", () => {
   assert.equal(W.builderTipGrainsFor(200_000_000_00, net, false), 0);
   assert.equal(W.builderTipGrainsFor(200_000_000_00, net, 1), 0); // only === true counts
   assert.equal(W.builderTipGrainsFor(200_000_000_00, W.NETWORKS.testnet, true), 0);
-  assert.equal(W.builderTipGrainsFor(50_000, net, true), 0); // 500 < dust: waived, not rounded up
-  assert.equal(W.builderTipGrainsFor(54_600, net, true), 546); // exact dust floor is charged
+  assert.equal(W.builderTipGrainsFor(25_000, net, true), 0); // 250 < dust: waived, not rounded up
+  assert.equal(W.builderTipGrainsFor(33_300, net, true), 333); // exact dust floor is charged
 });
 
 test("owner claim with builder tip: tip output exact on the signed wire, re-verifies, conserves", () => {

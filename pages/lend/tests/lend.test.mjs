@@ -163,8 +163,8 @@ test("builder tip: exactness, waivers, mainnet-only, opt-in only", () => {
   assert.equal(L.builderTipGrainsFor(collateral, NET, false), 0n, "off unless enabled === true");
   assert.equal(L.builderTipGrainsFor(collateral, NET, undefined), 0n);
   assert.equal(L.builderTipGrainsFor(collateral, L.NETWORKS.testnet, true), 0n, "mainnet only");
-  assert.equal(L.builderTipGrainsFor(50000n, NET, true), 0n, "1% below dust is waived, never rounded up");
-  assert.equal(L.builderTipGrainsFor(54600n, NET, true), 546n, "exact dust-floor tip is charged");
+  assert.equal(L.builderTipGrainsFor(25000n, NET, true), 0n, "1% below dust is waived, never rounded up");
+  assert.equal(L.builderTipGrainsFor(33300n, NET, true), 333n, "exact dust-floor tip is charged");
   assert.equal(L.BUILDER_TIP_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
 });
 

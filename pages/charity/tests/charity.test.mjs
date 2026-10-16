@@ -63,7 +63,7 @@ test("forge validation guards refuse bad input loudly", () => {
   assert.throws(() => forge({ recipient: "tprl1pft455f03ps70k9wkvsvg7xk46ftaejkjmsh7gaj9439ssqkjczrqjfpnkh".slice(0, 62) + "x" }), /rejected/);
   assert.throws(() => forge({ recipient: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh" }), /wrong network|rejected/);
   assert.throws(() => forge({ goalPRL: "0" }), /positive/);
-  assert.throws(() => forge({ goalPRL: "0.000005" }), /dust floor/); // 500 grains < dust
+  assert.throws(() => forge({ goalPRL: "0.000003" }), /dust floor/); // 300 grains < dust
   assert.throws(() => forge({ goalPRL: "abc" }), /not a PRL amount/);
   assert.throws(() => forge({ deadlineHeight: 42 }), /paste error/);
   assert.throws(() => forge({ deadlineHeight: 500000000 }), /block height/);
@@ -73,7 +73,7 @@ test("forge validation guards refuse bad input loudly", () => {
 
 test("parsePRLToGrains / fmtPRL", () => {
   assert.equal(parsePRLToGrains("100"), 100 * GRAIN_PER_PRL);
-  assert.equal(parsePRLToGrains("0.00000546"), 546);
+  assert.equal(parsePRLToGrains("0.00000333"), 333);
   assert.equal(fmtPRL(parsePRLToGrains("1.5")), "1.5");
   assert.equal(fmtPRL(parsePRLToGrains("100")), "100");
   assert.throws(() => parsePRLToGrains("0.00000001"), /dust floor/); // 1 grain

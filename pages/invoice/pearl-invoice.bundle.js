@@ -5690,7 +5690,7 @@ zoo`.split("\n");
   // src/invoice-core.js
   var DONATE_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
   var INVOICE_ACCOUNT = 9001;
-  var MIN_TOTAL_GRAINS = 546n;
+  var MIN_TOTAL_GRAINS = 333n;
   var VERSION = "v1";
   var DESCRIPTOR_PREFIX = "pearl-invoice";
   var RECEIPT_PREFIX = "pearl-invoice-receipt";

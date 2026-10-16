@@ -256,7 +256,7 @@ test("verify step: plan-only verify returns PROVEN", async () => {
   });
   const plan = P.planDividend({
     network: P.NETWORKS.mainnet, snapshot: sealed, snapshotFingerprint: sealed.fingerprint,
-    rule: "proportional", poolPRL: "1", dustPRL: "0.00000546", feeRate: 2,
+    rule: "proportional", poolPRL: "1", dustPRL: "0.00000333", feeRate: 2,
     maxOutputsPerTx: 250, exclusions: [], minBalanceUnits: "0",
     treasuryAddress: null, funderAddress: FUNDER, memo: "",
   });

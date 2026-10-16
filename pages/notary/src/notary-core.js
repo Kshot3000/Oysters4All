@@ -23,7 +23,7 @@
  *    Pearlscriptions/indexer docs/prl-20-v0-spec.md, mirrored by
  *    crypto.js buildInscriptionScript and etch-core extractEnvelopes.
  *  - Pearl chain params: bech32m HRPs prl/tprl, BIP-86 coin 808276/1,
- *    P2TR dust 546 grains (see hidden_files/pearl-knowledge.md).
+ *    P2TR dust 333 grains (see hidden_files/pearl-knowledge.md).
  */
 
 import {
@@ -156,7 +156,7 @@ export function addressToProgram(address, network) {
 
 /* ---------------- commit/reveal plan ---------------- */
 
-export const CARRIER_VALUE_GRAINS = 1000; // inscribed owner output value (above 546 dust)
+export const CARRIER_VALUE_GRAINS = 1000; // inscribed owner output value (above 333 dust)
 
 /** Plan the notarization: envelope → script → commit key → reveal outputs →
  *  fees. Single-envelope: one owner output carrying the inscription.

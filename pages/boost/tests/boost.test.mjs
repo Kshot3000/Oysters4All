@@ -22,7 +22,7 @@ test("policy constants match pearld mempool source", () => {
   assert.equal(MAX_RBF_SEQUENCE, 0xfffffffd); // node/mempool/mempool.go
   assert.equal(MAX_REPLACEMENT_EVICTIONS, 100);
   assert.equal(MIN_RELAY_PER_KB_GRAINS, 1000); // DefaultMinRelayTxFee
-  assert.equal(DUST_GRAINS, 546);
+  assert.equal(DUST_GRAINS, 333);
 });
 
 /* ---------- BIP-125 sequence boundary ---------- */
@@ -90,9 +90,9 @@ test("planCpfp refuses when the target is already met by the parent alone", () =
 });
 
 test("planCpfp refuses dust child output", () => {
-  // childFee = 1510; output value 2000 -> 490 < 546 dust
+  // childFee = 1510; output value 1800 -> 290 < 333 dust
   assert.throws(
-    () => planCpfp({ parentFeeGrains: 1000, parentVBytes: 140, targetRate: 10, childVBytes: 111, spendValueGrains: 2000 }),
+    () => planCpfp({ parentFeeGrains: 1000, parentVBytes: 140, targetRate: 10, childVBytes: 111, spendValueGrains: 1800 }),
     /dust/
   );
 });
@@ -132,9 +132,9 @@ test("planRbf refuses when absolute fee fails the min-relay rule", () => {
 });
 
 test("planRbf refuses dust fee-source output", () => {
-  // newFee = ceil(50*140) = 7000; feeDelta = 6000; 6400 - 6000 = 400 < 546
+  // newFee = ceil(50*140) = 7000; feeDelta = 6000; 6300 - 6000 = 300 < 333
   assert.throws(
-    () => planRbf({ oldFeeGrains: 1000, oldVBytes: 140, targetRate: 50, feeSourceValue: 6400 }),
+    () => planRbf({ oldFeeGrains: 1000, oldVBytes: 140, targetRate: 50, feeSourceValue: 6300 }),
     /dust/
   );
 });

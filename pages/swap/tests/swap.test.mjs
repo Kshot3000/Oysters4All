@@ -508,8 +508,8 @@ test("builder tip: exactness and waivers", () => {
   assert.equal(builderTipGrainsFor(3000000000, net, false), 0, "off unless enabled === true");
   assert.equal(builderTipGrainsFor(3000000000, net, 1), 0, "truthy is not true");
   assert.equal(builderTipGrainsFor(3000000000, NETWORKS.testnet, true), 0, "mainnet only");
-  assert.equal(builderTipGrainsFor(54599, net, true), 0, "545-grain tip waived");
-  assert.equal(builderTipGrainsFor(54600, net, true), 546, "546-grain tip charged exactly");
+  assert.equal(builderTipGrainsFor(33299, net, true), 0, "332-grain tip waived");
+  assert.equal(builderTipGrainsFor(33300, net, true), 333, "333-grain tip charged exactly");
   assert.equal(builderTipGrainsFor(1000, net, true), 0, "10-grain tip waived");
 });
 

@@ -15,7 +15,7 @@
  *       the P2TR output Q can never be spent. Burns are provable *by
  *       construction* — anyone can recompute tag -> address and confirm.
  *   (2) Burn planner — exact unsigned burn tx: one P2TR output to the burn
- *       address plus one P2TR change output, dust floor 546 grains, real
+ *       address plus one P2TR change output, dust floor 333 grains, real
  *       vByte fee math (P2TR keypath input: 154 vB with 2 outputs, 111 vB
  *       with 1 output). The page never holds keys and never signs.
  *   (3) Burn certificate — a sealed `pearl-burn:v1:<hrp>:<sha256>` descriptor
@@ -55,7 +55,7 @@ const utf8 = (s) => TE.encode(s);
 export const SEAL_PREFIX = "pearl-burn:v1";
 export const NUMS_DOMAIN = "PearlBurnNUMS/v1";
 export const MAX_TAG_BYTES = 64;
-export const BURN_DUST_GRAIN = DUST_GRAIN; // 546 grains — Pearl P2TR dust floor
+export const BURN_DUST_GRAIN = DUST_GRAIN; // 333 grains — Pearl P2TR dust floor
 
 /** Normalize and validate a user-supplied burn tag. Tags are public — they
  *  go into the burn address derivation and the certificate. */

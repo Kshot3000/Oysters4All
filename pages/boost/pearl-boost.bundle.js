@@ -61,7 +61,7 @@ var PearlBoost = (() => {
   var NON_RBF_SEQUENCE = 4294967294;
   var FINAL_SEQUENCE = 4294967295;
   var MIN_RELAY_PER_KB_GRAINS = 1e3;
-  var DUST_GRAINS = 546;
+  var DUST_GRAINS = 333;
   var MAX_REPLACEMENT_EVICTIONS = 100;
   var BLOCKBOOK_MAINNET = "https://blockbook.pearlresearch.ai";
   function signalsRbf(sequences) {
@@ -5050,7 +5050,7 @@ zoo`.split("\n");
 
   // ../sign/src/crypto.js
   var GRAIN_PER_PRL = 1e8;
-  var DUST_GRAIN = 546;
+  var DUST_GRAIN = 333;
   var NETWORKS = {
     mainnet: {
       id: "mainnet",

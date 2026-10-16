@@ -105,8 +105,8 @@ const testnet = W.NETWORKS.testnet;
   ok("single utxo selected", s.inputs.length === 1 && s.nOut === 2);
   ok("change = total - target - fee", s.changeGrains === 100000 - 50000 - s.feeGrains && s.feeGrains === 1540, JSON.stringify(s));
   // dust change folds into fee (no change output)
-  s = W.selectCoins([U(60000, 0)], 58000, 10);
-  ok("dust change → no change output, fee absorbs", s.nOut === 1 && s.changeGrains === 0 && s.feeGrains === 60000 - 58000, JSON.stringify(s));
+  s = W.selectCoins([U(60000, 0)], 58130, 10); // change would be 330 < 333 dust
+  ok("dust change → no change output, fee absorbs", s.nOut === 1 && s.changeGrains === 0 && s.feeGrains === 60000 - 58130, JSON.stringify(s));
   // multiple inputs, largest-first
   s = W.selectCoins([U(10000, 0), U(50000, 1), U(30000, 2)], 55000, 10);
   ok("largest-first accumulation", s.inputs.length === 2 && s.inputs[0].value === 50000 && s.inputs[1].value === 30000, JSON.stringify(s.inputs.map((i) => i.value)));

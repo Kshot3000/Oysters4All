@@ -32,7 +32,7 @@ Six steps, one page, zero build step:
 
 The Award step offers an **optional 1% builder tip**, off by default. When
 the poster ticks the box, `builderTipGrainsFor()` computes 1% of the award
-(floor, BigInt; mainnet only; waived when 1% would fall below the 546-grain
+(floor, BigInt; mainnet only; waived when 1% would fall below the 333-grain
 dust floor instead of being rounded up) and the award plan adds it as its
 own output **out of the poster's own change** — the winner's award amount
 is byte-identical with the tip on or off. The tip joins the plan before the
@@ -51,7 +51,7 @@ in every Bounty footer: `prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8
 - Tamper-evident `bounty:v1:` descriptors with 64-bit fingerprints; award/reclaim
   txs are verified input-by-input against the re-derived contract (script +
   control block re-derive the bounty address).
-- Dust floor (546 grains), absolute-height deadline bounds, poster-key match on
+- Dust floor (333 grains), absolute-height deadline bounds, poster-key match on
   award/reclaim, double-confirm, key wipe, GET-only Blockbook reads.
 - Hunter board is localStorage-only (public commitments, never solutions/salts)
   — no listing relay.

@@ -342,7 +342,7 @@ test("app.js buildPlan guards recipient and change amounts with safeGrains", () 
   assert.ok(app.includes('safeGrains(pick.change, "Change amount")'), "change amount guarded");
   assert.ok(!app.includes("value: Number(grains)"), "no unguarded recipient conversion remains");
   assert.ok(!app.includes("value: Number(pick.change)"), "no unguarded change conversion remains");
-  assert.ok(html.includes('pearl-sign.bundle.js?v=8'), "bundle cache key bumped");
+  assert.ok(html.includes('pearl-sign.bundle.js?v=9'), "bundle cache key bumped");
 });
 
 

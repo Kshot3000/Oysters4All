@@ -24,7 +24,7 @@
 // sign.
 //
 // Protocol facts (verified against upstream, not from memory):
-//  - P2TR dust 546 grains, tx version 1, bech32m HRPs prl/tprl,
+//  - P2TR dust 333 grains, tx version 1, bech32m HRPs prl/tprl,
 //    BIP-86 coin types 808276 (mainnet) / 1 (testnet).
 //  - TapLeaf/TapBranch/TapTweak tags + branch sort: BIP-341; the single-leaf
 //    case matches commitKeyInfo() in sign/src/crypto.js.
@@ -464,7 +464,7 @@ export function ceilFeeGrains(vBytes, rateGrainsPerVByte) {
  * Plan a vault spend. selectedUtxos: [{txid, vout, value(BigInt-like)}].
  * recipients: [{address, grains(BigInt-like)}].
  * Returns the plan with exact fee math; throws loudly on any shortfall.
- * Dust change (< 546 gr) is absorbed into the fee and disclosed.
+ * Dust change (< 333 gr) is absorbed into the fee and disclosed.
  */
 export function planSpend({ network, descriptor, selectedUtxos, recipients, feeRateGrainsPerVByte, blockbookBase }) {
   if (!descriptor || !descriptor.address) throw new Error("VAULT REFUSED: no vault descriptor loaded");

@@ -201,7 +201,7 @@
       <label>Fee rate (grains/vB)<input id="a-feerate" inputmode="decimal" value="2"></label>
       <label>Poster key<input id="a-key" type="password" autocomplete="off" spellcheck="false" placeholder="paste the poster key"></label>
     </div>
-    <label class="check"><input type="checkbox" id="a-tip"> <span><b>Builder tip (optional):</b> add 1% of the award as a tip to the builder of this desk, <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>. The tip comes out of <em>your</em> change — the winner still receives the full award amount. If the pot cannot cover award + tip + fee, the award is refused rather than shorting the winner. Mainnet only; waived when 1% would fall below the 546-grain dust floor. Reclaims never carry a tip.</span></label>
+    <label class="check"><input type="checkbox" id="a-tip"> <span><b>Builder tip (optional):</b> add 1% of the award as a tip to the builder of this desk, <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>. The tip comes out of <em>your</em> change — the winner still receives the full award amount. If the pot cannot cover award + tip + fee, the award is refused rather than shorting the winner. Mainnet only; waived when 1% would fall below the 333-grain dust floor. Reclaims never carry a tip.</span></label>
     <div class="row">
       <button id="a-plan" class="primary">Plan award</button>
       <span id="a-err" class="err" role="alert"></span>
@@ -315,7 +315,7 @@
   <p class="dim">Pearl Bounty — pure Taproot script, no smart contracts. Verify every hex before you broadcast.</p>
 </footer>
 
-<script src="pearl-bounty.bundle.js?v=6"></script>
+<script src="pearl-bounty.bundle.js?v=7"></script>
 <script src="app.js?v=2"></script>
 </body>
 </html>

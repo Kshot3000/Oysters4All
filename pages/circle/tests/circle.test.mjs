@@ -251,8 +251,8 @@ test("builderTipGrainsFor: exactness + waivers", () => {
   assert.equal(builderTipGrainsFor(100_000_000, MAINNET, true), 1_000_000);
   assert.equal(builderTipGrainsFor(100_000_000, MAINNET, false), 0);
   assert.equal(builderTipGrainsFor(100_000_000, NETWORKS.testnet, true), 0);
-  assert.equal(builderTipGrainsFor(54_599, MAINNET, true), 0); // sub-dust waived
-  assert.equal(builderTipGrainsFor(54_600, MAINNET, true), 546); // exact dust charged
+  assert.equal(builderTipGrainsFor(33_299, MAINNET, true), 0); // sub-dust waived
+  assert.equal(builderTipGrainsFor(33_300, MAINNET, true), 333); // exact dust charged
   assert.equal(BUILDER_TIP_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
 });
 

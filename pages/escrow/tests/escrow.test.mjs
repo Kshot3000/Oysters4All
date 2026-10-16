@@ -355,8 +355,8 @@ test("serviceFeeGrainsFor: disclosed 1% on mainnet releases, waived otherwise", 
   // floors, never rounds up
   assert.equal(serviceFeeGrainsFor(100001, net), 1000);
   // below the dust floor the fee is waived, not rounded up to dust
-  assert.equal(serviceFeeGrainsFor(50000, net), 0); // 1% = 500 < 546
-  assert.equal(serviceFeeGrainsFor(54600, net), DUST_GRAIN); // 1% = 546 exactly
+  assert.equal(serviceFeeGrainsFor(25000, net), 0); // 1% = 250 < 333
+  assert.equal(serviceFeeGrainsFor(33300, net), DUST_GRAIN); // 1% = 333 exactly
   // testnet releases pay no service fee
   assert.equal(serviceFeeGrainsFor(4 * GRAIN_PER_PRL, NETWORKS.testnet), 0);
   // bad amounts refused

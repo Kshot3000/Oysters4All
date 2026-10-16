@@ -11,7 +11,7 @@ track the consolidation, and prove the sweep worked.
 1. **Analyze** — paste a `prl1…`/`tprl1…` address (bech32m-validated, network
    auto-detected) or watch one. GET-only Blockbook reads fetch the UTXO set;
    the dashboard shows total balance, UTXO count, a value-distribution
-   histogram, and each UTXO classified as **dust** (< 546 grains), **uneconomic**
+   histogram, and each UTXO classified as **dust** (< 333 grains), **uneconomic**
    (spending it alone costs more than it's worth at your fee rate), or
    **healthy** — plus a "consolidation saves you" estimate per future spend.
 2. **Plan** — three strategies: sweep only uneconomic UTXOs, sweep everything
@@ -55,7 +55,7 @@ added as its own output to the builder address
 your keypath signature commits to every output, so it cannot be added
 or skimmed afterwards. `builderTipGrainsFor()` in `src/sweep-core.js`
 is the single source: floor(1%) in BigInt, mainnet only, waived when
-1% would fall below the 546-grain dust floor (never rounded up). With
+1% would fall below the 333-grain dust floor (never rounded up). With
 the box off, the plan is identical to the pre-tip planner. The plan
 shows the tip as its own labeled line and output row before signing,
 a flagged tip output that pays any other address is refused at

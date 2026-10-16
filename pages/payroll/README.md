@@ -15,7 +15,7 @@ Built by [@kshot9000](https://x.com/kshot9000) · tips: `prl1p62v09vuzyd8kdz9l23
    CSV, or use the sample roster. Amounts accept `PRL` decimals or `grains`.
    Invalid lines are **refused loudly** with the exact line number; duplicate
    addresses are merged when merging is on (the merge count is disclosed) and
-   refused when it's off. Any line below the 546-grain dust floor is refused.
+   refused when it's off. Any line below the 333-grain dust floor is refused.
    Rows can be added, edited, and removed after validation.
 2. **Schedule** — pick weekly, biweekly, monthly, or a custom day count, set an
    anchor payday and an optional run label. The planner shows the next **12 pay
@@ -61,7 +61,7 @@ table. CSV export per run, full CSV export, and a clear button.
 - Review math is exact to the grain; fees come from the fee-rate box.
 - Imported unsigned bundles are fully re-validated before use; imported history
   records are validated before display.
-- Dust rule: below-546-grain lines are refused; dust change is absorbed into
+- Dust rule: below-333-grain lines are refused; dust change is absorbed into
   the fee with the amount disclosed.
 
 ## Builder tip (optional, disclosed)
@@ -72,7 +72,7 @@ published in the page footer
 (`prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`).
 It is **off by default** — with the box unticked the payee list is
 byte-identical to the pre-tip planner and no tip output exists. Mainnet
-only; when 1% would fall below the 546-grain dust floor the tip is waived,
+only; when 1% would fall below the 333-grain dust floor the tip is waived,
 never rounded up. The tip is part of the plan before signing (the sender is
 the sole signer and the sighash commits to every output), it is shown as
 its own labeled line in the running totals and on the pay slip, and it
@@ -91,7 +91,7 @@ node --no-warnings --loader ./tests/loader.mjs tests/payroll.dom.test.mjs  # 16 
 ```
 
 Protocol facts reused from the audited Pearl Sign lineage: bech32m `prl1…`/
-`tprl1…` Taproot-only addresses, `1 PRL = 1e8 grains`, 546-grain dust floor,
+`tprl1…` Taproot-only addresses, `1 PRL = 1e8 grains`, 333-grain dust floor,
 fee sizing through `keypathTxVBytes`. No new cryptography.
 
 ## Attribution

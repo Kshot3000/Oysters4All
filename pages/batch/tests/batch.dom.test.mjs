@@ -198,8 +198,8 @@ test("manifest: sample validates — exact totals, 3 rows", async () => {
   assert.ok(m, "manifest accepted");
   assert.equal(JSON.parse(JSON.stringify(m.recipients)).length, 3);
   assert.equal(get("m-tbody").children.length, 3);
-  assert.equal(m.total, "1125000546n");
-  assert.match(get("m-total").textContent, /11\.25000546 PRL/);
+  assert.equal(m.total, "1125000333n");
+  assert.match(get("m-total").textContent, /11\.25000333 PRL/);
   assert.match(get("m-merged").textContent, /none/);
   get("m-next").click();
   await tick();
@@ -207,7 +207,7 @@ test("manifest: sample validates — exact totals, 3 rows", async () => {
 });
 
 test("manifest: dust line refused, duplicates merge", async () => {
-  get("m-text").value = `${A1}, 1\n${A2}, 545 grains`;
+  get("m-text").value = `${A1}, 1\n${A2}, 332 grains`;
   get("m-parse").click();
   await tick();
   assert.match(get("m-err").textContent, /dust floor/);
@@ -217,7 +217,7 @@ test("manifest: dust line refused, duplicates merge", async () => {
   assert.equal(get("m-tbody").children.length, 2);
   assert.match(get("m-merged").textContent, /1 duplicate/);
   // restore the full sample for the rest of the flow
-  get("m-text").value = `${A1}, 1.25, vendor\n${A2}, 546 grains\n${A3}, 10`;
+  get("m-text").value = `${A1}, 1.25, vendor\n${A2}, 333 grains\n${A3}, 10`;
   get("m-parse").click();
   await tick();
   assert.equal(get("m-tbody").children.length, 3);
@@ -236,7 +236,7 @@ test("manifest: merge off refuses duplicates loudly", async () => {
   await tick();
   assert.equal(get("m-tbody").children.length, 2, "merging back on merges");
   // restore the full sample for the rest of the flow
-  get("m-text").value = `${A1}, 1.25, vendor\n${A2}, 546 grains\n${A3}, 10`;
+  get("m-text").value = `${A1}, 1.25, vendor\n${A2}, 333 grains\n${A3}, 10`;
   get("m-parse").click();
   await tick();
   assert.equal(get("m-tbody").children.length, 3);
@@ -400,11 +400,11 @@ test("broadcast: double-confirm gate, POST to /api/sendtx/, track + verify", asy
 test("standalone verifier: clean batch verifies, shorted batch fails", async () => {
   get("v-txid").value = QA.signedTxid;
   get("v-sender").value = SENDER;
-  get("v-manifest").value = `${A1}, 1.25\n${A2}, 546 grains\n${A3}, 10`;
+  get("v-manifest").value = `${A1}, 1.25\n${A2}, 333 grains\n${A3}, 10`;
   get("v-run").click();
   await waitFor(() => !get("v-out").hidden, "verifier output");
   assert.match(get("v-verdict").textContent, /BATCH VERIFIED/);
-  get("v-manifest").value = `${A1}, 999\n${A2}, 546 grains\n${A3}, 10`;
+  get("v-manifest").value = `${A1}, 999\n${A2}, 333 grains\n${A3}, 10`;
   get("v-run").click();
   await tick(200);
   assert.match(get("v-verdict").textContent, /NOT VERIFIED/);
@@ -423,7 +423,7 @@ test("address/txid title attributes are escaped (XSS audit latent queue)", () =>
   const src = fs.readFileSync(resolvePath(dir, "app.js"), "utf8");
   assert.ok(!/title="\$\{(r\.address|u\.txid|state\.senderAddress|e\.address)\}"/.test(src), "no raw title interpolation");
   assert.equal((src.match(/title="\$\{escapeHtml\(/g) || []).length, 5, "all five titles escaped");
-  assert.ok(html.includes('app.js?v=4'), "cache key bumped");
+  assert.ok(html.includes('app.js?v=5'), "cache key bumped");
 });
 
 test("builder tip: opt-in only — totals + review show it as its own recipient, off removes it", async () => {
@@ -433,15 +433,15 @@ test("builder tip: opt-in only — totals + review show it as its own recipient,
   get("f-tip").checked = true;
   get("f-tip").fire("change");
   await tick();
-  // manifest total is 1,125,000,546 grains -> 1% floor = 11,250,005 grains
+  // manifest total is 1,125,000,333 grains -> 1% floor = 11,250,005 grains
   assert.match(get("f-totals").textContent, /Builder tip/);
-  assert.match(get("f-totals").textContent, /0\.11250005 PRL/);
+  assert.match(get("f-totals").textContent, /0\.11250003 PRL/);
   get("f-next").click();
   await tick();
   assert.ok(!get("step-review").hidden, "review visible");
   assert.equal(get("r-tbody").children.length, 4, "tip is its own review row");
   assert.match(get("r-summary").textContent, /Builder tip/);
-  assert.match(get("r-summary").textContent, /0\.11250005 PRL/);
+  assert.match(get("r-summary").textContent, /0\.11250003 PRL/);
   // opting back out restores the pre-tip plan shape
   T.goto("freight");
   get("f-tip").checked = false;

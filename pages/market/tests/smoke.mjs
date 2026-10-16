@@ -186,7 +186,7 @@ function click(win, el) {
       id: "lot1", ticker: "prls", displayTicker: "PRLS", amount: "250000000000000000000",
       currentOutpoint: lotTxid + ":0", currentOwnerAddress: walletAddr, locationStatus: "confirmed",
     }], tokens: {}, total: 1 });
-    if (u.includes("/utxos")) return json({ utxos: [{ outpoint: lotTxid + ":0", txid: lotTxid, vout: 0, valueGrain: 546, protected: true }] });
+    if (u.includes("/utxos")) return json({ utxos: [{ outpoint: lotTxid + ":0", txid: lotTxid, vout: 0, valueGrain: 333, protected: true }] });
     throw new Error("unexpected fetch " + u);
   };
 
@@ -250,7 +250,7 @@ function click(win, el) {
   const fakeSig = randomBytes(64).toString("hex");
   const lotTxid = randomBytes(32).toString("hex");
   const prog = M.decodeBech32m(seller, "prl").program;
-  M.boardAddListing({ v: 1, tick: "prls", amt: "50000", lotTxid, lotVout: 0, lotValue: 546,
+  M.boardAddListing({ v: 1, tick: "prls", amt: "50000", lotTxid, lotVout: 0, lotValue: 333,
     lotSpkHex: M.bytesToHex(M.p2trScriptPubKey(prog)), priceGrains: "2500000", seller,
     expiry: Date.now() + 86400000, created: Date.now(), sig: fakeSig });
   const bidId = M.boardAddBid({ tick: "prls", amount: "10000", maxPrice: "2000000", buyerAddress: seller, created: Date.now() });

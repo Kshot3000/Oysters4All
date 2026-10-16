@@ -145,8 +145,8 @@
         </select></label>
       <label>Fixed per holder (PRL) <span class="hint">fixed rule only.</span>
         <input id="plan-fixed" type="number" min="0" step="any" value="0.1" disabled></label>
-      <label>Dust floor (PRL) <span class="hint">shares below this are dropped. Default 0.00000546.</span>
-        <input id="plan-dust" type="number" min="0" step="any" value="0.00000546"></label>
+      <label>Dust floor (PRL) <span class="hint">shares below this are dropped. Default 0.00000333.</span>
+        <input id="plan-dust" type="number" min="0" step="any" value="0.00000333"></label>
       <label>Fee rate (grains/vB) <span class="hint">estimate — exact at signing.</span>
         <input id="plan-feerate" type="number" min="1" step="any" value="2"></label>
       <label>Max outputs per tx <span class="hint">1–250.</span>
@@ -158,7 +158,7 @@
       <label class="check wide"><input type="checkbox" id="plan-tip"> Optional builder tip — add 1% of the pool <strong>on top of the pool</strong>
         (holder shares are never reduced) as its own output in the last payout transaction, paid to the builder address
         <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>. Mainnet only; waived when 1% would fall
-        below the 546-grain dust floor. Off by default.</label>
+        below the 333-grain dust floor. Off by default.</label>
       <label>Minimum balance, token units (optional) <input id="plan-minbal" autocomplete="off" spellcheck="false" placeholder="0"></label>
       <label class="wide">Exclusions (optional) <span class="hint">one address per line — e.g. the deploy vault.</span>
         <textarea id="plan-exclusions" rows="2" spellcheck="false" placeholder="prl1…"></textarea></label>
@@ -322,7 +322,7 @@
   <p class="fine">Pearl has no smart contracts — every dividend here is plain Taproot keypath spends, planned grain-exact and verified output-by-output in your browser.</p>
 </footer>
 
-<script src="pearl-dividend.bundle.js?v=7"></script>
+<script src="pearl-dividend.bundle.js?v=8"></script>
 <script src="app.js?v=4"></script>
 </body>
 </html>

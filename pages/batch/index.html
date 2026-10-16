@@ -59,7 +59,7 @@
     <h2>Honest limits — read before any real PRL moves</h2>
     <ul>
       <li><strong>One transaction, one sender key.</strong> Every input must be spendable by the single sender key you sign with. Multi-sender batches are not supported — split them.</li>
-      <li><strong>Dust is refused, never rounded.</strong> Any recipient under 546 grains stops the manifest with a loud error. Change under 546 grains is absorbed into the miner fee and disclosed on the review screen — never silently dropped.</li>
+      <li><strong>Dust is refused, never rounded.</strong> Any recipient under 333 grains stops the manifest with a loud error. Change under 333 grains is absorbed into the miner fee and disclosed on the review screen — never silently dropped.</li>
       <li><strong>Memos are off-chain labels.</strong> They ride along in the unsigned bundle for your bookkeeping and are verified by the fingerprint — they never appear on-chain. Pearl has no smart contracts and no memo field.</li>
       <li><strong>The unsigned bundle commits to the final txid.</strong> Under segwit rules the txid covers only the non-witness data, so the bundle's fingerprint and txid survive signing unchanged. Import re-verifies everything and refuses loudly on any mismatch — always pair a bundle with its fingerprint.</li>
       <li><strong>Blockbook is read-only until the single broadcast POST.</strong> UTXO scans, fee estimates and tracking are GET-only against the endpoint you configure. If it is unreachable, the page says so — it never presents guesses as data.</li>
@@ -327,7 +327,7 @@
   </div>
 </footer>
 
-<script src="pearl-batch.bundle.js?v=5"></script>
-<script src="app.js?v=4"></script>
+<script src="pearl-batch.bundle.js?v=6"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>

@@ -96,7 +96,7 @@
   (function ticker() {
     const items = [
       "PEARL PREDICT", "NO SMART CONTRACTS", "TAPROOT ONLY", "194 S BLOCK TARGET",
-      "546 GRAIN DUST FLOOR", "ARBITER-SIGNED PAYOUTS", "CLTV VOID REFUNDS",
+      "333 GRAIN DUST FLOOR", "ARBITER-SIGNED PAYOUTS", "CLTV VOID REFUNDS",
       "DESCRIPTOR-COMMITTED MARKETS", "VERIFY BEFORE YOU TRUST",
     ];
     const half = items.map((t) => `<b>◆</b> ${esc(t)} `).join("");
@@ -313,7 +313,7 @@
         const oi = spkHex.indexOf(hex);
         if (oi >= 0) {
           const val = Number(vout.value);
-          if (!Number.isSafeInteger(val) || val < 546) continue;
+          if (!Number.isSafeInteger(val) || val < 333) continue;
           found.push({ outcomeIndex: oi, txid: txid.toLowerCase(), vout: vout.n, value: val, funderAddr: "", label: "" });
         }
       }

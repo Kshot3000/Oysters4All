@@ -103,7 +103,7 @@ test("deal warnings are fully escaped, not just '<' (XSS audit latent queue)", (
   assert.match(appSrc, /function esc\(s\)/);
   assert.ok(appSrc.includes("warns.map((x) => `<li>${esc(x)}</li>`)"), "warnings escaped");
   assert.ok(!appSrc.includes("warns.map((x) => `<li>${x.replace"), "warnings no longer use partial escaping");
-  assert.ok(html.includes('app.js?v=3'), "cache key bumped");
+  assert.ok(html.includes('app.js?v=4'), "cache key bumped");
 });
 
 test("builder tip: claim checkbox off by default, disclosure in page, bundle API exact", () => {
@@ -114,6 +114,6 @@ test("builder tip: claim checkbox off by default, disclosure in page, bundle API
   assert.ok(html.includes("Refunds never carry a tip"), "refund exclusion disclosed in the page");
   assert.ok(appSrc.includes('builderTipEnabled: $("claim-builder-tip").checked === true'), "claim plan wires the checkbox into the core planner");
   assert.ok(appSrc.includes("Builder tip (optional, 1%)"), "plan review renders the tip as its own line before signing");
-  assert.ok(html.includes("pearl-atomic.bundle.js?v=6"), "bundle cache key bumped");
+  assert.ok(html.includes("pearl-atomic.bundle.js?v=7"), "bundle cache key bumped");
   assert.ok(html.includes("styles.css?v=6"), "styles cache key bumped");
 });

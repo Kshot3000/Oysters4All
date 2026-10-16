@@ -190,7 +190,7 @@ test("builder tip: exactness, waivers, opt-in only", () => {
   assert.equal(builderTipGrainsFor(100_000_000, net, undefined), 0);
   assert.equal(builderTipGrainsFor(100_000_000, NETWORKS.testnet, true), 0, "testnet waived");
   assert.equal(builderTipGrainsFor(10_000, net, true), 0, "sub-dust 1% waived, never rounded up");
-  assert.equal(builderTipGrainsFor(54_600, net, true), 546, "exactly dust is charged");
+  assert.equal(builderTipGrainsFor(33_300, net, true), 333, "exactly dust is charged");
 });
 
 test("builder tip: tipped claim plan + signed tx carry the tip exact; off = pre-tip plan", () => {

@@ -56,7 +56,7 @@ second output — paid to `prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxk
 *before* signing, so the script-path sighash commits to it and it cannot be
 added or skimmed afterwards. The lender receives the collateral minus the fee
 and the tip; the fee is computed over both outputs. The tip is mainnet-only,
-waived (never rounded up) when 1% falls below the 546-grain dust floor, and
+waived (never rounded up) when 1% falls below the 333-grain dust floor, and
 refused when the lender payout is the builder address itself. Repayments and
 mutual closes never carry a tip: both are 2-of-2 spends whose outputs are the
 two parties' agreed amounts, and their builders take no tip parameter.

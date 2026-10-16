@@ -91,7 +91,7 @@ describe("amounts & rates", () => {
     assert.equal(P.parseGrains("0.00000001 PRL"), 1n);
   });
   it("parseGrains: grains integers", () => {
-    assert.equal(P.parseGrains("546"), 546n);
+    assert.equal(P.parseGrains("333"), 333n);
     assert.equal(P.parseGrains("1000000 grains"), 1_000_000n);
   });
   it("parseGrains refuses junk", () => {
@@ -118,7 +118,7 @@ describe("amounts & rates", () => {
   it("grainsToPRL", () => {
     assert.equal(P.grainsToPRL(100_000_000n), "1");
     assert.equal(P.grainsToPRL(150_000_000n), "1.5");
-    assert.equal(P.grainsToPRL(546n), "0.00000546");
+    assert.equal(P.grainsToPRL(333n), "0.00000333");
   });
 });
 
@@ -169,7 +169,7 @@ describe("receiver offer", () => {
     refused(() => P.decodePaste("{nope"), "bad-envelope");
   });
   it("dust payment refused", () => {
-    refused(() => stdOffer({ amount: "500 grains" }), "dust");
+    refused(() => stdOffer({ amount: "300 grains" }), "dust");
   });
   it("template validation refuses junk", () => {
     refused(() => P.validateOfferTemplate("cHNidP8="), "bad-psbt");
@@ -270,19 +270,19 @@ describe("proposal", () => {
   it("deducts from the payment output when the receiver underfunds", () => {
     const orig = stdOriginal();
     const rk = rKey(1);
-    const inp = P.prepareSenderInput({ txid: TXID_B, vout: 1, value: 600n, key: rk }); // tiny input
+    const inp = P.prepareSenderInput({ txid: TXID_B, vout: 1, value: 387n, key: rk }); // tiny input
     const prop = stdProposal(orig, { receiverInputs: [inp] });
     // with-change pass: addedVBytes = vsize(2,3)-vsize(1,2) = 255-154 = 101;
     // weightCost = ceil(308*101/154) = 202; minTotal = ceil(1*255) = 255;
     // required = max(202, 255-308 -> 0, 0) = 202;
-    // cRecv = min(600-546, 202) = 54; need = 202-54 = 148;
+    // cRecv = min(387-333, 202) = 54; need = 202-54 = 148;
     // d = min(148, maxAdd=1000, feeO - minfeerate*vsizeO = 154) = 148;
-    // rChange = 600-54 = 546 = DUST exactly -> change output kept.
+    // rChange = 387-54 = 333 = DUST exactly -> change output kept.
     assert.equal(prop.weightCost, 202n);
     assert.equal(prop.required, 202n);
     assert.equal(prop.cRecv, 54n);
     assert.equal(prop.d, 148n);
-    assert.equal(prop.rChange, 546n);
+    assert.equal(prop.rChange, 333n);
     assert.equal(prop.nOut, 3);
     assert.equal(prop.feeP, 510n);
     assert.equal(prop.paymentP, 100_000_000n - 148n);

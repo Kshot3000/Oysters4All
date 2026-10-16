@@ -149,7 +149,7 @@ test("lockHashForPreimage pins sha256 of the buyer secret", () => {
 
 test("forgeOption refuses bad economics loudly", () => {
   const base = { network: net, kind: "C", writer: W.xonly, buyer: B.xonly, lockHash: LOCKHASH, strikeGrains: 250_000_000, expiry: 800_000 };
-  assert.throws(() => forgeOption({ ...base, qtyGrains: 545 }), /dust/);
+  assert.throws(() => forgeOption({ ...base, qtyGrains: 332 }), /dust/);
   assert.throws(() => forgeOption({ ...base, qtyGrains: 100_000_000, strikeGrains: 0 }), /strike/);
   assert.throws(() => forgeOption({ ...base, qtyGrains: 100_000_000, kind: "X" }), /kind/);
   assert.throws(() => forgeOption({ ...base, qtyGrains: 100_000_000, premiumGrains: -1 }), /premium/);
@@ -204,7 +204,7 @@ test("buildExerciseTx loud refusals", () => {
   // Wrong key (writer's key cannot sign the buyer leaf).
   assert.throws(() => buildExerciseTx({ ...base, signerPriv: W.priv, chainTip: 800_000 }), /wrong key/);
   // Underfunded vault: fee eats everything.
-  assert.throws(() => buildExerciseTx({ ...base, utxo: { ...UTXO, value: 546 }, chainTip: 800_000 }), /insufficient funds/);
+  assert.throws(() => buildExerciseTx({ ...base, utxo: { ...UTXO, value: 333 }, chainTip: 800_000 }), /insufficient funds/);
 });
 
 test("buildRefundTx: happy path; refused before expiry; wrong key refused", () => {
@@ -360,8 +360,8 @@ test("builder tip: exactness and waivers", () => {
   assert.equal(builderTipGrainsFor(100_000_000, net, false), 0, "off unless enabled === true");
   assert.equal(builderTipGrainsFor(100_000_000, net, 1), 0, "truthy is not true");
   assert.equal(builderTipGrainsFor(100_000_000, NETWORKS.testnet, true), 0, "mainnet only");
-  assert.equal(builderTipGrainsFor(54599, net, true), 0, "545-grain tip waived");
-  assert.equal(builderTipGrainsFor(54600, net, true), 546, "546-grain tip charged exactly");
+  assert.equal(builderTipGrainsFor(33299, net, true), 0, "332-grain tip waived");
+  assert.equal(builderTipGrainsFor(33300, net, true), 333, "333-grain tip charged exactly");
   assert.equal(builderTipGrainsFor(1000, net, true), 0, "10-grain tip waived");
 });
 

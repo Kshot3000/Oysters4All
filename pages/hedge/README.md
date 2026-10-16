@@ -26,7 +26,7 @@ holder locks their underlying; the put writer holds the exercise right).
 `pearl-hedge:v1:<hrp>:<C|P>:<writer>:<buyer>:<lockHash>:<qty>:<strike>:<expiry>:<premium>`
 (all integers in grains, expiry a block height) re-derives the vault address
 deterministically; the sealed commitment `pearl-hedge:v1:<hrp>:<sha256(descriptor)>`
-binds every term. Exact vBytes fee math for both spends; 546-grain dust floor.
+binds every term. Exact vBytes fee math for both spends; 333-grain dust floor.
 
 **Exercise** — buyer side. The desk *first* verifies the strike payment via
 Blockbook (GET-only): the txid must pay `strikeGrains` to the writer's address
@@ -43,7 +43,7 @@ The buyer exercise form offers an **optional 1% builder tip** to
 default, disclosed next to its checkbox, and — when the buyer opts in — paid
 as its own output out of the exercise (the buyer receives the collateral
 minus the fee and the tip), committed by the buyer's signature before
-signing. It is waived on testnet and below the 546-grain dust floor. The
+signing. It is waived on testnet and below the 333-grain dust floor. The
 writer refund takes no tip parameter at all — it returns the writer's own
 locked collateral, so a tip there is impossible by construction.
 

@@ -11,7 +11,7 @@ as [Pearl Raffle](../raffle/).
 
 1. **List (auctioneer).** Name, description, optional image URL, seller `prl1…` address,
    minimum bid (PRL, decimals ok), commit deadline + reveal deadline as block heights.
-   Forge guards: dust minimum refusal (< 546 grains), commit deadline must be provably in
+   Forge guards: dust minimum refusal (< 333 grains), commit deadline must be provably in
    the future (live Blockbook tip via configurable endpoint, default
    `https://blockbook.pearlresearch.ai`, or air-gapped manual tip entry), reveal deadline
    after the commit deadline with a ≥ 3-block gap. Descriptor:

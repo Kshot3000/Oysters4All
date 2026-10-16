@@ -338,7 +338,7 @@ export function extractMarker(scriptBytes) {
 
 /* ---------------- claim planning (fee math) ---------------- */
 
-export const CARRIER_VALUE_GRAINS = 1000; // owner output value, above 546 dust
+export const CARRIER_VALUE_GRAINS = 1000; // owner output value, above 333 dust
 
 /** Plan a claim inscription: envelope, reveal script, commit key info, fee
  *  math. Produces a plan object shaped for etch-core's buildRevealTxSigned

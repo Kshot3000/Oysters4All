@@ -38,7 +38,7 @@ unmatured ticks in one transaction.
 The Claim step offers an **optional builder tip** — off by default, never automatic.
 When the beneficiary checks the box, `builderTipGrainsFor(total, network, enabled)`
 (the single source: floor of 1% computed in BigInt, **mainnet only**, waived when 1%
-would fall below the 546-grain dust floor instead of rounded up) is added as its own
+would fall below the 333-grain dust floor instead of rounded up) is added as its own
 second output in the batch claim **before signing**, paid to the operator address
 published in every Stream footer (`prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`).
 The fee is computed over both outputs (`batchClaimVBytes` with `nOut: 2`), the plan

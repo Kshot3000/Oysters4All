@@ -327,7 +327,7 @@ test("fetchBlockbookTx reads Blockbook vout values as grains, unscaled", async (
 
 test("parseGrainsExact accepts integer grain counts and refuses rescaling bait", () => {
   assert.equal(parseGrainsExact("200000000"), "200000000");
-  assert.equal(parseGrainsExact(546), "546");
+  assert.equal(parseGrainsExact(333), "333");
   assert.equal(parseGrainsExact("0"), "0");
   assert.throws(() => parseGrainsExact("1.5"), /bad grain value/);
   assert.throws(() => parseGrainsExact("2.00000000"), /bad grain value/);

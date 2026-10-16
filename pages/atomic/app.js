@@ -476,7 +476,7 @@
       const vout = Number($("fund-vout").value);
       const value = Number($("fund-value").value);
       if (!Number.isSafeInteger(vout) || vout < 0) throw new Error("bad vout");
-      if (!Number.isSafeInteger(value) || value < 546) throw new Error("value below dust (546 grains)");
+      if (!Number.isSafeInteger(value) || value < 333) throw new Error("value below dust (333 grains)");
       S.utxo = { txid, vout, value, spk: S.contract.tree.spk };
       ok("fund-pick", `✓ Manual outpoint accepted (trusted as-is): ${txid.slice(0, 16)}…:${vout} — ${E.fmtPRL(value)}`);
       $("to-track").disabled = false;

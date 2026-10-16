@@ -108,7 +108,7 @@
     <h2>Plan the burn transaction</h2>
     <p class="lede">Enter the PRL to burn and the UTXO that funds it. The desk builds the <strong>exact unsigned
     transaction</strong>: one P2TR output to the burn address plus one P2TR change output, with real vByte fee math
-    (154 vB for 2 outputs, 111 vB for 1). The burn output can never be below the 546-grain dust floor, and a
+    (154 vB for 2 outputs, 111 vB for 1). The burn output can never be below the 333-grain dust floor, and a
     dust-valued change is refused loudly — sweep it into the burn instead.</p>
 
     <div class="form-grid">
@@ -232,7 +232,7 @@
 </footer>
 
 <script src="qrcode.min.js?v=1"></script>
-<script src="pearl-burn.bundle.js?v=2"></script>
+<script src="pearl-burn.bundle.js?v=3"></script>
 <script src="app.js?v=2"></script>
 </body>
 </html>

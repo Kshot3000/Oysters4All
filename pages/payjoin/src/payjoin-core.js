@@ -75,7 +75,7 @@ import {
 
 export const VERSION = 1;
 export const PAYJOIN_V = 2; // lab query-string version per desk convention
-export const DUST = DUST_GRAIN; // 546 grains — P2TR dust floor
+export const DUST = DUST_GRAIN; // 333 grains — P2TR dust floor
 export const SEQ = 0xffffffff;
 export const TX_VERSION = 1;
 // Pearl's max money is 2.1B PRL, not Bitcoin's 21M: upstream

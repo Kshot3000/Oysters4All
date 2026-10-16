@@ -108,9 +108,9 @@ function norm0() { return fixtureSpec(); }
 
 test("position guards: dust, network, duplicates", () => {
   const norm = fixtureSpec();
-  const good = { outcomeIndex: 0, txid: "aa".repeat(32), vout: 0, value: 546, funderAddr: funderAddr("p1") };
-  assert.equal(validatePosition(norm, good).value, 546);
-  assert.throws(() => validatePosition(norm, { ...good, value: 545 }), /dust/);
+  const good = { outcomeIndex: 0, txid: "aa".repeat(32), vout: 0, value: 333, funderAddr: funderAddr("p1") };
+  assert.equal(validatePosition(norm, good).value, 333);
+  assert.throws(() => validatePosition(norm, { ...good, value: 332 }), /dust/);
   assert.throws(() => validatePosition(norm, { ...good, outcomeIndex: 7 }), /out of range/);
   assert.throws(() => validatePosition(norm, { ...good, txid: "zz" }), /64 hex/);
   // wrong-network payout address refused
@@ -208,7 +208,7 @@ test("award plan refuses: no winners, dust payouts, fee eats pot", () => {
     () => planAwardPayout({
       norm, contracts,
       positions: [
-        { outcomeIndex: 0, txid: "aa".repeat(32), vout: 0, value: 546, funderAddr: funderAddr("w1") },
+        { outcomeIndex: 0, txid: "aa".repeat(32), vout: 0, value: 333, funderAddr: funderAddr("w1") },
         { outcomeIndex: 0, txid: "bb".repeat(32), vout: 0, value: 100_000_000, funderAddr: funderAddr("w2") },
       ],
       winIndex: 0, feeRateGrainsPerVByte: 2000, // high rate: tiny winner's share drops below dust
@@ -423,10 +423,10 @@ test("fmtPRL / parsePRLToGrains round-trip", () => {
   assert.equal(fmtPRL(199998850n), "1.9999885");
   assert.equal(fmtPRL(100_000_000n), "1.0");
   assert.equal(parsePRLToGrains("1.9999885").toString(), "199998850");
-  assert.equal(parsePRLToGrains("0.00000546").toString(), "546");
+  assert.equal(parsePRLToGrains("0.00000333").toString(), "333");
   assert.throws(() => parsePRLToGrains("abc"), /bad PRL/);
   assert.equal(GRAIN_PER_PRL, 100_000_000);
-  assert.equal(DUST_GRAIN, 546);
+  assert.equal(DUST_GRAIN, 333);
   assert.equal(BLOCK_TARGET_SECONDS, 194);
 });
 

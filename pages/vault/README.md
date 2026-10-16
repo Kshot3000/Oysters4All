@@ -18,7 +18,7 @@ cosigners, verify every signature locally, and broadcast via Blockbook.
 2. **Fund** — deposit address + QR + `pearl:` URI; on-chain balance and UTXO list via
    GET-only Blockbook reads.
 3. **Plan** — select UTXOs, recipients, fee rate (or Blockbook estimate). Exact
-   script-path witness weight → exact vBytes → exact fee. Dust change (< 546 grains) is
+   script-path witness weight → exact vBytes → exact fee. Dust change (< 333 grains) is
    absorbed into the fee and disclosed, never stranded. Produces an unsigned bundle
    (`pearl-vault-unsigned:v1`) with per-input BIP-341 script-path digests and a 64-bit
    fingerprint.

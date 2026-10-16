@@ -56,7 +56,7 @@ output to the builder address
 (`prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d`)
 **before** signing — the script-path sighash commits to every output, so
 it cannot be added or skimmed afterwards. It is off by default, never
-automatic, mainnet only, and waived when 1% would fall below the 546-grain
+automatic, mainnet only, and waived when 1% would fall below the 333-grain
 dust floor instead of being rounded up. The claimer receives the to_local
 balance minus the claim fee (computed over 2 outputs when tipped) and
 the tip. Commitment transactions and the cooperative close are 2-of-2

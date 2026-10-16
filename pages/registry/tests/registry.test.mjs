@@ -232,5 +232,5 @@ test("inscription query helpers and candidates", () => {
   assert.equal(clampMaxPages(3), 3);
   assert.equal(formatPRL(100000000), "1 PRL");
   assert.equal(formatPRL(123456789), "1.23456789 PRL");
-  assert.equal(formatPRL(546), "0.00000546 PRL");
+  assert.equal(formatPRL(333), "0.00000333 PRL");
 });

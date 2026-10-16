@@ -30,7 +30,7 @@
  * Protocol facts (verified, not from memory):
  *  - TapLeaf/TapBranch/TapTweak tags + branch sort order: BIP-341, and the
  *    single-leaf case matches commitKeyInfo() in sign/src/crypto.js.
- *  - P2TR dust 546 grains, tx version 1, bech32m HRPs prl/tprl/rprl,
+ *  - P2TR dust 333 grains, tx version 1, bech32m HRPs prl/tprl/rprl,
  *    BIP-86 coin type 808276/1: pearl-knowledge.md (from node/chaincfg).
  *  - CLTV lock heights < 500000000 are block heights (BIP-65); the refund
  *    leaf needs tx locktime >= height and input sequence < 0xffffffff.
@@ -378,7 +378,7 @@ export function spendVBytes({ nOut, scriptLen, controlLen, stackLens }) {
  * quoted in the spend form and shown as its own line in the plan before
  * signing — never hidden. Refunds pay no service fee (the refund path
  * never calls planSpend), testnet releases pay none, and a fee that
- * would fall below the 546-grain dust floor is waived rather than
+ * would fall below the 333-grain dust floor is waived rather than
  * rounded up. */
 export const SERVICE_FEE_BPS = 100; // 1%
 export const SERVICE_FEE_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";

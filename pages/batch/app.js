@@ -351,7 +351,7 @@
       `<div><dt>Change</dt><dd>${plan.changeDropped ? `dust change absorbed into the fee (+${plan.changeBump} grains)` : R.fmtPRL(plan.change) + " PRL → sender"}</dd></div>`;
     const dn = $("r-dust-note");
     if (plan.changeDropped) {
-      dn.textContent = `Note: the change output would have been ${plan.changeBump} grains — below the 546-grain dust floor — so it was added to the miner fee instead of creating an unspendable output.`;
+      dn.textContent = `Note: the change output would have been ${plan.changeBump} grains — below the 333-grain dust floor — so it was added to the miner fee instead of creating an unspendable output.`;
       dn.hidden = false;
     } else dn.hidden = true;
     $("r-stamp").textContent = "UNSEALED";

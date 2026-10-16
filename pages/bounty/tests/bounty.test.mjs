@@ -235,8 +235,8 @@ test("builderTipGrainsFor: 1% floor, mainnet only, dust waived, opt-in only", ()
   assert.equal(builderTipGrainsFor(100_000_000, MAINNET, false), 0n);
   assert.equal(builderTipGrainsFor(100_000_000, MAINNET, undefined), 0n);
   assert.equal(builderTipGrainsFor(100_000_000, NETWORKS.testnet, true), 0n);
-  assert.equal(builderTipGrainsFor(54_599, MAINNET, true), 0n); // 545 < dust: waived, never rounded up
-  assert.equal(builderTipGrainsFor(54_600, MAINNET, true), 546n); // exact dust floor: charged
+  assert.equal(builderTipGrainsFor(33_299, MAINNET, true), 0n); // 332 < dust: waived, never rounded up
+  assert.equal(builderTipGrainsFor(33_300, MAINNET, true), 333n); // exact dust floor: charged
   assert.equal(BUILDER_TIP_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
 });
 

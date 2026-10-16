@@ -348,8 +348,8 @@ if (existsSync(launcherIns)) {
   const idxHtml = readFileSync(resolvePath(payDir, "index.html"), "utf8");
   const invHtml = readFileSync(resolvePath(payDir, "invoice.html"), "utf8");
   ok("index.html bundle cache key at ?v=2, app cache key at ?v=3",
-    idxHtml.includes("pearl-pay-core.bundle.js?v=2") && idxHtml.includes('src="app.js?v=3"'));
-  ok("invoice.html bundle cache key at ?v=2", invHtml.includes("pearl-pay-core.bundle.js?v=2"));
+    idxHtml.includes("pearl-pay-core.bundle.js?v=3") && idxHtml.includes('src="app.js?v=3"'));
+  ok("invoice.html bundle cache key at ?v=2", invHtml.includes("pearl-pay-core.bundle.js?v=3"));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

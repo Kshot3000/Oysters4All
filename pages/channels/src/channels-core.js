@@ -38,7 +38,7 @@
  * disabled here by design) and BIP-341/BIP-68 for sequence/locktime rules.
  *
  * Protocol facts (verified, not from memory):
- *  - P2TR dust 546 grains; tx version from network.txVersion (pearld = 1);
+ *  - P2TR dust 333 grains; tx version from network.txVersion (pearld = 1);
  *    bech32m HRPs prl/tprl/rprl; BIP-68 CSV block delays use sequences
  *    1..65535 with the type flag clear.
  */

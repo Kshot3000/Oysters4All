@@ -79,7 +79,7 @@ const documentShim = {
 const PRIV_HEX = "0f".repeat(32);
 let ADDR = null; // filled after bundle boot
 let utxoMode = "full"; // "full" | "swept"
-const FIXTURE_UTXOS = [100, 400, 2000, 2100, 2150, 2200, 50000, 200000].map((v, i) => ({
+const FIXTURE_UTXOS = [100, 300, 2100, 2100, 2150, 2200, 50000, 200000].map((v, i) => ({
   txid: (i + 1).toString(16).padStart(64, "a"), vout: i, value: String(v), confirmations: 6,
 }));
 const fetchCalls = [];
@@ -173,7 +173,7 @@ test("analyze renders the UTXO health dashboard", async () => {
   assert.ok(getEl("sw-total").textContent.includes("PRL"));
   assert.equal(getEl("sw-total-grains").textContent, "258950 grains");
   assert.equal(getEl("sw-dust-count").textContent, "2");
-  assert.equal(getEl("sw-dust-value").textContent, "0.000005 PRL");
+  assert.equal(getEl("sw-dust-value").textContent, "0.000004 PRL");
   assert.equal(getEl("sw-unecon-count").textContent, "4");
   assert.equal(getEl("sw-healthy-count").textContent, "2");
   assert.equal(getEl("sw-hist").children.length, 6, "six histogram buckets");

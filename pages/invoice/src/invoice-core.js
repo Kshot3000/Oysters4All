@@ -19,7 +19,7 @@ import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils";
 
 export const DONATE_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
 export const INVOICE_ACCOUNT = 9001; // invoicing account: m/86'/{coin}'/9001'/0/<index>
-export const MIN_TOTAL_GRAINS = 546n; // sub-dust totals refused (Pearl dust relay floor)
+export const MIN_TOTAL_GRAINS = 333n; // sub-dust totals refused (Pearl P2TR dust: node/mempool/policy.go GetDustThreshold = 333 grains at the default relay fee)
 export const VERSION = "v1";
 export const DESCRIPTOR_PREFIX = "pearl-invoice";
 export const RECEIPT_PREFIX = "pearl-invoice-receipt";

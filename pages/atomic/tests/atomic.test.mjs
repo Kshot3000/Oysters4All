@@ -307,11 +307,11 @@ test("classifyHtlcState: funding then spend", () => {
 test("fmtPRL / parsePRLtoGrains", () => {
   assert.equal(fmtPRL(100000000), "1 PRL");
   assert.equal(fmtPRL(125000000), "1.25 PRL");
-  assert.equal(fmtPRL(546), "0.00000546 PRL");
+  assert.equal(fmtPRL(333), "0.00000333 PRL");
   assert.equal(parsePRLtoGrains("1.25"), 125000000);
   assert.equal(parsePRLtoGrains("1.25 PRL"), 125000000);
-  assert.equal(parsePRLtoGrains("546 grains"), 546);
-  assert.throws(() => parsePRLtoGrains("0.00000545"), /dust/);
+  assert.equal(parsePRLtoGrains("333 grains"), 333);
+  assert.throws(() => parsePRLtoGrains("0.00000332"), /dust/);
   assert.throws(() => parsePRLtoGrains("abc"), /amount must look like/);
   // Exact-range regression: past MAX_SAFE_INTEGER grains the old
   // Number(grains) silently dropped grains (…001 came back …000).
@@ -353,8 +353,8 @@ test("builder tip: exactness and waivers", () => {
   assert.equal(builderTipGrainsFor(100000000, net, 1), 0, "truthy is not true");
   assert.equal(builderTipGrainsFor(100000000, NETWORKS.testnet, true), 0, "mainnet only");
   // dust floor: waived below it, never rounded up; charged exactly at it
-  assert.equal(builderTipGrainsFor(54599, net, true), 0, "545-grain tip waived");
-  assert.equal(builderTipGrainsFor(54600, net, true), 546, "546-grain tip charged exactly");
+  assert.equal(builderTipGrainsFor(33299, net, true), 0, "332-grain tip waived");
+  assert.equal(builderTipGrainsFor(33300, net, true), 333, "333-grain tip charged exactly");
   assert.equal(builderTipGrainsFor(1000, net, true), 0, "10-grain tip waived");
 });
 

@@ -41,7 +41,7 @@ amount every period — funded in addition in each period's funding output
 and paid as its own output in each pre-signed payment, sealed in the
 fingerprint-bound descriptor (`builderTipEnabled`/`builderTipGrains`) and
 recomputed — never trusted — by the bundle verifier. Mainnet only; waived
-when 1% would fall below the 546-grain dust floor. Cancelling a period
+when 1% would fall below the 333-grain dust floor. Cancelling a period
 reclaims that period's tip along with the rest of its funding output —
 the tip is only ever paid by a payment that actually confirms.
 

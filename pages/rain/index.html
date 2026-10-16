@@ -140,7 +140,7 @@
           </table>
         </div>
         <p class="fineprint">Every address must be a Pearl v1 Taproot address
-          (<code>prl1p…</code>); every amount must clear the 546-grain dust floor.</p>
+          (<code>prl1p…</code>); every amount must clear the 333-grain dust floor.</p>
       </div>
     </div>
   </section>
@@ -151,7 +151,7 @@
     <p class="lede">Exact fee math up front: one transaction, N outputs, change back to the funder.
       Nothing is signed until you approve the plan.</p>
     <div class="panel">
-      <label><input type="checkbox" id="plan-tip"> Optional builder tip — add 1% of the rain total as its own output to the builder (<code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>). Off by default. Mainnet only; waived when 1% would fall below the 546-grain dust floor. Shown as its own labeled line in the plan before you sign — never added after signing.</label>
+      <label><input type="checkbox" id="plan-tip"> Optional builder tip — add 1% of the rain total as its own output to the builder (<code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code>). Off by default. Mainnet only; waived when 1% would fall below the 333-grain dust floor. Shown as its own labeled line in the plan before you sign — never added after signing.</label>
       <div class="row">
         <button id="plan-button" class="primary">Compute plan</button>
       </div>
@@ -197,7 +197,7 @@
       <li>This tool moves <strong>real PRL</strong> when you broadcast. There is no undo.</li>
       <li>Max <strong>250 recipients</strong> per transaction (relay standardness headroom).</li>
       <li>Only Pearl v1 Taproot addresses (<code>prl1p…</code>) are accepted — no legacy formats exist on Pearl.</li>
-      <li>Amounts below 546 grains are rejected as dust; dust change is folded into the fee.</li>
+      <li>Amounts below 333 grains are rejected as dust; dust change is folded into the fee.</li>
       <li>UTXO fetching and broadcast need a Blockbook endpoint you configure (mainnet default:
         <code>https://blockbook.pearlresearch.ai</code>). The air-gapped paste mode never touches the network
         until broadcast.</li>
@@ -212,7 +212,7 @@
   <p>Tips: <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code></p>
 </footer>
 
-<script src="pearl-rain.bundle.js?v=4"></script>
+<script src="pearl-rain.bundle.js?v=5"></script>
 <script src="app.js?v=3"></script>
 </body>
 </html>

@@ -5592,7 +5592,7 @@ zoo`.split("\n");
 
   // ../sign/src/crypto.js
   var GRAIN_PER_PRL = 1e8;
-  var DUST_GRAIN = 546;
+  var DUST_GRAIN = 333;
   var NETWORKS = {
     mainnet: {
       id: "mainnet",
@@ -6296,7 +6296,7 @@ zoo`.split("\n");
       "# commas or whitespace both work \xB7 # lines ignored \xB7 duplicates merge",
       "# labels are OFF-CHAIN bookkeeping only \u2014 they never appear on-chain",
       "prl1pr6yuq8u2r95wjzzgpdy8cpnncpl7l8zgy6x5q0367pnc53s2famqg7pt74, 1.25, Alice \u2014 senior dev",
-      "prl1p7dwp74zgd4te3mqr58d6x3p3t70jljmpe4auey8g824ra4x43tks3y4pr6, 546 grains, Bob \u2014 bug bounty",
+      "prl1p7dwp74zgd4te3mqr58d6x3p3t70jljmpe4auey8g824ra4x43tks3y4pr6, 333 grains, Bob \u2014 bug bounty",
       "prl1p5gfau0gepxzjkjyx9t88ewnhujrmpjqgqfh8v9vympjaz94x36jqpepvyt 10 Carol \u2014 ops retainer"
     ].join("\n") + "\n";
   }

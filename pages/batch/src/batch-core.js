@@ -15,7 +15,7 @@
 // Protocol facts (do not re-derive): bech32m prl1.../tprl1... Taproot-only
 // addresses; NO smart contracts on Pearl; 1 PRL = 1e8 grains; P2TR vB math
 // via keypathTxVBytes (58 vB/input + 43 vB/output + witness discount, as in
-// Pearl Sweep); dust floor 546 grains; fee math grain-exact BigInt.
+// Pearl Sweep); dust floor 333 grains; fee math grain-exact BigInt.
 import { HDKey } from "@scure/bip32";
 import {
   NETWORKS, GRAIN_PER_PRL, DUST_GRAIN,
@@ -236,7 +236,7 @@ export function sampleManifest() {
     "# commas or whitespace both work · # lines ignored · duplicates merge",
     "# memos are OFF-CHAIN labels only — they never appear on-chain",
     "prl1pr6yuq8u2r95wjzzgpdy8cpnncpl7l8zgy6x5q0367pnc53s2famqg7pt74, 1.25, Q3 vendor payout",
-    "prl1p7dwp74zgd4te3mqr58d6x3p3t70jljmpe4auey8g824ra4x43tks3y4pr6, 546 grains",
+    "prl1p7dwp74zgd4te3mqr58d6x3p3t70jljmpe4auey8g824ra4x43tks3y4pr6, 333 grains",
     "prl1p5gfau0gepxzjkjyx9t88ewnhujrmpjqgqfh8v9vympjaz94x36jqpepvyt 10 contractor bonus",
   ].join("\n") + "\n";
 }
@@ -247,7 +247,7 @@ export function sampleManifest() {
  * dispatch total, as its own recipient output in the batch transaction, to
  * the operator address published in every Batch page footer. The checkbox
  * in the Fund step is unchecked by default; with it off (or on testnet, or
- * when 1% would fall below the 546-grain dust floor) the recipient list is
+ * when 1% would fall below the 333-grain dust floor) the recipient list is
  * byte-identical to the pre-tip planner — no tip output exists at all.
  * When on, the tip is just another recipient in the plan BEFORE signing:
  * the sender is the sole signer and the keypath sighash commits to every

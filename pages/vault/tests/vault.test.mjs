@@ -330,7 +330,7 @@ test("planSpend: exact fee math, change output, dust absorption", () => {
 
 test("planSpend absorbs dust change into the fee and discloses it", () => {
   const d = vault23();
-  // inputs 100000000, out 99997800: change would be 320 grains (< 546 dust),
+  // inputs 100000000, out 99997800: change would be 320 grains (< 333 dust),
   // so no change output is created and the leftover becomes extra fee.
   const plan = planSpend({
     network: N, descriptor: d,

@@ -43,9 +43,9 @@ const utxo = (txid, vout, value) => ({ txid, vout, value, confirmations: 6 });
 
 test("fmtPRL/parsePRL grain-exact round-trip", () => {
   assert.equal(parsePRL("1.25"), 125000000n);
-  assert.equal(parsePRL("0.00000546"), 546n);
+  assert.equal(parsePRL("0.00000333"), 333n);
   assert.equal(fmtPRL(1125000005n), "11.25000005");
-  assert.equal(fmtPRL(546n), "0.00000546");
+  assert.equal(fmtPRL(333n), "0.00000333");
   assert.throws(() => parsePRL("1.123456789"), /invalid PRL amount/);
 });
 
@@ -125,9 +125,9 @@ test("parseRoster: sample roster exact totals", () => {
   const { payees, merged, total } = parseRoster(sampleRoster(), N);
   assert.equal(payees.length, 3);
   assert.equal(merged, 0);
-  assert.equal(total, 125000000n + 546n + 1000000000n);
+  assert.equal(total, 125000000n + 333n + 1000000000n);
   assert.equal(payees[0].label, "Alice — senior dev");
-  assert.equal(payees[1].amount, 546n); // grains unit, dust boundary
+  assert.equal(payees[1].amount, 333n); // grains unit, dust boundary
   assert.equal(payees[2].label, "Carol — ops retainer");
   for (const r of payees) assert.ok(r.program instanceof Uint8Array && r.program.length === 32);
 });
@@ -140,10 +140,10 @@ test("parseRoster: whitespace format, label with spaces", () => {
 });
 
 test("parseRoster: dust refused loudly, boundary accepted", () => {
-  assert.throws(() => parseRoster(`${A1}, 0.00000545`, N), /dust floor/);
-  assert.throws(() => parseRoster(`${A1}, 545 grains`, N), /dust floor/);
-  const ok = parseRoster(`${A1}, 546 grains`, N);
-  assert.equal(ok.payees[0].amount, 546n);
+  assert.throws(() => parseRoster(`${A1}, 0.00000332`, N), /dust floor/);
+  assert.throws(() => parseRoster(`${A1}, 332 grains`, N), /dust floor/);
+  const ok = parseRoster(`${A1}, 333 grains`, N);
+  assert.equal(ok.payees[0].amount, 333n);
 });
 
 test("parseRoster: bad input refused", () => {
@@ -181,15 +181,15 @@ test("parseRoster: header line skipped, >250 payees refused", () => {
 });
 
 test("rosterToCsv / rosterFromCsv round-trip", () => {
-  const { payees } = parseRoster(`${A1}, 1.25, Alice — senior dev\n${A2}, 546 grains`, N);
+  const { payees } = parseRoster(`${A1}, 1.25, Alice — senior dev\n${A2}, 333 grains`, N);
   const csv = rosterToCsv(payees);
   assert.ok(csv.startsWith("address,amount_prl,label\n"));
   const back = rosterFromCsv(csv, N);
   assert.equal(back.payees.length, 2);
   assert.equal(back.payees[0].amount, 125000000n);
   assert.equal(back.payees[0].label, "Alice — senior dev");
-  assert.equal(back.payees[1].amount, 546n);
-  assert.equal(back.total, 125000546n);
+  assert.equal(back.payees[1].amount, 333n);
+  assert.equal(back.total, 125000333n);
 });
 
 test("rosterToCsv escapes commas in labels", () => {
@@ -269,23 +269,23 @@ test("PAY_PERIODS lists all four", () => {
 
 const PAYEES = () => [
   { address: A1, program: decodeBech32m(A1, N.hrp).program, amount: 125000000n, label: "Alice" },
-  { address: A2, program: decodeBech32m(A2, N.hrp).program, amount: 546n, label: null },
+  { address: A2, program: decodeBech32m(A2, N.hrp).program, amount: 333n, label: null },
   { address: A3, program: decodeBech32m(A3, N.hrp).program, amount: 1000000000n, label: "Carol" },
 ];
 const SENDER_PROGRAM = () => decodeBech32m(SENDER, N.hrp).program;
 
 test("autoSelectUtxos: largest-first covers payees + fee", () => {
   const us = [utxo("a".repeat(64), 0, 800000000), utxo("b".repeat(64), 1, 500000000), utxo("c".repeat(64), 2, 50000000)];
-  const r = autoSelectUtxos(us, 1125000546n, 20, 3);
+  const r = autoSelectUtxos(us, 1125000333n, 20, 3);
   assert.ok(r.selected.length >= 2);
   assert.ok(!r.changeDropped);
   assert.equal(r.fee, BigInt(keypathTxVBytes(r.selected.length, 4)) * 20n);
-  assert.equal(r.change, r.selected.reduce((a, u) => a + BigInt(u.value), 0n) - 1125000546n - r.fee);
+  assert.equal(r.change, r.selected.reduce((a, u) => a + BigInt(u.value), 0n) - 1125000333n - r.fee);
 });
 
 test("autoSelectUtxos: insufficient funds refused loudly", () => {
   assert.throws(
-    () => autoSelectUtxos([utxo("a".repeat(64), 0, 1000)], 1125000546n, 20, 3),
+    () => autoSelectUtxos([utxo("a".repeat(64), 0, 1000)], 1125000333n, 20, 3),
     /insufficient funds/
   );
   assert.throws(() => autoSelectUtxos([], 1n, 20, 1), /no UTXOs/);
@@ -305,9 +305,9 @@ test("planRun: totals balance grain-exact, change kept", () => {
 });
 
 test("planRun: dust change absorbed into the fee, disclosed", () => {
-  // with-change change would be 4300-4800 = -500 < 546 -> dropped;
+  // with-change change would be 4300-4800 = -500 (negative) -> dropped;
   // actual fee = nominal 197*20=3940, absorbed bump 360 grains
-  const us = [utxo("a".repeat(64), 0, 1125000546 + 4300)];
+  const us = [utxo("a".repeat(64), 0, 1125000333 + 4300)];
   const p = planRun({ utxos: us, payees: PAYEES(), senderProgram: SENDER_PROGRAM(), feeRateGrainsPerVByte: 20, network: N });
   assert.equal(p.changeDropped, true);
   assert.equal(p.change, 0n);
@@ -333,10 +333,10 @@ test("planRun: insufficient funds refused loudly", () => {
 test("estimateRunFee + runsCovered", () => {
   const fee = estimateRunFee({ nPayees: 3, nIn: 1, feeRateGrainsPerVByte: 20 });
   assert.equal(fee, BigInt(keypathTxVBytes(1, 4)) * 20n);
-  const per = 1125000546n + fee;
-  assert.equal(runsCovered(per * 5n, 1125000546n, fee), 5);
-  assert.equal(runsCovered(per * 5n - 1n, 1125000546n, fee), 4);
-  assert.equal(runsCovered(0n, 1125000546n, fee), 0);
+  const per = 1125000333n + fee;
+  assert.equal(runsCovered(per * 5n, 1125000333n, fee), 5);
+  assert.equal(runsCovered(per * 5n - 1n, 1125000333n, fee), 4);
+  assert.equal(runsCovered(0n, 1125000333n, fee), 0);
   assert.throws(() => runsCovered(100n, 0n, 0n), /run cost must be positive/);
 });
 
@@ -345,12 +345,12 @@ test("estimateRunFee + runsCovered", () => {
 test("builder tip: default off, testnet and sub-dust waived, 1% exact on mainnet", () => {
   assert.equal(BUILDER_TIP_BPS, 100);
   assert.equal(BUILDER_TIP_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
-  assert.equal(builderTipGrainsFor(1125000546n, N, false), 0n);
-  assert.equal(builderTipGrainsFor(1125000546n, N, undefined), 0n);
-  assert.equal(builderTipGrainsFor(1125000546n, N, true), 11250005n, "floor(1% of the sample run total)");
-  assert.equal(builderTipGrainsFor(1125000546n, NETWORKS.testnet, true), 0n);
+  assert.equal(builderTipGrainsFor(1125000333n, N, false), 0n);
+  assert.equal(builderTipGrainsFor(1125000333n, N, undefined), 0n);
+  assert.equal(builderTipGrainsFor(1125000333n, N, true), 11250003n, "floor(1% of the sample run total)");
+  assert.equal(builderTipGrainsFor(1125000333n, NETWORKS.testnet, true), 0n);
   assert.equal(builderTipGrainsFor(10000n, N, true), 0n, "100-grain tip is below dust — waived, never rounded up");
-  assert.equal(builderTipGrainsFor(54600n, N, true), 546n, "tip exactly at dust floor is charged");
+  assert.equal(builderTipGrainsFor(33300n, N, true), 333n, "tip exactly at dust floor is charged");
 });
 
 test("builder tip: applyBuilderTip is opt-in, non-mutating, idempotent, and plans grain-exact", () => {
@@ -362,17 +362,17 @@ test("builder tip: applyBuilderTip is opt-in, non-mutating, idempotent, and plan
   assert.equal(payees.length, 3, "original list not mutated");
   assert.equal(tipped.length, 4);
   assert.equal(tipped[3].address, BUILDER_TIP_ADDRESS);
-  assert.equal(tipped[3].amount, 11250005n, "1% of the 1,125,000,546-grain run total");
+  assert.equal(tipped[3].amount, 11250003n, "1% of the 1,125,000,333-grain run total");
   assert.equal(tipped[3].label, BUILDER_TIP_NAME);
   assert.equal(tipped[3].builderTip, true);
   assert.equal(applyBuilderTip(tipped, N, true), tipped, "second application is a no-op");
   const us = [utxo("a".repeat(64), 0, 800000000), utxo("b".repeat(64), 1, 500000000)];
   const p = planRun({ utxos: us, payees: tipped, senderProgram: SENDER_PROGRAM(), feeRateGrainsPerVByte: 20, network: N });
   assert.equal(p.total, p.sumOut + p.fee + p.change);
-  assert.equal(p.sumOut, 1125000546n + 11250005n, "tip counted in the planned sum");
+  assert.equal(p.sumOut, 1125000333n + 11250003n, "tip counted in the planned sum");
   const outs = p.outputs.filter((o) => !o.change);
   assert.equal(outs.length, 4);
-  assert.ok(outs.some((o) => o.address === BUILDER_TIP_ADDRESS && o.value === 11250005));
+  assert.ok(outs.some((o) => o.address === BUILDER_TIP_ADDRESS && o.value === 11250003));
 });
 
 test("builder tip: bundle round-trips with the tip and signing covers it", () => {
@@ -389,7 +389,7 @@ test("builder tip: bundle round-trips with the tip and signing covers it", () =>
   assert.equal(imp.payees.length, 4);
   assert.equal(imp.payees[3].builderTip, true);
   assert.equal(imp.payees[3].address, BUILDER_TIP_ADDRESS);
-  assert.equal(imp.payees[3].amount, 11250005n);
+  assert.equal(imp.payees[3].amount, 11250003n);
   const secret = parsePayrollSecret(HEXKEY, N);
   const { txid, hex } = buildPayrollTx({ secret, senderAddress: SENDER, utxos: us, plan, network: N });
   assert.match(txid, /^[0-9a-f]{64}$/);
@@ -419,7 +419,7 @@ test("buildDescriptor: kind tag, schedule context, 16-hex fingerprint", () => {
   assert.equal(descriptor.runLabel, "Oct-15 run");
   assert.equal(descriptor.payees[0].label, "Alice");
   assert.match(fingerprint, /^[0-9a-f]{16}$/);
-  assert.equal(descriptor.totals.payeesGrains, "1125000546");
+  assert.equal(descriptor.totals.payeesGrains, "1125000333");
 });
 
 test("exportUnsignedBundle / importUnsignedBundle round-trip", () => {
@@ -500,7 +500,7 @@ function sampleRecord() {
     txid: "d".repeat(64),
     payees: [
       { address: A1, label: "Alice", grains: 125000000n },
-      { address: A2, label: null, grains: 546n },
+      { address: A2, label: null, grains: 333n },
     ],
     feeGrains: 4400n, vBytes: 220,
     recordedAt: "2026-10-15T09:00:00.000Z",
@@ -526,7 +526,7 @@ test("runsToCsv: header + one row per payee", () => {
   assert.equal(lines.length, 1 + 2 * 2);
   assert.ok(lines[1].includes("2026-10-15,biweekly,Oct-15 run"));
   assert.ok(lines[1].includes(",125000000,1.25"));
-  assert.ok(lines[2].includes(",546,0.00000546"));
+  assert.ok(lines[2].includes(",333,0.00000333"));
 });
 
 test("perPayeeTotals: aggregates across runs", () => {
@@ -537,7 +537,7 @@ test("perPayeeTotals: aggregates across runs", () => {
   assert.equal(a.runs, 2);
   assert.equal(a.label, "Alice");
   const b = totals.get(A2.toLowerCase());
-  assert.equal(b.totalGrains, 1092n);
+  assert.equal(b.totalGrains, 666n); // 2 runs x the 333-grain sample row
   assert.equal(b.runs, 2);
 });
 

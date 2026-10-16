@@ -84,13 +84,13 @@ test("sub-dust totals are refused", () => {
     /dust floor/
   );
   assert.throws(
-    () => R.buildInvoice({ invoicee: "X", items: [{ description: "tip", amountPRL: "0.00000545" }], address: ADDR }),
+    () => R.buildInvoice({ invoicee: "X", items: [{ description: "tip", amountPRL: "0.00000332" }], address: ADDR }),
     /dust floor/
   );
 });
-test("545 grains refused, 546 accepted", () => {
-  const justDust = R.buildInvoice({ invoicee: "X", items: [{ description: "a", amountPRL: "0.00000546" }], address: ADDR });
-  assert.equal(justDust.totalGrains, "546");
+test("332 grains refused, 333 accepted", () => {
+  const justDust = R.buildInvoice({ invoicee: "X", items: [{ description: "a", amountPRL: "0.00000333" }], address: ADDR });
+  assert.equal(justDust.totalGrains, "333");
 });
 test("invalid address is loudly refused at build time", () => {
   assert.throws(

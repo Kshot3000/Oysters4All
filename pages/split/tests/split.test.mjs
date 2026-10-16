@@ -163,12 +163,12 @@ test("minimizeTransfers handles empty balances (tab nets to zero)", () => {
 
 /* ---------- dust refusal ---------- */
 
-test("dust policy refuses sub-546-grain transfers loudly", () => {
+test("dust policy refuses sub-333-grain transfers loudly", () => {
   const t = S.settleTab({
     tabName: "tiny", members: members(2), network: NET,
     expenses: [S.addExpense(tab(2), { desc: "coffee", amountPRL: "0.000005", payerIdx: 0, mode: "equal", memberIdxs: [0, 1] })],
   });
-  // 500 grains total, 250/250 split → both balances ±250, transfer = 250 grains < 546
+  // 500 grains total, 250/250 split → both balances ±250, transfer = 250 grains < 333
   assert.equal(t.blocked.length, 1);
   assert.equal(t.payable.length, 0);
   assert.ok(t.blocked[0].reason.includes("dust floor"));
@@ -323,7 +323,7 @@ test("builder tip: default off, testnet and sub-dust waived, 1% exact on mainnet
   assert.equal(S.builderTipGrainsFor(100000000n, NET, true), 1000000n);
   assert.equal(S.builderTipGrainsFor(100000000n, S.NETWORKS.testnet, true), 0n);
   assert.equal(S.builderTipGrainsFor(10000n, NET, true), 0n, "100-grain tip is below dust — waived, never rounded up");
-  assert.equal(S.builderTipGrainsFor(54600n, NET, true), 546n, "tip exactly at dust floor is charged");
+  assert.equal(S.builderTipGrainsFor(33300n, NET, true), 333n, "tip exactly at dust floor is charged");
 });
 
 test("builder tip: applyBuilderTip is opt-in, non-mutating, idempotent, and funds grain-exact", () => {

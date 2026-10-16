@@ -67,7 +67,7 @@ test("pinned certificate seal", () => {
 
 test("certificate with real txid verifies PROVEN", () => {
   const txid = "a".repeat(64);
-  const cert = B.formatCertificate({ tag: TAG, networkId: "mainnet", amountGrains: 546, txid });
+  const cert = B.formatCertificate({ tag: TAG, networkId: "mainnet", amountGrains: 333, txid });
   const r = B.verifyBurnSeal(cert);
   assert.equal(r.verdict, "PROVEN");
 });
@@ -150,7 +150,7 @@ test("planBurnTx: exact-fit single output (change folds into fee)", () => {
 test("planBurnTx refusals: dust burn, overspend, dust change", () => {
   assert.throws(() => B.planBurnTx({
     networkId: "mainnet", utxo: UTXO, burnAddress: PIN_ADDR,
-    amountGrains: 545, changeAddress: CHANGE, feeRateGrainsPerVByte: 10,
+    amountGrains: 332, changeAddress: CHANGE, feeRateGrainsPerVByte: 10,
   }), /dust floor/);
   assert.throws(() => B.planBurnTx({
     networkId: "mainnet", utxo: UTXO, burnAddress: PIN_ADDR,
@@ -191,9 +191,9 @@ test("reverifyUnsignedBurnHex catches a tampered output", () => {
 test("PRL <-> grains conversions", () => {
   assert.equal(B.prlToGrains("1"), 100000000);
   assert.equal(B.prlToGrains("1.5"), 150000000);
-  assert.equal(B.prlToGrains("0.00000546"), 546);
+  assert.equal(B.prlToGrains("0.00000333"), 333);
   assert.equal(B.grainsToPRL(150000000), "1.5");
-  assert.equal(B.grainsToPRL(546), "0.00000546");
+  assert.equal(B.grainsToPRL(333), "0.00000333");
   assert.throws(() => B.prlToGrains("1.123456789"), /max 8 decimals/);
   assert.throws(() => B.prlToGrains("-1"), /must look like/);
 });

@@ -48,7 +48,7 @@ the tip as its own output in the plan, before signing: the script-path
 sighash commits to every output, so the tip cannot be added or skimmed
 after signing, and the plan shows it as its own labeled line. It is
 waived on testnet and when 1% of the claim would fall below the
-546-grain dust floor (never rounded up). Clawback never carries a tip.
+333-grain dust floor (never rounded up). Clawback never carries a tip.
 
 ## Honest limits
 

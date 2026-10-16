@@ -456,7 +456,7 @@ test("amount inputs use the exact core parsers (float-parse class closed)", () =
   assert.ok(src.includes("E.parseBTCToSats(str)"), "parseBTC delegates to the core exact parser");
   assert.ok(!src.includes("Math.round(v * E.GRAIN_PER_PRL)"), "no float PRL parse left");
   assert.ok(!src.includes("Math.round(v * 1e8)"), "no float BTC parse left");
-  assert.ok(html.includes("pearl-swap.bundle.js?v=7"), "bundle cache key bumped");
+  assert.ok(html.includes("pearl-swap.bundle.js?v=8"), "bundle cache key bumped");
   assert.ok(html.includes('src="app.js?v=6"'), "app cache key bumped");
 });
 

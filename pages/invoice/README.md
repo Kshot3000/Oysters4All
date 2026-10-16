@@ -11,7 +11,7 @@ Live: https://kshot3000.github.io/Oysters4All/pages/invoice/
 
 1. **Compose** — invoicee name, 1–N line items (grain-exact BigInt PRL math),
    optional due date, memo, your own `prl1…`/`tprl1…` receiving address, optional
-   payer label. Guards: empty line items refused, totals under the 546-grain
+   payer label. Guards: empty line items refused, totals under the 333-grain
    dust floor refused, invalid addresses refused loudly.
 2. **Descriptor** — tamper-evident
    `pearl-invoice:v1:<hrp>:<invoiceHash>:<totalGrains>[:<dueUnix>]` where

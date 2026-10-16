@@ -37,7 +37,7 @@ adds the tip as its own output of the claim transaction, paid out of the
 claimed amount — the claimer receives the HTLC value minus the network
 fee and the tip, stated in those words next to the checkbox. The tip is
 computed by `builderTipGrainsFor` (1% floor in BigInt, mainnet only,
-waived when the 1% would fall below the 546-grain dust floor instead of
+waived when the 1% would fall below the 333-grain dust floor instead of
 rounded up) and is added before signing, so the script-path sighash
 commits to it — it cannot be added or skimmed afterwards, and assembly
 re-derives the builder program from the address constant and refuses a

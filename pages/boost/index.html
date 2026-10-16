@@ -123,7 +123,7 @@
     <div id="rbf-need-diag" class="warnbox">Diagnose a transaction first (tab 1) — and it must signal RBF, or this tab refuses.</div>
     <div id="rbf-wifs" class="wiflist"></div>
     <div class="form-grid">
-      <label class="wide">Trim the bump from this output <span class="hint">fee-source; must stay ≥ 546 grains.</span>
+      <label class="wide">Trim the bump from this output <span class="hint">fee-source; must stay ≥ 333 grains.</span>
         <select id="rbf-feesrc"></select></label>
       <label>Target feerate <span class="hint">grains/vB — must beat the current rate.</span>
         <input id="rbf-target" inputmode="decimal" value=""></label>
@@ -184,7 +184,7 @@
       <li><strong>RBF acceptance is node policy, not consensus.</strong> pearld implements BIP-125 (verified in <code>node/mempool/mempool.go</code>), but a node operator may set <code>rejectreplacement</code>, and the Blockbook relay you broadcast through may refuse replacements. A rejected broadcast is not a bug in your math.</li>
       <li><strong>CPFP needs package-aware miners.</strong> The child is worthless until the parent confirms; if a miner takes the child alone it can't — but most miners score by ancestor package. If the parent is double-spent, your child dies with it.</li>
       <li><strong>This page never sees the mempool directly</strong> — it sees Blockbook's view of it. Fees shown are what Blockbook reports.</li>
-      <li><strong>Dust floor: 546 grains</strong> per P2TR output (upstream <code>txrules</code>). The desk refuses to create dust.</li>
+      <li><strong>Dust floor: 333 grains</strong> per P2TR output (upstream <code>txrules</code>). The desk refuses to create dust.</li>
       <li><strong>Keys:</strong> WIFs live in page memory only, are wiped by the Wipe button and automatically after broadcast. Never paste a key you can't afford to lose into any website — ideally use a dedicated boosting key.</li>
       <li><strong>Already confirmed?</strong> Both accelerator paths refuse loudly — a confirmed transaction cannot be boosted, only spent onward.</li>
     </ul>
@@ -197,7 +197,7 @@
   <p class="fine">Pearl Boost · launchpad ignition desk · pure Taproot, no smart contracts · all signing local, keys wiped.</p>
 </footer>
 
-<script src="pearl-boost.bundle.js?v=5"></script>
-<script src="app.js?v=3"></script>
+<script src="pearl-boost.bundle.js?v=6"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

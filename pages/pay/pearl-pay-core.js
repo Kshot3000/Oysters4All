@@ -33,7 +33,7 @@ import { bytesToNumberBE } from "@noble/curves/abstract/utils";
 /* ---------------- chain params ---------------- */
 
 export const GRAIN_PER_PRL = 100_000_000;
-export const DUST_GRAIN = 546; // P2TR dust, matches upstream txrules / pearlpurse
+export const DUST_GRAIN = 333; // P2TR dust at pearld's default relay fee (node/mempool/policy.go GetDustThreshold: 3 x (43B output + 41 + CalcVsize(0,107)=27) = 333 grains; 546 was btcd's P2PKH figure)
 export const GAP_LIMIT_DEFAULT = 20;
 export const COINGECKO_PRICE_URL =
   "https://api.coingecko.com/api/v3/simple/price?ids=pearl-2&vs_currencies=usd&include_24hr_change=true";

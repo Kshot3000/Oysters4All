@@ -67,7 +67,7 @@ export const MAX_SAFE_PRICE_GRAINS = Number.MAX_SAFE_INTEGER;
  * invalidate it, and the seller always receives the exact listed price.
  * The fee is quoted in the fill dialog before signing — never hidden.
  * Testnet fills carry no platform fee, and a fee that would fall below the
- * 546-grain dust floor is waived rather than rounded up. */
+ * 333-grain dust floor is waived rather than rounded up. */
 export const PLATFORM_FEE_BPS = 100; // 1%
 export const PLATFORM_FEE_ADDRESS = "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d";
 
@@ -740,7 +740,7 @@ export function demoBook(tick, network = NETWORKS.mainnet, seed = 1337, nowMs = 
     const price = (amt * base * BigInt(drift)) / 100n;
     const lotTxid = [...Array(64)].map(() => "0123456789abcdef"[Math.floor(rng() * 16)]).join("");
     listings.push({
-      v: 1, tick: t, amt: amt.toString(), lotTxid, lotVout: 0, lotValue: 546,
+      v: 1, tick: t, amt: amt.toString(), lotTxid, lotVout: 0, lotValue: 333,
       lotSpkHex: bytesToHex(p2trScriptPubKey(prog)), priceGrains: price.toString(),
       seller, expiry: now + 7 * 86400000, created: now - Math.floor(rng() * 36) * 3600000,
       sig: [...Array(128)].map(() => "0123456789abcdef"[Math.floor(rng() * 16)]).join(""),

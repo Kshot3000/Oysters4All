@@ -15,7 +15,7 @@ Live: https://kshot3000.github.io/Oysters4All/pages/rain/
 2. **Recipients** — paste one `<address> <amount>` per line (PRL, decimals
    allowed; CSV with commas works too), or import a CSV file. Every address
    is validated as a Pearl v1 Taproot address, every amount must clear the
-   546-grain dust floor, and duplicate addresses merge into a single output.
+   333-grain dust floor, and duplicate addresses merge into a single output.
 3. **Plan** — exact fee math up front: `keypathTxVBytes(nIn, nOut)` × fee rate.
    Change returns to the funder; dust change is folded into the fee instead of
    creating a dust output. Insufficient funds are refused before anything is
@@ -35,7 +35,7 @@ same address in the footer below), computed by `builderTipGrainsFor()` in
 **before** signing and the funder is the sole signer, so the keypath
 sighash commits to it — it cannot be added or skimmed after signing. The
 plan shows it as its own labeled line before anything is signed. Waived
-on testnet, and waived when 1% would fall below the 546-grain dust floor
+on testnet, and waived when 1% would fall below the 333-grain dust floor
 (never rounded up). `applyBuilderTip()` refuses when the tip would push
 the rain past the 250-recipient cap, and `planRain()` refuses any
 recipient flagged as the tip that does not pay the builder address.

@@ -61,7 +61,7 @@ Bob's claim form offers an **optional 1% builder tip** to
 default, disclosed next to its checkbox, and — when Bob opts in — paid as its
 own output out of his claim (he receives the swap amount minus the fee and
 the tip), committed by his signature before signing. It is waived on testnet
-and below the 546-grain dust floor. Alice's refund takes no tip parameter at
+and below the 333-grain dust floor. Alice's refund takes no tip parameter at
 all — it returns her own locked funds, so a tip there is impossible by
 construction.
 

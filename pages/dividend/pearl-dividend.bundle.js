@@ -5582,7 +5582,7 @@ zoo`.split("\n");
 
   // ../sign/src/crypto.js
   var GRAIN_PER_PRL = 1e8;
-  var DUST_GRAIN = 546;
+  var DUST_GRAIN = 333;
   var NETWORKS = {
     mainnet: {
       id: "mainnet",

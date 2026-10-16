@@ -382,7 +382,7 @@
             <dt>old fee / rate</dt><dd>${grains(d.feeGrains)} · ${d.feeRate.toFixed(3)} gr/vB</dd>
             <dt>new fee / rate</dt><dd><span class="bigfee">${plan.newFee.toLocaleString("en-US")}</span> grains · <span class="bigfee">${plan.targetRate}</span> gr/vB</dd>
             <dt>fee bump (Δ)</dt><dd>${plan.feeDelta.toLocaleString("en-US")} grains — trimmed from output #${fsOut.n}</dd>
-            <dt>fee-source after trim</dt><dd>${grains(plan.newFeeSourceValue)} (≥ 546 dust ✓)</dd>
+            <dt>fee-source after trim</dt><dd>${grains(plan.newFeeSourceValue)} (≥ 333 dust ✓)</dd>
             <dt>min-relay check</dt><dd>${plan.newFee.toLocaleString()} &gt; ${plan.oldFee.toLocaleString()} + ${plan.minRelayEstimate} (est. per pearld policy.go) ✓</dd>
             <dt>inputs</dt><dd>${prevouts.length} — same outpoints, key↔script guard <span class="badge ok">MATCH</span> on all</dd>
             <dt>outputs</dt><dd>${d.vout.length} — identical, except #${fsOut.n} trimmed</dd>

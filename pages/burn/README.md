@@ -31,7 +31,7 @@ always yields the same address, which is what makes the burn verifiable.
    P2TR change address, and a fee rate. The desk builds the **exact unsigned
    tx**: one P2TR burn output + one P2TR change output, real vByte fee math
    (154 vB for 2 outputs / 111 vB for 1 output — one P2TR keypath input).
-   Burn outputs below the 546-grain dust floor are refused; a dust-valued
+   Burn outputs below the 333-grain dust floor are refused; a dust-valued
    change is refused loudly (sweep it into the burn instead). The unsigned
    hex is re-verified by decoding it before display.
 3. **Certify** — seal a `pearl-burn:v1:<hrp>:<sha256>` certificate binding

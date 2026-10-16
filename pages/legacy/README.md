@@ -120,7 +120,7 @@ second output — paid to `prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxk
 *before* signing, so the script-path sighash commits to it and it cannot be
 added or skimmed afterwards. The heir receives the claim minus the fee and
 the tip; the fee is computed over both outputs. The tip is mainnet-only,
-waived (never rounded up) when 1% falls below the 546-grain dust floor,
+waived (never rounded up) when 1% falls below the 333-grain dust floor,
 and refused when the claim destination is the builder address itself.
 Owner refreshes never carry a tip: `buildOwnerRefresh` takes no tip
 parameter and its single output must pay the vault's own address, so a

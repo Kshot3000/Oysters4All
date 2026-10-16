@@ -32,7 +32,7 @@
  * Protocol facts (verified, not from memory):
  *  - TapLeaf/TapBranch/TapTweak tags + branch sort order: BIP-341 (same as
  *    the audited escrow taptree2 this file reuses).
- *  - P2TR dust 546 grains, 1 PRL = 1e8 grains, bech32m HRPs prl/tprl:
+ *  - P2TR dust 333 grains, 1 PRL = 1e8 grains, bech32m HRPs prl/tprl:
  *    sign/src/crypto.js (from node/chaincfg + upstream txrules).
  *  - CLTV lock heights < 500000000 are block heights (BIP-65).
  *  - Pearl block target ~194 s (matches the fees desk).

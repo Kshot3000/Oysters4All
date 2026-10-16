@@ -5623,7 +5623,7 @@ zoo`.split("\n");
 
   // src/crypto.js
   var GRAIN_PER_PRL = 1e8;
-  var DUST_GRAIN = 546;
+  var DUST_GRAIN = 333;
   var NETWORKS = {
     mainnet: {
       id: "mainnet",
@@ -6858,7 +6858,7 @@ zoo`.split("\n");
         amt: amt.toString(),
         lotTxid,
         lotVout: 0,
-        lotValue: 546,
+        lotValue: 333,
         lotSpkHex: bytesToHex(p2trScriptPubKey(prog)),
         priceGrains: price.toString(),
         seller,

@@ -567,7 +567,7 @@
         <button class="btn btn-ghost" id="fill-estimate" type="button">Estimate fee</button>
         <button class="btn btn-primary" id="fill-go" type="button" disabled>Sign &amp; broadcast</button>
       </div>
-      <p class="hint muted small" style="margin-top:0.75rem">You pay the network fee, plus a <strong>1% platform fee</strong> on mainnet fills — charged on top of the price as its own output to the Bazaar operator address shown in this page's footer (waived on testnet, and waived when 1% would fall below the 546-grain dust floor). The seller always receives the exact listed price. The lot UTXO moves to your address; the indexer credits the tokens to you on confirmation.</p>`;
+      <p class="hint muted small" style="margin-top:0.75rem">You pay the network fee, plus a <strong>1% platform fee</strong> on mainnet fills — charged on top of the price as its own output to the Bazaar operator address shown in this page's footer (waived on testnet, and waived when 1% would fall below the 333-grain dust floor). The seller always receives the exact listed price. The lot UTXO moves to your address; the indexer credits the tokens to you on confirmation.</p>`;
 
     let quote = null;
     $("#fill-estimate", m).addEventListener("click", async () => {

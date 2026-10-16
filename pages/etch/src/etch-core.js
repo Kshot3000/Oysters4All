@@ -24,7 +24,7 @@
  *    (mintFeeRecipient prl1ppmla838yflfcsm5vr6lfgvfclf4fgn3puja70cke4wqqkl6vflaq3cn7ea,
  *    mintFeeGrain 100000000 = 1 PRL per credited mint).
  *  - Pearl chain params: bech32m HRPs prl/tprl, BIP-86 coin 808276/1,
- *    tx version 1, P2TR dust 546 grains (see pearl-knowledge.md).
+ *    tx version 1, P2TR dust 333 grains (see pearl-knowledge.md).
  */
 
 import {
@@ -113,7 +113,7 @@ export function addressToProgram(address, network) {
 
 /* ---------------- reveal + commit planning ---------------- */
 
-export const CARRIER_VALUE_GRAINS = 1000; // value of each inscribed owner output (above 546 dust)
+export const CARRIER_VALUE_GRAINS = 1000; // value of each inscribed owner output (above 333 dust)
 
 /** Plan the whole inscription: envelopes, reveal script, commit key info,
  *  reveal outputs (owner + optional PRLS fee), fees, and the commit value

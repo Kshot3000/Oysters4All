@@ -61,7 +61,7 @@ signers see and approve the exact fee output, and it cannot be added or
 altered after signing (the test suite proves a post-signing skim breaks
 both signatures). The spend form discloses the fee up front and the plan
 shows it as its own line. **Refunds pay no service fee**, testnet
-releases pay none, and a fee that would fall below the 546-grain dust
+releases pay none, and a fee that would fall below the 333-grain dust
 floor is waived rather than rounded up.
 
 ## Verification

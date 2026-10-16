@@ -159,7 +159,7 @@
       <label>Fee rate (grains/vB)
         <input id="claim-feerate" type="number" min="1" step="any" placeholder="auto">
       </label>
-      <label class="check wide"><input id="claim-builder-tip" type="checkbox"> Optional builder tip — add 1% of the claimed amount as its own output to the builder, <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code> (mainnet only; waived when 1% would fall below the 546-grain dust floor). Off by default — the plan shows it as its own line before you sign. Cancel (clawback) never carries a tip.</label>
+      <label class="check wide"><input id="claim-builder-tip" type="checkbox"> Optional builder tip — add 1% of the claimed amount as its own output to the builder, <code>prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d</code> (mainnet only; waived when 1% would fall below the 333-grain dust floor). Off by default — the plan shows it as its own line before you sign. Cancel (clawback) never carries a tip.</label>
     </div>
     <h3>Ticks to sweep</h3>
     <p class="hint">Matured, funded ticks are pre-ticked. For each ticked tick, supply its UTXO — scan via
@@ -264,7 +264,7 @@
 </footer>
 
 <script src="qrcode.min.js?v=1"></script>
-<script src="pearl-stream.bundle.js?v=7"></script>
+<script src="pearl-stream.bundle.js?v=8"></script>
 <script src="app.js?v=5"></script>
 </body>
 </html>

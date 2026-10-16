@@ -256,8 +256,8 @@ test("builder tip: amount math — opt-in only, mainnet only, sub-dust waived, e
   assert.equal(C.builderTipGrainsFor(1_000_000_000, M, false), 0);
   assert.equal(C.builderTipGrainsFor(1_000_000_000, M, undefined), 0);
   assert.equal(C.builderTipGrainsFor(1_000_000_000, T, true), 0);
-  assert.equal(C.builderTipGrainsFor(50_000, M, true), 0); // 500 < 546 dust — waived, never rounded up
-  assert.equal(C.builderTipGrainsFor(54_600, M, true), 546); // exact dust floor is charged
+  assert.equal(C.builderTipGrainsFor(25_000, M, true), 0); // 250 < 333 dust — waived, never rounded up
+  assert.equal(C.builderTipGrainsFor(33_300, M, true), 333); // exact dust floor is charged
   assert.equal(C.builderTipGrainsFor(1_000_000_001, M, true), 10_000_000); // floor, BigInt-exact
   assert.equal(C.BUILDER_TIP_ADDRESS, "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
 });

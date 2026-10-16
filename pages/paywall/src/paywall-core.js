@@ -26,7 +26,7 @@
  *    text inlines them verbatim.
  *
  * Protocol facts (verified, not from memory):
- *  - 1 PRL = 1e8 grains, P2TR dust 546 grains, bech32m HRPs prl/tprl:
+ *  - 1 PRL = 1e8 grains, P2TR dust 333 grains, bech32m HRPs prl/tprl:
  *    sign/src/crypto.js (from node/chaincfg + upstream txrules).
  *  - Blockbook mainnet: https://blockbook.pearlresearch.ai (verified live
  *    2026-09-26); GET-only reads, same as the invoice desk.

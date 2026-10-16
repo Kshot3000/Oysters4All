@@ -54,9 +54,9 @@ test("parseRecipients: formats, units, merge, dust, rejects", () => {
   assert.equal(recipients[0].amount, 125000000n);
   assert.equal(recipients[1].amount, 50000000n);
 
-  const grains = parseRecipients(`${R1} 546 grains`, NETWORKS.mainnet);
-  assert.equal(grains.recipients[0].amount, 546n, "exact dust floor allowed");
-  assert.throws(() => parseRecipients(`${R1} 545 grains`, NETWORKS.mainnet), /below the dust floor/);
+  const grains = parseRecipients(`${R1} 333 grains`, NETWORKS.mainnet);
+  assert.equal(grains.recipients[0].amount, 333n, "exact dust floor allowed");
+  assert.throws(() => parseRecipients(`${R1} 332 grains`, NETWORKS.mainnet), /below the dust floor/);
   assert.throws(() => parseRecipients(`${R1} 0`, NETWORKS.mainnet), /must be positive/);
   assert.throws(() => parseRecipients(`${R1}`, NETWORKS.mainnet), /need "<address> <amount>"/);
   assert.throws(() => parseRecipients(`bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4 1`, NETWORKS.mainnet), /not a valid prl1 address/);
@@ -202,8 +202,8 @@ test("builderTipGrainsFor: exact 1% floor + waivers", () => {
   assert.equal(builderTipGrainsFor(175000000n, NETWORKS.mainnet, false), 0n, "off by default");
   assert.equal(builderTipGrainsFor(175000000n, NETWORKS.mainnet, undefined), 0n, "only === true enables");
   assert.equal(builderTipGrainsFor(175000000n, NETWORKS.testnet, true), 0n, "testnet waived");
-  assert.equal(builderTipGrainsFor(40000n, NETWORKS.mainnet, true), 0n, "sub-dust 1% waived, not rounded up");
-  assert.equal(builderTipGrainsFor(54600n, NETWORKS.mainnet, true), 546n, "1% landing exactly on dust is charged");
+  assert.equal(builderTipGrainsFor(25000n, NETWORKS.mainnet, true), 0n, "sub-dust 1% waived, not rounded up");
+  assert.equal(builderTipGrainsFor(33300n, NETWORKS.mainnet, true), 333n, "1% landing exactly on dust is charged");
 });
 
 test("applyBuilderTip: non-mutating, idempotent, cap refusal", () => {
