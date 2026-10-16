@@ -654,6 +654,41 @@ export function builderTipGrainsFor(totalGrains, network, enabled) {
   return tip >= DUST_GRAIN ? tip : 0;
 }
 
+/* ---------------- exact decimal fee pricing ---------------- */
+
+/* Exact decimal fee pricing (fleet pattern, first shipped in Pearl Fees):
+ * a fee rate is read through String(), whose shortest round-trip form
+ * recovers the decimal the user typed, then ceil(vBytes × rate) is computed
+ * in BigInt rational arithmetic. The old float form — Math.ceil(vB * rate)
+ * — overcharged whenever the float product of an exact-integer fee landed
+ * a hair above it: an owner refresh consolidating 4 vault UTXOs (385 vB)
+ * at 2.2 g/vB priced 848 grains instead of 847, and at 4.4 priced 1,695
+ * instead of 1,694. The claim leg's vBytes are near-fixed (138/181 for the
+ * reachable heir-script lengths) and did not trigger at the standard
+ * rates, but it prices through the same helper so no float site remains. */
+export function decimalToRational(x, name) {
+  const s = String(x ?? "").trim();
+  const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+  if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+  const [, sign, intPart, fracPart = "", expPart] = m;
+  let num = BigInt(intPart + fracPart);
+  let den = 10n ** BigInt(fracPart.length);
+  const exp = expPart ? BigInt(expPart) : 0n;
+  if (exp >= 0n) num *= 10n ** exp; else den *= 10n ** -exp;
+  if (sign === "-") num = -num;
+  return { num, den };
+}
+
+export function ceilFeeGrains(vBytes, rateGrainsPerVByte) {
+  if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("bad vBytes for fee");
+  const r = decimalToRational(rateGrainsPerVByte, "fee rate");
+  if (r.num <= 0n) throw new Error("fee rate must be positive");
+  const num = BigInt(vBytes) * r.num;
+  const grains = (num + r.den - 1n) / r.den;
+  if (grains > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("fee exceeds safe integer range");
+  return Number(grains);
+}
+
 /* ------------------------------------------------------------------ */
 /* Heir claim: script-path spend of leaf B, refused before maturity    */
 /* ------------------------------------------------------------------ */
@@ -708,7 +743,7 @@ export function buildHeirClaim(network, vault, {
   if (builderTip > 0 && constEq(destProgram, builderTipProgram)) {
     throw new Error("claim destination is the builder address — the builder tip would duplicate the claim output; leave the tip off");
   }
-  const fee = Math.ceil(claimSpendVBytes(vault, builderTip > 0 ? 2 : 1) * feeRateGrainsPerVByte);
+  const fee = ceilFeeGrains(claimSpendVBytes(vault, builderTip > 0 ? 2 : 1), feeRateGrainsPerVByte);
   const value = utxo.value - fee - builderTip;
   if (value < DUST_GRAIN) {
     if (builderTip > 0) {
@@ -826,8 +861,8 @@ export function buildOwnerRefresh(network, vault, {
   const perInput = spends.map(() => ({
     scriptLen: leafA.length, controlLen: 65, stackLens: [64],
   }));
-  const fee = Math.ceil(
-    multiScriptPathVBytes({ nIn: spends.length, nOut: 1, perInput }) * feeRateGrainsPerVByte
+  const fee = ceilFeeGrains(
+    multiScriptPathVBytes({ nIn: spends.length, nOut: 1, perInput }), feeRateGrainsPerVByte
   );
   const value = totalIn - fee;
   if (value < DUST_GRAIN) {

@@ -14,6 +14,7 @@ import {
   claimSpendVBytes, buildHeirClaim,
   builderTipGrainsFor, BUILDER_TIP_BPS, BUILDER_TIP_ADDRESS, BUILDER_TIP_NAME,
   buildOwnerRefresh, buildMultiScriptPathSpend, multiScriptPathVBytes,
+  decimalToRational, ceilFeeGrains,
   vaultUtxoStatus,
   parseTx, parseXOnlyKey, addressToProgram,
   verifySchnorrSig, signForXOnly, scriptPathSigDigestEx, buildScriptPathSpend,
@@ -528,6 +529,44 @@ test("owner refresh: same address, fresh clock, multi-input, exact fee", () => {
     utxos: [utxos[0], { ...utxos[0] }],
     ownerPrivHex: K[0].priv, feeRateGrainsPerVByte: 5,
   }), /duplicate outpoint/);
+});
+
+test("exact decimal fee ceiling: unit cases", () => {
+  // The float form Math.ceil(385 * 2.2) prices 848 — the exact product is
+  // 847.0, so the exact ceiling is 847 (the refresh regression below).
+  assert.equal(ceilFeeGrains(385, 2.2), 847);
+  assert.equal(ceilFeeGrains(385, "2.2"), 847, "string rates price identically");
+  assert.equal(ceilFeeGrains(385, 4.4), 1694);
+  assert.equal(ceilFeeGrains(219, 1.1), 241, "fractional products still ceil up");
+  assert.equal(ceilFeeGrains(219, 5), 1095, "integer rates price exactly as before");
+  assert.equal(ceilFeeGrains(138, 2.2), 304, "claim-shape vBytes at a decimal rate");
+  assert.throws(() => ceilFeeGrains(219, 0), /positive/);
+  assert.throws(() => ceilFeeGrains(219, -1), /positive/);
+  assert.throws(() => ceilFeeGrains(219, "abc"), /finite decimal/);
+  assert.throws(() => ceilFeeGrains(219, NaN), /finite decimal/);
+  assert.deepEqual(decimalToRational("2.20"), { num: 220n, den: 100n });
+});
+
+test("owner refresh: 4-UTXO consolidation at 2.2 g/vB pays the exact fee", () => {
+  const vault = makeVault();
+  const spkHex = vault.spkHex;
+  const utxos = ["ab", "cd", "ef", "12"].map((p, i) => ({
+    txid: p.repeat(32), vout: i, value: GRAIN_PER_PRL, spkHex,
+  }));
+  // vBytes: base = 53 + 41*4 = 217; witness 167/input -> ceil(1538/4) = 385.
+  assert.equal(multiScriptPathVBytes({
+    nIn: 4, nOut: 1,
+    perInput: utxos.map(() => ({ scriptLen: 34, controlLen: 65, stackLens: [64] })),
+  }), 385);
+  const r = buildOwnerRefresh(net, vault, {
+    utxos, ownerPrivHex: K[0].priv, feeRateGrainsPerVByte: 2.2,
+  });
+  // Float Math.ceil(385 * 2.2) charged 848; the exact fee is 847.
+  assert.equal(r.feeGrains, 847);
+  const parsed = parseTx(r.hex);
+  assert.equal(parsed.outputs.length, 1);
+  assert.equal(parsed.outputs[0].value, 4 * GRAIN_PER_PRL - 847, "output conserves at the exact fee");
+  assert.equal(parsed.inputs.length, 4);
 });
 
 test("vaultUtxoStatus classifier", () => {

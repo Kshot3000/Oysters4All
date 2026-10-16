@@ -45,10 +45,12 @@ var PearlLegacy = (() => {
     buildScriptPathSpend: () => buildScriptPathSpend,
     builderTipGrainsFor: () => builderTipGrainsFor,
     bytesToHex: () => bytesToHex,
+    ceilFeeGrains: () => ceilFeeGrains,
     checkInactivity: () => checkInactivity,
     claimSpendVBytes: () => claimSpendVBytes,
     convertBits: () => convertBits,
     dblSha: () => dblSha,
+    decimalToRational: () => decimalToRational,
     decodeBech32m: () => decodeBech32m,
     describeVault: () => describeVault,
     encodeBech32m: () => encodeBech32m,
@@ -6527,6 +6529,28 @@ zoo`.split("\n");
     const tip = Number(BigInt(totalGrains) * BigInt(BUILDER_TIP_BPS) / 10000n);
     return tip >= DUST_GRAIN ? tip : 0;
   }
+  function decimalToRational(x, name) {
+    const s = String(x ?? "").trim();
+    const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+    if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+    const [, sign, intPart, fracPart = "", expPart] = m;
+    let num2 = BigInt(intPart + fracPart);
+    let den = 10n ** BigInt(fracPart.length);
+    const exp = expPart ? BigInt(expPart) : 0n;
+    if (exp >= 0n) num2 *= 10n ** exp;
+    else den *= 10n ** -exp;
+    if (sign === "-") num2 = -num2;
+    return { num: num2, den };
+  }
+  function ceilFeeGrains(vBytes, rateGrainsPerVByte) {
+    if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("bad vBytes for fee");
+    const r = decimalToRational(rateGrainsPerVByte, "fee rate");
+    if (r.num <= 0n) throw new Error("fee rate must be positive");
+    const num2 = BigInt(vBytes) * r.num;
+    const grains = (num2 + r.den - 1n) / r.den;
+    if (grains > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("fee exceeds safe integer range");
+    return Number(grains);
+  }
   function claimSpendVBytes(vault, nOut = 1) {
     return spendVBytes({
       nOut,
@@ -6567,7 +6591,7 @@ zoo`.split("\n");
     if (builderTip > 0 && constEq(destProgram, builderTipProgram)) {
       throw new Error("claim destination is the builder address \u2014 the builder tip would duplicate the claim output; leave the tip off");
     }
-    const fee = Math.ceil(claimSpendVBytes(vault, builderTip > 0 ? 2 : 1) * feeRateGrainsPerVByte);
+    const fee = ceilFeeGrains(claimSpendVBytes(vault, builderTip > 0 ? 2 : 1), feeRateGrainsPerVByte);
     const value = utxo.value - fee - builderTip;
     if (value < DUST_GRAIN) {
       if (builderTip > 0) {
@@ -6658,8 +6682,9 @@ zoo`.split("\n");
       controlLen: 65,
       stackLens: [64]
     }));
-    const fee = Math.ceil(
-      multiScriptPathVBytes({ nIn: spends.length, nOut: 1, perInput }) * feeRateGrainsPerVByte
+    const fee = ceilFeeGrains(
+      multiScriptPathVBytes({ nIn: spends.length, nOut: 1, perInput }),
+      feeRateGrainsPerVByte
     );
     const value = totalIn - fee;
     if (value < DUST_GRAIN) {
