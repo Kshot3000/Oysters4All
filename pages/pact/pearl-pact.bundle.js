@@ -23,6 +23,8 @@
     buildPactTerms: () => buildPactTerms,
     buildRefundTx: () => buildRefundTx,
     bytesToHex: () => bytesToHex,
+    ceilFeeGrains: () => ceilFeeGrains,
+    decimalToRational: () => decimalToRational,
     decodeBech32m: () => decodeBech32m,
     encodeBech32m: () => encodeBech32m,
     executePact: () => executePact,
@@ -6237,6 +6239,28 @@ zoo`.split("\n");
     if (!Number.isFinite(n) || n < 1 || n > 1e5) refuse(`${what} must be between 1 and 100000 grains/vB`);
     return n;
   }
+  function decimalToRational(x, name) {
+    const s = String(x ?? "").trim();
+    const m = /^([+-]?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s);
+    if (!m) throw new Error(`${name} must be a finite decimal number, got: ${s.slice(0, 40)}`);
+    const [, sign, intPart, fracPart = "", expPart] = m;
+    let num2 = BigInt(intPart + fracPart);
+    let den = 10n ** BigInt(fracPart.length);
+    const exp = expPart ? BigInt(expPart) : 0n;
+    if (exp >= 0n) num2 *= 10n ** exp;
+    else den *= 10n ** -exp;
+    if (sign === "-") num2 = -num2;
+    return { num: num2, den };
+  }
+  function ceilFeeGrains(vBytes, rateGrainsPerVByte) {
+    if (!Number.isSafeInteger(vBytes) || vBytes < 0) throw new Error("bad vBytes for fee");
+    const r = decimalToRational(rateGrainsPerVByte, "fee rate");
+    if (r.num <= 0n) throw new Error("fee rate must be positive");
+    const num2 = BigInt(vBytes) * r.num;
+    const grains = (num2 + r.den - 1n) / r.den;
+    if (grains > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("fee exceeds safe integer range");
+    return Number(grains);
+  }
   function canonicalTermsJson(t) {
     return JSON.stringify({
       kind: DESCRIPTOR_KIND,
@@ -6320,7 +6344,7 @@ zoo`.split("\n");
     const fr = assertFeeRate(fundingFeeRate, "funding fee rate");
     const cr = assertFeeRate(cetFeeRate, "CET fee rate");
     const rr = assertFeeRate(refundFeeRate, "refund fee rate");
-    const cetFeeGrains = Math.ceil(cetVBytes * cr);
+    const cetFeeGrains = ceilFeeGrains(cetVBytes, cr);
     const distributable = total - cetFeeGrains;
     if (distributable < 2 * DUST_GRAIN) refuse(`collateral ${total} grains cannot cover the CET fee of ${cetFeeGrains} grains plus dust floors`);
     rows.forEach((r) => {
@@ -6486,7 +6510,7 @@ zoo`.split("\n");
     let nOut = 3, fee = 0, changeA = 0, changeB = 0;
     for (let round = 0; round < 4; round++) {
       const vBytes2 = keypathTxVBytes(nIn, nOut);
-      fee = Math.ceil(vBytes2 * rate);
+      fee = ceilFeeGrains(vBytes2, rate);
       const feeA = Math.ceil(fee / 2), feeB = fee - feeA;
       changeA = aIn - terms.collateralAlice - feeA;
       changeB = bIn - terms.collateralBob - feeB;
@@ -6501,7 +6525,7 @@ zoo`.split("\n");
     const absorbedA = changeA > 0 && changeA < DUST_GRAIN ? changeA : 0;
     const absorbedB = changeB > 0 && changeB < DUST_GRAIN ? changeB : 0;
     const vBytes = keypathTxVBytes(nIn, nOut);
-    fee = Math.ceil(vBytes * rate) + absorbedA + absorbedB;
+    fee = ceilFeeGrains(vBytes, rate) + absorbedA + absorbedB;
     const outputs = [{ program: fundingProgram, value: terms.totalCollateral, label: "pact funding (2-of-2)" }];
     if (changeA >= DUST_GRAIN) outputs.push({ program: aliceProg, value: changeA, label: `${terms.alice.name} change` });
     if (changeB >= DUST_GRAIN) outputs.push({ program: bobProg, value: changeB, label: `${terms.bob.name} change` });
@@ -6719,7 +6743,7 @@ zoo`.split("\n");
     if (!/^[0-9a-f]{64}$/.test(ftx)) refuse("funding txid must be 64 hex characters");
     const script = hexToBytes(terms.script);
     const vBytes = scriptPathVBytes(1, 2, script.length, 2, 2);
-    const fee = Math.ceil(vBytes * terms.refundFeeRate);
+    const fee = ceilFeeGrains(vBytes, terms.refundFeeRate);
     const feeA = Math.floor(fee / 2), feeB = fee - feeA;
     const aVal = terms.collateralAlice - feeA, bVal = terms.collateralBob - feeB;
     if (aVal < DUST_GRAIN || bVal < DUST_GRAIN) refuse("collateral cannot cover the refund fee plus dust floors");
@@ -6849,7 +6873,7 @@ zoo`.split("\n");
     const bob = mintOracleKey();
     const eventId = "demo/pact-" + bytesToHex(randomBytes(4));
     const { script } = buildFundingScript(alice.pubXOnlyHex, bob.pubXOnlyHex);
-    const cetFeeGrains = Math.ceil(scriptPathVBytes(1, 2, script.length, 2, 2) * 5);
+    const cetFeeGrains = ceilFeeGrains(scriptPathVBytes(1, 2, script.length, 2, 2), 5);
     const distributable = 2e8 - cetFeeGrains;
     const commits = oracleAnnouncements(oracle.privHex, eventId, 2).map((a) => a.pointXHex);
     const terms = buildPactTerms({

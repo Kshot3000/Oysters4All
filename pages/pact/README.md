@@ -35,7 +35,7 @@ collateral if the oracle never attests.
 ## Scripts
 
 - `node build.mjs` — bundle `src/` → `pearl-pact.bundle.js`
-- `node tests/pact.test.mjs` — 10 core tests (adaptor round-trip, attestation,
+- `node tests/pact.test.mjs` — 13 core tests (adaptor round-trip, attestation,
   funding planner fee math, full sealing ceremony, execution, refund)
 - `node tests/dom.test.mjs` — bundle surface + HTML wiring checks
 - `node ../../hidden_files/qa-pact-browser.mjs` — 32 headless-Chromium checks

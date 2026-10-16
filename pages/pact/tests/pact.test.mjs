@@ -252,6 +252,34 @@ test("payout math helpers", () => {
 });
 
 
+test("exact decimal fee pricing: ceilFeeGrains is exact at decimal rates", () => {
+  // The float form Math.ceil(370 * 1.1) prices 408; the exact fee is 407.
+  assert.equal(P.ceilFeeGrains(370, 1.1), 407);
+  assert.equal(P.ceilFeeGrains(370, 2.2), 814);
+  assert.equal(P.ceilFeeGrains(370, "1.1"), 407); // string rates price identically
+  assert.equal(P.ceilFeeGrains(371, 1.1), 409); // fractional products still ceil up (408.1 -> 409)
+  assert.equal(P.ceilFeeGrains(179, 5), 895); // integer rates unchanged
+  assert.throws(() => P.ceilFeeGrains(370, "abc"), /finite decimal/);
+  assert.throws(() => P.ceilFeeGrains(370, 0), /must be positive/);
+  assert.throws(() => P.ceilFeeGrains(-1, 1.1), /bad vBytes/);
+});
+
+test("funding plan: decimal rates price the exact fee (plan level)", () => {
+  const t = buildTerms();
+  // 1 Alice UTXO + 3 Bob UTXOs = 4 keypath inputs, 3 outputs -> 370 vB.
+  const utxoA = "aa".repeat(32) + ":0:1000000000";
+  const utxoB = [0, 1, 2].map((i) => "bb".repeat(32) + `:${i}:1000000000`).join("\n");
+  const plan = P.planFundingTx({ networkId: "mainnet", terms: t, aliceUtxoText: utxoA, bobUtxoText: utxoB, fundingFeeRate: 1.1 });
+  assert.equal(plan.vBytes, 370);
+  assert.equal(plan.absorbedDust, 0);
+  assert.equal(plan.feeGrains, 407); // float pricing charged 408
+  const totalIn = 4_000_000_000;
+  const totalOut = plan.outputs.reduce((a, o) => a + o.value, 0);
+  assert.equal(totalOut + plan.feeGrains, totalIn); // conservation at the exact fee
+  const plan22 = P.planFundingTx({ networkId: "mainnet", terms: t, aliceUtxoText: utxoA, bobUtxoText: utxoB, fundingFeeRate: 2.2 });
+  assert.equal(plan22.feeGrains, 814); // float pricing charged 815
+});
+
 test("funding plan: duplicated outpoints refused (own list and cross-party)", () => {
   const t = buildTerms();
   const utxoA = "aa".repeat(32) + ":0:100001000";
