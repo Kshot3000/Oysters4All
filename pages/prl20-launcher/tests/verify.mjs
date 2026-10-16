@@ -26,6 +26,7 @@ import {
   buildDeployJson, buildMintJson, validatePrl20Json,
   buildInscriptionScript, tapLeafHash, commitKeyInfo,
   buildKeypathTx, buildRevealTx, keypathTxVBytes, revealTxVBytes,
+  fetchUtxos,
   bytesToHex, hexToBytes,
 } from "../pearl-inscribe.js";
 import { schnorr } from "@noble/curves/secp256k1";
@@ -397,6 +398,30 @@ if (canParse) {
     const res = findMintFeePayment(outs, policy);
     ok("both-fees prls mint: indexer fee matcher still satisfied by the PRLS output alone", res.paid && res.paidGrain === String(PRLS.mintFeeGrain), JSON.stringify(res));
   } else skip("both-fees prls matcher (checkout absent)");
+}
+
+/* fetchUtxos must never pass endpoint strings through (app.js renders vout
+ * and confirmations via innerHTML) nor silently round a >2^53 value. */
+{
+  const EVIL = "<svg onload=alert(1)>";
+  const TX = "a".repeat(64);
+  const payload = [
+    { txid: TX, vout: EVIL, value: "100000", confirmations: 3 },
+    { txid: TX, vout: 1, value: "9007199254740993", confirmations: 3 },
+    { txid: TX, vout: 2, value: "200000000", confirmations: EVIL },
+    { txid: TX, vout: 0, value: "5000", confirmations: 7 },
+  ];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: true, status: 200, text: async () => JSON.stringify(payload) });
+  try {
+    const us = await fetchUtxos("https://bb.example", "prl1x");
+    ok("fetchUtxos drops hostile vout, coerces hostile confirmations, refuses rounded value",
+      us.length === 2 &&
+      us.every((u) => Number.isSafeInteger(u.vout) && u.vout >= 0 && Number.isSafeInteger(u.confirmations) && u.confirmations >= 0) &&
+      us.some((u) => u.vout === 2 && u.value === 200000000 && u.confirmations === 0) &&
+      us.some((u) => u.vout === 0 && u.value === 5000 && u.confirmations === 7),
+      JSON.stringify(us));
+  } finally { globalThis.fetch = realFetch; }
 }
 
 console.log(`\n${pass} passed, ${fail} failed${skipped ? `, ${skipped} skipped` : ""}`);

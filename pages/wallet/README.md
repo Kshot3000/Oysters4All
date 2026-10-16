@@ -46,7 +46,7 @@ No new cryptography was invented for this app.
 
 ## Tests
 
-- `tests/verify.mjs` — 66/66 crypto checks: derivation, addresses, signing,
+- `tests/verify.mjs` — 78/78 checks: derivation, addresses, signing,
   transaction bytes and txids against known-answer vectors.
 - `tests/smoke.mjs` — full-flow jsdom drive of the real page (onboarding →
   quiz → password → home → send validation → receive rotation → settings →

@@ -64,7 +64,7 @@ is the single source of the launcher-fee amount and waiver.
 | `lib/` | Vendored ESM dependencies (`@scure/*`, `@noble/*`) for the source + tests |
 | `importmap.json` | Import map for the ESM source (used by `tests/`) |
 | `qrcode.min.js` | Vendored QR generator (classic script) |
-| `tests/verify.mjs` | 49-check verification suite |
+| `tests/verify.mjs` | 62-check verification suite |
 | `tests/loader.mjs` | Node ESM loader applying `importmap.json` for the suite |
 
 Rebuild the bundle after editing the core:

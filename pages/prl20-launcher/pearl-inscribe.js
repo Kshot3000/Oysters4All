@@ -577,10 +577,22 @@ async function bbFetch(base, path, opts = {}) {
 export async function fetchUtxos(blockbookBase, address) {
   const list = await bbFetch(blockbookBase, `/api/v2/utxo/${address}`);
   if (!Array.isArray(list)) throw new Error("unexpected utxo response");
-  return list.map((u) => ({
-    txid: u.txid, vout: u.vout, value: Number(u.value), // grains (satoshis field)
-    confirmations: u.confirmations ?? 0,
-  })).filter((u) => u.value > 0 && /^[0-9a-f]{64}$/i.test(u.txid));
+  return list.flatMap((u) => {
+    // Every field is coerced at the data layer (the fleet fetchUtxos shape):
+    // app.js renders vout and confirmations via innerHTML, so an endpoint-
+    // supplied string must never pass through, and a value past
+    // MAX_SAFE_INTEGER must never be silently rounded into a sighash amount.
+    const vout = Number(u.vout);
+    const value = Number(u.value); // grains (satoshis field)
+    const conf = Number(u.confirmations);
+    if (!/^[0-9a-f]{64}$/i.test(u.txid)) return [];
+    if (!Number.isSafeInteger(vout) || vout < 0) return [];
+    if (!Number.isSafeInteger(value) || value <= 0) return [];
+    return [{
+      txid: u.txid, vout, value,
+      confirmations: Number.isSafeInteger(conf) && conf >= 0 ? conf : 0,
+    }];
+  });
 }
 /** Fee rate in grains/vByte. Blockbook estimatefee returns PRL/kB (like BTC/kB). */
 export async function fetchFeeRateGrainsPerVByte(blockbookBase, blocks = 2) {

@@ -248,5 +248,28 @@ const testnet = W.NETWORKS.testnet;
   throws("pearl.js buildTx duplicate input throws", () => P.buildTx(dupIn, [{ xOnlyPub: w5.internalXOnly, value: 1000 }]), "duplicate input outpoint");
 }
 
+/* bbGetUtxos must coerce confirmations at the data layer and never
+ * silently round a value past MAX_SAFE_INTEGER. */
+{
+  const EVIL = "<svg onload=alert(1)>";
+  const TX = "a".repeat(64);
+  const payload = [
+    { txid: TX, vout: 1, value: "9007199254740993", confirmations: 3 },
+    { txid: TX, vout: 2, value: "200000000", confirmations: EVIL },
+    { txid: TX, vout: 0, value: "5000", confirmations: 7 },
+  ];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => payload, text: async () => JSON.stringify(payload) });
+  try {
+    const us = await W.bbGetUtxos("https://bb.example", "prl1x");
+    ok("bbGetUtxos coerces hostile confirmations and refuses rounded value",
+      us.length === 2 &&
+      us.every((u) => Number.isSafeInteger(u.confirmations) && u.confirmations >= 0 && Number.isSafeInteger(u.vout) && u.vout >= 0) &&
+      us.some((u) => u.vout === 2 && u.value === 200000000 && u.confirmations === 0) &&
+      us.some((u) => u.vout === 0 && u.value === 5000 && u.confirmations === 7),
+      JSON.stringify(us));
+  } finally { globalThis.fetch = realFetch; }
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.error("FAILURES:", failures); process.exit(1); }

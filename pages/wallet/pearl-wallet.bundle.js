@@ -6102,12 +6102,15 @@ zoo`.split("\n");
     const r = await f(`/api/v2/utxo/${addr}`);
     const j = await r.json();
     if (!Array.isArray(j)) throw new Error("unexpected UTXO response");
-    return j.map((u) => ({
-      txid: String(u.txid || "").toLowerCase(),
-      vout: u.vout,
-      value: Number(u.value),
-      confirmations: u.confirmations ?? 0
-    })).filter((u) => u.value > 0 && /^[0-9a-f]{64}$/.test(u.txid) && Number.isInteger(u.vout));
+    return j.map((u) => {
+      const conf = Number(u.confirmations);
+      return {
+        txid: String(u.txid || "").toLowerCase(),
+        vout: Number(u.vout),
+        value: Number(u.value),
+        confirmations: Number.isSafeInteger(conf) && conf >= 0 ? conf : 0
+      };
+    }).filter((u) => Number.isSafeInteger(u.value) && u.value > 0 && /^[0-9a-f]{64}$/.test(u.txid) && Number.isSafeInteger(u.vout) && u.vout >= 0);
   }
   async function bbGetTx(base, txid) {
     const f = bbFetch(base);
