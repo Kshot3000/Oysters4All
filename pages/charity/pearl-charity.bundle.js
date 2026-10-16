@@ -6193,7 +6193,7 @@ zoo`.split("\n");
       throw new Error("blockbook returned a bad totalReceived");
     }
     const donations = [];
-    for (const tx of j.txs || []) {
+    for (const tx of Array.isArray(j.transactions) ? j.transactions : Array.isArray(j.txs) ? j.txs : []) {
       const txid = String(tx.txid || "").toLowerCase();
       if (!/^[0-9a-f]{64}$/.test(txid)) continue;
       let valueGrains = 0;

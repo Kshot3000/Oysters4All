@@ -56,7 +56,7 @@ shared importmap and the committed `pearl-invoice.bundle.js` (built with
 
 ## Tests
 
-- `node --no-warnings --loader ./tests/loader.mjs --test tests/invoice.test.mjs` — 25 core tests (pinned descriptor hash, dust refusal, partial-payment math, tamper verifier, pinned BIP-86 vectors).
+- `node --no-warnings --loader ./tests/loader.mjs --test tests/invoice.test.mjs` — 27 core tests (pinned descriptor hash, dust refusal, partial-payment math, tamper verifier, pinned BIP-86 vectors).
 - `node --no-warnings --loader ./tests/loader.mjs --test tests/dom.test.mjs` — 13 DOM tests booting the real committed bundle via `vm`, driving the whole wizard against a stubbed Blockbook.
 
 Built by [@kshot9000](https://x.com/kshot9000).

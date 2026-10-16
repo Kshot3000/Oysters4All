@@ -18,7 +18,7 @@ import {
   planClaim, planRefund, settleDigest, assembleClaim, assembleRefund,
   builderTipGrainsFor, BUILDER_TIP_BPS, BUILDER_TIP_ADDRESS, BUILDER_TIP_NAME,
   exportUnsignedBundle, importUnsignedBundle,
-  classifyHtlcState, fmtPRL, parsePRLtoGrains,
+  classifyHtlcState, fetchAddressTxs, fmtPRL, parsePRLtoGrains,
   signForXOnly, verifySchnorrSig,
   taptree2, verifyControlBlock, spendVBytes,
   addressToProgram,
@@ -458,4 +458,14 @@ test("partyKeyFromInput + addressToProgram gates", () => {
   const prog = addressToProgram(encodeBech32m(net.hrp, 1, KEYS[0]), net);
   assert.equal(bytesToHex(prog), bytesToHex(KEYS[0]));
   assert.throws(() => addressToProgram(encodeBech32m("tprl", 1, KEYS[0]), net), /wrong network HRP/);
+});
+
+test("fetchAddressTxs reads the real Blockbook shape (txs is a count, array is transactions)", async () => {
+  const realFetch = globalThis.fetch;
+  const body = { address: "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d", txs: 1, transactions: [{ txid: "a".repeat(64), confirmations: 5, vout: [] }] };
+  globalThis.fetch = async () => ({ ok: true, json: async () => body });
+  try {
+    const txs = await fetchAddressTxs("https://x", "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
+    assert.equal(txs.length, 1);
+  } finally { globalThis.fetch = realFetch; }
 });

@@ -674,9 +674,10 @@ export async function fetchAddressTxs({ blockbook, address, fetchImpl = fetch, p
     }
     if (!res.ok) throw new Error(`Blockbook ${res.status} at ${base} (address ${address.slice(0, 16)}…)`);
     const j = await res.json();
-    total = Number(j.totalTxs ?? (j.txs || []).length);
-    for (const t of j.txs || []) seen.set(String(t.txid), t);
-    if ((j.txs || []).length < pageSize) break;
+    const list = Array.isArray(j.transactions) ? j.transactions : Array.isArray(j.txs) ? j.txs : [];
+    total = Number(j.totalTxs ?? (Number.isInteger(j.txs) ? j.txs : list.length));
+    for (const t of list) seen.set(String(t.txid), t);
+    if (list.length < pageSize) break;
     page++;
   }
   return { txs: [...seen.values()], totalTxs: total, capped: seen.size < total };

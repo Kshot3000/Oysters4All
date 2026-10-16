@@ -5859,7 +5859,7 @@ zoo`.split("\n");
     }
     if (!res.ok) throw new Error(`blockbook ${res.status} on ${url}`);
     const data = JSON.parse(await res.text());
-    const txs = Array.isArray(data.txs) ? data.txs : [];
+    const txs = Array.isArray(data.transactions) ? data.transactions : Array.isArray(data.txids) ? data.txids : Array.isArray(data.txs) ? data.txs : [];
     return { txs, totalReceived: data.totalReceived != null ? BigInt(String(data.totalReceived)) : null };
   }
   async function fetchTx(fetcher, blockbookBase, txid) {

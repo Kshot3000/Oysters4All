@@ -607,7 +607,8 @@ export async function fetchAddressTxs(blockbookBase, address) {
   const res = await fetch(blockbookBase.replace(/\/$/, "") + `/api/v2/address/${address}?details=txs&pageSize=50`);
   if (!res.ok) throw new Error(`blockbook ${res.status} on /api/v2/address/`);
   const j = await res.json();
-  return Array.isArray(j.txs) ? j.txs : [];
+  // Blockbook v2: the tx array is `transactions`; `txs` is an integer count.
+  return Array.isArray(j.transactions) ? j.transactions : Array.isArray(j.txs) ? j.txs : [];
 }
 
 /** Classify the HTLC state from address txs: funding + any spend of it.

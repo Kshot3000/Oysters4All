@@ -6097,7 +6097,7 @@ zoo`.split("\n");
       fetcher,
       `${base}/api/v2/address/${encodeURIComponent(address)}?details=txs&pageSize=${pageSize}`
     );
-    return Array.isArray(data.txs) ? data.txs : [];
+    return Array.isArray(data.transactions) ? data.transactions : Array.isArray(data.txs) ? data.txs : [];
   }
   function voutAddresses(o) {
     const out = [];

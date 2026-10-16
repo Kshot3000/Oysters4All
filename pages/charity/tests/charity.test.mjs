@@ -382,3 +382,18 @@ test("fetchTipHeight reads backend.blocks", async () => {
     globalThis.fetch = realFetch;
   }
 });
+
+test("fetchCampaignStats reads the real Blockbook shape (txs is a count, array is transactions)", async () => {
+  const realFetch = globalThis.fetch;
+  const addr = FIXTURE_RECIPIENT;
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    address: addr, totalReceived: String(5 * GRAIN_PER_PRL), txs: 1,
+    transactions: [{ txid: "ab".repeat(32), blockHeight: 900100, confirmations: 5,
+      vout: [{ value: String(5 * GRAIN_PER_PRL), scriptPubKey: { addresses: [addr] } }] }],
+  }), { status: 200 });
+  try {
+    const s = await fetchCampaignStats("https://x", addr);
+    assert.equal(s.donations.length, 1);
+    assert.equal(s.donations[0].valueGrains, 5 * GRAIN_PER_PRL);
+  } finally { globalThis.fetch = realFetch; }
+});

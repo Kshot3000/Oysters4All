@@ -240,7 +240,7 @@ if (existsSync(launcherIns)) {
       address: ADDR, totalReceived: totalReceived.toString(), totalSent: "0",
       unconfirmedBalance: unconf, txs: txs.length,
     };
-    if (String(url).includes("details=txs")) body.txs = txs;
+    if (String(url).includes("details=txs")) body.transactions = txs; // real Blockbook shape: `txs` stays the int count
     return { ok: true, json: async () => body };
   };
   const stateOf = async (txs, reqConf, requiredGrains, expiryMs, unconf = "0") => {
@@ -348,8 +348,8 @@ if (existsSync(launcherIns)) {
   const idxHtml = readFileSync(resolvePath(payDir, "index.html"), "utf8");
   const invHtml = readFileSync(resolvePath(payDir, "invoice.html"), "utf8");
   ok("index.html bundle cache key at ?v=2, app cache key at ?v=3",
-    idxHtml.includes("pearl-pay-core.bundle.js?v=3") && idxHtml.includes('src="app.js?v=3"'));
-  ok("invoice.html bundle cache key at ?v=2", invHtml.includes("pearl-pay-core.bundle.js?v=3"));
+    idxHtml.includes("pearl-pay-core.bundle.js?v=4") && idxHtml.includes('src="app.js?v=3"'));
+  ok("invoice.html bundle cache key at ?v=2", invHtml.includes("pearl-pay-core.bundle.js?v=4"));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

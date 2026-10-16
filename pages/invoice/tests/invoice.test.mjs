@@ -242,3 +242,12 @@ test("invoiceToCSV: spreadsheet formula-injection guard (CWE-1236)", () => {
   assert.ok(csv.includes("\"'=2+2"), "formula cell apostrophe-prefixed inside quotes");
   assert.ok(!csv.includes("\"=2+2"), "no raw formula cell");
 });
+
+test("fetchAddressActivity reads the real Blockbook shape (txs is a count, array is transactions)", async () => {
+  const tx = { txid: "a".repeat(64), confirmations: 5, vout: [{ value: "200000000", addresses: ["prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d"] }] };
+  const body = { address: "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d", totalReceived: "200000000", txs: 1, transactions: [tx] };
+  const fetcher = async () => ({ ok: true, text: async () => JSON.stringify(body) });
+  const act = await R.fetchAddressActivity(fetcher, "https://x", "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
+  assert.equal(act.txs.length, 1);
+  assert.equal(act.txs[0].txid, "a".repeat(64));
+});

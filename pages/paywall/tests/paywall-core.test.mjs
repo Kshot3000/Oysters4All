@@ -426,3 +426,12 @@ test("embed snippet: verifyToken end-to-end in a page-like sandbox", async () =>
   const wrongDesc = await gate.verifyToken(JSON.stringify({ v: 1, descriptor: PIN_DESC.replace("prl:", "tprl:"), pubkey: PIN_PUBKEY, txid: TXID, sig: PIN_SIG }));
   assert.equal(wrongDesc.ok, false);
 });
+
+test("fetchAddressTxs reads the real Blockbook shape (txs is a count, array is transactions)", async () => {
+  const tx = { txid: "a".repeat(64), confirmations: 5, vout: [] };
+  const body = { address: "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d", txs: 1, transactions: [tx] };
+  const fetcher = async () => ({ ok: true, text: async () => JSON.stringify(body), json: async () => body });
+  const txs = await P.fetchAddressTxs(fetcher, "https://x", "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d");
+  assert.equal(txs.length, 1);
+  assert.equal(txs[0].txid, "a".repeat(64));
+});

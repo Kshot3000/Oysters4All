@@ -418,3 +418,12 @@ test("disposalsCSV: formula guard keeps negative gain/loss numeric", () => {
   assert.ok(row.includes("'=2+2"), "label formula cell prefixed");
   assert.ok(row.includes(",-0.25,"), "plain negative amount untouched");
 });
+
+test("fetchAddressTxs reads the real Blockbook shape (txs is a count, array is transactions)", async () => {
+  const tx = { txid: "a".repeat(64), confirmations: 5, vout: [] };
+  const body = { address: "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d", txs: 1, transactions: [tx] };
+  const fetchImpl = async () => ({ ok: true, json: async () => body });
+  const r = await R.fetchAddressTxs({ blockbook: "https://x", address: "prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8psu3zw9d", fetchImpl });
+  assert.equal(r.txs.length, 1);
+  assert.equal(r.totalTxs, 1);
+});

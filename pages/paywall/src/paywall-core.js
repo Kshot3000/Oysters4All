@@ -191,7 +191,8 @@ export async function fetchAddressTxs(fetcher, blockbookBase, address, pageSize 
     fetcher,
     `${base}/api/v2/address/${encodeURIComponent(address)}?details=txs&pageSize=${pageSize}`
   );
-  return Array.isArray(data.txs) ? data.txs : [];
+  // Blockbook v2: the tx array is `transactions`; `txs` is an integer count.
+  return Array.isArray(data.transactions) ? data.transactions : Array.isArray(data.txs) ? data.txs : [];
 }
 
 function voutAddresses(o) {

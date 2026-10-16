@@ -6538,7 +6538,7 @@ zoo`.split("\n");
     const res = await fetch(blockbookBase.replace(/\/$/, "") + `/api/v2/address/${address}?details=txs&pageSize=50`);
     if (!res.ok) throw new Error(`blockbook ${res.status} on /api/v2/address/`);
     const j = await res.json();
-    return Array.isArray(j.txs) ? j.txs : [];
+    return Array.isArray(j.transactions) ? j.transactions : Array.isArray(j.txs) ? j.txs : [];
   }
   function classifyHtlcState(txs, address, spkHex) {
     let funding = null, spend = null;

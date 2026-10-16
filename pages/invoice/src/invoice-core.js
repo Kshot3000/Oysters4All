@@ -233,7 +233,10 @@ export async function fetchAddressActivity(fetcher, blockbookBase, address, page
   }
   if (!res.ok) throw new Error(`blockbook ${res.status} on ${url}`);
   const data = JSON.parse(await res.text());
-  const txs = Array.isArray(data.txs) ? data.txs : [];
+  // Blockbook v2: the tx array is `transactions`; `txs` is an integer count.
+  const txs = Array.isArray(data.transactions) ? data.transactions
+    : Array.isArray(data.txids) ? data.txids
+    : Array.isArray(data.txs) ? data.txs : [];
   return { txs, totalReceived: data.totalReceived != null ? BigInt(String(data.totalReceived)) : null };
 }
 

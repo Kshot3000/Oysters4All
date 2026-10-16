@@ -412,7 +412,7 @@
       return r.json();
     }).then(function (j) {
       var s = summarizeAddress(j);
-      var deep = 0n, txs = Array.isArray(j.txs) ? j.txs : [];
+      var deep = 0n, txs = Array.isArray(j.transactions) ? j.transactions : Array.isArray(j.txs) ? j.txs : []; // Blockbook v2: array is `transactions`; `txs` is an int count
       txs.forEach(function (tx) {
         var conf = Number(tx && tx.confirmations != null ? tx.confirmations : 0);
         if (!(conf >= reqConf)) return;

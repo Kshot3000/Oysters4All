@@ -511,7 +511,7 @@ async function refreshAll(showSpin) {
         try { u = BigInt(info.unconfirmedBalance || 0); } catch (e) {}
         if (b > 0n) { confirmed += Number(b); fundedAddrs.push(watched[idx].address); }
         pending += Number(u);
-        var txList = Array.isArray(info.txs) ? info.txs : [];
+        var txList = Array.isArray(info.transactions) ? info.transactions : Array.isArray(info.txs) ? info.txs : []; // Blockbook v2: array is `transactions`; `txs` is an int count
         txList.forEach(function (tx) {
           if (tx && tx.txid && !txById[tx.txid]) txById[tx.txid] = tx;
         });

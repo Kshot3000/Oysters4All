@@ -3614,7 +3614,7 @@ var PearlPayCore = (() => {
     const j = await r.json();
     const s = summarizeAddress(j);
     let deep = 0n;
-    const txs = Array.isArray(j.txs) ? j.txs : [];
+    const txs = Array.isArray(j.transactions) ? j.transactions : Array.isArray(j.txs) ? j.txs : [];
     for (const tx of txs) {
       const conf = Number(tx?.confirmations ?? 0);
       if (!(conf >= reqConf)) continue;

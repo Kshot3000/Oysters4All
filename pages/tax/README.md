@@ -45,7 +45,7 @@ Six steps — **Addresses → Import → Classify → Prices → Report → Expo
 - `node build.mjs` — rebuilds `pearl-tax.bundle.js` (esbuild IIFE,
   `window.PearlTax`; crypto resolves through `../sign/importmap.json`).
 - `node --no-warnings --loader ./tests/loader.mjs --test tests/tax.test.mjs` —
-  core engine tests (19/19).
+  core engine tests (24/24).
 - `node --no-warnings --loader ./tests/loader.mjs --test tests/dom.test.mjs` —
   DOM integration tests against the real `index.html` + bundle + `app.js`.
 
