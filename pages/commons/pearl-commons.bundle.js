@@ -4931,6 +4931,15 @@ zoo`.split("\n");
     }
     return { ok: true, entries: log.length, tip: prev };
   }
+  function parseGrainsExact(value) {
+    if (typeof value === "number") {
+      if (!Number.isSafeInteger(value) || value < 0) throw new Error(`bad grain value from Blockbook: ${value}`);
+      return value.toString();
+    }
+    const s = String(value ?? "").trim();
+    if (!/^\d+$/.test(s)) throw new Error(`bad grain value from Blockbook: ${value}`);
+    return BigInt(s).toString();
+  }
   async function fetchBlockbookTx(blockbookBase, txid) {
     const base = String(blockbookBase || "").replace(/\/+$/, "");
     if (!/^https?:\/\//.test(base)) throw new Error("Blockbook URL must start with http(s)://");
@@ -4945,7 +4954,13 @@ zoo`.split("\n");
       confirmations: j.confirmations ?? 0,
       outputs: (j.vout || []).map((o) => ({
         addresses: o.addresses || [],
-        valueGrains: BigInt(Math.round(Number(o.value) * GRAIN_PER_PRL)).toString()
+        // Blockbook v2 reports vout values in GRAINS (base units) already, as
+        // integer strings — the same convention sign-core's fetchUtxos relies
+        // on with BigInt(u.value). The old line multiplied by GRAIN_PER_PRL
+        // anyway, inflating every verified contribution 1e8x (a 2-PRL output
+        // "verified" as 200,000,000 PRL and auto-filled the record form).
+        // Parse exactly and refuse anything that is not an integer grain count.
+        valueGrains: parseGrainsExact(o.value)
       }))
     };
   }
@@ -5473,6 +5488,7 @@ zoo`.split("\n");
       verifyAuditChain,
       fetchBlockbookTx,
       locateContributionOutput,
+      parseGrainsExact,
       sha256HexText,
       canon
     },

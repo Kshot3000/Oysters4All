@@ -22,6 +22,8 @@ import {
   appendAuditEvent,
   verifyAuditChain,
   locateContributionOutput,
+  fetchBlockbookTx,
+  parseGrainsExact,
   sha256HexText,
 } from "../src/commons-core.js";
 import { encodeBech32m } from "../../sign/src/crypto.js";
@@ -293,6 +295,46 @@ test("locateContributionOutput finds the paying output", () => {
   assert.equal(hit.valueGrains, (2n * G).toString());
   assert.equal(locateContributionOutput(tx, ADDR, (3n * G).toString()), null); // too small
   assert.equal(locateContributionOutput(tx, ADDR2, G.toString()), null); // wrong addr
+});
+
+test("fetchBlockbookTx reads Blockbook vout values as grains, unscaled", async () => {
+  // Blockbook v2 reports values in base units (grains) as integer strings —
+  // a 2-PRL output arrives as "200000000" and must stay 200000000 grains.
+  // The old mapping multiplied by GRAIN_PER_PRL, verifying a 2-PRL
+  // contribution as 200,000,000 PRL.
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({
+      txid: "ab".repeat(32),
+      confirmations: 3,
+      vout: [
+        { addresses: ["prl1other"], value: "999999999" },
+        { addresses: [ADDR], value: "200000000" },
+      ],
+    }),
+  });
+  try {
+    const tx = await fetchBlockbookTx("https://blockbook.example", "ab".repeat(32));
+    assert.equal(tx.outputs[1].valueGrains, "200000000");
+    const hit = locateContributionOutput(tx, ADDR, (2n * G).toString());
+    assert.equal(hit.valueGrains, "200000000");
+    assert.equal(locateContributionOutput(tx, ADDR, (3n * G).toString()), null);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("parseGrainsExact accepts integer grain counts and refuses rescaling bait", () => {
+  assert.equal(parseGrainsExact("200000000"), "200000000");
+  assert.equal(parseGrainsExact(546), "546");
+  assert.equal(parseGrainsExact("0"), "0");
+  assert.throws(() => parseGrainsExact("1.5"), /bad grain value/);
+  assert.throws(() => parseGrainsExact("2.00000000"), /bad grain value/);
+  assert.throws(() => parseGrainsExact(1.5), /bad grain value/);
+  assert.throws(() => parseGrainsExact(-1), /bad grain value/);
+  assert.throws(() => parseGrainsExact("abc"), /bad grain value/);
+  assert.throws(() => parseGrainsExact(undefined), /bad grain value/);
 });
 
 test("sha256HexText is deterministic", () => {

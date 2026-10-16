@@ -19,7 +19,7 @@ import {
   recordContribution,
   aggregateByDonor, qfDesiredMatch, computeResults,
   appendAuditEvent, verifyAuditChain,
-  fetchBlockbookTx, locateContributionOutput,
+  fetchBlockbookTx, locateContributionOutput, parseGrainsExact,
   sha256HexText, canon,
 } from "./commons-core.js";
 
@@ -557,7 +557,7 @@ window.PearlCommons = {
     parsePRLtoGrains, formatPRL, validatePearlAddress, normalizeDonorLabel,
     createRound, roundStatus, canContribute, projectCategories, createProject,
     recordContribution, aggregateByDonor, qfDesiredMatch, computeResults,
-    appendAuditEvent, verifyAuditChain, fetchBlockbookTx, locateContributionOutput,
+    appendAuditEvent, verifyAuditChain, fetchBlockbookTx, locateContributionOutput, parseGrainsExact,
     sha256HexText, canon,
   },
   ui: { init, renderAll, get state() { return S; } },
