@@ -313,9 +313,9 @@
       $("w-unlock").textContent = unlock !== undefined ? unlock.toLocaleString() : "(unknown — seal a draft)";
       $("w-countdown").textContent = unlock !== undefined ? countdownText(unlock, tip) : "—";
       if (st) {
-        const spent = st.txCount > 0 && st.balance === 0 && st.unconfirmed === 0;
-        $("w-status").textContent = spent ? "SPENT (vault emptied)" : st.balance > 0 ? "FUNDED" : "UNFUNDED";
-        $("w-balance").textContent = fmtPRL(st.balance) + (st.unconfirmed ? " (+" + fmtPRL(st.unconfirmed) + " unconfirmed)" : "");
+        const spent = st.txCount > 0 && st.balance === 0n && st.unconfirmed === 0n;
+        $("w-status").textContent = spent ? "SPENT (vault emptied)" : st.balance > 0n ? "FUNDED" : "UNFUNDED";
+        $("w-balance").textContent = fmtPRL(st.balance) + (st.unconfirmed > 0n ? " (+" + fmtPRL(st.unconfirmed) + " unconfirmed)" : "");
         $("w-txs").textContent = st.txs.length ? st.txs.map((t) => trunc(t.txid, 10) + " (" + t.confirmations + " conf)").join(", ") : "none";
       } else {
         $("w-status").textContent = bb ? "unreachable — balance unknown" : "offline mode";

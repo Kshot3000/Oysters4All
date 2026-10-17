@@ -786,24 +786,48 @@ function keypathSigDigestExMulti(network, inputs, outputs, sequences, idx, hashT
 
 /* ---------------- tracking ---------------- */
 
+/** Exact grain balance from an address-info payload. Blockbook sends
+ *  `balance` as a decimal STRING of grains and Pearl's supply is
+ *  2.1e17 grains, so a bare Number() silently rounds legitimate
+ *  balances past 2^53 (9007199254740993 -> 9007199254740992). Accept a
+ *  safe-integer number, a decimal string, or a bigint; anything else
+ *  is null (unreadable — never funded, never spent). */
+function balanceGrainsExact(v) {
+  if (typeof v === "bigint") return v >= 0n ? v : null;
+  if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0 ? BigInt(v) : null;
+  if (typeof v === "string" && /^\d+$/.test(v.trim())) return BigInt(v.trim());
+  return null;
+}
+function txCountExact(v) {
+  const n = typeof v === "string" && /^\d+$/.test(v.trim()) ? Number(v.trim()) : v;
+  return Number.isSafeInteger(n) && n >= 0 ? n : 0;
+}
+
 /** Classify each tranche against chain state.
- *  chainState: { height, info: { [address]: { balance, txs } } } */
+ *  chainState: { height, info: { [address]: { balance, txs } } } —
+ *  balance may be the raw Blockbook decimal string; it is compared
+ *  exactly (BigInt), never through a float. The returned balance is a
+ *  Number when it fits safely, a BigInt beyond that. */
 export function classifyTranches(bond, chainState) {
   const height = chainState && Number.isInteger(chainState.height) ? chainState.height : null;
   const info = (chainState && chainState.info) || {};
   return bond.tranches.map((t) => {
     const st = info[t.address] || { balance: 0, txs: 0 };
-    const funded = st.balance >= t.amountGrains;
+    const bal = balanceGrainsExact(st.balance);
+    const txs = txCountExact(st.txs);
+    const amount = Number.isSafeInteger(t.amountGrains) ? BigInt(t.amountGrains) : null;
+    const funded = bal !== null && amount !== null && bal >= amount;
     const matured = height === null ? null : height >= t.lockHeight;
     let status = "unfunded";
     if (funded && matured === true) status = "claimable";
     else if (funded && matured === false) status = "locked";
     else if (funded) status = "funded";
-    else if (st.txs > 0 && st.balance === 0) status = "spent";
+    else if (txs > 0 && bal === 0n) status = "spent";
     return {
       index: t.index, kind: t.kind, address: t.address,
       amountGrains: t.amountGrains, lockHeight: t.lockHeight,
-      balance: st.balance, txs: st.txs, matured, funded, status,
+      balance: bal === null ? 0 : bal <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(bal) : bal,
+      txs, matured, funded, status,
     };
   });
 }

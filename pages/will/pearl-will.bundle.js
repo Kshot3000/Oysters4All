@@ -6652,10 +6652,15 @@ zoo`.split("\n");
     if (!r.ok) throw new Error(`WILL REFUSED: Blockbook unreachable (HTTP ${r.status})`);
     const j = await r.json();
     const txs = Array.isArray(j.transactions) ? j.transactions : [];
-    const confirmed = j.balance !== void 0 ? Number(j.balance) : 0;
+    const grainsExact = (v, field) => {
+      if (v === void 0 || v === null) return 0n;
+      const s = String(v).trim();
+      if (!/^\d+$/.test(s)) throw new Error(`WILL REFUSED: Blockbook returned a bad ${field} (${s.slice(0, 24)})`);
+      return BigInt(s);
+    };
     return {
-      balance: confirmed,
-      unconfirmed: Number(j.unconfirmedBalance || 0),
+      balance: grainsExact(j.balance, "balance"),
+      unconfirmed: grainsExact(j.unconfirmedBalance, "unconfirmedBalance"),
       // Blockbook v2's address count is the integer `txs` field; with no
       // details param the response carries `txids`, never `transactions`,
       // and `txApperances` is a btcd RPC field Blockbook never sends —

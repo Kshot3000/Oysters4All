@@ -7153,17 +7153,30 @@ zoo`.split("\n");
     }
     return { ...spend, sigsUsed: template.need };
   }
+  function balanceGrainsExact(v) {
+    if (typeof v === "bigint") return v >= 0n ? v : null;
+    if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0 ? BigInt(v) : null;
+    if (typeof v === "string" && /^\d+$/.test(v.trim())) return BigInt(v.trim());
+    return null;
+  }
+  function txCountExact(v) {
+    const n = typeof v === "string" && /^\d+$/.test(v.trim()) ? Number(v.trim()) : v;
+    return Number.isSafeInteger(n) && n >= 0 ? n : 0;
+  }
   function classifyRounds(circle, chainState) {
     const height = chainState && Number.isInteger(chainState.height) ? chainState.height : null;
     const info = chainState && chainState.info || {};
     return circle.rounds.map((r) => {
       const st = info[r.address] || { balance: 0, txs: 0 };
-      const funded = st.balance >= r.potGrains;
+      const bal = balanceGrainsExact(st.balance);
+      const txs = txCountExact(st.txs);
+      const pot = Number.isSafeInteger(r.potGrains) ? BigInt(r.potGrains) : null;
+      const funded = bal !== null && pot !== null && bal >= pot;
       const refundable = height === null ? null : height >= r.lockHeight;
       let status = "unfunded";
       if (funded) status = "pot-full";
-      else if (st.balance === 0 && st.txs > 0) status = "spent";
-      else if (st.txs > 0 || st.balance > 0) status = "funding";
+      else if (bal === 0n && txs > 0) status = "spent";
+      else if (txs > 0 || bal !== null && bal > 0n) status = "funding";
       return {
         index: r.index,
         address: r.address,
@@ -7171,8 +7184,8 @@ zoo`.split("\n");
         potGrains: r.potGrains,
         lockHeight: r.lockHeight,
         fundingOpensHeight: r.fundingOpensHeight,
-        balance: st.balance,
-        txs: st.txs,
+        balance: bal === null ? 0 : bal <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(bal) : bal,
+        txs,
         funded,
         refundable,
         status

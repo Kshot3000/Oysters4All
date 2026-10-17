@@ -422,3 +422,32 @@ test("plan-level: refund and tipped claim price exact fees at decimal rates", ()
   assert.equal(tipped.outputs[0].value + tipped.outputs[1].value + tipped.fee, r.potGrains);
   assert.ok(c, "fixture sanity");
 });
+
+test("classifyRounds: Blockbook string balances compare exactly, never via float", () => {
+  const t = TERMS();
+  const { order } = fixtureLottery(t);
+  const c = forgeCircle(MAINNET, t, order);
+  // Real wire shape: balance is a decimal string of grains.
+  const exact = classifyRounds(c, {
+    height: 900000,
+    info: { [c.rounds[2].address]: { balance: String(c.rounds[2].potGrains), txs: "3" } },
+  });
+  assert.equal(exact[2].status, "pot-full");
+  assert.equal(exact[2].txs, 3);
+  // Past 2^53 a bare Number() rounds 9007199254740993 -> 9007199254740992;
+  // the exact path keeps every grain.
+  const jumbo = classifyRounds(c, {
+    height: 900000,
+    info: { [c.rounds[0].address]: { balance: "9007199254740993", txs: 1 } },
+  });
+  assert.equal(jumbo[0].funded, true);
+  assert.equal(jumbo[0].balance, 9007199254740993n);
+  // A junk balance is unreadable: never funded, never spent.
+  const junk = classifyRounds(c, {
+    height: 900000,
+    info: { [c.rounds[0].address]: { balance: "12.5", txs: 2 } },
+  });
+  assert.equal(junk[0].funded, false);
+  assert.notEqual(junk[0].status, "spent");
+  assert.equal(junk[0].balance, 0);
+});

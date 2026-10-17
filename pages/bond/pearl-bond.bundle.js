@@ -7233,26 +7233,39 @@ zoo`.split("\n");
     msg.push(0, ...u32le(idx));
     return taggedHash2("TapSighash", Uint8Array.from(msg));
   }
+  function balanceGrainsExact(v) {
+    if (typeof v === "bigint") return v >= 0n ? v : null;
+    if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0 ? BigInt(v) : null;
+    if (typeof v === "string" && /^\d+$/.test(v.trim())) return BigInt(v.trim());
+    return null;
+  }
+  function txCountExact(v) {
+    const n = typeof v === "string" && /^\d+$/.test(v.trim()) ? Number(v.trim()) : v;
+    return Number.isSafeInteger(n) && n >= 0 ? n : 0;
+  }
   function classifyTranches(bond, chainState) {
     const height = chainState && Number.isInteger(chainState.height) ? chainState.height : null;
     const info = chainState && chainState.info || {};
     return bond.tranches.map((t) => {
       const st = info[t.address] || { balance: 0, txs: 0 };
-      const funded = st.balance >= t.amountGrains;
+      const bal = balanceGrainsExact(st.balance);
+      const txs = txCountExact(st.txs);
+      const amount = Number.isSafeInteger(t.amountGrains) ? BigInt(t.amountGrains) : null;
+      const funded = bal !== null && amount !== null && bal >= amount;
       const matured = height === null ? null : height >= t.lockHeight;
       let status = "unfunded";
       if (funded && matured === true) status = "claimable";
       else if (funded && matured === false) status = "locked";
       else if (funded) status = "funded";
-      else if (st.txs > 0 && st.balance === 0) status = "spent";
+      else if (txs > 0 && bal === 0n) status = "spent";
       return {
         index: t.index,
         kind: t.kind,
         address: t.address,
         amountGrains: t.amountGrains,
         lockHeight: t.lockHeight,
-        balance: st.balance,
-        txs: st.txs,
+        balance: bal === null ? 0 : bal <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(bal) : bal,
+        txs,
         matured,
         funded,
         status

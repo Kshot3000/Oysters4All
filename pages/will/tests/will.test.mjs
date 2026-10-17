@@ -493,7 +493,26 @@ test("fetchVaultStatus: txCount comes from Blockbook's integer `txs` field (real
   try {
     const st = await W.fetchVaultStatus("https://bb.example", "prl1pwill");
     assert.equal(st.txCount, 2);
-    assert.equal(st.balance, 0);
-    assert.ok(st.txCount > 0 && st.balance === 0 && st.unconfirmed === 0, "emptied vault must satisfy the SPENT verdict");
+    assert.equal(st.balance, 0n);
+    assert.ok(st.txCount > 0 && st.balance === 0n && st.unconfirmed === 0n, "emptied vault must satisfy the SPENT verdict");
+  } finally { globalThis.fetch = realFetch; }
+});
+
+test("fetchVaultStatus: jumbo string balances stay exact (BigInt, no float rounding)", async () => {
+  const realFetch = globalThis.fetch;
+  const shape = {
+    address: "prl1pwill", balance: "9007199254740993", unconfirmedBalance: "5", unconfirmedTxs: 1,
+    txs: 2, txids: ["d".repeat(64)], page: 1, totalPages: 1, itemsOnPage: 1,
+  };
+  globalThis.fetch = async () => ({ ok: true, json: async () => shape, text: async () => JSON.stringify(shape) });
+  try {
+    const st = await W.fetchVaultStatus("https://bb.example", "prl1pwill");
+    assert.equal(st.balance, 9007199254740993n); // Number() would give 9007199254740992
+    assert.equal(st.unconfirmed, 5n);
+  } finally { globalThis.fetch = realFetch; }
+  const junk = { ...shape, balance: "1.5" };
+  globalThis.fetch = async () => ({ ok: true, json: async () => junk, text: async () => JSON.stringify(junk) });
+  try {
+    await assert.rejects(() => W.fetchVaultStatus("https://bb.example", "prl1pwill"), /bad balance/);
   } finally { globalThis.fetch = realFetch; }
 });

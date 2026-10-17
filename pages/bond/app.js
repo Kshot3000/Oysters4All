@@ -79,7 +79,10 @@
     const res = await fetch(base + "/api/v2/address/" + address);
     if (!res.ok) throw new Error("blockbook address HTTP " + res.status);
     const j = await res.json();
-    return { balance: Number(j.balance || 0), txs: Number(j.txs || 0) };
+    // Pass the RAW balance through: Blockbook sends it as a decimal
+    // string of grains and Number() would silently round it past 2^53;
+    // classifyTranches compares it exactly (BigInt) in the core.
+    return { balance: j.balance ?? 0, txs: j.txs ?? 0 };
   }
 
   /* Parse a holder key field: returns { xonly, priv } where priv may be null.

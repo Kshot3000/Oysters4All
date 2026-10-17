@@ -559,10 +559,19 @@ export async function fetchVaultStatus(blockbookUrl, address) {
   if (!r.ok) throw new Error(`WILL REFUSED: Blockbook unreachable (HTTP ${r.status})`);
   const j = await r.json();
   const txs = Array.isArray(j.transactions) ? j.transactions : [];
-  const confirmed = j.balance !== undefined ? Number(j.balance) : 0;
+  // Blockbook sends balances as decimal STRINGS of grains; Pearl's
+  // supply is 2.1e17 grains, so a bare Number() silently rounds past
+  // 2^53. Parse exactly as BigInt (ballot/pulse shape) and refuse
+  // anything that is not a non-negative integer string.
+  const grainsExact = (v, field) => {
+    if (v === undefined || v === null) return 0n;
+    const s = String(v).trim();
+    if (!/^\d+$/.test(s)) throw new Error(`WILL REFUSED: Blockbook returned a bad ${field} (${s.slice(0, 24)})`);
+    return BigInt(s);
+  };
   return {
-    balance: confirmed,
-    unconfirmed: Number(j.unconfirmedBalance || 0),
+    balance: grainsExact(j.balance, "balance"),
+    unconfirmed: grainsExact(j.unconfirmedBalance, "unconfirmedBalance"),
     // Blockbook v2's address count is the integer `txs` field; with no
     // details param the response carries `txids`, never `transactions`,
     // and `txApperances` is a btcd RPC field Blockbook never sends —

@@ -521,8 +521,15 @@
         const r = await fetch(S.blockbook.replace(/\/$/, "") + "/api/v2/address/" + c.address);
         if (!r.ok) throw new Error("HTTP " + r.status);
         const j = await r.json();
-        bal = Number(j.balance); txs = Number(j.txs);
-        if (bal > 0 || txs > 0) life = "funded";
+        // Blockbook sends balance as a decimal STRING of grains; Number()
+        // would silently round it past 2^53 before fmtPRLg's BigInt ever
+        // sees it. Keep the validated raw string (fmtPRLg parses it
+        // BigInt-exact); anything else stays null and renders as "—"
+        // (an unvalidated string must never reach the innerHTML card).
+        bal = (typeof j.balance === "string" && /^\d+$/.test(j.balance.trim())) ? j.balance.trim()
+          : (Number.isSafeInteger(j.balance) && j.balance >= 0 ? j.balance : null);
+        txs = Number(j.txs);
+        if ((bal !== null && BigInt(bal) > 0n) || txs > 0) life = "funded";
         // award/void detection: a known bundle txid confirmed on this address
         for (const b of [S.bundle, S.voidBundle]) {
           if (!b) continue;

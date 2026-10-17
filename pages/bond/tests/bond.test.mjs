@@ -484,3 +484,37 @@ test("buildFillTx: 6-leg fill at 1.1 g/vB prices the fee exactly", () => {
   assert.equal(fill.feeGrains, 1001); // float form charged 1002
   assert.equal(fill.nLegs, 6);
 });
+
+test("classifyTranches: Blockbook string balances compare exactly, never via float", () => {
+  const bond = forgeBond(MAINNET, TERMS, { key: sellerXOnly, mode: "raw" });
+  const addrs = bond.tranches.map((t) => t.address);
+  // Real wire shape: balance/txs arrive as a decimal string / integer.
+  // A string balance equal to the tranche amount funds it exactly.
+  const exact = classifyTranches(bond, {
+    height: bond.tranches[0].lockHeight,
+    info: { [addrs[0]]: { balance: String(bond.tranches[0].amountGrains), txs: "1" } },
+  });
+  assert.equal(exact[0].status, "claimable");
+  assert.equal(exact[0].txs, 1);
+  // Past 2^53 a bare Number() rounds 9007199254740993 -> 9007199254740992;
+  // the exact path keeps every grain and still funds.
+  const jumbo = classifyTranches(bond, {
+    height: null,
+    info: { [addrs[0]]: { balance: "9007199254740993", txs: 1 } },
+  });
+  assert.equal(jumbo[0].funded, true);
+  assert.equal(jumbo[0].balance, 9007199254740993n);
+  // A junk balance is unreadable: never funded, never spent.
+  const junk = classifyTranches(bond, {
+    height: null,
+    info: { [addrs[0]]: { balance: "<svg onload=alert(1)>", txs: 3 } },
+  });
+  assert.equal(junk[0].status, "unfunded");
+  assert.equal(junk[0].balance, 0);
+  // String zero with history still reads spent.
+  const spent = classifyTranches(bond, {
+    height: null,
+    info: { [addrs[0]]: { balance: "0", txs: "2" } },
+  });
+  assert.equal(spent[0].status, "spent");
+});

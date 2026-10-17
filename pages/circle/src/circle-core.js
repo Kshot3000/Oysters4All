@@ -705,24 +705,48 @@ export function finalizeRefund(network, circle, template, partialSigs) {
 
 /* ---------------- tracking ---------------- */
 
+/** Exact grain balance from an address-info payload. Blockbook sends
+ *  `balance` as a decimal STRING of grains and Pearl's supply is
+ *  2.1e17 grains, so a bare Number() silently rounds legitimate
+ *  balances past 2^53 (9007199254740993 -> 9007199254740992). Accept a
+ *  safe-integer number, a decimal string, or a bigint; anything else
+ *  is null (unreadable — never funded, never spent). */
+function balanceGrainsExact(v) {
+  if (typeof v === "bigint") return v >= 0n ? v : null;
+  if (typeof v === "number") return Number.isSafeInteger(v) && v >= 0 ? BigInt(v) : null;
+  if (typeof v === "string" && /^\d+$/.test(v.trim())) return BigInt(v.trim());
+  return null;
+}
+function txCountExact(v) {
+  const n = typeof v === "string" && /^\d+$/.test(v.trim()) ? Number(v.trim()) : v;
+  return Number.isSafeInteger(n) && n >= 0 ? n : 0;
+}
+
 /** Classify each round against chain state.
- *  chainState: { height, info: { [address]: { balance, txs } } } */
+ *  chainState: { height, info: { [address]: { balance, txs } } } —
+ *  balance may be the raw Blockbook decimal string; it is compared
+ *  exactly (BigInt), never through a float. The returned balance is a
+ *  Number when it fits safely, a BigInt beyond that. */
 export function classifyRounds(circle, chainState) {
   const height = chainState && Number.isInteger(chainState.height) ? chainState.height : null;
   const info = (chainState && chainState.info) || {};
   return circle.rounds.map((r) => {
     const st = info[r.address] || { balance: 0, txs: 0 };
-    const funded = st.balance >= r.potGrains;
+    const bal = balanceGrainsExact(st.balance);
+    const txs = txCountExact(st.txs);
+    const pot = Number.isSafeInteger(r.potGrains) ? BigInt(r.potGrains) : null;
+    const funded = bal !== null && pot !== null && bal >= pot;
     const refundable = height === null ? null : height >= r.lockHeight;
     let status = "unfunded";
     if (funded) status = "pot-full";
-    else if (st.balance === 0 && st.txs > 0) status = "spent";
-    else if (st.txs > 0 || st.balance > 0) status = "funding";
+    else if (bal === 0n && txs > 0) status = "spent";
+    else if (txs > 0 || (bal !== null && bal > 0n)) status = "funding";
     return {
       index: r.index, address: r.address, winnerName: r.winnerName,
       potGrains: r.potGrains, lockHeight: r.lockHeight,
       fundingOpensHeight: r.fundingOpensHeight,
-      balance: st.balance, txs: st.txs, funded, refundable, status,
+      balance: bal === null ? 0 : bal <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(bal) : bal,
+      txs, funded, refundable, status,
     };
   });
 }

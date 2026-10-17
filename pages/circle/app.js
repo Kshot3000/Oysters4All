@@ -203,7 +203,7 @@
       for (const r of circle.rounds) {
         try {
           const a = await bbGet("/api/v2/address/" + r.address);
-          info[r.address] = { balance: Number(a.balance || 0), txs: Number(a.txs || 0) };
+          info[r.address] = { balance: a.balance ?? 0, txs: a.txs ?? 0 }; // raw: classifyRounds coerces exactly (Number() rounds grain strings past 2^53)
         } catch (_) { info[r.address] = { balance: 0, txs: 0 }; }
       }
       const rows = B.classifyRounds(circle, { height, info });
@@ -367,7 +367,7 @@
       for (const r of c.rounds) {
         try {
           const a = await bbGet("/api/v2/address/" + r.address);
-          info[r.address] = { balance: Number(a.balance || 0), txs: Number(a.txs || 0) };
+          info[r.address] = { balance: a.balance ?? 0, txs: a.txs ?? 0 }; // raw: classifyRounds coerces exactly (Number() rounds grain strings past 2^53)
         } catch (_) { info[r.address] = { balance: 0, txs: 0 }; }
       }
       const rows = B.classifyRounds(c, { height, info });
