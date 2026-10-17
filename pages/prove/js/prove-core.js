@@ -293,6 +293,70 @@ function decodeHeader(hex) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Block-fetch paging guard — pure policy for the UI's blockbook      */
+/* block fetch (the core stays network-free; app.js does the I/O).    */
+/*                                                                    */
+/* The fetch mode promises (README) to refuse blocks with more than   */
+/* MAX_BLOCK_TXS transactions. Blockbook's Block type (api/types.go)  */
+/* carries txCount AND totalPages as independent fields, and a        */
+/* hostile or broken user-configured endpoint can pair a small        */
+/* txCount with an enormous totalPages: guarding on txCount while     */
+/* looping on totalPages then fetches without bound. These helpers    */
+/* coerce both fields at the data layer and cap the ACCUMULATED       */
+/* txids, so the budget holds no matter which field lies.             */
+/* ------------------------------------------------------------------ */
+
+const MAX_BLOCK_TXS = 5000;
+
+/* The endpoint's claimed tx count, coerced: a safe non-negative integer
+ * or the fetch is refused outright (Blockbook always sends an integer
+ * txCount; anything else means the response cannot be trusted to size
+ * the fetch). Counts above the budget get the documented refusal. */
+function blockTxCount(first) {
+  if (!first || typeof first !== "object") {
+    throw new Error("blockbook endpoint returned an invalid tx count for this block");
+  }
+  const n = Number(first.txCount);
+  if (!Number.isSafeInteger(n) || n < 0) {
+    throw new Error("blockbook endpoint returned an invalid tx count for this block");
+  }
+  if (n > MAX_BLOCK_TXS) {
+    throw new Error(`block has ${n.toLocaleString()} transactions — too many to fetch in a browser. Paste a proof instead.`);
+  }
+  return n;
+}
+
+/* The endpoint's claimed page count, coerced: a safe integer >= 1,
+ * else 1 (totalPages is omitempty in Blockbook's Paging — a single-page
+ * block may omit it). The loop in app.js additionally stops as soon as
+ * txCount txids have accumulated, so an inflated value cannot extend
+ * the fetch past the block's own claimed contents. */
+function blockTotalPages(first) {
+  const n = Number(first && first.totalPages);
+  return Number.isSafeInteger(n) && n >= 1 ? n : 1;
+}
+
+/* One page of a block's tx list, validated: every entry must carry a
+ * 64-hex txid (a malformed entry would corrupt the merkle computation
+ * or crash its render, so the fetch refuses — never drops silently),
+ * and the running total must stay within the budget. */
+function checkedBlockTxids(page, alreadyHave) {
+  const list = page && Array.isArray(page.txs) ? page.txs : [];
+  const out = [];
+  for (const t of list) {
+    const id = t && t.txid;
+    if (typeof id !== "string" || !HEX64.test(id)) {
+      throw new Error("blockbook endpoint returned a malformed txid in this block's tx list");
+    }
+    out.push(id);
+  }
+  if (alreadyHave + out.length > MAX_BLOCK_TXS) {
+    throw new Error(`block has more than ${MAX_BLOCK_TXS.toLocaleString()} transactions — too many to fetch in a browser. Paste a proof instead.`);
+  }
+  return out;
+}
+
+/* ------------------------------------------------------------------ */
 /* Exports (node) + browser global                                     */
 /* ------------------------------------------------------------------ */
 
@@ -301,6 +365,7 @@ const PearlProve = {
   txidToInternal, internalToTxid,
   merkleRoot, merkleProof, verifyProof, parseProofLines, parseTxidList,
   targetFromBits, cmp256, decodeHeader,
+  MAX_BLOCK_TXS, blockTxCount, blockTotalPages, checkedBlockTxids,
 };
 
 if (typeof module !== "undefined" && module.exports) {

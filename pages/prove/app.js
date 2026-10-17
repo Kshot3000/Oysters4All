@@ -74,15 +74,24 @@ async function fetchBlockTxids(base, blk) {
   const hash = blk.hash || (await bbGet(base, `/block-index/${blk.height}`)).blockHash;
   if (!hash) throw new Error("block not found at that height");
   const first = await bbGet(base, `/block/${hash}`);
-  const totalPages = first.totalPages || 1;
-  const txCount = first.txCount || 0;
-  if (txCount > 5000) {
-    throw new Error(`block has ${txCount.toLocaleString()} transactions — too many to fetch in a browser. Paste a proof instead.`);
-  }
-  let txs = (first.txs || []).map((t) => t.txid);
-  for (let p = 2; p <= totalPages; p++) {
+  // The 5,000-tx budget (README) is enforced by prove-core's paging guard
+  // on the ACCUMULATED txids — never trust the endpoint's txCount and
+  // totalPages to agree: a hostile or broken endpoint can pair a small
+  // txCount with a huge totalPages and make a naive page loop fetch
+  // forever. The loop also stops the moment txCount txids have arrived,
+  // and a page that adds nothing before the list is complete is refused
+  // (a conforming Blockbook never returns an empty mid-block page), so
+  // every iteration either advances toward txCount or throws.
+  const txCount = P.blockTxCount(first);
+  const totalPages = P.blockTotalPages(first);
+  let txs = P.checkedBlockTxids(first, 0);
+  for (let p = 2; p <= totalPages && txs.length < txCount; p++) {
     const pg = await bbGet(base, `/block/${hash}?page=${p}`);
-    txs = txs.concat((pg.txs || []).map((t) => t.txid));
+    const add = P.checkedBlockTxids(pg, txs.length);
+    if (add.length === 0) {
+      throw new Error("blockbook endpoint returned an empty page before the block's tx list was complete");
+    }
+    txs = txs.concat(add);
   }
   return { hash, height: first.height, merkleRoot: first.merkleRoot, txs, txCount };
 }

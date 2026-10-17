@@ -42,10 +42,12 @@ Three tools, all 100% client-side:
 node --test tests/prove.test.cjs
 ```
 
-15/15 green: SHA-256 FIPS vectors + node:crypto cross-check, strict input
+18/18 green: SHA-256 FIPS vectors + node:crypto cross-check, strict input
 validation, merkle vectors (1/2/odd/5-leaf with tamper cases), the real
 block-120195 fixture (root recompute + mid-list proof + outsider rejection),
-header decode round-trip, nBits target pass/fail, proof/txid-list parsers.
+header decode round-trip, nBits target pass/fail, proof/txid-list parsers,
+and the block-fetch paging guard (the 5,000-tx budget holds even when an
+endpoint's txCount and totalPages disagree).
 
 ---
 

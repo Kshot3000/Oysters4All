@@ -178,3 +178,48 @@ test("parseProofLines ignores comments and blanks", () => {
     { sibling: b, position: "right" },
   ]);
 });
+
+/* --- block-fetch paging guard: the 5,000-tx budget must hold even when
+ * the endpoint's txCount and totalPages disagree (a hostile or broken
+ * user-configured endpoint pairs a small txCount with a huge
+ * totalPages — guarding one field while looping on the other fetched
+ * without bound). --- */
+
+test("blockTxCount coerces and enforces the budget at the data layer", () => {
+  assert.equal(P.blockTxCount({ txCount: 40 }), 40);
+  assert.equal(P.blockTxCount({ txCount: 5000 }), 5000);
+  assert.equal(P.blockTxCount({ txCount: "40" }), 40); // numeric string coerces
+  assert.throws(() => P.blockTxCount({ txCount: 5001 }), /too many to fetch/);
+  assert.throws(() => P.blockTxCount({ txCount: "<svg onload=alert(1)>" }), /invalid tx count/);
+  assert.throws(() => P.blockTxCount({ txCount: 2.5 }), /invalid tx count/);
+  assert.throws(() => P.blockTxCount({ txCount: -1 }), /invalid tx count/);
+  assert.throws(() => P.blockTxCount({}), /invalid tx count/);
+  assert.throws(() => P.blockTxCount(null), /invalid tx count/);
+});
+
+test("blockTotalPages coerces junk to a single page", () => {
+  assert.equal(P.blockTotalPages({ totalPages: 3 }), 3);
+  assert.equal(P.blockTotalPages({ totalPages: "3" }), 3);
+  assert.equal(P.blockTotalPages({}), 1); // omitempty: absent means one page
+  assert.equal(P.blockTotalPages({ totalPages: "<svg onload=alert(1)>" }), 1);
+  assert.equal(P.blockTotalPages({ totalPages: 0 }), 1);
+  assert.equal(P.blockTotalPages({ totalPages: -4 }), 1);
+  assert.equal(P.blockTotalPages(null), 1);
+});
+
+test("checkedBlockTxids validates entries and caps the accumulated total", () => {
+  const a = "aa".repeat(32), b = "bb".repeat(32);
+  assert.deepEqual(P.checkedBlockTxids({ txs: [{ txid: a }, { txid: b }] }, 0), [a, b]);
+  assert.deepEqual(P.checkedBlockTxids({}, 0), []); // no txs array -> empty page
+  assert.deepEqual(P.checkedBlockTxids(null, 0), []);
+  // exactly at the budget is allowed; one over is refused
+  const page = { txs: Array.from({ length: 25 }, () => ({ txid: a })) };
+  assert.equal(P.checkedBlockTxids(page, 4975).length, 25);
+  assert.throws(() => P.checkedBlockTxids(page, 4976), /too many to fetch/);
+  // malformed entries are refused, never silently dropped (a dropped tx
+  // would corrupt the merkle root the page goes on to "verify")
+  assert.throws(() => P.checkedBlockTxids({ txs: [{ txid: "zz" }] }, 0), /malformed txid/);
+  assert.throws(() => P.checkedBlockTxids({ txs: [{ txid: 7 }] }, 0), /malformed txid/);
+  assert.throws(() => P.checkedBlockTxids({ txs: [{}] }, 0), /malformed txid/);
+  assert.throws(() => P.checkedBlockTxids({ txs: ["aa".repeat(32)] }, 0), /malformed txid/);
+});
