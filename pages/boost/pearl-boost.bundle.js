@@ -327,24 +327,31 @@ var PearlBoost = (() => {
   }
   var fetchTxDetail = (base, txid) => blockbookGet(base, `/api/v2/tx/${txid}`);
   async function broadcastViaBlockbook(base, hex) {
-    const url = base.replace(/\/+$/, "") + "/api/sendtx";
-    let res;
+    const url = base.replace(/\/+$/, "") + "/api/sendtx/";
+    let res, text;
     try {
       res = await fetch(url, {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ hex })
+        headers: { "Content-Type": "text/plain" },
+        body: hex
       });
+      text = await res.text();
     } catch (e) {
       throw new Error(`broadcast failed: backend unreachable (${e.message || e})`);
     }
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(`broadcast rejected (${res.status}): ${body.error || body.message || JSON.stringify(body).slice(0, 200)}`);
+    let j = {};
+    try {
+      j = JSON.parse(text);
+    } catch {
     }
-    const txid = body.result || body.txid;
-    if (!txid) throw new Error("broadcast returned no txid \u2014 treat as unconfirmed, do not rebroadcast blindly");
-    return String(txid);
+    if (!res.ok || j.error) {
+      throw new Error(`broadcast rejected (${res.status}): ${j.error || text.slice(0, 160)}`);
+    }
+    const txid = j.result ?? j.txid;
+    if (!/^[0-9a-f]{64}$/i.test(txid || "")) {
+      throw new Error("broadcast returned no valid txid \u2014 treat as unconfirmed, do not rebroadcast blindly");
+    }
+    return txid.toLowerCase();
   }
   function pearldBroadcastCmd(hex) {
     return `curl -s --user <rpcuser>:<rpcpass> --data-binary '{"jsonrpc":"1.0","id":"boost","method":"sendrawtransaction","params":["${hex}"]}' -H 'content-type: text/plain;' http://127.0.0.1:44107/`;

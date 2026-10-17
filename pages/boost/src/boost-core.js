@@ -351,26 +351,38 @@ export async function blockbookGet(base, path) {
 
 export const fetchTxDetail = (base, txid) => blockbookGet(base, `/api/v2/tx/${txid}`);
 
-/** POST a raw tx hex via Blockbook /api/sendtx. Returns the resulting txid. */
+/** POST a raw tx hex via Blockbook /api/sendtx/. Returns the resulting txid.
+ *  Wire contract is Blockbook v1 sendtx, identical to the fleet's verified
+ *  broadcasters (Sign core, wallet, sweep, PRL-20 launcher): the raw hex IS
+ *  the request body (text/plain) — a JSON wrapper is not valid tx hex and
+ *  the real backend rejects it — success is {"result":"<txid>"}, rejection
+ *  is {"error":"..."} (possibly on HTTP 200), and the returned txid is
+ *  refused unless it is exactly 64 hex chars: the caller declares success
+ *  and wipes keys on this return value, so a non-txid "result" must never
+ *  pass as a broadcast. */
 export async function broadcastViaBlockbook(base, hex) {
-  const url = base.replace(/\/+$/, "") + "/api/sendtx";
-  let res;
+  const url = base.replace(/\/+$/, "") + "/api/sendtx/";
+  let res, text;
   try {
     res = await fetch(url, {
       method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ hex }),
+      headers: { "Content-Type": "text/plain" },
+      body: hex,
     });
+    text = await res.text();
   } catch (e) {
     throw new Error(`broadcast failed: backend unreachable (${e.message || e})`);
   }
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(`broadcast rejected (${res.status}): ${body.error || body.message || JSON.stringify(body).slice(0, 200)}`);
+  let j = {};
+  try { j = JSON.parse(text); } catch { /* non-JSON body */ }
+  if (!res.ok || j.error) {
+    throw new Error(`broadcast rejected (${res.status}): ${j.error || text.slice(0, 160)}`);
   }
-  const txid = body.result || body.txid;
-  if (!txid) throw new Error("broadcast returned no txid — treat as unconfirmed, do not rebroadcast blindly");
-  return String(txid);
+  const txid = j.result ?? j.txid;
+  if (!/^[0-9a-f]{64}$/i.test(txid || "")) {
+    throw new Error("broadcast returned no valid txid — treat as unconfirmed, do not rebroadcast blindly");
+  }
+  return txid.toLowerCase();
 }
 
 /** pearld one-liner for manual broadcast (air-gapped fallback). */

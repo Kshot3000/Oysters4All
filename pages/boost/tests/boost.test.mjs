@@ -9,7 +9,7 @@ import {
   signalsRbf, estimateMinRelayFee, packageFeeRate, diagnoseTx,
   vSizeFromRawHex, planCpfp, planRbf, verifyPackageClaim,
   decimalToRational, ceilFeeGrains,
-  pearldBroadcastCmd,
+  pearldBroadcastCmd, broadcastViaBlockbook,
   Sign,
 } from "../src/index.js";
 import { NETWORKS, walletFromPriv, walletToWIF, walletFromWIF, p2trScriptPubKey, tweakKeypath, keypathTxVBytes } from "../../sign/src/crypto.js";
@@ -315,4 +315,55 @@ test("pearldBroadcastCmd emits the sendrawtransaction one-liner", () => {
   assert.match(cmd, /sendrawtransaction/);
   assert.match(cmd, /127\.0\.0\.1:44107/);
   assert.match(cmd, /deadbeef/);
+});
+
+/* ---------- broadcast wire contract (Blockbook v1 sendtx) ---------- */
+// The fleet's verified broadcasters (Sign core, wallet, sweep, PRL-20
+// launcher) all POST the raw hex as text/plain to /api/sendtx/ and refuse
+// a non-64-hex txid. Boost's clone once sent a JSON wrapper (not valid tx
+// hex — the real backend rejects it) and accepted any truthy "result" as
+// a txid, after which the UI declares success and wipes keys.
+
+const BCAST_HEX = "00".repeat(50);
+const BCAST_TXID = "AB".repeat(32);
+function stubFetch(handler) {
+  const calls = [];
+  const prev = globalThis.fetch;
+  globalThis.fetch = async (url, opts) => { calls.push({ url, opts }); return handler(url, opts); };
+  return { calls, restore: () => { globalThis.fetch = prev; } };
+}
+const textRes = (body, ok = true, status = 200) => ({ ok, status, text: async () => body });
+
+test("broadcastViaBlockbook sends raw hex text/plain to /api/sendtx/ and lowercases the txid", async () => {
+  const s = stubFetch(async () => textRes(JSON.stringify({ result: BCAST_TXID })));
+  try {
+    const txid = await broadcastViaBlockbook("https://blockbook.example/", BCAST_HEX);
+    assert.equal(txid, BCAST_TXID.toLowerCase());
+    assert.equal(s.calls.length, 1);
+    assert.equal(s.calls[0].url, "https://blockbook.example/api/sendtx/");
+    assert.equal(s.calls[0].opts.method, "POST");
+    assert.equal(s.calls[0].opts.headers["Content-Type"], "text/plain");
+    assert.equal(s.calls[0].opts.body, BCAST_HEX); // raw hex, never a JSON wrapper
+  } finally { s.restore(); }
+});
+
+test("broadcastViaBlockbook refuses a non-txid result — no false success", async () => {
+  const s = stubFetch(async () => textRes(JSON.stringify({ result: "ok" })));
+  try {
+    await assert.rejects(() => broadcastViaBlockbook("https://blockbook.example", BCAST_HEX), /no valid txid/);
+  } finally { s.restore(); }
+});
+
+test("broadcastViaBlockbook refuses an error payload even on HTTP 200", async () => {
+  const s = stubFetch(async () => textRes(JSON.stringify({ error: "mempool: insufficient fee" })));
+  try {
+    await assert.rejects(() => broadcastViaBlockbook("https://blockbook.example", BCAST_HEX), /insufficient fee/);
+  } finally { s.restore(); }
+});
+
+test("broadcastViaBlockbook refuses an HTTP error with a non-JSON body", async () => {
+  const s = stubFetch(async () => textRes("upstream exploded", false, 502));
+  try {
+    await assert.rejects(() => broadcastViaBlockbook("https://blockbook.example", BCAST_HEX), /502.*upstream exploded/);
+  } finally { s.restore(); }
 });
