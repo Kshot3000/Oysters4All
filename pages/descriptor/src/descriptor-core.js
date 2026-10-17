@@ -146,6 +146,13 @@ export class DescError extends Error {
 // ---------------------------------------------------------------------------
 
 const MAX_DESC_LEN = 100000;
+// Every other recursive consumer in this file caps its depth
+// (buildTapscript 32, the taptree walk 128) — the parser must too:
+// without a cap, a descriptor nested a few thousand times within the
+// length limit above exhausts the call stack and surfaces a raw
+// RangeError instead of a DescError refusal. 128 matches the taptree
+// cap; no descriptor this file can build comes close.
+const MAX_EXPR_DEPTH = 128;
 
 export function parseDescriptor(input) {
   const check = descCheckChecksum(input.trim(), { require: false });
@@ -164,6 +171,7 @@ class Parser {
   constructor(s) {
     this.s = s;
     this.i = 0;
+    this.depth = 0;
   }
   peek() { return this.s[this.i]; }
   eof() { return this.i >= this.s.length; }
@@ -182,14 +190,19 @@ class Parser {
     return m[0];
   }
   parseArgs() {
-    const args = [];
-    this.expect("(");
-    if (this.peek() === ")") { this.i++; return args; }
-    for (;;) {
-      args.push(this.parseExpr());
-      if (this.peek() === ",") { this.i++; continue; }
+    if (++this.depth > MAX_EXPR_DEPTH) this.error(`descriptor nested deeper than ${MAX_EXPR_DEPTH} expressions`);
+    try {
+      const args = [];
+      this.expect("(");
       if (this.peek() === ")") { this.i++; return args; }
-      this.error(`expected ',' or ')', found '${this.peek() ?? "end"}'`);
+      for (;;) {
+        args.push(this.parseExpr());
+        if (this.peek() === ",") { this.i++; continue; }
+        if (this.peek() === ")") { this.i++; return args; }
+        this.error(`expected ',' or ')', found '${this.peek() ?? "end"}'`);
+      }
+    } finally {
+      this.depth--;
     }
   }
   // A "leaf": function call, or a bare key/value literal.

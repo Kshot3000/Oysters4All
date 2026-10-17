@@ -259,6 +259,22 @@ describe("loud refusals", () => {
   it("garbage input fails with position info", () => {
     refused(() => D.parseDescriptor("tr(xpub###"), "expected");
   });
+  it("pathological nesting is refused as DescError, never a stack overflow", () => {
+    // Within the 100k length cap, a few thousand nested calls exhausted
+    // the call stack on pristine code (RangeError, not DescError): the
+    // parser was the one recursive consumer in this file with no depth
+    // cap (buildTapscript caps at 32, the taptree walk at 128).
+    const deep = "a(".repeat(5000) + "x" + ")".repeat(5000);
+    refused(() => D.parseDescriptor(deep), "nested deeper");
+    const deepValid = "sh(".repeat(5000) + `pk(${XONLY_A})` + ")".repeat(5000);
+    refused(() => D.parseDescriptor(deepValid), "nested deeper");
+    // Legitimate nesting far above any real descriptor still parses:
+    // a 20-deep and_v chain inside tr().
+    let frag = "older(7)";
+    for (let i = 0; i < 20; i++) frag = `and_v(pk(${XONLY_A}),${frag})`;
+    const ok = D.parseDescriptor(`tr(${XONLY_A},${frag})`);
+    assert.equal(ok.kind, "tr");
+  });
 });
 
 describe("describe()", () => {
