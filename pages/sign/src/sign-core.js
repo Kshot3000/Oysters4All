@@ -379,7 +379,11 @@ export async function broadcastViaBlockbook(blockbookBase, hex) {
   return txid.toLowerCase();
 }
 
-/** Fetch UTXOs for an address from blockbook. */
+/** Fetch UTXOs for an address from blockbook. Every field is coerced at
+ *  this data layer: callers render vout via innerHTML and feed it to the
+ *  u32le tx serializer, so an endpoint-supplied vout must arrive as a
+ *  uint32-range integer or the row is dropped (never a raw string, never
+ *  a wrapped/negative index); txids are canonicalized to lowercase hex. */
 export async function fetchUtxos(blockbookBase, address) {
   const base = blockbookBase.replace(/\/$/, "");
   let res;
@@ -392,8 +396,8 @@ export async function fetchUtxos(blockbookBase, address) {
   const list = await res.json();
   if (!Array.isArray(list)) throw new Error("unexpected utxo response");
   return list
-    .map((u) => { const conf = Number(u.confirmations); return { txid: u.txid, vout: u.vout, value: grainsToNumber(BigInt(u.value), "UTXO value"), confirmations: Number.isSafeInteger(conf) && conf >= 0 ? conf : 0 }; })
-    .filter((u) => u.value > 0 && /^[0-9a-f]{64}$/i.test(u.txid || ""));
+    .map((u) => { const conf = Number(u.confirmations); return { txid: String(u.txid || "").toLowerCase(), vout: Number(u.vout), value: grainsToNumber(BigInt(u.value), "UTXO value"), confirmations: Number.isSafeInteger(conf) && conf >= 0 ? conf : 0 }; })
+    .filter((u) => u.value > 0 && /^[0-9a-f]{64}$/.test(u.txid) && Number.isSafeInteger(u.vout) && u.vout >= 0 && u.vout <= 0xffffffff);
 }
 
 /** Fee rate in grains/vByte from blockbook estimatefee (PRL/kB → grains/vB). */

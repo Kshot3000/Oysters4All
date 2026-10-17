@@ -636,6 +636,25 @@ test("fetchLegacyUtxos never passes an endpoint-supplied string confirmations th
   } finally { globalThis.fetch = realFetch; }
 });
 
+test("fetchLegacyUtxos drops an out-of-uint32-range vout row", async () => {
+  const vault = makeVault();
+  const realFetch = globalThis.fetch;
+  const stub = (payload) => ({ ok: true, status: 200, text: async () => JSON.stringify(payload), json: async () => payload });
+  globalThis.fetch = async (url) => {
+    if (String(url).includes("/api/v2/utxo/")) return stub([
+      { txid: "ab".repeat(32), vout: 4294967296, value: "5000", confirmations: 3 },
+      { txid: "ab".repeat(32), vout: 0, value: "5000", confirmations: 3 },
+    ]);
+    if (String(url).includes("/api/v2/tx/")) return stub({ vout: [{ scriptPubKey: { hex: vault.spkHex } }], blockHeight: 900000 });
+    throw new Error("unexpected " + url);
+  };
+  try {
+    const list = await fetchLegacyUtxos("https://evil.example", vault);
+    assert.equal(list.length, 1);
+    assert.equal(list[0].vout, 0);
+  } finally { globalThis.fetch = realFetch; }
+});
+
 test("fetchLegacyUtxos reads the script from Blockbook's FLAT vout.hex", async () => {
   // Blockbook v2 Vout carries the script hex FLAT as `hex` (api/types.go);
   // `scriptPubKey.hex` is btcd's nested shape. The pre-fix reader looked

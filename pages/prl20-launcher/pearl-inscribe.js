@@ -586,7 +586,7 @@ export async function fetchUtxos(blockbookBase, address) {
     const value = Number(u.value); // grains (satoshis field)
     const conf = Number(u.confirmations);
     if (!/^[0-9a-f]{64}$/i.test(u.txid)) return [];
-    if (!Number.isSafeInteger(vout) || vout < 0) return [];
+    if (!Number.isSafeInteger(vout) || vout < 0 || vout > 0xffffffff) return [];
     if (!Number.isSafeInteger(value) || value <= 0) return [];
     return [{
       txid: u.txid, vout, value,

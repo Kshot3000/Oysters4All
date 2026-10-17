@@ -469,6 +469,18 @@ function signedListing(over = {}) {
     stubUtxos([{ txid: "ab".repeat(32), vout: 1, value: "250000000", confirmations: "<svg onload=alert(1)>" }]);
     const coerced = await fetchUtxos("https://bb.example", "prl1xyz");
     ok("fetch-utxos-conf-coerced", coerced.length === 1 && coerced[0].confirmations === 0);
+    // Vout must never pass through raw either: callers render it via
+    // innerHTML and feed it to the u32le serializer — hostile rows drop,
+    // a numeric string coerces, oversized indices drop.
+    stubUtxos([
+      { txid: "ab".repeat(32), vout: "<svg onload=alert(1)>", value: "250000000", confirmations: 2 },
+      { txid: "ab".repeat(32), vout: -1, value: "250000000", confirmations: 2 },
+      { txid: "ab".repeat(32), vout: 4294967296, value: "250000000", confirmations: 2 },
+      { txid: "AB".repeat(32), vout: "1", value: "250000000", confirmations: 2 },
+      { txid: "ab".repeat(32), vout: 2, value: "250000000", confirmations: 2 },
+    ]);
+    const vouts = await fetchUtxos("https://bb.example", "prl1xyz");
+    ok("fetch-utxos-vout-coerced", vouts.length === 2 && vouts.every((u) => Number.isInteger(u.vout) && u.txid === "ab".repeat(32)) && vouts.some((u) => u.vout === 1) && vouts.some((u) => u.vout === 2), JSON.stringify(vouts));
     // Past MAX_SAFE_INTEGER a bare Number() rounds (…993 -> …992, …995 -> …996):
     // the fetch must refuse loudly instead of returning a rounded funding UTXO.
     for (const raw of ["9007199254740993", "9007199254740995"]) {

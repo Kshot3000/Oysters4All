@@ -114,6 +114,6 @@ test("builder tip: claim checkbox off by default, disclosure in page, bundle API
   assert.ok(html.includes("Refunds never carry a tip"), "refund exclusion disclosed in the page");
   assert.ok(appSrc.includes('builderTipEnabled: $("claim-builder-tip").checked === true'), "claim plan wires the checkbox into the core planner");
   assert.ok(appSrc.includes("Builder tip (optional, 1%)"), "plan review renders the tip as its own line before signing");
-  assert.ok(html.includes("pearl-atomic.bundle.js?v=11"), "bundle cache key bumped");
+  assert.ok(html.includes("pearl-atomic.bundle.js?v=12"), "bundle cache key bumped");
   assert.ok(html.includes("styles.css?v=6"), "styles cache key bumped");
 });

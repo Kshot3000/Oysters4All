@@ -59,7 +59,7 @@ in every Bounty footer: `prl1p62v09vuzyd8kdz9l23jaf3kph4wwx6jqcmhkkhg8lhr2qlxky8
 ## Tests
 
 - `node build.mjs` → `pearl-bounty.bundle.js` (`window.PearlBounty`).
-- `node --no-warnings --loader ./tests/loader.mjs tests/bounty.test.mjs` — 21/21 core tests green
+- `node --no-warnings --loader ./tests/loader.mjs tests/bounty.test.mjs` — 22/22 core tests green
   (descriptor round-trip, reclaim-leaf byte-identity with the audited escrow,
   award/reclaim sign + verify, commit-reveal, deadline rules, fixture address pin,
   builder-tip exactness/waivers, winner-invariant tipped plan + signed wire, reclaim untipped).

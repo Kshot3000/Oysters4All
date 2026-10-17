@@ -346,6 +346,40 @@ test("fetchUtxos coerces string confirmations from the backend to 0", async () =
   }
 });
 
+// Vout gets the same data-layer treatment as confirmations: callers render
+// it via innerHTML (batch/covenant/escrow/fund UTXO tables) and feed it to
+// the u32le serializer, so a hostile endpoint's string/negative/oversized
+// vout must never reach a caller — the row is dropped, a numeric string
+// coerces, and txids come back canonical lowercase.
+test("fetchUtxos drops hostile vout rows and coerces string vout", async () => {
+  const core = await import("../src/sign-core.js");
+  const crypto = await import("../src/crypto.js");
+  const realFetch = globalThis.fetch;
+  const EVIL = "<svg onload=alert(1)>";
+  const rows = [
+    { txid: "AA".repeat(32), vout: EVIL, value: "100000", confirmations: 3 },
+    { txid: "AA".repeat(32), vout: -1, value: "100000", confirmations: 3 },
+    { txid: "AA".repeat(32), vout: 4294967296, value: "100000", confirmations: 3 },
+    { txid: "AA".repeat(32), vout: "1", value: "100000", confirmations: 3 },
+    { txid: "AA".repeat(32), vout: 2, value: "200000000", confirmations: 7 },
+  ];
+  try {
+    globalThis.fetch = async () => ({
+      ok: true,
+      json: async () => structuredClone(rows),
+      text: async () => JSON.stringify(rows),
+    });
+    for (const fetcher of [core.fetchUtxos, crypto.fetchUtxos]) {
+      const list = await fetcher("http://127.0.0.1:9", "prl1pabc");
+      assert.equal(list.length, 2);
+      assert.deepEqual(list.map((u) => u.vout), [1, 2]);
+      assert.ok(list.every((u) => u.txid === "aa".repeat(32)));
+    }
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
 test("verifySignedTx reports an out-of-range output as a range problem, not a bad signature", () => {
   const w0 = walletFromMnemonic(MNEMONIC, NETWORKS.mainnet, 0, 0);
   const spk0 = p2trScriptPubKey(tweakKeypath(w0.internalXOnly).tweakedX);
@@ -373,7 +407,7 @@ test("app.js buildPlan guards recipient and change amounts with safeGrains", () 
   assert.ok(app.includes('safeGrains(pick.change, "Change amount")'), "change amount guarded");
   assert.ok(!app.includes("value: Number(grains)"), "no unguarded recipient conversion remains");
   assert.ok(!app.includes("value: Number(pick.change)"), "no unguarded change conversion remains");
-  assert.ok(html.includes('pearl-sign.bundle.js?v=11'), "bundle cache key bumped");
+  assert.ok(html.includes('pearl-sign.bundle.js?v=12'), "bundle cache key bumped");
 });
 
 

@@ -255,6 +255,8 @@ const testnet = W.NETWORKS.testnet;
   const TX = "a".repeat(64);
   const payload = [
     { txid: TX, vout: 1, value: "9007199254740993", confirmations: 3 },
+    { txid: TX, vout: EVIL, value: "200000000", confirmations: 3 },
+    { txid: TX, vout: 4294967296, value: "200000000", confirmations: 3 },
     { txid: TX, vout: 2, value: "200000000", confirmations: EVIL },
     { txid: TX, vout: 0, value: "5000", confirmations: 7 },
   ];
@@ -264,7 +266,7 @@ const testnet = W.NETWORKS.testnet;
     const us = await W.bbGetUtxos("https://bb.example", "prl1x");
     ok("bbGetUtxos coerces hostile confirmations and refuses rounded value",
       us.length === 2 &&
-      us.every((u) => Number.isSafeInteger(u.confirmations) && u.confirmations >= 0 && Number.isSafeInteger(u.vout) && u.vout >= 0) &&
+      us.every((u) => Number.isSafeInteger(u.confirmations) && u.confirmations >= 0 && Number.isSafeInteger(u.vout) && u.vout >= 0 && u.vout <= 0xffffffff) &&
       us.some((u) => u.vout === 2 && u.value === 200000000 && u.confirmations === 0) &&
       us.some((u) => u.vout === 0 && u.value === 5000 && u.confirmations === 7),
       JSON.stringify(us));

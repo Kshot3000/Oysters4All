@@ -965,7 +965,7 @@ export async function fetchLegacyUtxos(blockbookBase, vault) {
     if (!/^[0-9a-f]{64}$/.test(txid)) continue;
     const vout = Number(u.vout);
     const value = Number(u.value);
-    if (!Number.isSafeInteger(vout) || vout < 0) continue;
+    if (!Number.isSafeInteger(vout) || vout < 0 || vout > 0xffffffff) continue;
     if (!Number.isSafeInteger(value) || value <= 0) continue;
     let scriptOk = false;
     let fundingHeight = null;

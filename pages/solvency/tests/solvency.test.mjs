@@ -329,6 +329,29 @@ test("fetchUtxosBig coerces string confirmations from the backend to 0", async (
   }
 });
 
+test("fetchUtxosBig drops out-of-range vout rows and junk-value rows, keeps clean rows", async () => {
+  const { fetchUtxosBig } = await import("../src/solvency-core.js");
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: true,
+    text: async () => JSON.stringify([
+      { txid: "aa".repeat(32), vout: -1, value: "5000", confirmations: 1 },
+      { txid: "aa".repeat(32), vout: 4294967296, value: "5000", confirmations: 1 },
+      { txid: "aa".repeat(32), vout: "0", value: "5000", confirmations: 1 },
+      { txid: "aa".repeat(32), vout: 0, value: "not-a-number", confirmations: 1 },
+      { txid: "aa".repeat(32), vout: 1, value: "6000", confirmations: 4 },
+    ]),
+  });
+  try {
+    const list = await fetchUtxosBig("https://evil.example", "prl1pabc");
+    assert.equal(list.length, 1);
+    assert.equal(list[0].vout, 1);
+    assert.equal(list[0].valueGrains, 6000n);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
 test("parseSolvencyBundle: a 5,000-deep nested payload refuses as a clean error, never a RangeError (regression)", () => {
   const DT = "[".repeat(5000) + "]".repeat(5000);
   const bundle = `{"v":"${BUNDLE_VERSION}","fingerprint":"0123456789abcdef","x":${DT}}`;

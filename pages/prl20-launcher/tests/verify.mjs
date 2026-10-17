@@ -407,6 +407,7 @@ if (canParse) {
   const TX = "a".repeat(64);
   const payload = [
     { txid: TX, vout: EVIL, value: "100000", confirmations: 3 },
+    { txid: TX, vout: 4294967296, value: "100000", confirmations: 3 },
     { txid: TX, vout: 1, value: "9007199254740993", confirmations: 3 },
     { txid: TX, vout: 2, value: "200000000", confirmations: EVIL },
     { txid: TX, vout: 0, value: "5000", confirmations: 7 },

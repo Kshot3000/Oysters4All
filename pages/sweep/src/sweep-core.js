@@ -164,7 +164,7 @@ export async function fetchSweepUtxos(fetcher = defaultFetcher, blockbookBase, a
       const txid = String(u.txid || "").toLowerCase();
       if (!/^[0-9a-f]{64}$/.test(txid)) continue;
       const vout = Number(u.vout);
-      if (!Number.isInteger(vout) || vout < 0) continue;
+      if (!Number.isInteger(vout) || vout < 0 || vout > 0xffffffff) continue;
       const value = BigInt(u.value);
       if (value <= 0n) continue;
       out.push({ txid, vout, value, confirmations: Number(u.confirmations ?? 0) || 0 });

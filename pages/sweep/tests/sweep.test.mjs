@@ -388,6 +388,7 @@ test("fetchSweepUtxos: parses rows, BigInt values, drops malformed rows", async 
       { txid: "a".repeat(64), vout: 0, value: "12345", confirmations: 6 },
       { txid: "BAD", vout: 1, value: "999", confirmations: 1 }, // dropped
       { txid: "b".repeat(64), vout: -1, value: "5", confirmations: 0 }, // dropped
+      { txid: "d".repeat(64), vout: 4294967296, value: "5", confirmations: 0 }, // dropped: past uint32
       { txid: "c".repeat(64), vout: 2, value: "0", confirmations: 0 }, // dropped
     ],
   });

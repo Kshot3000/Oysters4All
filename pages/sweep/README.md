@@ -78,7 +78,7 @@ consolidation verifier) account for the tip explicitly.
 
 ## Tests
 
-- `node --no-warnings --loader ./tests/loader.mjs tests/sweep.test.mjs` — 19 core tests
+- `node --no-warnings --loader ./tests/loader.mjs tests/sweep.test.mjs` — 23 core tests
 - `node --no-warnings --loader ./tests/loader.mjs tests/dom.test.mjs` — 10 DOM tests (real index.html + committed bundle + app.js in a DOM shim, stubbed Blockbook)
 - Real-browser QA: `hidden_files/qa-sweep-browser.mjs` (not committed) — 25 checks green in headless Chromium 152 via file:// + CDP, zero console/page errors
 - Rebuild the bundle after touching `src/`: `node build.mjs`

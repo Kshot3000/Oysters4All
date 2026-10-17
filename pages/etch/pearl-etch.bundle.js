@@ -6134,8 +6134,8 @@ zoo`.split("\n");
       const value = Number(u.value);
       if (!Number.isSafeInteger(value)) throw new Error("UTXO value too large to handle exactly");
       const conf = Number(u.confirmations);
-      return { txid: u.txid, vout: u.vout, value, confirmations: Number.isSafeInteger(conf) && conf >= 0 ? conf : 0 };
-    }).filter((u) => u.value > 0 && /^[0-9a-f]{64}$/i.test(u.txid));
+      return { txid: String(u.txid || "").toLowerCase(), vout: Number(u.vout), value, confirmations: Number.isSafeInteger(conf) && conf >= 0 ? conf : 0 };
+    }).filter((u) => u.value > 0 && /^[0-9a-f]{64}$/.test(u.txid) && Number.isSafeInteger(u.vout) && u.vout >= 0 && u.vout <= 4294967295);
   }
   async function fetchFeeRateGrainsPerVByte(blockbookBase, blocks = 2) {
     const r = await bbFetch(blockbookBase, `/api/v2/estimatefee/${blocks}`);

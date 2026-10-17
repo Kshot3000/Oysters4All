@@ -6110,7 +6110,7 @@ zoo`.split("\n");
         value: Number(u.value),
         confirmations: Number.isSafeInteger(conf) && conf >= 0 ? conf : 0
       };
-    }).filter((u) => Number.isSafeInteger(u.value) && u.value > 0 && /^[0-9a-f]{64}$/.test(u.txid) && Number.isSafeInteger(u.vout) && u.vout >= 0);
+    }).filter((u) => Number.isSafeInteger(u.value) && u.value > 0 && /^[0-9a-f]{64}$/.test(u.txid) && Number.isSafeInteger(u.vout) && u.vout >= 0 && u.vout <= 4294967295);
   }
   async function bbGetTx(base, txid) {
     const f = bbFetch(base);

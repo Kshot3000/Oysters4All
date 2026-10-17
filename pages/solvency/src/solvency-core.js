@@ -357,7 +357,7 @@ export async function fetchUtxosBig(blockbookBase, address) {
   const list = await bbGetJson(blockbookBase, `/api/v2/utxo/${address}`);
   if (!Array.isArray(list)) throw new Error("unexpected utxo response");
   return list
-    .filter((u) => u && /^[0-9a-f]{64}$/i.test(u.txid || "") && Number.isInteger(u.vout))
+    .filter((u) => u && /^[0-9a-f]{64}$/i.test(u.txid || "") && Number.isInteger(u.vout) && u.vout >= 0 && u.vout <= 0xffffffff && /^\d+$/.test(String(u.value)))
     .map((u) => ({
       txid: String(u.txid).toLowerCase(),
       vout: u.vout,
