@@ -52,6 +52,14 @@ export function depositFeeGrains(depositGrains, feeBps = 25n) {
 function expandScientific(s) {
   const m = /^(\d+)(?:\.(\d+))?[eE]([+-]?\d+)$/.exec(s);
   if (!m) return s;
+  // Bound the exponent BEFORE expanding: the expansion below repeats
+  // "0" |exp| times and the caller then BigInt-parses the result, so a
+  // crafted RPC string value like "1e100000000" would allocate and parse
+  // without bound and hang/OOM the deposit scanner. Returning the string
+  // unexpanded lets the caller's format regex refuse it as invalid. Any
+  // real JSON number's String() form stays within +/-324, and no valid
+  // PRL coin amount comes close to this bound.
+  if (Math.abs(parseInt(m[3], 10)) > 999) return s;
   const digits = m[1] + (m[2] ?? "");
   const pointPos = m[1].length + parseInt(m[3], 10);
   if (pointPos <= 0) return "0." + "0".repeat(-pointPos) + digits;

@@ -49,6 +49,18 @@ test("prlValueToGrains parses decimals exactly, never floats", () => {
   assert.throws(() => prlValueToGrains("-1"), /invalid PRL/);
 });
 
+test("prlValueToGrains refuses absurd scientific exponents without expanding them", () => {
+  // The exponent must be refused BEFORE "0".repeat(exp) / BigInt parsing
+  // can amplify a few input bytes into unbounded allocation (fleet bound:
+  // |exp| > 999; real JSON numbers stay within +/-324).
+  assert.throws(() => prlValueToGrains("1e100000000"), /invalid PRL/);
+  assert.throws(() => prlValueToGrains("1e-100000000"), /invalid PRL/);
+  assert.throws(() => prlValueToGrains("1e1000"), /invalid PRL/);
+  // Legit scientific forms still parse exactly.
+  assert.equal(prlValueToGrains("1e-8"), 1n);
+  assert.equal(prlValueToGrains("5e-7"), 50n);
+});
+
 test("grainsToPrlString produces exact 8-decimal strings for sendtoaddress", () => {
   assert.equal(grainsToPrlString(1n), "0.00000001");
   assert.equal(grainsToPrlString(123456789n), "1.23456789");
