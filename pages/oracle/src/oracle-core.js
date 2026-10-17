@@ -465,11 +465,18 @@ export function seriesForAsset(rows, asset) {
   const parsed = list.map((r) => {
     const a = typeof r === "string" ? JSON.parse(r) : r;
     const dec = Number(a.decimals);
-    if (dec > maxDec) maxDec = dec;
-    return { ts: Number(BigInt(a.ts)), price: BigInt(a.price), dec, id: verifyAttestation(r).id };
+    // Decimals become a BigInt exponent in the scaling below: an imported
+    // row carrying decimals like 100000000 would make 10n ** (maxDec - dec)
+    // allocate without bound and hang the page. Rows whose decimals are
+    // not an integer in 0..36 cannot be scaled honestly — exclude them
+    // from the series (the feed table still shows them, marked INVALID
+    // by their own field rules when applicable).
+    const decOk = Number.isInteger(dec) && dec >= 0 && dec <= 36;
+    if (decOk && dec > maxDec) maxDec = dec;
+    return { ts: Number(BigInt(a.ts)), price: BigInt(a.price), dec: decOk ? dec : null, id: verifyAttestation(r).id };
   });
   parsed.sort((x, y) => x.ts - y.ts);
-  const points = parsed.map((p) => ({
+  const points = parsed.filter((p) => p.dec !== null).map((p) => ({
     ts: p.ts,
     value: Number(p.price * (10n ** BigInt(maxDec - p.dec))), // display scaling only
     id: p.id,
@@ -482,6 +489,12 @@ export function seriesForAsset(rows, asset) {
  *  significant for minor-unit prices). Pure string math — no floats. */
 export function formatPrice(priceStr, decimalsStr) {
   const dec = Number(decimalsStr);
+  // dec drives the zero-pad loop below: an imported decimals of 100000000
+  // would loop/pad without bound. Price decimals beyond 36 are not a
+  // displayable price — refuse (both call sites render a fallback).
+  if (!Number.isInteger(dec) || dec < 0 || dec > 36) {
+    throw new Error(`bad price decimals: ${decimalsStr} (limit 0-36)`);
+  }
   let p = String(priceStr);
   if (dec === 0) return p;
   while (p.length <= dec) p = "0" + p;

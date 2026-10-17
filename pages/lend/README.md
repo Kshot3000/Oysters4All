@@ -63,7 +63,7 @@ two parties' agreed amounts, and their builders take no tip parameter.
 
 ## Tests
 
-- `node --no-warnings --loader ./tests/loader.mjs tests/lend.test.mjs` — 20 core tests.
+- `node --no-warnings --loader ./tests/loader.mjs tests/lend.test.mjs` — 21 core tests.
 - `node --no-warnings tests/dom.test.mjs` — full wizard flow in a stub DOM.
 - `node tests/lend.browser.qa.mjs` — real headless-Chromium QA (file:// + CDP).
 

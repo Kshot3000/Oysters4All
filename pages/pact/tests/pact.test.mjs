@@ -296,3 +296,8 @@ test("funding plan: duplicated outpoints refused (own list and cross-party)", ()
     aliceUtxoText: utxoA, bobUtxoText: utxoA, fundingFeeRate: 5,
   }), /duplicate UTXO/);
 });
+
+test("ceilFeeGrains: absurd exponent in a rate string is refused, not allocated (regression)", () => {
+  assert.throws(() => P.ceilFeeGrains(370, "1e100000000"), /exponent out of range/);
+  assert.throws(() => P.ceilFeeGrains(370, "1e-100000000"), /exponent out of range/);
+});

@@ -6419,6 +6419,7 @@ zoo`.split("\n");
     let num2 = BigInt(intPart + fracPart);
     let den = 10n ** BigInt(fracPart.length);
     const exp = expPart ? BigInt(expPart) : 0n;
+    if (exp > 999n || exp < -999n) throw new Error(`${name} exponent out of range: ${expPart} (limit +/-999)`);
     if (exp >= 0n) num2 *= 10n ** exp;
     else den *= 10n ** -exp;
     if (sign === "-") num2 = -num2;

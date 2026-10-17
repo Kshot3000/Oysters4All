@@ -576,3 +576,8 @@ test("parsePRLToGrains: exact decimal parsing, strict rejection (float-parse reg
   assert.throws(() => parsePRLToGrains("90071992.54740992"), /out of range/);
   assert.throws(() => parsePRLToGrains(5), /must be a string/);
 });
+
+test("ceilFeeGrains: absurd exponent in a rate string is refused, not allocated (regression)", () => {
+  assert.throws(() => ceilFeeGrains(370, "1e100000000"), /exponent out of range/);
+  assert.throws(() => ceilFeeGrains(370, "1e-100000000"), /exponent out of range/);
+});

@@ -72,7 +72,7 @@ is a different consent shape.
 
 ## Tests
 
-- `node --no-warnings --loader ./tests/loader.mjs tests/stream.test.mjs` — 19 core tests
+- `node --no-warnings --loader ./tests/loader.mjs tests/stream.test.mjs` — 20 core tests
 - `node --no-warnings --loader ./tests/loader.mjs tests/dom.test.mjs` — 12 DOM tests
   (real `index.html` + committed bundle + `app.js` against a minimal DOM shim, hostile localStorage)
 - Real-browser QA (headless Chromium, file:// + CDP) — 18/18 checks green,

@@ -6116,6 +6116,7 @@ zoo`.split("\n");
     let num2 = BigInt(intPart + fracPart);
     let den = 10n ** BigInt(fracPart.length);
     const exp = expPart ? BigInt(expPart) : 0n;
+    if (exp > 999n || exp < -999n) throw new Error(`${name} exponent out of range: ${expPart} (limit +/-999)`);
     if (exp >= 0n) num2 *= 10n ** exp;
     else den *= 10n ** -exp;
     if (sign === "-") num2 = -num2;
@@ -6367,6 +6368,7 @@ zoo`.split("\n");
     let num2 = BigInt(intPart + fracPart);
     let den = 10n ** BigInt(fracPart.length);
     const exp = expPart ? BigInt(expPart) : 0n;
+    if (exp > 999n || exp < -999n) throw new Error(`${name} exponent out of range: ${expPart} (limit +/-999)`);
     if (exp >= 0n) num2 *= 10n ** exp;
     else den *= 10n ** -exp;
     if (sign === "-") num2 = -num2;
@@ -6607,6 +6609,9 @@ zoo`.split("\n");
   }
   function formatTokenUnits(units, decimals) {
     const dec = Number(decimals);
+    if (!Number.isInteger(dec) || dec < 0 || dec > DIV_MAX_DECIMALS) {
+      throw new Error(`bad token decimals: ${decimals}`);
+    }
     const u = BigInt(units);
     if (u < 0n) throw new Error("negative token units");
     if (dec === 0) return u.toString();

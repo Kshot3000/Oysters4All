@@ -97,6 +97,12 @@ export function decimalToRational(x, name) {
   let num = BigInt(intPart + fracPart);
   let den = 10n ** BigInt(fracPart.length);
   const exp = expPart ? BigInt(expPart) : 0n;
+  // Bound the exponent BEFORE it becomes a BigInt power: a fee rate read
+  // from a crafted bundle/file (or pasted text) like "1e100000000" would
+  // otherwise make 10n ** exp allocate without bound and hang the page.
+  // Any real Number's String() form stays within +/-324, so +/-999 is
+  // generous headroom, never a legitimate fee rate or vsize.
+  if (exp > 999n || exp < -999n) throw new Error(`${name} exponent out of range: ${expPart} (limit +/-999)`);
   if (exp >= 0n) num *= 10n ** exp; else den *= 10n ** -exp;
   if (sign === "-") num = -num;
   return { num, den };
@@ -138,6 +144,11 @@ export function fmtInt(v) {
 export function fmtTokens(baseUnits, decimals) {
   const b = BigInt(baseUnits);
   const d = Number(decimals || 0);
+  // Decimals feed a BigInt power and a pad length below: an indexer-supplied
+  // value like 1000000 would allocate without bound (and 8.5 / -1 crashed or
+  // mis-scaled). PRL-20 deploys are validated to 0-18 in this same core
+  // (validatePrl20Json), so refuse anything outside that range.
+  if (!Number.isInteger(d) || d < 0 || d > 18) throw new Error(`bad token decimals: ${decimals}`);
   if (d === 0) return fmtInt(b);
   const neg = b < 0n;
   const a = neg ? -b : b;

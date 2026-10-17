@@ -482,3 +482,8 @@ test("buildUnsignedTx: duplicate input outpoint refused", () => {
   const plan = planDispatch({ utxos: TWO_UTXOS, recipients: threeRecipients(), senderProgram: SENDER_PROGRAM, feeRateGrainsPerVByte: 20, network: N });
   assert.throws(() => buildUnsignedTx(N, [TWO_UTXOS[0], TWO_UTXOS[0]], plan.outputs), /duplicate input outpoint/);
 });
+
+test("ceilFeeGrains: absurd exponent in a rate string is refused, not allocated (regression)", () => {
+  assert.throws(() => ceilFeeGrains(370, "1e100000000"), /exponent out of range/);
+  assert.throws(() => ceilFeeGrains(370, "1e-100000000"), /exponent out of range/);
+});

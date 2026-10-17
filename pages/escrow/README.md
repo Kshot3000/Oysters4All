@@ -66,7 +66,7 @@ floor is waived rather than rounded up.
 
 ## Verification
 
-- `tests/escrow.test.mjs` — 23/23: exact script bytes, script-number
+- `tests/escrow.test.mjs` — 24/24: exact script bytes, script-number
   vectors, Taproot address/control-block derivation, leaf-order
   independence, sighash byte-equality with the audited Pearl Sign
   `buildRevealTx` digest, odd-Y BIP-340 signing, full 2-of-3 release flow,

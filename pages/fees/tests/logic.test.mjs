@@ -183,3 +183,9 @@ test("bumpPlan from an exactly-parsed fee (regression: sub-grain fee must not pl
   assert.equal(plan.wantFeeGrains, 28200);
   assert.equal(plan.extraGrains, 14100);
 });
+
+test("feeFor: absurd exponent in a rate string is refused, not allocated (regression)", () => {
+  assert.throws(() => feeFor(200, "1e100000000"), /exponent out of range/);
+  assert.throws(() => feeFor(200, "2e-100000000"), /exponent out of range/);
+  assert.equal(feeFor(200, 2.2).grains, 440); // ordinary rates unchanged
+});

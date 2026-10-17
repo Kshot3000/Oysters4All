@@ -158,7 +158,7 @@ covenant-style contract on top of it.
 ## Tests
 
 ```sh
-node --no-warnings --loader ./tests/loader.mjs --test tests/legacy.test.mjs   # 25/25
+node --no-warnings --loader ./tests/loader.mjs --test tests/legacy.test.mjs   # 26/26
 node --no-warnings --loader ./tests/loader.mjs --test tests/dom.test.mjs       # 7/7
 node ../../../../hidden_files/qa-legacy-browser.mjs                            # real-browser QA (hidden_files, not committed) — 47/47 checks green (2026-10-02)
 ```

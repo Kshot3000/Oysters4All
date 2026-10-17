@@ -6266,6 +6266,7 @@ zoo`.split("\n");
     let num2 = BigInt(intPart + fracPart);
     let den = 10n ** BigInt(fracPart.length);
     const exp = expPart ? BigInt(expPart) : 0n;
+    if (exp > 999n || exp < -999n) throw new Error(`${name} exponent out of range: ${expPart} (limit +/-999)`);
     if (exp >= 0n) num2 *= 10n ** exp;
     else den *= 10n ** -exp;
     if (sign === "-") num2 = -num2;
@@ -6299,6 +6300,7 @@ zoo`.split("\n");
   function fmtTokens(baseUnits, decimals) {
     const b = BigInt(baseUnits);
     const d = Number(decimals || 0);
+    if (!Number.isInteger(d) || d < 0 || d > 18) throw new Error(`bad token decimals: ${decimals}`);
     if (d === 0) return fmtInt(b);
     const neg = b < 0n;
     const a = neg ? -b : b;

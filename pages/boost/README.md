@@ -47,7 +47,7 @@ plus an always-visible Honest Limits panel.
 - `node build.mjs` → committed `pearl-boost.bundle.js` (`window.PearlBoost`), bundling
   `src/boost-core.js` + the audited Sign core (`../sign/src/*`, vendored libs).
   No new cryptography anywhere in this app.
-- `node --no-warnings --loader ./tests/loader.mjs tests/boost.test.mjs` — 33/33 core tests
+- `node --no-warnings --loader ./tests/loader.mjs tests/boost.test.mjs` — 34/34 core tests
   (pinned package-feerate vector, BIP-125 sequence boundary, exact CPFP/RBF fee math,
   real Schnorr sign + re-verify round-trip with tamper check).
 - `node --no-warnings tests/dom.test.mjs` — 13/13 DOM tests driving the real bundle.

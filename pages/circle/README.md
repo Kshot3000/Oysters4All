@@ -68,7 +68,7 @@ leaves are byte-identical to the audited originals.
 
 ## Tests
 
-- `tests/circle.test.mjs` — 19/19: terms/member validation, pinned setup hash / fingerprint / payout order / round addresses / claim txid / refund txid, lottery tamper paths, leaf byte-equality with the audited lineage, descriptor round-trip + tamper detection, funding plan, claim/refund signing round-trips, builder-tip exactness/waivers, tipped plan conservation + refusals, tipped claim signed with the tip exact on the wire, classification, exact decimal fee pricing (refund + tipped-claim plan-level pins).
+- `tests/circle.test.mjs` — 20/20: terms/member validation, pinned setup hash / fingerprint / payout order / round addresses / claim txid / refund txid, lottery tamper paths, leaf byte-equality with the audited lineage, descriptor round-trip + tamper detection, funding plan, claim/refund signing round-trips, builder-tip exactness/waivers, tipped plan conservation + refusals, tipped claim signed with the tip exact on the wire, classification, exact decimal fee pricing (refund + tipped-claim plan-level pins).
 - `tests/dom.test.mjs` — 9/9: drives the real `app.js` against a strict DOM shim through found → lottery → fund → claim (double-confirm + wipe) → refund → track, plus the claim builder-tip opt-in/opt-out flow with the tip parsed exact from the signed wire.
 - Real-browser QA (`hidden_files/qa-circle-browser.mjs`): headless Chromium 152 via file:// + CDP, stubbed Blockbook, zero console/page errors — 37/37 green.
 

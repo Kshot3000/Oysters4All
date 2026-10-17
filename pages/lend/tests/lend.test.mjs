@@ -297,3 +297,8 @@ test("funding payment builds a valid unsigned keypath tx", () => {
   const tx = L.buildFundingPayment(NET, utxos, bPay, 100n * 100000000n, 2, utxoAddr);
   assert.ok(/^[0-9a-f]+$/.test(tx.hex));
 });
+
+test("ceilFeeGrains: absurd exponent in a rate string is refused, not allocated (regression)", () => {
+  assert.throws(() => L.ceilFeeGrains(370, "1e100000000"), /exponent out of range/);
+  assert.throws(() => L.ceilFeeGrains(370, "1e-100000000"), /exponent out of range/);
+});

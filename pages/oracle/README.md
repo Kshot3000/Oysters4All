@@ -101,7 +101,7 @@ proven. This page never moves PRL and never broadcasts anything.
 ## Tests
 
 ```sh
-node --no-warnings --loader ./tests/loader.mjs --test tests/oracle.test.mjs  # 38/38
+node --no-warnings --loader ./tests/loader.mjs --test tests/oracle.test.mjs  # 40/40
 node --no-warnings --loader ./tests/loader.mjs --test tests/dom.test.mjs      # 15/15
 ```
 

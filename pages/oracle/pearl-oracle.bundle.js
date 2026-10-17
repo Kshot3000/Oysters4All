@@ -6092,11 +6092,12 @@ zoo`.split("\n");
     const parsed = list.map((r) => {
       const a = typeof r === "string" ? JSON.parse(r) : r;
       const dec = Number(a.decimals);
-      if (dec > maxDec) maxDec = dec;
-      return { ts: Number(BigInt(a.ts)), price: BigInt(a.price), dec, id: verifyAttestation(r).id };
+      const decOk = Number.isInteger(dec) && dec >= 0 && dec <= 36;
+      if (decOk && dec > maxDec) maxDec = dec;
+      return { ts: Number(BigInt(a.ts)), price: BigInt(a.price), dec: decOk ? dec : null, id: verifyAttestation(r).id };
     });
     parsed.sort((x, y) => x.ts - y.ts);
-    const points = parsed.map((p) => ({
+    const points = parsed.filter((p) => p.dec !== null).map((p) => ({
       ts: p.ts,
       value: Number(p.price * 10n ** BigInt(maxDec - p.dec)),
       // display scaling only
@@ -6106,6 +6107,9 @@ zoo`.split("\n");
   }
   function formatPrice(priceStr, decimalsStr) {
     const dec = Number(decimalsStr);
+    if (!Number.isInteger(dec) || dec < 0 || dec > 36) {
+      throw new Error(`bad price decimals: ${decimalsStr} (limit 0-36)`);
+    }
     let p = String(priceStr);
     if (dec === 0) return p;
     while (p.length <= dec) p = "0" + p;

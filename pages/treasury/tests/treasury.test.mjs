@@ -327,3 +327,14 @@ test("selectUtxoForProposal: 1-of-3 vault at 1.1 g/vB prices the exact 209-grain
   assert.equal(round.feeGrains, sel.fee);
   assert.equal(round.vBytes, sel.vBytes);
 });
+
+test("decimalToRational: exponent is bounded before it becomes a BigInt power (regression)", () => {
+  // A fee rate read from a crafted bundle/file like "1e100000000" used to make
+  // 10n ** exp allocate without bound and hang the page; now refused at +/-999
+  // (any real Number's String() form stays within +/-324).
+  assert.throws(() => T.decimalToRational("1e100000000", "fee rate"), /exponent out of range/);
+  assert.throws(() => T.decimalToRational("1e-100000000", "fee rate"), /exponent out of range/);
+  assert.throws(() => T.decimalToRational("1e1000", "fee rate"), /exponent out of range/);
+  assert.equal(T.decimalToRational("1e999", "fee rate").num, 10n ** 999n); // boundary still exact
+  assert.deepEqual(T.decimalToRational("2.2", "fee rate"), { num: 22n, den: 10n }); // ordinary rates unchanged
+});

@@ -39,7 +39,7 @@ fee math, and the RPC helpers.
 node --no-warnings --loader ./tests/loader.mjs --test ./tests/verify.mjs
 ```
 
-16/16 green: derivation known-answer vectors, WIF round-trip, bech32m strictness,
+27/27 green: derivation known-answer vectors, WIF round-trip, bech32m strictness,
 build→decode round-trip, local verification (DEFAULT + 0x83), tamper detection
 (DEFAULT fails all inputs — amounts are committed globally; 0x83 fails only the
 tampered input), fee math vs the audited formula, coin selection, amount parsing,

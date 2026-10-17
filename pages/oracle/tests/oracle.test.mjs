@@ -387,3 +387,18 @@ test("CSV export: spreadsheet formula-injection guard (CWE-1236)", () => {
   assert.ok(line.includes("'=2+2"), "formula cell apostrophe-prefixed");
   assert.ok(!/,=2\+2/.test(line), "no raw formula cell");
 });
+
+test("formatPrice / seriesForAsset: absurd decimals cannot amplify into unbounded work (regression)", () => {
+  // An imported row's decimals drove formatPrice's zero-pad loop and
+  // seriesForAsset's 10n ** (maxDec - dec) scaling with no bound.
+  assert.throws(() => formatPrice("5", "100000000"), /bad price decimals/);
+  assert.equal(formatPrice("41250", "2"), "412.50"); // ordinary values unchanged
+  const rows = [
+    { asset: "X", price: "41", decimals: "0", ts: "1" },
+    { asset: "X", price: "4141", decimals: "2", ts: "2" },
+    { asset: "X", price: "41", decimals: "100000000", ts: "3" },
+  ];
+  const s = seriesForAsset(rows, "X");
+  assert.equal(s.decimals, 2);
+  assert.deepEqual(s.points.map((p) => p.value), [4100, 4141]); // absurd-decimals row excluded, legit rows exact
+});

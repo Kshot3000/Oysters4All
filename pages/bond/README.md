@@ -40,7 +40,7 @@ That cross-check caught a genuine latent consensus bug: the JS lineage wrote `sp
 - `src/bond-core.js` — bond math, forging, signing, transfer packages (~700 lines)
 - `src/index.js` — bundle entry (`window.PearlBond`)
 - `pearl-bond.bundle.js` — committed esbuild bundle (rebuild with `node build.mjs`)
-- `tests/bond.test.mjs` — 31 node tests incl. the Go-pinned vectors; `tests/dom.test.mjs` — 9 UI smoke tests
+- `tests/bond.test.mjs` — 32 node tests incl. the Go-pinned vectors; `tests/dom.test.mjs` — 9 UI smoke tests
 - `tests/loader.mjs` — import-map loader for node
 
 ## Honest limits

@@ -538,3 +538,14 @@ test("indexer fetchers handle ok / 404 / network failure", async () => {
   assert.match(r4.error, /NETWORK/);
   await assert.rejects(D.fetchTokenMeta(okFetch, "", "pearl"), /indexer base URL required/);
 });
+
+test("formatTokenUnits: decimals are bounded like parseTokenUnits (regression)", () => {
+  // dec becomes a pad length: 2000000 allocated a giant string and -3 silently
+  // mis-formatted ("123.45" for 12345 units). Sibling parseTokenUnits has
+  // always refused both; formatTokenUnits now refuses them too.
+  assert.throws(() => D.formatTokenUnits(1000n, 2000000), /bad token decimals/);
+  assert.throws(() => D.formatTokenUnits(12345n, -3), /bad token decimals/);
+  assert.throws(() => D.formatTokenUnits(1000n, 8.5), /bad token decimals/);
+  assert.equal(D.formatTokenUnits(1500000n, 6), "1.5"); // ordinary values unchanged
+  assert.throws(() => D.ceilFeeGrains(370, "1e100000000"), /exponent out of range/);
+});

@@ -585,5 +585,11 @@ throws("selectCoinsSimple-duplicate-utxo", () => selectCoinsSimple([
     `fee ${simpleSel.feeGrains} change ${simpleSel.changeGrains}`);
 }
 
+throws("ceilFee-exponent-refused", () => ceilFeeGrains(370, "1e100000000"));
+throws("ceilFee-neg-exponent-refused", () => ceilFeeGrains(370, "1e-100000000"));
+throws("fmtTokens-decimals-refused", () => fmtTokens("1000", 1000000));
+throws("fmtTokens-fractional-decimals-refused", () => fmtTokens("1000", 8.5));
+ok("fmtTokens-boundary-18", fmtTokens("1500000000000000000", 18) === "1.5");
+
 console.log(`\n${pass} passed, ${fail} failed, ${skipped} skipped`);
 process.exit(fail ? 1 : 0);

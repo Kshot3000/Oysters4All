@@ -60,7 +60,7 @@ standalone verifier recomputes the tip from the pool and checks it.
 ```bash
 cd pages/dividend
 node build.mjs              # emits pearl-dividend.bundle.js
-node --no-warnings --loader ./tests/loader.mjs tests/div.test.mjs   # 26 core tests
+node --no-warnings --loader ./tests/loader.mjs tests/div.test.mjs   # 27 core tests
 node --no-warnings tests/dom.test.mjs                                # 11 DOM tests
 ```
 

@@ -63,7 +63,7 @@ from `pages/escrow/`, the canonical-JSON fingerprint from `pages/batch/`.
 ```sh
 cd pages/quorum
 node build.mjs                                   # rebuild pearl-quorum.bundle.js
-node --no-warnings --loader ./tests/loader.mjs tests/quorum.test.mjs   # 36/36 core
+node --no-warnings --loader ./tests/loader.mjs tests/quorum.test.mjs   # 37/37 core
 node --no-warnings tests/dom.test.mjs            # 8/8 UI (vm DOM harness, stubbed fetch)
 node tests/quorum.browser.qa.mjs                 # 32/32 real-browser QA (headless Chromium, file:// + CDP, stubbed Blockbook, zero console/page errors)
 ```

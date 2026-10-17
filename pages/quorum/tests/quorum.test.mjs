@@ -488,3 +488,8 @@ test("importUnsignedBundle: crafted duplicate-input bundle refused at re-plannin
   b.inputs[1] = { ...b.inputs[0] };
   assert.throws(() => Q.importUnsignedBundle(Q.QUORUM_BUNDLE_KIND + JSON.stringify(b)), /duplicate input/);
 });
+
+test("ceilFeeGrains: absurd exponent in a rate string is refused, not allocated (regression)", () => {
+  assert.throws(() => Q.ceilFeeGrains(370, "1e100000000"), /exponent out of range/);
+  assert.throws(() => Q.ceilFeeGrains(370, "1e-100000000"), /exponent out of range/);
+});

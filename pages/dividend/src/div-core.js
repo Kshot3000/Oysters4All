@@ -101,6 +101,12 @@ export function parseTokenUnits(s, decimals) {
 /** Format base-unit BigInt back to a human string, trimming trailing zeros. */
 export function formatTokenUnits(units, decimals) {
   const dec = Number(decimals);
+  // Same guard parseTokenUnits has always had: dec becomes a pad length
+  // below, so an unvalidated value (e.g. straight from an indexer body)
+  // like 2000000 allocates a giant string, and -3 silently mis-formats.
+  if (!Number.isInteger(dec) || dec < 0 || dec > DIV_MAX_DECIMALS) {
+    throw new Error(`bad token decimals: ${decimals}`);
+  }
   const u = BigInt(units);
   if (u < 0n) throw new Error("negative token units");
   if (dec === 0) return u.toString();
