@@ -281,6 +281,27 @@ test("tipsToCsv exports exact rows", () => {
   assert.equal(lines[2], "bbb,1,0.00000001,12");
 });
 
+test("tipsToCsv guards endpoint-supplied txids (CWE-1236 + row/column injection)", () => {
+  // The txid is String(t.txid) from a user-configured Blockbook endpoint,
+  // never hex-validated — a hostile endpoint controls this cell fully.
+  const csv = tipsToCsv([
+    { txid: "=2+5+cmd|'calc'!A0", grains: 50000000n, confirmations: 3 },
+    { txid: " @SUM(1+1)", grains: 1n, confirmations: 1 },
+    { txid: "aaa,999999,999,1", grains: 1n, confirmations: 1 },
+    { txid: '"quoted"', grains: 1n, confirmations: 1 },
+  ]);
+  const lines = csv.trim().split("\n");
+  assert.equal(lines.length, 5); // header + 4 rows, no forged columns/rows
+  assert.equal(lines[1], "'=2+5+cmd|'calc'!A0,50000000,0.5,3");
+  assert.equal(lines[2], "' @SUM(1+1),1,0.00000001,1");
+  assert.equal(lines[3], '"aaa,999999,999,1",1,0.00000001,1');
+  assert.equal(lines[4], '"""quoted""",1,0.00000001,1');
+  for (const l of lines.slice(1)) assert.ok(!/^\s*[=+@|%]/.test(l), `formula-start row: ${l}`);
+  // A newline in the txid stays inside a quoted field, not a new row-start:
+  const nl = tipsToCsv([{ txid: "bbb\n=evil,1,1,1", grains: 1n, confirmations: 1 }]);
+  assert.ok(nl.includes('"bbb\n=evil,1,1,1",1,0.00000001,1\n'), "newline txid is quoted whole");
+});
+
 test("buildEmbedSnippet emits a self-contained block with the descriptor", () => {
   const f = forgeTipjar(GOOD_CFG);
   const qr = { "0.5": "<svg>qr1</svg>", "1": "<svg>qr2</svg>", "2.5": "<svg>qr3</svg>", "": "<svg>qr0</svg>" };

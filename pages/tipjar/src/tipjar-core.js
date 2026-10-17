@@ -380,9 +380,25 @@ const TIPS_CSV_HEADER = "txid,received_grains,received_prl,confirmations";
 
 /** CSV of detected tips. */
 export function tipsToCsv(tips) {
+  // Spreadsheet formula-injection guard (CWE-1236): the txid comes from a
+  // user-configured Blockbook endpoint (String(t.txid) in fetchTipActivity
+  // and the widget poll — never hex-validated), so a hostile or broken
+  // endpoint can return a "txid" that begins with =, +, -, @, | or %,
+  // contains commas/quotes, or carries a newline. Unescaped, the first
+  // executes as a formula when the CSV is opened in Excel/Sheets and the
+  // rest forge extra columns/rows. Apply the fleet csvCell pattern (ballot/
+  // tax/watch): prefix formula-starting cells with an apostrophe (quoting
+  // alone does NOT prevent formula execution) and quote cells containing
+  // , " or a newline. Plain numbers are data, not formulas, and pass
+  // untouched — the exact-rows test pins the normal output byte-for-byte.
+  const cell = (v) => {
+    let s = String(v ?? "");
+    if (!/^-?\d+(\.\d+)?$/.test(s) && /^\s*[=+\-@|%]/.test(s)) s = "'" + s;
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
   const lines = [TIPS_CSV_HEADER];
   for (const t of tips || []) {
-    lines.push([t.txid, t.grains.toString(), formatPrl(t.grains), t.confirmations].join(","));
+    lines.push([t.txid, t.grains.toString(), formatPrl(t.grains), t.confirmations].map(cell).join(","));
   }
   return lines.join("\n") + "\n";
 }

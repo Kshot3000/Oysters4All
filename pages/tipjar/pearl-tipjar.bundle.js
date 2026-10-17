@@ -4955,9 +4955,14 @@ zoo`.split("\n");
   }
   var TIPS_CSV_HEADER = "txid,received_grains,received_prl,confirmations";
   function tipsToCsv(tips) {
+    const cell = (v) => {
+      let s = String(v ?? "");
+      if (!/^-?\d+(\.\d+)?$/.test(s) && /^\s*[=+\-@|%]/.test(s)) s = "'" + s;
+      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
     const lines = [TIPS_CSV_HEADER];
     for (const t of tips || []) {
-      lines.push([t.txid, t.grains.toString(), formatPrl(t.grains), t.confirmations].join(","));
+      lines.push([t.txid, t.grains.toString(), formatPrl(t.grains), t.confirmations].map(cell).join(","));
     }
     return lines.join("\n") + "\n";
   }
