@@ -618,22 +618,52 @@ export async function fetchAddressTxs(blockbookBase, address) {
 export function classifyHtlcState(txs, address, spkHex) {
   let funding = null, spend = null;
   const addrLower = address.toLowerCase();
+  // The txs come from a user-configured Blockbook endpoint, and the funding
+  // object feeds the claim/refund signers as a UTXO (txid, vout, value) —
+  // so every field is coerced at this data layer in the fleet shape (the
+  // games findFunding / bounty fetcher pattern): a txid must be real
+  // 32-byte hex (lowercased), vout/value/confirmations safe integers, and
+  // blockHeight a safe non-negative integer else null. A vout whose value
+  // cannot be represented exactly (past MAX_SAFE_INTEGER) is not a usable
+  // funding hit at all — the old Number(v.value) silently rounded
+  // 9007199254740993 grains to 9007199254740992 — and a non-string txid
+  // crashed the spend loop on funding.txid.toLowerCase().
+  const txidOf = (t) => {
+    const id = String(t?.txid || "").toLowerCase();
+    return /^[0-9a-f]{64}$/.test(id) ? id : null;
+  };
+  const confOf = (t) => {
+    const c = Number(t?.confirmations);
+    return Number.isSafeInteger(c) && c >= 0 ? c : 0;
+  };
+  const heightOf = (t) => {
+    const h = Number(t?.blockHeight);
+    return Number.isSafeInteger(h) && h >= 0 ? h : null;
+  };
   for (const t of txs || []) {
-    const isSelf = (x) => String(x.txid || "").toLowerCase() === String(funding?.txid || "").toLowerCase();
+    const txid = txidOf(t);
+    if (!txid) continue;
     for (const v of t.vout || []) {
       const addrs = (v.addresses || []).map((a) => String(a).toLowerCase());
       const scriptHex = String(v.hex || "").toLowerCase();
       if (addrs.includes(addrLower) || (spkHex && scriptHex === spkHex.toLowerCase())) {
-        const conf = t.confirmations ?? 0;
-        if (!funding && conf > 0) funding = { txid: t.txid, vout: v.n, value: Number(v.value), confirmations: conf, height: t.blockHeight };
+        const vout = Number(v.n);
+        const value = Number(v.value);
+        if (!Number.isSafeInteger(vout) || vout < 0) continue;
+        if (!Number.isSafeInteger(value) || value <= 0) continue;
+        const conf = confOf(t);
+        if (!funding && conf > 0) funding = { txid, vout, value, confirmations: conf, height: heightOf(t) };
       }
     }
   }
   if (funding) {
     for (const t of txs || []) {
+      const txid = txidOf(t);
+      if (!txid) continue;
       for (const vin of t.vin || []) {
-        if (String(vin.txid || "").toLowerCase() === funding.txid.toLowerCase() && vin.vout === funding.vout) {
-          if (!spend) spend = { txid: t.txid, confirmations: t.confirmations ?? 0, height: t.blockHeight };
+        const vinVout = Number(vin.vout);
+        if (String(vin.txid || "").toLowerCase() === funding.txid && Number.isSafeInteger(vinVout) && vinVout >= 0 && vinVout === funding.vout) {
+          if (!spend) spend = { txid, confirmations: confOf(t), height: heightOf(t) };
         }
       }
     }

@@ -50,7 +50,7 @@ returns the maker's own locked funds.
 
 ```bash
 cd pages/atomic
-node --no-warnings --loader ./tests/loader.mjs --test tests/atomic.test.mjs   # 19/19 core tests
+node --no-warnings --loader ./tests/loader.mjs --test tests/atomic.test.mjs   # 20/20 core tests
 node --no-warnings --test tests/dom.test.mjs               # 4/4 DOM tests: id cross-check + init smoke + tip wiring
 ```
 

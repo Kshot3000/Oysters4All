@@ -304,6 +304,40 @@ test("classifyHtlcState: funding then spend", () => {
   assert.equal(empty.spend, null);
 });
 
+test("classifyHtlcState: endpoint fields are coerced before they can feed a signer", () => {
+  const f = forgeHtlc(net, { claimerXOnly: KEYS[0], refundeeXOnly: KEYS[1], hash: HASH, timeout: TIMEOUT });
+  const addr = f.tree.address;
+  const fundTxid = "aa".repeat(32), spendTxid = "bb".repeat(32);
+  // A vout value past MAX_SAFE_INTEGER must not be silently rounded into
+  // the funding UTXO (9007199254740993 came back 9007199254740992): the
+  // vout is not a usable funding hit.
+  const jumbo = classifyHtlcState([
+    { txid: fundTxid, confirmations: 12, blockHeight: 199000, vout: [{ n: 0, value: "9007199254740993", addresses: [addr] }], vin: [] },
+  ], addr, null);
+  assert.equal(jumbo.funding, null);
+  // Numeric-string fields from the endpoint are coerced to safe integers,
+  // and the spend is still detected when vin.vout arrives as a string.
+  const coerced = classifyHtlcState([
+    { txid: fundTxid, confirmations: "12", blockHeight: "199000", vout: [{ n: "0", value: "100000000", addresses: [addr] }], vin: [{ txid: "ff".repeat(32), vout: 0 }] },
+    { txid: spendTxid, confirmations: "3", blockHeight: 199010, vout: [], vin: [{ txid: fundTxid, vout: "0" }] },
+  ], addr, null);
+  assert.equal(coerced.funding.txid, fundTxid);
+  assert.equal(coerced.funding.vout, 0);
+  assert.equal(coerced.funding.value, 100000000);
+  assert.equal(coerced.funding.confirmations, 12);
+  assert.equal(coerced.funding.height, 199000);
+  assert.equal(coerced.spend.txid, spendTxid);
+  assert.equal(coerced.spend.confirmations, 3);
+  // A non-string txid is skipped, never crashed on (the old spend loop
+  // threw TypeError on funding.txid.toLowerCase()).
+  const junk = classifyHtlcState([
+    { txid: 12345, confirmations: 12, blockHeight: 199000, vout: [{ n: 0, value: "100000000", addresses: [addr] }], vin: [] },
+    { txid: spendTxid, confirmations: 3, blockHeight: 199010, vout: [], vin: [{ txid: fundTxid, vout: 0 }] },
+  ], addr, null);
+  assert.equal(junk.funding, null);
+  assert.equal(junk.spend, null);
+});
+
 test("fmtPRL / parsePRLtoGrains", () => {
   assert.equal(fmtPRL(100000000), "1 PRL");
   assert.equal(fmtPRL(125000000), "1.25 PRL");
