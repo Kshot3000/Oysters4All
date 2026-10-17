@@ -12,6 +12,14 @@ import { once } from "node:events";
 const DEFAULT_BINARY =
   new URL("../verifier/target/release/pearl-pool-verifier", import.meta.url).pathname;
 
+// A verifier response is one small line-delimited JSON object
+// ({ _seq, ok, digest?, block?, error? }) — never a proof or a blob.
+// Cap the per-worker line buffer so a malfunctioning or compromised
+// worker that spews without a newline cannot grow pool memory without
+// bound (the stratum server caps miner lines for the same reason);
+// crossing the cap fails the worker like any other worker error.
+const MAX_WORKER_BUF_BYTES = 1024 * 1024;
+
 export class VerifierPool {
   /**
    * @param {object} opts
@@ -66,6 +74,12 @@ export class VerifierPool {
 
   _onData(w, chunk) {
     w.buf += chunk.toString("utf8");
+    if (w.buf.length > MAX_WORKER_BUF_BYTES) {
+      w.buf = "";
+      try { w.child.kill("SIGKILL"); } catch { /* already gone */ }
+      this._onWorkerError(w, new Error("verifier worker output exceeded the 1 MiB line limit"));
+      return;
+    }
     let nl;
     while ((nl = w.buf.indexOf("\n")) >= 0) {
       const line = w.buf.slice(0, nl).trim();
