@@ -513,3 +513,9 @@ test("buildKeypathTxLocktime refuses a duplicate input outpoint", () => {
     /duplicate input outpoint/,
   );
 });
+
+test("parseDescriptor: a 5,000-deep nested payload refuses as a clean error, never a RangeError (regression)", () => {
+  const DT = "[".repeat(5000) + "]".repeat(5000);
+  const desc = `{"v":"${DESCRIPTOR_VERSION}","fingerprint":"00","x":${DT}}`;
+  assert.throws(() => parseDescriptor(desc), /canonical JSON nested deeper than 128 levels/);
+});

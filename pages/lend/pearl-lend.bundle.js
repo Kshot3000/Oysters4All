@@ -6591,12 +6591,14 @@ zoo`.split("\n");
       delayBlocks
     };
   }
-  function canonicalJson(obj) {
+  var MAX_CANON_DEPTH = 128;
+  function canonicalJson(obj, depth = 0) {
+    if (depth > MAX_CANON_DEPTH) throw new Error("canonical JSON nested deeper than " + MAX_CANON_DEPTH + " levels \u2014 refusing");
     if (obj === null || typeof obj !== "object" || Array.isArray(obj)) {
-      if (Array.isArray(obj)) return "[" + obj.map(canonicalJson).join(",") + "]";
+      if (Array.isArray(obj)) return "[" + obj.map((x) => canonicalJson(x, depth + 1)).join(",") + "]";
       return JSON.stringify(obj);
     }
-    return "{" + Object.keys(obj).sort().map((k) => JSON.stringify(k) + ":" + canonicalJson(obj[k])).join(",") + "}";
+    return "{" + Object.keys(obj).sort().map((k) => JSON.stringify(k) + ":" + canonicalJson(obj[k], depth + 1)).join(",") + "}";
   }
   function buildDescriptor(o) {
     const network = o.network;

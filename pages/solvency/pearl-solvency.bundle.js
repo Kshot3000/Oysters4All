@@ -5749,11 +5749,13 @@ zoo`.split("\n");
   var BUNDLE_VERSION = "pearl-solvency:v1";
   var UNSIGNED_VERSION = "pearl-solvency-unsigned:v1";
   var MAX_ADDRESSES = 250;
-  function canonicalJson(v) {
+  var MAX_CANON_DEPTH = 128;
+  function canonicalJson(v, depth = 0) {
+    if (depth > MAX_CANON_DEPTH) throw new Error("canonical JSON nested deeper than " + MAX_CANON_DEPTH + " levels \u2014 refusing");
     if (v === null || v === void 0) return "null";
-    if (Array.isArray(v)) return "[" + v.map(canonicalJson).join(",") + "]";
+    if (Array.isArray(v)) return "[" + v.map((x) => canonicalJson(x, depth + 1)).join(",") + "]";
     if (typeof v === "object") {
-      return "{" + Object.keys(v).sort().map((k) => JSON.stringify(k) + ":" + canonicalJson(v[k])).join(",") + "}";
+      return "{" + Object.keys(v).sort().map((k) => JSON.stringify(k) + ":" + canonicalJson(v[k], depth + 1)).join(",") + "}";
     }
     return JSON.stringify(v);
   }

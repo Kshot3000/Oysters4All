@@ -342,3 +342,9 @@ test("sha256HexText is deterministic", () => {
   assert.equal(sha256HexText("pearl").length, 64);
   assert.notEqual(sha256HexText("pearl"), sha256HexText("Pearl"));
 });
+
+test("verifyAuditChain: a 5,000-deep nested entry refuses as a clean error, never a RangeError (regression)", () => {
+  const DT = "[".repeat(5000) + "]".repeat(5000);
+  const entry = JSON.parse(`{"seq":0,"prev":"GENESIS","hash":"abc","x":${DT}}`);
+  assert.throws(() => verifyAuditChain([entry]), /canonical JSON nested deeper than 128 levels/);
+});

@@ -302,3 +302,9 @@ test("ceilFeeGrains: absurd exponent in a rate string is refused, not allocated 
   assert.throws(() => L.ceilFeeGrains(370, "1e100000000"), /exponent out of range/);
   assert.throws(() => L.ceilFeeGrains(370, "1e-100000000"), /exponent out of range/);
 });
+
+test("canonicalJson: a 5,000-deep nested value refuses as a clean error, never a RangeError (regression)", () => {
+  const deep = JSON.parse("[".repeat(5000) + "]".repeat(5000));
+  assert.throws(() => L.canonicalJson(deep), /canonical JSON nested deeper than 128 levels/);
+  assert.equal(L.canonicalJson({ a: [1, { b: "x" }] }), '{"a":[1,{"b":"x"}]}');
+});

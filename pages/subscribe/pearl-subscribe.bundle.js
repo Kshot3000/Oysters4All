@@ -6176,14 +6176,16 @@ zoo`.split("\n");
     }
     return derived;
   }
-  function canonicalJson(v) {
+  var MAX_CANON_DEPTH = 128;
+  function canonicalJson(v, depth = 0) {
+    if (depth > MAX_CANON_DEPTH) throw new Error("canonical JSON nested deeper than " + MAX_CANON_DEPTH + " levels \u2014 refusing");
     if (v === null || v === void 0) return "null";
     if (typeof v === "bigint") return v.toString();
     if (typeof v === "number" || typeof v === "boolean") return JSON.stringify(v);
     if (typeof v === "string") return JSON.stringify(v);
-    if (Array.isArray(v)) return "[" + v.map(canonicalJson).join(",") + "]";
+    if (Array.isArray(v)) return "[" + v.map((x) => canonicalJson(x, depth + 1)).join(",") + "]";
     const keys = Object.keys(v).sort();
-    return "{" + keys.map((k) => JSON.stringify(k) + ":" + canonicalJson(v[k])).join(",") + "}";
+    return "{" + keys.map((k) => JSON.stringify(k) + ":" + canonicalJson(v[k], depth + 1)).join(",") + "}";
   }
   function fingerprintOf(canonical) {
     const h = sha2562(new TextEncoder().encode(canonical));

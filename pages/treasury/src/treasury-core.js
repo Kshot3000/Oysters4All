@@ -69,10 +69,18 @@ export const BLOCKBOOK_MAINNET = NETWORKS.mainnet.blockbook;
  * for tamper-evident ids and the audit chain, on top of the audited
  * sha256) ---------------- */
 
-function canon(v) {
-  if (Array.isArray(v)) return "[" + v.map(canon).join(",") + "]";
+// Depth cap for the recursive canonicalizer: import paths fingerprint the
+// RAW parsed payload before normalizing it, and JSON.parse survives ~10k
+// nesting levels while this recursion dies near ~5k — a crafted descriptor,
+// bundle, proposal, or audit entry nested 5,000 deep surfaced a raw
+// RangeError instead of the app's standard refusal. 128 matches the
+// descriptor parser's MAX_EXPR_DEPTH; no legitimate payload comes close.
+const MAX_CANON_DEPTH = 128;
+function canon(v, depth = 0) {
+  if (depth > MAX_CANON_DEPTH) throw new Error("canonical JSON nested deeper than " + MAX_CANON_DEPTH + " levels — refusing");
+  if (Array.isArray(v)) return "[" + v.map((x) => canon(x, depth + 1)).join(",") + "]";
   if (v !== null && typeof v === "object") {
-    return "{" + Object.keys(v).sort().map((k) => JSON.stringify(k) + ":" + canon(v[k])).join(",") + "}";
+    return "{" + Object.keys(v).sort().map((k) => JSON.stringify(k) + ":" + canon(v[k], depth + 1)).join(",") + "}";
   }
   return JSON.stringify(v);
 }

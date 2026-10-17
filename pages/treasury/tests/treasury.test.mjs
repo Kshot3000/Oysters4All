@@ -338,3 +338,11 @@ test("decimalToRational: exponent is bounded before it becomes a BigInt power (r
   assert.equal(T.decimalToRational("1e999", "fee rate").num, 10n ** 999n); // boundary still exact
   assert.deepEqual(T.decimalToRational("2.2", "fee rate"), { num: 22n, den: 10n }); // ordinary rates unchanged
 });
+
+test("canonical depth cap: 5,000-deep proposal and audit payloads refuse as clean errors, never RangeErrors (regression)", () => {
+  const DT = "[".repeat(5000) + "]".repeat(5000);
+  const prop = `{"kind":"${T.PROPOSAL_KIND}","version":${T.PROPOSAL_VERSION},"id":"x","fingerprint":"y","status":"open","roundDigests":[],"txids":[],"x":${DT}}`;
+  assert.throws(() => T.parseProposal(prop, null), /canonical JSON nested deeper than 128 levels/);
+  const entry = JSON.parse(`{"seq":0,"prev":"GENESIS","hash":"abc","x":${DT}}`);
+  assert.throws(() => T.verifyAuditChain([entry]), /canonical JSON nested deeper than 128 levels/);
+});

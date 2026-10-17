@@ -71,7 +71,7 @@ desired_p = (Σᵢ √cᵢ)² − Σᵢ cᵢ
 - `build.mjs` — esbuild → committed `pearl-commons.bundle.js` (IIFE, no
   `globalName`; explicit `window.PearlCommons` assignment — see AGENTS.md).
 - Tests: `node --no-warnings --loader ./tests/loader.mjs ./tests/commons-core.test.mjs`
-  — 19/19 green (amount parsing, address policy incl. v0/short-program
+  — 20/20 green (amount parsing, address policy incl. v0/short-program
   rejection, round lifecycle, QF known vectors, capital-constraint scaling,
   audit tamper detection).
 - Real-browser QA: `hidden_files/qa-commons-browser.mjs` — 19/19 green

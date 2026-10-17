@@ -86,7 +86,7 @@ box ticked, so re-planning reproduces the identical run.
 ```bash
 cd files/pages/payroll
 node build.mjs                                   # rebuilds pearl-payroll.bundle.js
-node --no-warnings --loader ./tests/loader.mjs tests/payroll.test.mjs      # 50 core tests
+node --no-warnings --loader ./tests/loader.mjs tests/payroll.test.mjs      # 51 core tests
 node --no-warnings --loader ./tests/loader.mjs tests/payroll.dom.test.mjs  # 16 DOM tests
 ```
 

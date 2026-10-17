@@ -328,3 +328,10 @@ test("fetchUtxosBig coerces string confirmations from the backend to 0", async (
     globalThis.fetch = realFetch;
   }
 });
+
+test("parseSolvencyBundle: a 5,000-deep nested payload refuses as a clean error, never a RangeError (regression)", () => {
+  const DT = "[".repeat(5000) + "]".repeat(5000);
+  const bundle = `{"v":"${BUNDLE_VERSION}","fingerprint":"0123456789abcdef","x":${DT}}`;
+  assert.throws(() => parseSolvencyBundle(bundle), /canonical JSON nested deeper than 128 levels/);
+  assert.equal(canonicalJson({ b: 1, a: [2] }), '{"a":[2],"b":1}');
+});

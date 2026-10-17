@@ -6138,10 +6138,12 @@ zoo`.split("\n");
   var isHex64 = (s) => /^[0-9a-fA-F]{64}$/.test(s);
   var isXprvLike = (s) => /^[xt]prv[1-9A-HJ-NP-Za-km-z]{100,120}$/.test(s);
   var isWifLike = (s) => /^[1-9A-HJ-NP-Za-km-z]{40,80}$/.test(s);
-  function canonicalJson(value) {
+  var MAX_CANON_DEPTH = 128;
+  function canonicalJson(value, depth = 0) {
+    if (depth > MAX_CANON_DEPTH) throw new Error("canonical JSON nested deeper than " + MAX_CANON_DEPTH + " levels \u2014 refusing");
     if (value === null || typeof value !== "object") return JSON.stringify(value);
-    if (Array.isArray(value)) return "[" + value.map(canonicalJson).join(",") + "]";
-    return "{" + Object.keys(value).sort().map((k) => JSON.stringify(k) + ":" + canonicalJson(value[k])).join(",") + "}";
+    if (Array.isArray(value)) return "[" + value.map((x) => canonicalJson(x, depth + 1)).join(",") + "]";
+    return "{" + Object.keys(value).sort().map((k) => JSON.stringify(k) + ":" + canonicalJson(value[k], depth + 1)).join(",") + "}";
   }
   function descriptorFingerprint(descriptorObj) {
     const h = sha2562(new TextEncoder().encode(canonicalJson(descriptorObj)));

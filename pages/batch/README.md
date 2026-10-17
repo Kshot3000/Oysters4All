@@ -69,7 +69,7 @@ identical amount.
 - `node build.mjs` — rebuilds `pearl-batch.bundle.js` (esbuild IIFE,
   `window.PearlBatch`; crypto reuses the audited `../sign` modules — no new cryptography).
 - `node --no-warnings --loader ./tests/loader.mjs tests/batch.test.mjs` —
-  core engine tests (42/42): parsing, dust, duplicates ± merge, fee/change math
+  core engine tests (43/43): parsing, dust, duplicates ± merge, fee/change math
   incl. dust-absorption, bundle round-trip + tamper refusal, signing, audit,
   opt-in builder tip (math/waivers, cap refusal, signed conservation).
 - `node --no-warnings --loader ./tests/loader.mjs tests/batch.dom.test.mjs` —

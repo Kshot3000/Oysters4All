@@ -564,3 +564,9 @@ test("buildUnsignedTx: duplicate input outpoint refused", () => {
   const { us, plan } = settled();
   assert.throws(() => buildUnsignedTx(N, [us[0], us[0]], plan.outputs), /duplicate input outpoint/);
 });
+
+test("importUnsignedBundle: a 5,000-deep nested descriptor refuses as a clean error, never a RangeError (regression)", () => {
+  const DT = "[".repeat(5000) + "]".repeat(5000);
+  const bundle = `{"bundle":"${PAYROLL_BUNDLE_KIND}","descriptor":{"kind":"${PAYROLL_DESCRIPTOR_KIND}","network":"mainnet","x":${DT}},"fingerprint":"00"}`;
+  assert.throws(() => importUnsignedBundle(bundle), /canonical JSON nested deeper than 128 levels/);
+});

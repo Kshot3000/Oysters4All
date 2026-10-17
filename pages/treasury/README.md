@@ -79,7 +79,7 @@ primitives.
   esbuild resolved via `~/workspace/.build-tools`, with the same importmap
   plugin the bounty app uses (bare `@…` specifiers → `../sign/lib/`).
 - `node --no-warnings --loader ./tests/loader.mjs --test tests/treasury.test.mjs`
-  — 23/23 core tests green (descriptor rebind semantics, proposal
+  — 24/24 core tests green (descriptor rebind semantics, proposal
   tamper-evidence, dust/integer amount rules, 2-of-3 round → quorum →
   finalize hex, intent-drift refusal, audit-chain tamper detection, schedule
   math, key wipe zeroing).

@@ -6204,10 +6204,12 @@ zoo`.split("\n");
     }
     return null;
   }
-  function canonicalJson(v) {
+  var MAX_CANON_DEPTH = 128;
+  function canonicalJson(v, depth = 0) {
+    if (depth > MAX_CANON_DEPTH) throw new Error("canonical JSON nested deeper than " + MAX_CANON_DEPTH + " levels \u2014 refusing");
     if (v === null || typeof v !== "object") return JSON.stringify(v);
-    if (Array.isArray(v)) return "[" + v.map(canonicalJson).join(",") + "]";
-    return "{" + Object.keys(v).sort().map((k) => JSON.stringify(k) + ":" + canonicalJson(v[k])).join(",") + "}";
+    if (Array.isArray(v)) return "[" + v.map((x) => canonicalJson(x, depth + 1)).join(",") + "]";
+    return "{" + Object.keys(v).sort().map((k) => JSON.stringify(k) + ":" + canonicalJson(v[k], depth + 1)).join(",") + "}";
   }
   function b64urlEncode(bytes) {
     const b = bytes instanceof Uint8Array ? bytes : utf8(String(bytes));

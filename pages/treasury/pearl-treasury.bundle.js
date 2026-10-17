@@ -6971,10 +6971,12 @@ zoo`.split("\n");
   var MEMO_MAX = 280;
   var LABEL_MAX = 64;
   var BLOCKBOOK_MAINNET = NETWORKS.mainnet.blockbook;
-  function canon(v) {
-    if (Array.isArray(v)) return "[" + v.map(canon).join(",") + "]";
+  var MAX_CANON_DEPTH = 128;
+  function canon(v, depth = 0) {
+    if (depth > MAX_CANON_DEPTH) throw new Error("canonical JSON nested deeper than " + MAX_CANON_DEPTH + " levels \u2014 refusing");
+    if (Array.isArray(v)) return "[" + v.map((x) => canon(x, depth + 1)).join(",") + "]";
     if (v !== null && typeof v === "object") {
-      return "{" + Object.keys(v).sort().map((k) => JSON.stringify(k) + ":" + canon(v[k])).join(",") + "}";
+      return "{" + Object.keys(v).sort().map((k) => JSON.stringify(k) + ":" + canon(v[k], depth + 1)).join(",") + "}";
     }
     return JSON.stringify(v);
   }

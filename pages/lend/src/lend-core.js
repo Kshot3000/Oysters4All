@@ -238,12 +238,20 @@ export function deriveLoan(params) {
 }
 
 /** Canonical (key-sorted, whitespace-free) JSON for tamper-evident descriptors. */
-export function canonicalJson(obj) {
+// Depth cap for the recursive canonicalizer: import paths fingerprint the
+// RAW parsed payload before normalizing it, and JSON.parse survives ~10k
+// nesting levels while this recursion dies near ~5k — a crafted descriptor,
+// bundle, proposal, or audit entry nested 5,000 deep surfaced a raw
+// RangeError instead of the app's standard refusal. 128 matches the
+// descriptor parser's MAX_EXPR_DEPTH; no legitimate payload comes close.
+const MAX_CANON_DEPTH = 128;
+export function canonicalJson(obj, depth = 0) {
+  if (depth > MAX_CANON_DEPTH) throw new Error("canonical JSON nested deeper than " + MAX_CANON_DEPTH + " levels — refusing");
   if (obj === null || typeof obj !== "object" || Array.isArray(obj)) {
-    if (Array.isArray(obj)) return "[" + obj.map(canonicalJson).join(",") + "]";
+    if (Array.isArray(obj)) return "[" + obj.map((x) => canonicalJson(x, depth + 1)).join(",") + "]";
     return JSON.stringify(obj);
   }
-  return "{" + Object.keys(obj).sort().map((k) => JSON.stringify(k) + ":" + canonicalJson(obj[k])).join(",") + "}";
+  return "{" + Object.keys(obj).sort().map((k) => JSON.stringify(k) + ":" + canonicalJson(obj[k], depth + 1)).join(",") + "}";
 }
 
 /**

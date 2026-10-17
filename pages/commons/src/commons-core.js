@@ -47,16 +47,24 @@ const te = new TextEncoder();
 
 /* ---------- canonical JSON + hashing ---------- */
 
-export function canon(value) {
+// Depth cap for the recursive canonicalizer: import paths fingerprint the
+// RAW parsed payload before normalizing it, and JSON.parse survives ~10k
+// nesting levels while this recursion dies near ~5k — a crafted descriptor,
+// bundle, proposal, or audit entry nested 5,000 deep surfaced a raw
+// RangeError instead of the app's standard refusal. 128 matches the
+// descriptor parser's MAX_EXPR_DEPTH; no legitimate payload comes close.
+const MAX_CANON_DEPTH = 128;
+export function canon(value, depth = 0) {
+  if (depth > MAX_CANON_DEPTH) throw new Error("canonical JSON nested deeper than " + MAX_CANON_DEPTH + " levels — refusing");
   if (value === null || value === undefined) return "null";
   if (typeof value === "bigint") return value.toString();
-  if (Array.isArray(value)) return "[" + value.map(canon).join(",") + "]";
+  if (Array.isArray(value)) return "[" + value.map((x) => canon(x, depth + 1)).join(",") + "]";
   if (typeof value === "object") {
     return (
       "{" +
       Object.keys(value)
         .sort()
-        .map((k) => JSON.stringify(k) + ":" + canon(value[k]))
+        .map((k) => JSON.stringify(k) + ":" + canon(value[k], depth + 1))
         .join(",") +
       "}"
     );

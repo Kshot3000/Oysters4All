@@ -487,3 +487,12 @@ test("ceilFeeGrains: absurd exponent in a rate string is refused, not allocated 
   assert.throws(() => ceilFeeGrains(370, "1e100000000"), /exponent out of range/);
   assert.throws(() => ceilFeeGrains(370, "1e-100000000"), /exponent out of range/);
 });
+
+test("importUnsignedBundle: a 5,000-deep nested descriptor refuses as a clean error, never a RangeError (regression)", () => {
+  const DT = "[".repeat(5000) + "]".repeat(5000);
+  const bundle = `{"bundle":"${BATCH_BUNDLE_KIND}","descriptor":{"kind":"${BATCH_DESCRIPTOR_KIND}","network":"mainnet","x":${DT}},"fingerprint":"00"}`;
+  assert.throws(() => importUnsignedBundle(bundle), /canonical JSON nested deeper than 128 levels/);
+  // legit nesting still canonicalizes exactly
+  let deep20 = []; let cur = deep20; for (let i = 1; i < 20; i++) { const n = []; cur.push(n); cur = n; }
+  assert.equal(canonicalJson({ a: deep20 }), `{"a":${"[".repeat(20)}${"]".repeat(20)}}`);
+});

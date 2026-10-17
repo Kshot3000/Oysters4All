@@ -58,10 +58,18 @@ const isWifLike = (s) => /^[1-9A-HJ-NP-Za-km-z]{40,80}$/.test(s);
 /* ---------------- canonical JSON + fingerprints ---------------- */
 
 /** Deterministic canonical JSON: object keys sorted recursively, no whitespace. */
-export function canonicalJson(value) {
+// Depth cap for the recursive canonicalizer: import paths fingerprint the
+// RAW parsed payload before normalizing it, and JSON.parse survives ~10k
+// nesting levels while this recursion dies near ~5k — a crafted descriptor,
+// bundle, proposal, or audit entry nested 5,000 deep surfaced a raw
+// RangeError instead of the app's standard refusal. 128 matches the
+// descriptor parser's MAX_EXPR_DEPTH; no legitimate payload comes close.
+const MAX_CANON_DEPTH = 128;
+export function canonicalJson(value, depth = 0) {
+  if (depth > MAX_CANON_DEPTH) throw new Error("canonical JSON nested deeper than " + MAX_CANON_DEPTH + " levels — refusing");
   if (value === null || typeof value !== "object") return JSON.stringify(value);
-  if (Array.isArray(value)) return "[" + value.map(canonicalJson).join(",") + "]";
-  return "{" + Object.keys(value).sort().map((k) => JSON.stringify(k) + ":" + canonicalJson(value[k])).join(",") + "}";
+  if (Array.isArray(value)) return "[" + value.map((x) => canonicalJson(x, depth + 1)).join(",") + "]";
+  return "{" + Object.keys(value).sort().map((k) => JSON.stringify(k) + ":" + canonicalJson(value[k], depth + 1)).join(",") + "}";
 }
 
 /** 64-bit descriptor fingerprint: first 8 bytes of SHA-256 over canonical JSON, hex. */

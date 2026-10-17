@@ -129,14 +129,22 @@ export function descriptorBuilderTipGrains(terms, network) {
 
 /* ---------------- canonical JSON + fingerprints (not crypto) ---------------- */
 
-export function canonicalJson(v) {
+// Depth cap for the recursive canonicalizer: import paths fingerprint the
+// RAW parsed payload before normalizing it, and JSON.parse survives ~10k
+// nesting levels while this recursion dies near ~5k — a crafted descriptor,
+// bundle, proposal, or audit entry nested 5,000 deep surfaced a raw
+// RangeError instead of the app's standard refusal. 128 matches the
+// descriptor parser's MAX_EXPR_DEPTH; no legitimate payload comes close.
+const MAX_CANON_DEPTH = 128;
+export function canonicalJson(v, depth = 0) {
+  if (depth > MAX_CANON_DEPTH) throw new Error("canonical JSON nested deeper than " + MAX_CANON_DEPTH + " levels — refusing");
   if (v === null || v === undefined) return "null";
   if (typeof v === "bigint") return v.toString();
   if (typeof v === "number" || typeof v === "boolean") return JSON.stringify(v);
   if (typeof v === "string") return JSON.stringify(v);
-  if (Array.isArray(v)) return "[" + v.map(canonicalJson).join(",") + "]";
+  if (Array.isArray(v)) return "[" + v.map((x) => canonicalJson(x, depth + 1)).join(",") + "]";
   const keys = Object.keys(v).sort();
-  return "{" + keys.map((k) => JSON.stringify(k) + ":" + canonicalJson(v[k])).join(",") + "}";
+  return "{" + keys.map((k) => JSON.stringify(k) + ":" + canonicalJson(v[k], depth + 1)).join(",") + "}";
 }
 
 /** 64-bit fingerprint: first 8 bytes of SHA-256 over the canonical form. */

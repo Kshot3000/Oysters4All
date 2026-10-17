@@ -503,3 +503,10 @@ test("fetchAddressTxs reads the real Blockbook shape (txs is a count, array is t
     assert.equal(txs.length, 1);
   } finally { globalThis.fetch = realFetch; }
 });
+
+test("parseDescriptor: a 5,000-deep nested payload refuses as a clean error, never a RangeError (regression)", () => {
+  const DT = "[".repeat(5000) + "]".repeat(5000);
+  const text = `{"app":"pearl-atomic","v":1,"hrp":"${NETWORKS.mainnet.hrp}","x":${DT}}`;
+  const str = "pearl-atomic:v1:" + Buffer.from(text, "utf8").toString("base64url");
+  assert.throws(() => parseDescriptor(NETWORKS.mainnet, str), /canonical JSON nested deeper than 128 levels/);
+});

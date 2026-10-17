@@ -45,7 +45,7 @@ when 1% would fall below the 333-grain dust floor. Cancelling a period
 reclaims that period's tip along with the rest of its funding output —
 the tip is only ever paid by a payment that actually confirms.
 
-**Tests.** 29/29 core tests (`tests/subscribe.test.mjs`) — the locktime-aware
+**Tests.** 30/30 core tests (`tests/subscribe.test.mjs`) — the locktime-aware
 verifier is pinned two ways: byte-identical output to the audited
 `buildKeypathTxEx` at locktime 0, and an independent Node `crypto` SHA-256
 reconstruction of the BIP-341 digest at nonzero locktime. 7/7 DOM tests boot

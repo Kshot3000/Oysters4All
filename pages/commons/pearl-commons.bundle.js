@@ -4672,12 +4672,14 @@ zoo`.split("\n");
   var MAX_PROJECTS_PER_ROUND = 64;
   var MAX_SUPPLY_GRAINS = 2100000000n * 100000000n;
   var te = new TextEncoder();
-  function canon(value) {
+  var MAX_CANON_DEPTH = 128;
+  function canon(value, depth = 0) {
+    if (depth > MAX_CANON_DEPTH) throw new Error("canonical JSON nested deeper than " + MAX_CANON_DEPTH + " levels \u2014 refusing");
     if (value === null || value === void 0) return "null";
     if (typeof value === "bigint") return value.toString();
-    if (Array.isArray(value)) return "[" + value.map(canon).join(",") + "]";
+    if (Array.isArray(value)) return "[" + value.map((x) => canon(x, depth + 1)).join(",") + "]";
     if (typeof value === "object") {
-      return "{" + Object.keys(value).sort().map((k) => JSON.stringify(k) + ":" + canon(value[k])).join(",") + "}";
+      return "{" + Object.keys(value).sort().map((k) => JSON.stringify(k) + ":" + canon(value[k], depth + 1)).join(",") + "}";
     }
     return JSON.stringify(value);
   }
