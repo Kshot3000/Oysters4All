@@ -45,8 +45,16 @@ function loadStore() {
     const raw = fs.readFileSync(CFG.storeFile, 'utf8');
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed.drips)) {
+      // Keep only entries in the exact shape saveStore writes. Anything
+      // else (a null from a hand-edited or externally damaged file) is
+      // unevaluable: rateLimitCheck derefs every entry, so one bad entry
+      // would 500 every drip request until the file was hand-fixed. A
+      // real drip always carries all three fields, so dropping malformed
+      // entries cannot loosen a limit a well-shaped entry would enforce.
+      const wellShaped = parsed.drips.filter((d) => d && typeof d === 'object' &&
+        typeof d.address === 'string' && Number.isFinite(d.time) && Number.isFinite(d.amountPRL));
       // Prune on load so the next save writes a bounded store (see lib.js).
-      return { drips: pruneDrips(parsed.drips, { cooldownMs: CFG.cooldownHours * 3600 * 1000 }) };
+      return { drips: pruneDrips(wellShaped, { cooldownMs: CFG.cooldownHours * 3600 * 1000 }) };
     }
   } catch { /* missing or corrupt -> start fresh */ }
   return { drips: [] };

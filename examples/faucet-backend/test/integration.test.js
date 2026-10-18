@@ -361,6 +361,34 @@ describe('faucet backend store durability', { timeout: 30000 }, () => {
   });
 });
 
+describe('faucet backend persisted-store shape', { timeout: 30000 }, () => {
+  it('drops malformed drip entries at load instead of 500ing every drip', async () => {
+    const stub = await startStubOyster();
+    const faucet = await startFaucet({
+      OYSTER_RPC_URL: stub.url,
+      OYSTER_RPC_USER: 'test',
+      OYSTER_RPC_PASS: 'test',
+      DAILY_CAP_PRL: '100',
+    }, [
+      null, // malformed: rateLimitCheck derefs every entry — used to throw per request
+      { address: 42, txid: FAKE_TXID, amountPRL: 1, time: Date.now() },
+      { address: VALID_TPRL_V1, txid: FAKE_TXID, amountPRL: 1, time: Date.now() }, // valid, recent
+    ]);
+    try {
+      // The valid entry still enforces the cooldown for its address.
+      const limited = await postDrip(faucet.base, { address: VALID_TPRL_V1 });
+      assert.equal(limited.status, 429);
+      // And an unrelated address drips normally — no 500 from the bad entries.
+      const ok = await postDrip(faucet.base, { address: VALID_TPRL_V2 });
+      assert.equal(ok.status, 200);
+      assert.equal(ok.body.txid, FAKE_TXID);
+    } finally {
+      await stopFaucet(faucet);
+      await new Promise((r) => stub.server.close(r));
+    }
+  });
+});
+
 describe('faucet backend without wallet credentials', { timeout: 30000 }, () => {
   let faucet;
   before(async () => {

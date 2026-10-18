@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Payouts } from "../src/payouts.js";
@@ -87,6 +87,55 @@ test("state persists across restarts", () => {
     assert.equal(p2.blocksFound, 1);
     assert.equal(p2.window.length, 1);
     assert.equal(p2.balancesView()[0].unpaidGrains, "495");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("wrong-shape state file loads fully fresh — never half-loaded, never poisoned", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pool-payouts-shape-"));
+  try {
+    // Case A: window is a string, balances valid. Field-by-field loading
+    // used to leak the string into this.window (its reduce threw inside
+    // the try) and then every addShare threw TypeError forever.
+    const fa = join(dir, "a.json");
+    writeFileSync(fa, JSON.stringify({
+      v: 1, window: "not-an-array",
+      balances: [[W1, { unpaid: "500", paid: "0", blocks: 1 }]],
+      rounds: [], blocksFound: 3, pendingBlocks: [],
+    }));
+    const pa = new Payouts({ windowShares: 10, poolFeePct: 1.0, stateFile: fa });
+    assert.deepEqual(pa.window, []);
+    assert.equal(pa.balances.size, 0);
+    assert.equal(pa.blocksFound, 0);
+    pa.addShare({ wallet: W1, diff: 5, solo: false, height: 9, at: 1 }); // must not throw
+    assert.equal(pa.window.length, 1);
+
+    // Case B: window valid, balances is an object (not pairs). The old
+    // loader kept the window but silently wiped balances/blocksFound.
+    const fb = join(dir, "b.json");
+    writeFileSync(fb, JSON.stringify({
+      v: 1, window: [{ wallet: W1, diff: 5, height: 1, at: 1 }],
+      balances: { [W1]: { unpaid: "500", paid: "0", blocks: 1 } },
+      rounds: [], blocksFound: 7, pendingBlocks: [],
+    }));
+    const pb = new Payouts({ windowShares: 10, poolFeePct: 1.0, stateFile: fb });
+    assert.deepEqual(pb.window, [], "no half-load: window must reset with the rest");
+    assert.equal(pb.balances.size, 0);
+    assert.equal(pb.blocksFound, 0);
+
+    // Case C: a balance whose unpaid is not a decimal string used to load
+    // fine and explode at credit time; now the whole file is refused.
+    const fc = join(dir, "c.json");
+    writeFileSync(fc, JSON.stringify({
+      v: 1, window: [],
+      balances: [[W1, { unpaid: "not-a-number", paid: "0", blocks: 0 }]],
+      rounds: [], blocksFound: 0, pendingBlocks: [],
+    }));
+    const pc = new Payouts({ windowShares: 10, poolFeePct: 1.0, stateFile: fc });
+    assert.equal(pc.balances.size, 0);
+    const round = pc.creditConfirmedBlock({ height: 1, rewardGrains: 1000n, finderWallet: W1, solo: true, at: 1 });
+    assert.equal(round.payouts[0].grains, "990"); // 1% fee, works on the fresh state
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

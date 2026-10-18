@@ -63,7 +63,7 @@ reports `walletConfigured: false` and every drip is refused with HTTP 503 —
 Zero dependencies — the suite uses only Node's built-in test runner:
 
 ```bash
-npm test        # 40 tests: unit + integration
+npm test        # 41 tests: unit + integration
 npm run check   # node --check on server.js, lib.js, and both test files
 ```
 

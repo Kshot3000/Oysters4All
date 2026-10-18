@@ -226,12 +226,44 @@ export class Payouts {
   _load() {
     try {
       const data = JSON.parse(readFileSync(this.cfg.stateFile, "utf8"));
-      this.window = data.window || [];
-      this.windowWeight = this.window.reduce((a, s) => a + s.diff, 0);
-      this.balances = new Map(data.balances || []);
-      this.rounds = data.rounds || [];
-      this.blocksFound = data.blocksFound || 0;
-      this.pendingBlocks = data.pendingBlocks || [];
+      // Validate EVERYTHING into locals first and assign only on full
+      // success. Field-by-field assignment inside the try half-loads a
+      // wrong-shape file: a string `window` survived the catch (its reduce
+      // threw) and then made every addShare throw, while a non-pairs
+      // `balances` threw at the Map and silently wiped balances/rounds
+      // after the window had already loaded — the exact opposite of the
+      // all-or-nothing fresh start below. A balance whose unpaid/paid is
+      // not a decimal string loads "fine" and only explodes at credit
+      // time, so shapes are checked here, at the boundary.
+      const bad = () => { throw new Error("payout state has an unexpected shape"); };
+      if (!data || typeof data !== "object" || Array.isArray(data)) bad();
+      const isRec = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+      const isGrains = (v) => typeof v === "string" && /^-?\d+$/.test(v);
+      // Missing fields keep the old loader's defaults; a field that is
+      // PRESENT but wrong-shaped makes the whole file corrupt.
+      const win = data.window ?? [];
+      const bal = data.balances ?? [];
+      const rounds = data.rounds ?? [];
+      const pending = data.pendingBlocks ?? [];
+      const found = data.blocksFound ?? 0;
+      if (!Array.isArray(win) ||
+          !win.every((s) => isRec(s) && typeof s.wallet === "string" && Number.isFinite(s.diff))) bad();
+      if (!Array.isArray(bal) ||
+          !bal.every((e) => Array.isArray(e) && e.length === 2 && typeof e[0] === "string" &&
+            isRec(e[1]) && isGrains(e[1].unpaid) && isGrains(e[1].paid) &&
+            (e[1].blocks === undefined || Number.isFinite(e[1].blocks)))) bad();
+      if (!Array.isArray(rounds) || !rounds.every(isRec)) bad();
+      if (!Array.isArray(pending) || !pending.every(isRec)) bad();
+      if (!Number.isFinite(found) || found < 0) bad();
+      const balances = new Map(bal.map(([w, b]) => [w, {
+        unpaid: b.unpaid, paid: b.paid, blocks: b.blocks ?? 0,
+      }]));
+      this.window = win;
+      this.windowWeight = win.reduce((a, s) => a + s.diff, 0);
+      this.balances = balances;
+      this.rounds = rounds;
+      this.blocksFound = found;
+      this.pendingBlocks = pending;
     } catch {
       // Corrupt state file: start fresh rather than refuse to start.
     }
