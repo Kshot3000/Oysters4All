@@ -18,6 +18,25 @@ describe('PRL ↔ grains conversion', () => {
     assert.equal(grainsToPrl(1n), '0.00000001');
     assert.equal(grainsToPrl(322964000000n), '3229.64');
   });
+
+  it('refuses inexact or malformed amounts instead of silently mis-converting them', () => {
+    // Sub-grain precision must refuse, never truncate to a wrong amount.
+    assert.throws(() => prlToGrains('0.000000001'), /bad amount/);
+    assert.throws(() => prlToGrains('1.123456789'), /bad amount/);
+    // Malformed shapes the old parser silently coerced.
+    assert.throws(() => prlToGrains('1.5.2'), /bad amount/); // dropped segment → 1.5
+    assert.throws(() => prlToGrains(''), /bad amount/); // empty → 0
+    assert.throws(() => prlToGrains('.5'), /bad amount/); // missing whole part
+    assert.throws(() => prlToGrains('0x10'), /bad amount/); // hex → 16 PRL
+    assert.throws(() => prlToGrains('1e3'), /bad amount/); // scientific notation
+    assert.throws(() => prlToGrains('1,000'), /bad amount/);
+    // Canonical forms stay exact, including the negative round-trip
+    // grainsToPrl can emit.
+    assert.equal(prlToGrains('-1.5'), -150000000n);
+    assert.equal(prlToGrains(grainsToPrl(-1n)), -1n);
+    assert.equal(prlToGrains(' 2.5 '), 250000000n);
+    assert.equal(prlToGrains(2.5), 250000000n);
+  });
 });
 
 describe('OysterClient', () => {

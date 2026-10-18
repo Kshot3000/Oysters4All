@@ -15,7 +15,7 @@ validates addresses with the same rules as upstream
 ```bash
 npm install
 npm run build     # tsc → dist/
-npm test          # build + 27 tests (node:test), incl. official BIP-86 vectors
+npm test          # build + 30 tests (node:test), incl. official BIP-86 vectors
 npm run typecheck # tsc --noEmit
 ```
 
@@ -108,7 +108,7 @@ vectors** (mnemonic `abandon … about`, `m/86'/0'/0'/0/0` →
 - `src/bip32.ts` — BIP-32 master/child derivation, xprv/xpub serialization
 - `src/taproot.ts` — BIP-86 `lift_x` + TapTweak + address derivation
 - `src/oyster.ts` — Oyster legacy JSON-RPC client + PRL/grains conversion
-- `test/` — 27 tests incl. official BIP-86 vectors and a stub-RPC server
+- `test/` — 30 tests incl. official BIP-86 vectors and a stub-RPC server
 
 ---
 

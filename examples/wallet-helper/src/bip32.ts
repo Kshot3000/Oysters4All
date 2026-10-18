@@ -108,8 +108,16 @@ export function parsePath(path: string): number[] {
   if (!clean) throw new Error('empty derivation path');
   return clean.split('/').map((part) => {
     const hardened = part.endsWith("'") || part.endsWith('h') || part.endsWith('H');
-    const num = parseInt(hardened ? part.slice(0, -1) : part, 10);
-    if (!Number.isInteger(num) || num < 0 || num >= HARDENED) {
+    const digits = hardened ? part.slice(0, -1) : part;
+    // Strict digits only: bare parseInt silently coerces malformed
+    // components — "86abc" derived 86, "1.5" derived 1, "0x10" derived 0,
+    // and a doubled suffix ("86''") derived hardened 86 — so a typo'd
+    // path silently derived a different key instead of failing.
+    if (!/^\d+$/.test(digits)) {
+      throw new Error(`invalid path component "${part}"`);
+    }
+    const num = parseInt(digits, 10);
+    if (num >= HARDENED) {
       throw new Error(`invalid path component "${part}"`);
     }
     return hardened ? num + HARDENED : num;

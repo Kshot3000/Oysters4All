@@ -22,11 +22,23 @@ import { getNetwork, type NetworkName, type PearlNetwork } from './networks.js';
 export const GRAINS_PER_PRL = 100_000_000;
 
 export function prlToGrains(prl: number | string): bigint {
-  const [whole, frac = ''] = String(prl).split('.');
-  const fracPadded = (frac + '00000000').slice(0, 8);
-  const sign = String(prl).trim().startsWith('-') ? -1n : 1n;
-  const abs = BigInt(whole.replace('-', '') || '0') * BigInt(GRAINS_PER_PRL) + BigInt(fracPadded);
-  return sign * abs;
+  // Exact parser (fleet standard — same shape as the Pearl wallet core and
+  // the pool's parsePRL): the old split-and-pad version silently
+  // mis-converted malformed amounts instead of refusing them — fractions
+  // past 8 decimals were truncated ("0.000000001" became 0 grains,
+  // "1.123456789" lost its last digit), extra segments were dropped
+  // ("1.5.2" became 1.5 PRL), "" became 0, and "0x10" became 16 PRL via
+  // BigInt's hex parsing. A misparse here is a wrong-amount conversion,
+  // not a display glitch, so anything that is not a canonical decimal
+  // with at most 8 decimal places (1 grain = 0.00000001 PRL) is refused.
+  // Number inputs are stringified first, so values whose shortest form
+  // is scientific notation (e.g. 1e-8) refuse too — pass a string for
+  // grain-exact amounts.
+  const s = String(prl).trim();
+  const m = /^(-?)(\d+)(?:\.(\d{1,8}))?$/.exec(s);
+  if (!m) throw new Error(`prlToGrains: bad amount "${s}"`);
+  const grains = BigInt(m[2]) * BigInt(GRAINS_PER_PRL) + BigInt((m[3] || '').padEnd(8, '0'));
+  return m[1] ? -grains : grains;
 }
 
 export function grainsToPrl(grains: bigint | number | string): string {
