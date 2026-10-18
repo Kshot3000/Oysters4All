@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
-import { scanDeposits, scanWithdrawals } from "../operator.js";
+import { scanDeposits, scanWithdrawals, MAX_DEPOSIT_PAGES_PER_SCAN } from "../operator.js";
 import { StateStore } from "../state.js";
 
 const VAULT = "prl1vault0000000000000000000000000000000000000000";
@@ -76,6 +76,37 @@ test("too-young deposit is parked in pending and minted after it confirms", asyn
   assert.equal(mints[0].amountWei, 1_000_000_000_000_000_000n);
   assert.deepEqual(state.get("pearl:pending", {}), {});
   assert.ok(state.has(`deposit:${young.txid}`));
+});
+
+test("a pearld that ignores skip cannot loop a deposit scan forever — the pass caps and the next poll resumes", async () => {
+  const batch = Array.from({ length: 100 }, (_, i) => ({ txid: String(i).padStart(64, "0"), confirmations: 10, vout: [] }));
+  const { op, state } = makeOp({});
+  let calls = 0;
+  op.pearld.searchRawTransactions = async () => {
+    calls++;
+    if (calls > MAX_DEPOSIT_PAGES_PER_SCAN + 50) throw new Error("scan did not terminate");
+    return batch; // hostile/broken: same full batch whatever skip says
+  };
+  const r1 = await scanDeposits(op);
+  assert.equal(calls, MAX_DEPOSIT_PAGES_PER_SCAN);
+  assert.equal(r1.capped, true);
+  assert.equal(r1.pages, MAX_DEPOSIT_PAGES_PER_SCAN);
+  assert.equal(state.get("pearl:skip"), MAX_DEPOSIT_PAGES_PER_SCAN * 100); // cursor persisted — nothing lost
+  calls = 0; // the sentinel above is per-scan
+  const r2 = await scanDeposits(op); // next poll resumes from the persisted cursor
+  assert.equal(r2.capped, true);
+  assert.equal(state.get("pearl:skip"), MAX_DEPOSIT_PAGES_PER_SCAN * 200);
+});
+
+test("an honest multi-page history still completes in one uncapped pass", async () => {
+  const all = Array.from({ length: 250 }, (_, i) => ({ txid: String(i).padStart(64, "0"), confirmations: 10, vout: [] }));
+  const { op, state } = makeOp({});
+  op.pearld.searchRawTransactions = async (addr, skip, count) => all.slice(skip, skip + count);
+  const r = await scanDeposits(op);
+  assert.equal(r.capped, false);
+  assert.equal(r.pages, 3);
+  assert.equal(r.scanned, 250);
+  assert.equal(state.get("pearl:skip"), 250);
 });
 
 test("already-used txid on-chain is not re-minted", async () => {

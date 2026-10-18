@@ -107,12 +107,23 @@ export async function startupChecks(op) {
   });
 }
 
+/**
+ * Max history pages one deposit-scan pass will fetch. The scan loop below
+ * only ends when pearld returns a short page, so a broken or hostile node
+ * that ignores `skip` and keeps returning a full batch would loop forever —
+ * starving the withdrawal loop and persisting an ever-growing skip. `skip`
+ * is persisted after every batch, so capping a pass loses nothing: the next
+ * poll resumes exactly where this one stopped. 100 pages = 10,000 txs.
+ */
+export const MAX_DEPOSIT_PAGES_PER_SCAN = 100;
+
 /** One deposit-scan pass. Returns counts for logging. */
 export async function scanDeposits(op) {
   const { cfg, pearld, bridge, state } = op;
   const BATCH = 100;
   let skip = Number(state.get("pearl:skip", 0));
   let scanned = 0, minted = 0, held = 0, skipped = 0, rechecked = 0;
+  let pages = 0, capped = false;
 
   // 1. Re-check pending (previously too-young) txs by txid. A deposit that was
   //    unconfirmed at first sight must not be forgotten once it confirms.
@@ -143,8 +154,10 @@ export async function scanDeposits(op) {
   // 2. Scan history newest-first (skip-paged; the list only grows at the front,
   //    so paging can't miss entries). Process oldest-first within each batch.
   for (;;) {
+    if (pages >= MAX_DEPOSIT_PAGES_PER_SCAN) { capped = true; break; }
     const txs = await pearld.searchRawTransactions(cfg.vaultAddress, skip, BATCH);
     if (!txs || txs.length === 0) break;
+    pages++;
     for (const tx of [...txs].reverse()) {
       const txid = tx.txid ?? tx.hash;
       scanned++;
@@ -163,7 +176,7 @@ export async function scanDeposits(op) {
     state.set("pearl:skip", skip);
     if (txs.length < BATCH) break;
   }
-  return { scanned, minted, held, skipped, rechecked };
+  return { scanned, minted, held, skipped, rechecked, pages, capped };
 }
 
 /**

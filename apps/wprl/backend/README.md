@@ -37,7 +37,7 @@ Pearl txid can never mint twice even across restarts.
 cd apps/wprl/backend
 npm install
 cp .env.example .env   # then fill in: RPC URLs, contract addresses, operator key
-npm test               # 38 unit tests, all offline (mocked RPCs)
+npm test               # 45 unit tests, all offline (mocked RPCs)
 npm start              # the operator loop
 npm run api            # proof-of-reserves API on :8080 (separate process)
 ```
@@ -71,7 +71,7 @@ only. Never commit `.env` (gitignored). Startup logs a redacted config.
 ## Testing
 
 ```bash
-npm test              # 41 unit tests, all offline (mocked RPCs)
+npm test              # 45 unit tests, all offline (mocked RPCs)
 ```
 
 `test/e2e-local.mjs` is a full end-to-end run of the **real** `operator.js`
@@ -118,4 +118,4 @@ invents numbers.
 - `convert.js` — exact BigInt unit + fee math
 - `config.js` — env loading + validation (+ mainnet guard)
 - `state.js` — atomic JSON cursor store
-- `test/` — 38 unit tests (`node --test`), zero network
+- `test/` — 45 unit tests (`node --test`), zero network
