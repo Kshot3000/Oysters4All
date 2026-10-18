@@ -407,3 +407,34 @@ test("eventsToCSV: spreadsheet formula-injection guard (CWE-1236)", () => {
   assert.ok(line.includes("\"'=2+2\""), "rule label formula cell prefixed");
   assert.ok(line.includes("\"'@SUM(1+1)\""), "message formula cell prefixed");
 });
+
+test("eventsToCSV guards EVERY cell — imported events are unvalidated", () => {
+  // deserializeWatchState passes events through raw (slice only) and the
+  // state is file-importable, so kind/ruleId/address/txid/grains/
+  // confirmations are attacker-controlled too. Before the fix only
+  // ruleLabel and message went through the guard: a crafted event
+  // executed formula cells, forged a column via a comma/quote address,
+  // and forged a whole row via a newline txid.
+  const st = deserializeWatchState(JSON.stringify({
+    watched: [], rules: [],
+    events: [{
+      ts: 1700000000000, kind: "=2+5+cmd|' /C calc'!A0", ruleId: "+2+2",
+      ruleLabel: "ok", address: 'x",forged',
+      txid: "abc\n2099-01-01,forged,row,here",
+      grains: "@SUM(A1:A9)", confirmations: "=1+1", message: "ok",
+    }],
+  }), N);
+  const csv = eventsToCSV(st.events);
+  const lines = csv.split("\n");
+  assert.ok(lines[1].includes("\"'=2+5+cmd|' /C calc'!A0\""), "kind formula cell prefixed + quoted");
+  assert.ok(lines[1].includes("\"'+2+2\""), "ruleId formula cell prefixed");
+  assert.ok(csv.includes("\"'@SUM(A1:A9)\""), "grains formula cell prefixed");
+  assert.ok(csv.includes("\"'=1+1\""), "confirmations formula cell prefixed");
+  assert.ok(lines[1].includes("\"x\"\",forged\""), "address quote doubled, no forged column");
+  // The newline txid is contained inside a quoted field (a legal in-field
+  // newline a CSV parser reads as one record), not a forged row start:
+  assert.ok(csv.includes("\"abc\n2099-01-01,forged,row,here\""), "txid newline contained in quotes");
+  // A normal event keeps its values, now uniformly quoted.
+  const ok = eventsToCSV([{ ts: 1700000000000, kind: "incoming", ruleId: "r1", ruleLabel: "lbl", address: A1, txid: TX1, grains: "100", confirmations: 3, message: "hi" }]);
+  assert.ok(ok.split("\n")[1].includes(`"incoming","r1","lbl","${A1}","${TX1}","100","3","hi"`), "normal row values intact");
+});

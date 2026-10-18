@@ -5064,13 +5064,13 @@ zoo`.split("\n");
     for (const e of events) {
       rows.push([
         isoOrEmpty(e.ts),
-        e.kind,
-        e.ruleId,
+        q(e.kind),
+        q(e.ruleId),
         q(e.ruleLabel),
-        e.address || "",
-        e.txid || "",
-        e.grains || "",
-        e.confirmations ?? "",
+        q(e.address || ""),
+        q(e.txid || ""),
+        q(e.grains || ""),
+        q(e.confirmations ?? ""),
         q(e.message)
       ].join(","));
     }

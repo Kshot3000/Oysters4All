@@ -415,10 +415,18 @@ export function eventsToCSV(events) {
   };
   const rows = ["ts_utc,kind,rule_id,rule_label,address,txid,grains,confirmations,message"];
   for (const e of events) {
+    // EVERY cell goes through q: events are file-importable and
+    // deserializeWatchState passes them through unvalidated, so kind,
+    // ruleId, address, txid, grains and confirmations are exactly as
+    // attacker-controlled as the label and message — unguarded, a crafted
+    // event executed as a formula (=, +, @ cells), forged extra columns
+    // (comma/quote in an address) and forged whole rows (newline in a
+    // txid). The ts cell is isoOrEmpty output (ISO text or empty — a
+    // safe charset by construction).
     rows.push([
-      isoOrEmpty(e.ts), e.kind, e.ruleId, q(e.ruleLabel),
-      e.address || "", e.txid || "", e.grains || "",
-      e.confirmations ?? "", q(e.message),
+      isoOrEmpty(e.ts), q(e.kind), q(e.ruleId), q(e.ruleLabel),
+      q(e.address || ""), q(e.txid || ""), q(e.grains || ""),
+      q(e.confirmations ?? ""), q(e.message),
     ].join(","));
   }
   return rows.join("\n");
