@@ -16,7 +16,10 @@ export class StateStore {
     try {
       const raw = fs.readFileSync(this.filePath, "utf8");
       this.data = JSON.parse(raw);
-      if (typeof this.data !== "object" || this.data === null) this.data = {};
+      // A JSON array passes the typeof check but cannot persist string keys
+      // (JSON.stringify drops them), so records would save silently and be
+      // lost on the next restart — treat it as an empty store like scalars.
+      if (!this.data || typeof this.data !== "object" || Array.isArray(this.data)) this.data = {};
     } catch (err) {
       if (err.code !== "ENOENT") throw err;
       this.data = {};

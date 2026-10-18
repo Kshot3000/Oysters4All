@@ -109,6 +109,62 @@ test("an honest multi-page history still completes in one uncapped pass", async 
   assert.equal(state.get("pearl:skip"), 250);
 });
 
+test("a JSON array state file is an empty store whose records actually persist", () => {
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wprl-op-")), "state.json");
+  fs.writeFileSync(file, "[]");
+  const s1 = new StateStore(file);
+  s1.set("withdraw:7", { nonce: "7", netGrains: "5" });
+  const s2 = new StateStore(file);
+  assert.ok(s2.has("withdraw:7")); // string keys must survive a restart
+  assert.equal(s2.get("withdraw:7").netGrains, "5");
+});
+
+test("a wrong-shape pending value is repaired — a too-young deposit still parks and later mints", async () => {
+  const young = makeTx(2);
+  const { op, state, mints } = makeOp({ txs: [young] });
+  state.set("pearl:pending", 123); // not a { txid: {firstSeen} } map
+  const r1 = await scanDeposits(op); // must not throw on p[txid] =
+  assert.equal(r1.minted, 0);
+  assert.deepEqual(Object.keys(state.get("pearl:pending", {})), [young.txid]);
+  young.confirmations = 10;
+  const r2 = await scanDeposits(op);
+  assert.equal(r2.minted, 1);
+  assert.equal(mints.length, 1);
+});
+
+test("a null pending entry for a vanished tx does not crash the recheck loop", async () => {
+  const { op, state } = makeOp({ txs: [] });
+  const deadTxid = "ee".repeat(32);
+  state.set("pearl:pending", { [deadTxid]: null });
+  const r = await scanDeposits(op); // getRawTransaction throws; firstSeen of null must not
+  assert.equal(r.rechecked, 0);
+  assert.ok(state.get("pearl:pending", {})[deadTxid]); // repaired and kept for retry
+});
+
+test("a non-numeric skip cursor restarts the deposit scan from 0 instead of stalling", async () => {
+  const tx = makeTx(10);
+  const { op, state, mints } = makeOp({ txs: [tx] });
+  state.set("pearl:skip", "not-a-number");
+  const r = await scanDeposits(op);
+  assert.equal(r.minted, 1);
+  assert.equal(mints.length, 1);
+  assert.equal(state.get("pearl:skip"), 1);
+});
+
+test("a non-numeric lastEventBlock cursor falls back to the deploy block", async () => {
+  const { op, state } = makeOp({});
+  state.set("base:lastEventBlock", "abc");
+  op.oyster = { sendToAddress: async () => "ptx" };
+  op.provider = { getBlockNumber: async () => 1000 };
+  const ranges = [];
+  op.bridge.queryFilter = async (_f, from, to) => { ranges.push([from, to]); return []; };
+  const r = await scanWithdrawals(op);
+  assert.equal(r.events, 0);
+  assert.ok(ranges.length > 0); // the scan actually ran
+  assert.equal(ranges[0][0], 100); // deployBlock, not NaN
+  assert.ok(Number.isInteger(state.get("base:lastEventBlock")));
+});
+
 test("already-used txid on-chain is not re-minted", async () => {
   const tx = makeTx(10);
   const usedTxids = new Set(["0x" + tx.txid]);

@@ -117,17 +117,49 @@ export async function startupChecks(op) {
  */
 export const MAX_DEPOSIT_PAGES_PER_SCAN = 100;
 
+/**
+ * A persisted numeric cursor must be a finite non-negative integer. Anything
+ * else (a string, NaN from Number(), a negative) resets to the fallback: a
+ * scan from the checkpoint is safe because the work it guards is idempotent
+ * (deposit done-keys, withdrawal nonces), while a NaN cursor either errors
+ * the RPC or silently scans nothing forever.
+ */
+function readCursor(state, key, fallback) {
+  const n = Number(state.get(key, fallback));
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : fallback;
+}
+
+/**
+ * The pearl:pending map must be a plain object of { firstSeen } records. A
+ * wrong-shape value (number, string, array) can never hold one — and writing
+ * a txid into it either throws (strict-mode property write on a primitive)
+ * or is silently dropped by JSON.stringify (array) — so it is repaired to a
+ * clean map. Entries that are not objects get a fresh { firstSeen }, so the
+ * recheck below can never throw reading entry.firstSeen of null.
+ */
+function readPending(state) {
+  const raw = state.get("pearl:pending", {});
+  const clean = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  const out = {};
+  for (const txid of Object.keys(clean)) {
+    const e = clean[txid];
+    const firstSeen = e && typeof e === "object" && Number.isFinite(e.firstSeen) ? e.firstSeen : Date.now();
+    out[txid] = { ...(e && typeof e === "object" ? e : {}), firstSeen };
+  }
+  return out;
+}
+
 /** One deposit-scan pass. Returns counts for logging. */
 export async function scanDeposits(op) {
   const { cfg, pearld, bridge, state } = op;
   const BATCH = 100;
-  let skip = Number(state.get("pearl:skip", 0));
+  let skip = readCursor(state, "pearl:skip", 0);
   let scanned = 0, minted = 0, held = 0, skipped = 0, rechecked = 0;
   let pages = 0, capped = false;
 
   // 1. Re-check pending (previously too-young) txs by txid. A deposit that was
   //    unconfirmed at first sight must not be forgotten once it confirms.
-  const pending = state.get("pearl:pending", {});
+  const pending = readPending(state);
   for (const txid of Object.keys(pending)) {
     let tx;
     try {
@@ -165,7 +197,7 @@ export async function scanDeposits(op) {
       if (r === "minted") minted++;
       else if (r === "held") held++;
       else if (r === "too-young") {
-        const p = state.get("pearl:pending", {});
+        const p = readPending(state);
         if (!p[txid]) {
           p[txid] = { firstSeen: Date.now() };
           state.set("pearl:pending", p);
@@ -240,7 +272,7 @@ async function handleDepositTx(op, tx, txid) {
 export async function scanWithdrawals(op) {
   const { cfg, bridge, oyster, state, provider } = op;
   const iface = new ethers.Interface(BRIDGE_ABI);
-  const fromBlock = Number(state.get("base:lastEventBlock", cfg.deployBlock));
+  const fromBlock = readCursor(state, "base:lastEventBlock", cfg.deployBlock);
   const latest = await provider.getBlockNumber();
   // Never scan (or advance the cursor into) the freshest blocks: a stale
   // block-number read could otherwise move the cursor past an event block and
