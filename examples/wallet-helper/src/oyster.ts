@@ -16,6 +16,7 @@
  * certificate verification is opt-out via `insecureTls: true`.
  */
 
+import { Buffer } from 'node:buffer';
 import { getNetwork, type NetworkName, type PearlNetwork } from './networks.js';
 
 /** 1 PRL = 100_000_000 grains (smallest unit; cf. btcutil.GrainPerPearl). */
@@ -66,6 +67,63 @@ export interface OysterClientOptions {
   insecureTls?: boolean;
   /** request timeout ms. Default 30_000 */
   timeoutMs?: number;
+  /** response body size cap in bytes. Default MAX_RPC_RESPONSE_BYTES */
+  maxResponseBytes?: number;
+}
+
+/** Largest RPC response OysterClient will buffer: 16 MiB (the wPRL
+ *  backend precedent). The response cap pairs with the whole-call
+ *  timeout below: previously the timer was cleared as soon as response
+ *  HEADERS arrived, so the body read that followed was unbounded in
+ *  both time and size — a malfunctioning or compromised daemon could
+ *  stream forever and OOM or hang the caller. */
+export const MAX_RPC_RESPONSE_BYTES = 16 * 1024 * 1024;
+
+/** Read a response body with a hard byte cap, streaming so the cap is
+ *  enforced as bytes arrive rather than after the whole body buffered.
+ *  Falls back to text()+length check for stub responses without a
+ *  readable stream body. */
+async function readBodyCapped(
+  res: Response,
+  maxBytes: number,
+  signal?: AbortSignal,
+): Promise<string> {
+  const body = res.body as ReadableStream<Uint8Array> | null;
+  if (!body || typeof body.getReader !== 'function') {
+    const text = await res.text();
+    if (Buffer.byteLength(text) > maxBytes) {
+      throw new Error(`Oyster RPC response exceeded the ${maxBytes}-byte limit`);
+    }
+    return text;
+  }
+  const reader = body.getReader();
+  // Race each read against the caller's abort: a body stream that never
+  // settles (slow-drip daemon, or a fetch implementation that does not
+  // tie the stream to the signal) must not outlive the call timeout.
+  const abortP = signal
+    ? new Promise<never>((_, rej) => {
+        if (signal.aborted) rej(new Error('RPC call aborted'));
+        else
+          signal.addEventListener('abort', () => rej(new Error('RPC call aborted')), {
+            once: true,
+          });
+      })
+    : null;
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = abortP
+      ? await Promise.race([reader.read(), abortP])
+      : await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => {});
+      throw new Error(`Oyster RPC response exceeded the ${maxBytes}-byte limit`);
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks).toString('utf8');
 }
 
 export interface UnspentOutput {
@@ -106,6 +164,7 @@ export class OysterClient {
   private readonly authHeader?: string;
   private readonly insecureTls: boolean;
   private readonly timeoutMs: number;
+  private readonly maxResponseBytes: number;
   private id = 0;
 
   constructor(opts: OysterClientOptions) {
@@ -120,6 +179,7 @@ export class OysterClient {
     }
     this.insecureTls = opts.insecureTls ?? false;
     this.timeoutMs = opts.timeoutMs ?? 30_000;
+    this.maxResponseBytes = opts.maxResponseBytes ?? MAX_RPC_RESPONSE_BYTES;
   }
 
   private async call<T>(method: string, params: unknown[] = []): Promise<T> {
@@ -128,34 +188,55 @@ export class OysterClient {
     if (this.authHeader) headers.Authorization = this.authHeader;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
-    let res: Response;
     try {
-      // undici (Node's global fetch) accepts a custom dispatcher; use it to
-      // allow the wallet's self-signed rpc.cert when insecureTls is set.
-      const dispatcher = this.insecureTls
-        ? new (await import('node:https')).Agent({ rejectUnauthorized: false })
-        : undefined;
-      res = await fetch(this.url, {
-        method: 'POST',
-        headers,
-        body,
-        signal: controller.signal,
-        // @ts-expect-error undici dispatcher for custom TLS handling
-        dispatcher,
-      });
+      let res: Response;
+      try {
+        // undici (Node's global fetch) accepts a custom dispatcher; use it to
+        // allow the wallet's self-signed rpc.cert when insecureTls is set.
+        const dispatcher = this.insecureTls
+          ? new (await import('node:https')).Agent({ rejectUnauthorized: false })
+          : undefined;
+        res = await fetch(this.url, {
+          method: 'POST',
+          headers,
+          body,
+          signal: controller.signal,
+          // @ts-expect-error undici dispatcher for custom TLS handling
+          dispatcher,
+        });
+      } catch (err) {
+        if (controller.signal.aborted) {
+          throw new Error(`Oyster RPC request to ${this.url} timed out after ${this.timeoutMs} ms`);
+        }
+        throw new Error(
+          `cannot reach Oyster at ${this.url} — is the wallet running with legacy RPC enabled? (${(err as Error).message})`,
+        );
+      }
+      if (!res.ok) {
+        throw new Error(`Oyster HTTP ${res.status} ${res.statusText} at ${this.url}`);
+      }
+      // The timer stays armed until the body is fully read and parsed:
+      // clearing it at headers (the old shape) left this read unbounded.
+      const text = await readBodyCapped(res, this.maxResponseBytes, controller.signal);
+      let json: { result?: T; error?: { code: number; message: string } | null; id: number };
+      try {
+        json = JSON.parse(text) as typeof json;
+      } catch {
+        throw new Error(`Oyster at ${this.url} returned a non-JSON response`);
+      }
+      if (json.error) throw new OysterRpcError(json.error.code, json.error.message);
+      return json.result as T;
     } catch (err) {
+      if (
+        controller.signal.aborted &&
+        !/timed out|byte limit/.test((err as Error).message)
+      ) {
+        throw new Error(`Oyster RPC request to ${this.url} timed out after ${this.timeoutMs} ms`);
+      }
+      throw err;
+    } finally {
       clearTimeout(timer);
-      throw new Error(
-        `cannot reach Oyster at ${this.url} — is the wallet running with legacy RPC enabled? (${(err as Error).message})`,
-      );
     }
-    clearTimeout(timer);
-    if (!res.ok) {
-      throw new Error(`Oyster HTTP ${res.status} ${res.statusText} at ${this.url}`);
-    }
-    const json = (await res.json()) as { result?: T; error?: { code: number; message: string } | null; id: number };
-    if (json.error) throw new OysterRpcError(json.error.code, json.error.message);
-    return json.result as T;
   }
 
   /** getbalance ("account" minconf=1) — confirmed balance in PRL. */

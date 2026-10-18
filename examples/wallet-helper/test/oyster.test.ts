@@ -61,7 +61,10 @@ describe('OysterClient', () => {
               res.writeHead(200, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ result, error, id }));
             };
-            if (method === 'getbalance') reply(12.5);
+            if (method === 'getbalance' && params[0] === 'big') reply('x'.repeat(2 * 1024 * 1024));
+            else if (method === 'getbalance' && params[0] === 'hang') {
+              /* never replies: the client whole-call timeout must fire */
+            } else if (method === 'getbalance') reply(12.5);
             else if (method === 'listunspent')
               reply([{ txid: 'ab'.repeat(32), vout: 0, address: 'prl1p...', account: 'default', scriptPubKey: '5120' + 'ab'.repeat(32), amount: 12.5, confirmations: 6, spendable: true }]);
             else if (method === 'sendtoaddress') reply('cd'.repeat(32));
@@ -107,6 +110,22 @@ describe('OysterClient', () => {
     const v = await client().validateAddress('prl1p...');
     assert.equal(v.isvalid, true);
     assert.equal(v.witness_version, 1);
+  });
+
+  it('refuses a response past the byte cap instead of buffering it whole', async () => {
+    const capped = new OysterClient({
+      network: 'testnet', host: '127.0.0.1', port, username: 'u', password: 'p', tls: false,
+      maxResponseBytes: 4096,
+    });
+    await assert.rejects(() => capped.getBalance('big'), /byte limit/);
+  });
+
+  it('times out when the body never finishes, not just on slow headers', async () => {
+    const impatient = new OysterClient({
+      network: 'testnet', host: '127.0.0.1', port, username: 'u', password: 'p', tls: false,
+      timeoutMs: 100,
+    });
+    await assert.rejects(() => impatient.getBalance('hang'), /timed out after 100 ms/);
   });
 
   it('surfaces RPC errors as OysterRpcError', async () => {

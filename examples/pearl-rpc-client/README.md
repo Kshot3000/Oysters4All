@@ -67,7 +67,7 @@ Zero new dependencies — plain `node:test` run through `tsx`, with `fetch`
 stubbed (no live node needed):
 
 ```bash
-npm test        # 15 tests: constructor/env, wire format, error handling, wrappers
+npm test        # 17 tests: constructor/env, wire format, error handling, wrappers
 npm run typecheck
 npm run build   # emits dist/
 ```

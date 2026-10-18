@@ -223,3 +223,23 @@ describe("typed wrappers send the right method + params", () => {
     ]);
   });
 });
+
+describe("response hardening", () => {
+  it("refuses a response past the byte cap instead of buffering it whole", async () => {
+    handler = () =>
+      new Response(JSON.stringify({ result: "x".repeat(64 * 1024), error: null, id: 1 }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    await assert.rejects(
+      () => client({ maxResponseBytes: 1024 }).getBestBlockHash(),
+      /byte limit/
+    );
+  });
+
+  it("times out a body that never finishes, not just slow headers", async () => {
+    handler = () =>
+      new Response(new ReadableStream<Uint8Array>({ start() {} }), { status: 200 });
+    await assert.rejects(() => client({ timeoutMs: 50 }).getBlockCount(), /timed out after 50 ms/);
+  });
+});

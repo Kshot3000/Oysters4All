@@ -48,7 +48,7 @@ CLI that wires them together.
 Zero new dependencies — plain `node:test` run through `tsx`:
 
 ```bash
-npm test        # 13 tests: config/env, request builders, stub-server RPC calls
+npm test        # 15 tests: config/env, request builders, stub-server RPC calls
 npm run typecheck
 ```
 

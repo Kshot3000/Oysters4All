@@ -146,3 +146,35 @@ describe("rpc() over HTTP", () => {
     );
   });
 });
+
+describe("rpc() response hardening", () => {
+  const realFetch = globalThis.fetch;
+  it("refuses a response past the byte cap instead of buffering it whole", async () => {
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ result: "x".repeat(64 * 1024), error: null, id: 1 }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })) as typeof fetch;
+    try {
+      await assert.rejects(
+        () => rpc("http://127.0.0.1:44107/", "Basic dTpw", "getbestblockhash", [], 1, { maxResponseBytes: 1024 }),
+        /byte limit/
+      );
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
+  it("times out a body that never finishes, not just slow headers", async () => {
+    globalThis.fetch = (async () =>
+      new Response(new ReadableStream<Uint8Array>({ start() {} }), { status: 200 })) as typeof fetch;
+    try {
+      await assert.rejects(
+        () => rpc("http://127.0.0.1:44107/", "Basic dTpw", "getblockcount", [], 1, { timeoutMs: 50 }),
+        /timed out after 50 ms/
+      );
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+});
