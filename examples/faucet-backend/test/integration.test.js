@@ -25,8 +25,10 @@ const FAKE_TXID = 'ab'.repeat(32);
 let nextPort = 18200 + (process.pid % 500);
 const takePort = () => nextPort++;
 
-/* Stub Oyster legacy JSON-RPC: answers sendtoaddress with a fake txid. */
-function startStubOyster() {
+/* Stub Oyster legacy JSON-RPC: answers sendtoaddress with a fake txid.
+ * opts.delayMs widens the payout window (concurrency tests); opts.counter,
+ * when passed, counts sendtoaddress calls. */
+function startStubOyster(opts = {}) {
   const port = takePort();
   const server = http.createServer((req, res) => {
     let body = '';
@@ -37,10 +39,15 @@ function startStubOyster() {
         const parsed = JSON.parse(body);
         id = parsed.id;
         if (parsed.method !== 'sendtoaddress') result = null;
+        else if (opts.counter) opts.counter.calls++;
       } catch { /* ignore */ }
       const out = JSON.stringify({ jsonrpc: '1.0', id, result, error: null });
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(out);
+      const send = () => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(out);
+      };
+      if (opts.delayMs) setTimeout(send, opts.delayMs);
+      else send();
     });
   });
   return new Promise((resolve) => server.listen(port, '127.0.0.1', () =>
@@ -247,6 +254,77 @@ describe('faucet backend hardening: RPC response cap + store pruning', { timeout
       const store = JSON.parse(fs.readFileSync(faucet.storeFile, 'utf8'));
       assert.equal(store.drips.length, 1);
       assert.equal(store.drips[0].address, VALID_TPRL_V1);
+    } finally {
+      await stopFaucet(faucet);
+      await new Promise((r) => stub.server.close(r));
+    }
+  });
+});
+
+describe('faucet backend concurrency + body shapes', { timeout: 30000 }, () => {
+  it('serializes concurrent drips: same address pays once, second gets 429', async () => {
+    const counter = { calls: 0 };
+    const stub = await startStubOyster({ delayMs: 300, counter });
+    const faucet = await startFaucet({
+      OYSTER_RPC_URL: stub.url,
+      OYSTER_RPC_USER: 'test',
+      OYSTER_RPC_PASS: 'test',
+      DAILY_CAP_PRL: '100',
+    });
+    try {
+      const [a, b] = await Promise.all([
+        postDrip(faucet.base, { address: VALID_TPRL_V1 }),
+        postDrip(faucet.base, { address: VALID_TPRL_V1 }),
+      ]);
+      assert.deepEqual([a.status, b.status].sort(), [200, 429]);
+      assert.equal(counter.calls, 1, 'wallet must be paid exactly once');
+      const store = JSON.parse(fs.readFileSync(faucet.storeFile, 'utf8'));
+      assert.equal(store.drips.length, 1);
+    } finally {
+      await stopFaucet(faucet);
+      await new Promise((r) => stub.server.close(r));
+    }
+  });
+
+  it('serializes concurrent drips against the daily cap across addresses', async () => {
+    const counter = { calls: 0 };
+    const stub = await startStubOyster({ delayMs: 300, counter });
+    const faucet = await startFaucet({
+      OYSTER_RPC_URL: stub.url,
+      OYSTER_RPC_USER: 'test',
+      OYSTER_RPC_PASS: 'test',
+      MAX_DRIP_PRL: '1',
+      DAILY_CAP_PRL: '1',
+    });
+    try {
+      const [a, b] = await Promise.all([
+        postDrip(faucet.base, { address: VALID_TPRL_V1 }),
+        postDrip(faucet.base, { address: VALID_TPRL_V2 }),
+      ]);
+      assert.deepEqual([a.status, b.status].sort(), [200, 429]);
+      const loser = a.status === 429 ? a : b;
+      assert.equal(loser.body.error, 'daily cap reached');
+      assert.equal(counter.calls, 1);
+    } finally {
+      await stopFaucet(faucet);
+      await new Promise((r) => stub.server.close(r));
+    }
+  });
+
+  it('answers wrong-shape JSON bodies with 400, not 500', async () => {
+    const stub = await startStubOyster();
+    const faucet = await startFaucet({
+      OYSTER_RPC_URL: stub.url,
+      OYSTER_RPC_USER: 'test',
+      OYSTER_RPC_PASS: 'test',
+    });
+    try {
+      const nul = await postDrip(faucet.base, 'null', true);
+      assert.equal(nul.status, 400);
+      assert.equal(nul.body.error, 'address is required');
+      const num = await postDrip(faucet.base, { address: 123 });
+      assert.equal(num.status, 400);
+      assert.equal(num.body.error, 'address is required');
     } finally {
       await stopFaucet(faucet);
       await new Promise((r) => stub.server.close(r));

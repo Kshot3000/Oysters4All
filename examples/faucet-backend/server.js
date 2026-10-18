@@ -122,6 +122,21 @@ function sendJson(res, status, obj) {
   res.end(body);
 }
 
+/* Drip handling is serialized through this promise chain. The flow is
+ * check-then-pay-then-record: it loads the store, checks the rate limit,
+ * awaits the payout RPC, and only then saves. Without serialization, two
+ * concurrent requests for the same address both pass the rate-limit check
+ * before either saves — the faucet pays twice (and the second save
+ * overwrites the first, so the store under-records what was paid, weakening
+ * the daily cap too). The lock covers exactly load -> check -> pay -> save;
+ * body reading and address validation stay outside it (pure, per-request). */
+let dripQueue = Promise.resolve();
+function withDripLock(fn) {
+  const run = dripQueue.then(fn);
+  dripQueue = run.then(() => {}, () => {});
+  return run;
+}
+
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let data = '';
@@ -153,11 +168,12 @@ const server = http.createServer(async (req, res) => {
       try { payload = JSON.parse(body); }
       catch { sendJson(res, 400, { ok: false, error: 'invalid JSON body' }); return; }
 
-      const address = (payload.address || '').trim();
+      const address = typeof payload?.address === 'string' ? payload.address.trim() : '';
       if (!address) { sendJson(res, 400, { ok: false, error: 'address is required' }); return; }
       try { validatePearlAddress(address); }
       catch (e) { sendJson(res, 400, { ok: false, error: 'invalid address', detail: e.message }); return; }
 
+      await withDripLock(async () => {
       const store = loadStore();
       const rl = rateLimitCheck(store.drips, address, {
         cooldownMs: CFG.cooldownHours * 3600 * 1000,
@@ -189,6 +205,7 @@ const server = http.createServer(async (req, res) => {
       store.drips.push({ address, txid, amountPRL: CFG.maxDripPRL, network: CFG.network, time: Date.now() });
       saveStore(store);
       sendJson(res, 200, { ok: true, txid, amountPRL: CFG.maxDripPRL, network: CFG.network });
+      });
       return;
     }
 
