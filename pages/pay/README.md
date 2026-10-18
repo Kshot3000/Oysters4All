@@ -85,7 +85,10 @@ either the merchant xpub + derivation index or a fixed address.
 1. Zip the folder (or upload it) via **Plugins → Add New → Upload**, activate.
 2. **WooCommerce → Settings → Payments** → enable **Pearl (PRL)**.
 3. Paste pre-generated Taproot addresses (one per line) into **Address pool** —
-   each order consumes the next address. Generate them with any BIP-86 wallet;
+   each order consumes the next address, and addresses are **never reused**:
+   checkout refuses when the pool runs out (payment checks credit an order
+   from its address's lifetime totals, so reuse would credit a later order
+   with an earlier order's payment). Generate them with any BIP-86 wallet;
    keys never touch WordPress.
 4. Set the PRL rate, required confirmations (2 recommended), and payment
    window. Orders go on-hold at checkout; the thank-you page shows QR + live

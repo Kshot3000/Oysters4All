@@ -4,7 +4,7 @@ Tags: woocommerce, payment gateway, crypto, pearl, prl
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -44,6 +44,10 @@ The order stays on-hold and the UI shows "partial". Top up the same address with
 Yes — set Network to testnet and use `tprl1p…` addresses plus a testnet Blockbook.
 
 == Changelog ==
+
+= 1.0.1 =
+* Security: the address pool no longer wraps around. Payment checks credit an order from its address's lifetime totals, so a reused address would have marked a later order paid from an earlier order's payment — checkout now refuses when the pool is exhausted instead of reusing an address, and the remaining-address count is exact.
+* Security: required-confirmation depth is actually enforced server-side. The deep-confirmation sum now reads Blockbook's `transactions` list (`txs` is an integer count), so a payment can no longer satisfy a 2-confirmation setting with only 1 confirmation.
 
 = 1.0.0 =
 * Initial release: gateway settings, per-order Taproot addresses from a pool, QR + live states on the thank-you page, server-side Blockbook confirmation (AJAX + cron), expiry sweep.

@@ -146,8 +146,8 @@ class WC_Gateway_Pearl extends WC_Payment_Gateway {
 
     public function pool_remaining() {
         $pool = $this->get_pool();
-        $used = get_option('pearl_gateway_used_count', 0);
-        return max(0, count($pool) - ((int) $used % max(1, count($pool))));
+        $used = (int) get_option('pearl_gateway_used_count', 0);
+        return max(0, count($pool) - $used);
     }
 
     public function admin_options() {
@@ -227,10 +227,20 @@ class WC_Gateway_Pearl extends WC_Payment_Gateway {
             return array('result' => 'failure', 'redirect' => '');
         }
 
-        // Assign the next pool address (round-robin; repeats only after the
-        // whole pool is consumed — add more addresses before that happens).
-        $used    = (int) get_option('pearl_gateway_used_count', 0);
-        $address = $pool[$used % count($pool)];
+        // Assign the next pool address — NEVER reuse one. Payment checks
+        // credit an order from its address's lifetime Blockbook totals
+        // (blockbook_summary), which is sound only while each address
+        // serves exactly one order: a reused address's earlier payments
+        // would mark a later order paid with no new payment. When the
+        // pool is exhausted, refuse the order (the admin notice in
+        // admin_options() warns well before this point) instead of
+        // wrapping around to an already-used address.
+        $used = (int) get_option('pearl_gateway_used_count', 0);
+        if ($used >= count($pool)) {
+            wc_add_notice(__('Pearl payments are temporarily unavailable (address pool exhausted — each order needs a fresh address).', 'pearl-gateway'), 'error');
+            return array('result' => 'failure', 'redirect' => '');
+        }
+        $address = $pool[$used];
         update_option('pearl_gateway_used_count', $used + 1, false);
 
         $grains  = self::amount_to_grains($order->get_total(), $rate);
@@ -357,19 +367,41 @@ class WC_Gateway_Pearl extends WC_Payment_Gateway {
         }
         $confirmed = $this->bigsub($received, $unconf);
 
-        if ((int) $req_conf > 1 && !empty($j['txs']) && is_array($j['txs'])) {
+        if ((int) $req_conf > 1) {
+            // Blockbook v2 carries the tx list in `transactions`; `txs` is
+            // an integer COUNT, not the list (the JS SDK's
+            // fetchConfirmationAwareSummary reads it the same way). Reading
+            // `txs` as the list never matched a real response, so the deep
+            // sum never ran and $confirmed stayed at the totals fallback —
+            // a 1-confirmation payment then satisfied req_conf=2. The deep
+            // sum is authoritative whenever req_conf > 1, even when the
+            // list is empty; an array-typed `txs` stays as a fallback for
+            // non-Blockbook backends.
+            $txs = array();
+            if (isset($j['transactions']) && is_array($j['transactions'])) {
+                $txs = $j['transactions'];
+            } elseif (isset($j['txs']) && is_array($j['txs'])) {
+                $txs = $j['txs'];
+            }
             $deep = '0';
-            foreach ($j['txs'] as $tx) {
+            foreach ($txs as $tx) {
+                if (!is_array($tx)) {
+                    continue;
+                }
                 $conf = isset($tx['confirmations']) ? (int) $tx['confirmations'] : 0;
                 if ($conf < (int) $req_conf) {
                     continue;
                 }
                 foreach ((array) ($tx['vout'] ?? array()) as $vout) {
+                    if (!is_array($vout)) {
+                        continue;
+                    }
                     $addrs = isset($vout['addresses']) && is_array($vout['addresses'])
                         ? $vout['addresses']
                         : (isset($vout['scriptPubKey']['addresses']) && is_array($vout['scriptPubKey']['addresses']) ? $vout['scriptPubKey']['addresses'] : array());
-                    if (in_array($address, $addrs, true)) {
-                        $deep = $this->bigadd($deep, (string) ($vout['value'] ?? '0'));
+                    $val = isset($vout['value']) ? (string) $vout['value'] : '0';
+                    if (in_array($address, $addrs, true) && preg_match('/^[0-9]+$/', $val)) {
+                        $deep = $this->bigadd($deep, $val);
                     }
                 }
             }
