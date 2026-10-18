@@ -332,6 +332,35 @@ describe('faucet backend concurrency + body shapes', { timeout: 30000 }, () => {
   });
 });
 
+describe('faucet backend store durability', { timeout: 30000 }, () => {
+  it('saves atomically: the store file is replaced via rename, not truncated in place', async () => {
+    const stub = await startStubOyster();
+    const faucet = await startFaucet({
+      OYSTER_RPC_URL: stub.url,
+      OYSTER_RPC_USER: 'test',
+      OYSTER_RPC_PASS: 'test',
+      DAILY_CAP_PRL: '100',
+    }, []); // seed an empty store so its inode can be recorded before the save
+    try {
+      const inoBefore = fs.statSync(faucet.storeFile).ino;
+      const { status } = await postDrip(faucet.base, { address: VALID_TPRL_V1 });
+      assert.equal(status, 200);
+      const inoAfter = fs.statSync(faucet.storeFile).ino;
+      assert.notEqual(inoAfter, inoBefore,
+        'an in-place write truncates the live store first — a crash mid-save would tear it and reset the rate limits');
+      const store = JSON.parse(fs.readFileSync(faucet.storeFile, 'utf8'));
+      assert.equal(store.drips.length, 1);
+      assert.equal(store.drips[0].address, VALID_TPRL_V1);
+      const leftovers = fs.readdirSync(path.dirname(faucet.storeFile))
+        .filter((n) => n.startsWith(path.basename(faucet.storeFile) + '.tmp'));
+      assert.deepEqual(leftovers, [], 'the temp file must be renamed away, not left behind');
+    } finally {
+      await stopFaucet(faucet);
+      await new Promise((r) => stub.server.close(r));
+    }
+  });
+});
+
 describe('faucet backend without wallet credentials', { timeout: 30000 }, () => {
   let faucet;
   before(async () => {

@@ -52,7 +52,15 @@ function loadStore() {
   return { drips: [] };
 }
 function saveStore(store) {
-  fs.writeFileSync(CFG.storeFile, JSON.stringify(store, null, 2) + '\n');
+  // Atomic replace (write temp + rename), the pool-server / wPRL StateStore
+  // pattern: writeFileSync directly on the live file truncates it first, so
+  // a crash mid-save leaves a torn store — and loadStore's corrupt-file
+  // fallback would then start fresh, silently wiping the cooldown / daily-
+  // cap history and letting paid addresses drip again. Saves are serialized
+  // by the drip lock, so a per-process temp name cannot collide.
+  const tmp = `${CFG.storeFile}.tmp.${process.pid}`;
+  fs.writeFileSync(tmp, JSON.stringify(store, null, 2) + '\n');
+  fs.renameSync(tmp, CFG.storeFile);
 }
 
 /* ---------- Oyster JSON-RPC ---------- */

@@ -63,7 +63,7 @@ reports `walletConfigured: false` and every drip is refused with HTTP 503 —
 Zero dependencies — the suite uses only Node's built-in test runner:
 
 ```bash
-npm test        # 39 tests: unit + integration
+npm test        # 40 tests: unit + integration
 npm run check   # node --check on server.js, lib.js, and both test files
 ```
 
@@ -79,6 +79,9 @@ npm run check   # node --check on server.js, lib.js, and both test files
   result is a 64-char txid; an unbounded daemon response must not OOM the
   faucet), and store entries older than the rate-limit horizon
   (max(cooldown, 24h)) are pruned on load so `drips.json` stays bounded.
+  Drip handling is serialized (concurrent requests cannot double-pay past
+  the rate limit), and the store is saved atomically (temp file + rename),
+  so a crash mid-save cannot tear `drips.json` and reset the rate limits.
 
 ## Operating notes
 
