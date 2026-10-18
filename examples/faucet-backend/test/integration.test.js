@@ -48,9 +48,10 @@ function startStubOyster() {
 }
 
 /* Boot server.js in a child process; resolves when /api/status answers. */
-function startFaucet(extraEnv) {
+function startFaucet(extraEnv, seedDrips = null) {
   const port = takePort();
   const storeFile = path.join(os.tmpdir(), `faucet-int-${process.pid}-${port}.json`);
+  if (seedDrips) fs.writeFileSync(storeFile, JSON.stringify({ drips: seedDrips }));
   const child = fork(SERVER_JS, [], {
     env: {
       ...process.env,
@@ -196,6 +197,60 @@ describe('faucet backend daily cap', { timeout: 30000 }, () => {
     const second = await postDrip(faucet.base, { address: VALID_TPRL_V2 });
     assert.equal(second.status, 429);
     assert.equal(second.body.error, 'daily cap reached');
+  });
+});
+
+describe('faucet backend hardening: RPC response cap + store pruning', { timeout: 30000 }, () => {
+  it('refuses a drip when the Oyster response exceeds the 1 MiB cap — never pays out on an unbounded body', async () => {
+    // Stub Oyster that buries a valid txid in a 2 MiB response body.
+    const padPort = takePort();
+    const padStub = http.createServer((req, res) => {
+      let body = '';
+      req.on('data', (c) => { body += c; });
+      req.on('end', () => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ jsonrpc: '1.0', id: 'faucet', result: FAKE_TXID, error: null, pad: 'x'.repeat(2 * 1024 * 1024) }));
+      });
+    });
+    await new Promise((r) => padStub.listen(padPort, '127.0.0.1', r));
+    const faucet = await startFaucet({
+      OYSTER_RPC_URL: `http://127.0.0.1:${padPort}`,
+      OYSTER_RPC_USER: 'test',
+      OYSTER_RPC_PASS: 'test',
+      DAILY_CAP_PRL: '100',
+    });
+    try {
+      const { status, body } = await postDrip(faucet.base, { address: VALID_TPRL_V1 });
+      assert.equal(status, 502);
+      assert.equal(body.error, 'payout failed');
+      assert.match(body.detail, /byte limit/);
+      assert.ok(!fs.existsSync(faucet.storeFile) || JSON.parse(fs.readFileSync(faucet.storeFile, 'utf8')).drips.length === 0,
+        'no drip may be recorded for a refused payout');
+    } finally {
+      await stopFaucet(faucet);
+      await new Promise((r) => padStub.close(r));
+    }
+  });
+
+  it('prunes store entries older than the rate-limit horizon on the next save', async () => {
+    const stub = await startStubOyster();
+    const ancient = { address: VALID_TPRL_V2, txid: FAKE_TXID, amountPRL: 1, network: 'testnet', time: Date.now() - 30 * 24 * 3600 * 1000 };
+    const faucet = await startFaucet({
+      OYSTER_RPC_URL: stub.url,
+      OYSTER_RPC_USER: 'test',
+      OYSTER_RPC_PASS: 'test',
+      DAILY_CAP_PRL: '100',
+    }, [ancient]);
+    try {
+      const { status } = await postDrip(faucet.base, { address: VALID_TPRL_V1 });
+      assert.equal(status, 200);
+      const store = JSON.parse(fs.readFileSync(faucet.storeFile, 'utf8'));
+      assert.equal(store.drips.length, 1);
+      assert.equal(store.drips[0].address, VALID_TPRL_V1);
+    } finally {
+      await stopFaucet(faucet);
+      await new Promise((r) => stub.server.close(r));
+    }
   });
 });
 

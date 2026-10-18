@@ -6,6 +6,12 @@
 import http from "node:http";
 import https from "node:https";
 
+// Hard cap on one RPC response body. The largest legitimate replies this
+// client consumes (verbose blocks, listsinceblocks for the deposit
+// scanner) are far below this; a daemon — or anything answering on its
+// port — that streams without ending must not OOM the bridge process.
+export const MAX_RPC_RESPONSE_BYTES = 16 * 1024 * 1024;
+
 export class RpcError extends Error {
   constructor(code, message, data) {
     super(`RPC error ${code}: ${message}`);
@@ -29,6 +35,10 @@ export class RpcClient {
     this.user = opts.user ?? "";
     this.pass = opts.pass ?? "";
     this.timeoutMs = opts.timeoutMs ?? 15000;
+    this.maxResponseBytes =
+      Number.isFinite(opts.maxResponseBytes) && opts.maxResponseBytes > 0
+        ? Math.floor(opts.maxResponseBytes)
+        : MAX_RPC_RESPONSE_BYTES;
     this.agentOptions = opts.agentOptions;
     this.id = 0;
   }
@@ -64,8 +74,22 @@ export class RpcClient {
     const text = await new Promise((resolve, reject) => {
       const req = lib.request(options, (res) => {
         let data = "";
-        res.on("data", (c) => (data += c));
+        let bytes = 0;
+        let settled = false;
+        res.on("data", (c) => {
+          if (settled) return;
+          bytes += c.length;
+          if (bytes > this.maxResponseBytes) {
+            settled = true;
+            res.destroy();
+            reject(new RpcError(-32000, `RPC response exceeded the ${this.maxResponseBytes}-byte limit`));
+            return;
+          }
+          data += c;
+        });
         res.on("end", () => {
+          if (settled) return;
+          settled = true;
           if (res.statusCode === 401 || res.statusCode === 403) {
             reject(new RpcError(-32000, `RPC auth failed (HTTP ${res.statusCode})`));
             return;

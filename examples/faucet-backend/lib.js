@@ -113,6 +113,23 @@ function rateLimitCheck(drips, address, opts) {
   return { ok: true };
 }
 
+/* Drop drips that can no longer influence any rate-limit decision, so
+ * the store file stays bounded instead of growing one entry per drip
+ * forever (it is parsed and rewritten in full on every drip).
+ * rateLimitCheck reads only (a) each address's LATEST drip, against the
+ * cooldown, and (b) drips inside the rolling 24h window, against the
+ * daily cap — so an entry older than max(cooldown, 24h) is dead weight:
+ * if it is an address's latest, it is already past the cooldown and
+ * does not block; if it is not, the newer entry is kept. Entries with a
+ * non-finite time are kept (their age is unprovable, and keeping an
+ * entry can only make the limits stricter, never looser). */
+function pruneDrips(drips, opts) {
+  const { cooldownMs, now = Date.now() } = opts;
+  const horizon = Math.max(Number(cooldownMs) || 0, 24 * 3600 * 1000);
+  const cutoff = now - horizon;
+  return drips.filter((d) => !(d && Number.isFinite(d.time) && d.time < cutoff));
+}
+
 module.exports = {
   BECH32M_CONST,
   bech32Polymod,
@@ -120,4 +137,5 @@ module.exports = {
   bech32Decode,
   validatePearlAddress,
   rateLimitCheck,
+  pruneDrips,
 };

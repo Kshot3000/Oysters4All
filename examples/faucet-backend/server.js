@@ -17,7 +17,7 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-const { validatePearlAddress, rateLimitCheck } = require('./lib.js');
+const { validatePearlAddress, rateLimitCheck, pruneDrips } = require('./lib.js');
 
 /* ---------- config ---------- */
 const CFG = {
@@ -44,7 +44,10 @@ function loadStore() {
   try {
     const raw = fs.readFileSync(CFG.storeFile, 'utf8');
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed.drips)) return parsed;
+    if (Array.isArray(parsed.drips)) {
+      // Prune on load so the next save writes a bounded store (see lib.js).
+      return { drips: pruneDrips(parsed.drips, { cooldownMs: CFG.cooldownHours * 3600 * 1000 }) };
+    }
   } catch { /* missing or corrupt -> start fresh */ }
   return { drips: [] };
 }
@@ -53,6 +56,12 @@ function saveStore(store) {
 }
 
 /* ---------- Oyster JSON-RPC ---------- */
+// A sendtoaddress result is a 64-char txid — a real response is a few
+// hundred bytes. Cap the accumulated body anyway (the request-body side
+// below is already capped at 64 KiB): a malfunctioning or compromised
+// daemon that streams without ending must not OOM the faucet process.
+const MAX_RPC_RESPONSE_BYTES = 1024 * 1024;
+
 function oysterRpc(method, params) {
   return new Promise((resolve, reject) => {
     const body = JSON.stringify({ jsonrpc: '1.0', id: 'faucet', method, params });
@@ -68,8 +77,22 @@ function oysterRpc(method, params) {
       { host: url.hostname, port: url.port || 80, path: url.pathname || '/', method: 'POST', headers, timeout: 15000 },
       (res) => {
         let data = '';
-        res.on('data', (c) => { data += c; });
+        let bytes = 0;
+        let settled = false;
+        res.on('data', (c) => {
+          if (settled) return;
+          bytes += c.length;
+          if (bytes > MAX_RPC_RESPONSE_BYTES) {
+            settled = true;
+            res.destroy();
+            reject(new Error(`Oyster RPC response exceeded the ${MAX_RPC_RESPONSE_BYTES}-byte limit`));
+            return;
+          }
+          data += c;
+        });
         res.on('end', () => {
+          if (settled) return;
+          settled = true;
           try {
             const parsed = JSON.parse(data);
             if (parsed.error) reject(new Error(parsed.error.message || JSON.stringify(parsed.error)));

@@ -63,7 +63,7 @@ reports `walletConfigured: false` and every drip is refused with HTTP 503 —
 Zero dependencies — the suite uses only Node's built-in test runner:
 
 ```bash
-npm test        # 31 tests: unit + integration
+npm test        # 36 tests: unit + integration
 npm run check   # node --check on server.js, lib.js, and both test files
 ```
 
@@ -75,6 +75,10 @@ npm run check   # node --check on server.js, lib.js, and both test files
   stub Oyster JSON-RPC and drives `/api/status` + `/api/drip` end to end:
   malformed input (400s), cooldown 429, daily-cap 429, the honest 503 when no
   wallet is configured (no fake txids), and drip persistence to the store file.
+  Hardening: Oyster RPC responses are capped at 1 MiB (a valid `sendtoaddress`
+  result is a 64-char txid; an unbounded daemon response must not OOM the
+  faucet), and store entries older than the rate-limit horizon
+  (max(cooldown, 24h)) are pruned on load so `drips.json` stays bounded.
 
 ## Operating notes
 

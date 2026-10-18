@@ -16,6 +16,7 @@ const {
   bech32Decode,
   validatePearlAddress,
   rateLimitCheck,
+  pruneDrips,
 } = require('../lib.js');
 
 /* ---------- address validation ---------- */
@@ -166,5 +167,41 @@ describe('rateLimitCheck', () => {
     assert.deepEqual(ok, { ok: true });
     const blocked = rateLimitCheck(drips, VALID_TPRL_V1, { ...OPTS, maxDripPRL: 1, now: NOW });
     assert.equal(blocked.ok, false);
+  });
+});
+
+describe('pruneDrips', () => {
+  it('drops entries older than max(cooldown, 24h) and keeps the rest', () => {
+    const drips = [
+      drip(VALID_TPRL_V1, NOW - 30 * 24 * 3600 * 1000), // ancient — dropped
+      drip(VALID_TPRL_V2, NOW - 23 * 3600 * 1000), // inside 24h — kept
+      drip(VALID_TPRL_V1, NOW - 3600 * 1000), // recent — kept
+      { address: VALID_TPRL_V2, amountPRL: 1 }, // no time — kept (age unprovable)
+    ];
+    const out = pruneDrips(drips, { ...OPTS, now: NOW });
+    assert.equal(out.length, 3);
+    assert.ok(out.every((d) => d.time === undefined || NOW - d.time <= 24 * 3600 * 1000));
+  });
+
+  it('honors a cooldown longer than 24h as the horizon', () => {
+    const long = { cooldownMs: 72 * 3600 * 1000, now: NOW };
+    const drips = [drip(VALID_TPRL_V1, NOW - 48 * 3600 * 1000), drip(VALID_TPRL_V2, NOW - 96 * 3600 * 1000)];
+    const out = pruneDrips(drips, long);
+    assert.deepEqual(out.map((d) => d.address), [VALID_TPRL_V1]);
+  });
+
+  it('never changes a rate-limit decision', () => {
+    const scenarios = [
+      [drip(VALID_TPRL_V1, NOW - 3600 * 1000), drip(VALID_TPRL_V1, NOW - 90 * 24 * 3600 * 1000)],
+      [drip(VALID_TPRL_V1, NOW - 90 * 24 * 3600 * 1000)],
+      Array.from({ length: 100 }, (_, i) => drip(`tprl1a${i}`, NOW - i * 60 * 1000))
+        .concat([drip('tprl1old', NOW - 40 * 24 * 3600 * 1000, 500)]),
+      [],
+    ];
+    for (const drips of scenarios) {
+      const before = rateLimitCheck(drips, VALID_TPRL_V1, { ...OPTS, now: NOW });
+      const after = rateLimitCheck(pruneDrips(drips, { ...OPTS, now: NOW }), VALID_TPRL_V1, { ...OPTS, now: NOW });
+      assert.deepEqual(after, before);
+    }
   });
 });

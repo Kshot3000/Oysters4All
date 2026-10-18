@@ -91,6 +91,26 @@ test("non-JSON response becomes an RpcError", async () => {
   }
 });
 
+test("oversized response is rejected at the byte cap instead of buffered whole", async () => {
+  const server = await scriptedServer(({ res }) => {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ jsonrpc: "2.0", id: 1, result: "x".repeat(256 * 1024), error: null }));
+  });
+  try {
+    const c = new RpcClient(`http://127.0.0.1:${server.address().port}`, { maxResponseBytes: 64 * 1024 });
+    await assert.rejects(c.call("getblockcount"), (e) => {
+      assert.ok(e instanceof RpcError);
+      assert.match(e.message, /exceeded the 65536-byte limit/);
+      return true;
+    });
+    // A response under the cap still round-trips on the same client class.
+    const ok = new RpcClient(`http://127.0.0.1:${server.address().port}`, { maxResponseBytes: 1024 * 1024 });
+    assert.equal(String(await ok.call("getblockcount")).length, 256 * 1024);
+  } finally {
+    server.close();
+  }
+});
+
 test("unsupported protocol is rejected at construction", () => {
   assert.throws(() => new RpcClient("ftp://example.com"), /unsupported RPC protocol/);
 });
