@@ -82,6 +82,19 @@ t("composeBinding allows expires_at years in the future", () => {
   assert.ok(v.checks.some((c) => c.label === "not expired" && c.warn), "expiring-soon warning expected");
   assert.ok(v.checks.some((c) => c.label === "not expired" && c.ok));
 });
+t("verifySignedBinding: expiry beyond the Date-representable range never throws", () => {
+  // expires_at is a safe integer and allowFuture sets no upper bound, so
+  // 1e13 passes validation — but new Date(1e13 * 1000).toISOString()
+  // throws RangeError. The verifier documents "never throws": it must
+  // rule the binding valid with a non-throwing expiry detail.
+  const good = { name: "alice", address: W.address, xonly: bytesToHex(W.internalXOnly), network: NET, registeredAt: 1788000000, expiresAt: null };
+  const b = composeBinding({ ...good, expiresAt: 10000000000000 });
+  const sig = signBinding(W.priv, b, NETWORKS[NET]);
+  const v = verifySignedBinding({ json: b.json, sig: bytesToHex(sig) });
+  assert.equal(v.ok, true, JSON.stringify(v.checks.filter((c) => !c.ok)));
+  const exp = v.checks.find((c) => c.label === "not expired");
+  assert.ok(exp && exp.ok && /beyond the representable range/.test(exp.detail), JSON.stringify(exp));
+});
 t("validateNameRecord round-trips", () => {
   const b = composeBinding({ name: "alice", address: W.address, xonly: bytesToHex(W.internalXOnly), network: NET, registeredAt: 1788000000, expiresAt: null });
   validateNameRecord(JSON.parse(b.json));

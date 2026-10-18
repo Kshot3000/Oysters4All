@@ -11,8 +11,10 @@
 
   /* ---------- pure helpers (unit-tested in tests/explorer.test.mjs) ---------- */
   function fmtTime(ts) {
-    if (typeof ts !== 'number') return '—';
-    return new Date(ts * 1000).toISOString().replace('T', ' ').replace('Z', ' UTC');
+    if (typeof ts !== 'number' || !Number.isFinite(ts)) return '—';
+    var d = new Date(ts * 1000);
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toISOString().replace('T', ' ').replace('Z', ' UTC');
   }
   function fmtNum(n) {
     return typeof n === 'number' ? n.toLocaleString('en-US') : '—';

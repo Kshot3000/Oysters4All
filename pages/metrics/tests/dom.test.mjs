@@ -21,7 +21,7 @@ test("all id lookups in app.js resolve to an element in index.html", () => {
 
 test("cache-buster keys present and pinned", () => {
   assert.ok(html.includes('href="styles.css?v=1"'));
-  assert.ok(html.includes('src="metrics-core.js?v=1"'));
+  assert.ok(html.includes('src="metrics-core.js?v=2"'));
   assert.ok(html.includes('src="app.js?v=1"'));
 });
 

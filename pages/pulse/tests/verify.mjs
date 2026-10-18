@@ -127,6 +127,10 @@ test('timeAgo', () => {
   assert.equal(timeAgo(now - 90, now), '1m ago');
   assert.equal(timeAgo(now - 3 * 3600 - 12 * 60, now), '3h 12m ago');
   assert.equal(timeAgo(now - 2 * 86400, now), '2d 0h ago');
+  // An unparseable lastBlockTime from the endpoint yields a NaN timestamp;
+  // the formatter must dash it, not render "NaNd NaNh ago".
+  assert.equal(timeAgo(NaN, now), '—');
+  assert.equal(timeAgo('not-a-date', now), '—');
 });
 
 // ---------------------------------------------------------------- blockbook status
@@ -331,11 +335,11 @@ test('tx row escapes backend-supplied txid and confirmations', () => {
 
 test('load() re-validates persisted watchlist entries (mainnet only)', () => {
   assert.match(APP_JS, /validatePearlAddress\(String\(w\.addr \?\? ''\)\)\.network === 'mainnet'/);
-  assert.match(INDEX_HTML, /js\/app\.js\?v=1\.2\.2/);
+  assert.match(INDEX_HTML, /js\/app\.js\?v=1\.2\.3/);
 });
 
 
 test('core module import is cache-versioned (structural ?v= gap)', () => {
-  assert.ok(APP_JS.includes("from './pulse-core.js?v=1'"), 'pulse-core import carries ?v=');
+  assert.ok(APP_JS.includes("from './pulse-core.js?v=2'"), 'pulse-core import carries ?v=');
   assert.ok(!APP_JS.includes("from './pulse-core.js';"), 'no unversioned core import remains');
 });

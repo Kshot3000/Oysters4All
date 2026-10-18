@@ -367,11 +367,15 @@ export async function verifyBurnTx(blockbookBase, { txid, address, amountGrains 
       break;
     }
   }
+  // blockTime is endpoint-supplied: keep it only when it is a finite,
+  // Date-representable unix-seconds value, so a broken endpoint cannot
+  // turn a proven burn into a formatting crash downstream.
+  const bt = Number(tx.blockTime);
   return {
     found: !!hit,
     valueGrains: hit ? Number(hit.valueSat ?? hit.value) : 0,
     height: tx.blockHeight ?? null,
-    time: tx.blockTime ?? null,
+    time: Number.isFinite(bt) && bt > 0 && bt <= 8.64e12 ? bt : null,
     confirmations: tx.confirmations ?? 0,
   };
 }

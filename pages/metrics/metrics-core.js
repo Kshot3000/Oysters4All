@@ -189,7 +189,11 @@ function summarize(parsed, nowSeconds) {
   const info = infoFam && infoFam.samples.length ? { ...infoFam.samples[0].labels } : null;
 
   const tipHeight = g("pearld_chain_tip_height");
-  const tipTs = g("pearld_chain_tip_timestamp_seconds");
+  // A timestamp the Date constructor cannot represent (|sec| > 8.64e12)
+  // would throw RangeError at render time in the app; treat it as absent,
+  // exactly like a metric the endpoint never emitted.
+  const tipTsRaw = g("pearld_chain_tip_timestamp_seconds");
+  const tipTs = tipTsRaw != null && Number.isFinite(tipTsRaw) && tipTsRaw >= 0 && tipTsRaw <= 8.64e12 ? tipTsRaw : null;
   const mempoolMax = g("pearld_mempool_max_bytes");
   const mempoolBytes = g("pearld_mempool_bytes");
   const mempoolUpdated = g("pearld_mempool_last_updated_timestamp_seconds");

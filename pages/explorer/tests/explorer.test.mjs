@@ -30,6 +30,14 @@ test("fmtTime dashes anything that is not a number (defensive render)", () => {
     assert.equal(m.fmtTime(v), "—", String(v));
 });
 
+test("fmtTime dashes non-finite and Date-unrepresentable numbers instead of throwing", () => {
+  // block.time comes from the user-configured RPC endpoint: NaN and
+  // out-of-range values are numbers, so the typeof guard alone let
+  // toISOString() throw RangeError and fail the whole block lookup.
+  for (const v of [NaN, Infinity, -Infinity, 1e15, -1e15])
+    assert.equal(m.fmtTime(v), "—", String(v));
+});
+
 test("fmtNum groups thousands en-US and keeps zero", () => {
   assert.equal(m.fmtNum(0), "0");
   assert.equal(m.fmtNum(42), "42");

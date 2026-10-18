@@ -188,6 +188,29 @@ test("reverifyUnsignedBurnHex catches a tampered output", () => {
   assert.ok(!bad.ok);
 });
 
+test("verifyBurnTx: unrepresentable blockTime is nulled, the proven burn still proves", async () => {
+  // blockTime is endpoint-supplied. 1e15 is truthy, so the app's
+  // formatting guard passed it to toISOString(), which threw — and the
+  // handler's catch re-labelled a PROVEN burn as NOT PROVEN. The core
+  // must keep only finite, Date-representable times.
+  const txid = "ab".repeat(32);
+  const mkTx = (blockTime) => ({
+    vout: [{ addresses: [PIN_ADDR], value: "1000" }],
+    blockHeight: 42, blockTime, confirmations: 3,
+  });
+  const realFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => ({ ok: true, text: async () => JSON.stringify(mkTx(1e15)) });
+    const bad = await B.verifyBurnTx("https://bb.example", { txid, address: PIN_ADDR, amountGrains: 1000 });
+    assert.equal(bad.found, true);
+    assert.equal(bad.time, null);
+    globalThis.fetch = async () => ({ ok: true, text: async () => JSON.stringify(mkTx(1767225600)) });
+    const ok = await B.verifyBurnTx("https://bb.example", { txid, address: PIN_ADDR, amountGrains: 1000 });
+    assert.equal(ok.found, true);
+    assert.equal(ok.time, 1767225600);
+  } finally { globalThis.fetch = realFetch; }
+});
+
 test("PRL <-> grains conversions", () => {
   assert.equal(B.prlToGrains("1"), 100000000);
   assert.equal(B.prlToGrains("1.5"), 150000000);

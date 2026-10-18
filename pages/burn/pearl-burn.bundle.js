@@ -5236,11 +5236,12 @@ zoo`.split("\n");
         break;
       }
     }
+    const bt = Number(tx.blockTime);
     return {
       found: !!hit,
       valueGrains: hit ? Number(hit.valueSat ?? hit.value) : 0,
       height: tx.blockHeight ?? null,
-      time: tx.blockTime ?? null,
+      time: Number.isFinite(bt) && bt > 0 && bt <= 864e10 ? bt : null,
       confirmations: tx.confirmations ?? 0
     };
   }

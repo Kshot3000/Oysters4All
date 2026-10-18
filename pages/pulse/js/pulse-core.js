@@ -215,6 +215,7 @@ export function shortAddress(addr) {
 /** Human "3h 12m ago" from unix seconds. */
 export function timeAgo(tsSec, nowSec = Math.floor(Date.now() / 1000)) {
   const d = nowSec - Number(tsSec);
+  if (!Number.isFinite(d)) return '—';
   if (d < 0) return 'in the future';
   if (d < 60) return `${d}s ago`;
   const m = Math.floor(d / 60);

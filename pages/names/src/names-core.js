@@ -228,9 +228,14 @@ export function verifySignedBinding(signed, opts = {}) {
     // Expiry — judged against the stated instant, not the wall clock.
     const now = clockSec(opts);
     if (obj.expires_at != null) {
-      if (obj.expires_at <= now) { fail("not expired", `expired at ${new Date(obj.expires_at * 1000).toISOString()}`); return { ok: false, checks, id: bindingId(bytes) }; }
+      // expires_at is a validated safe integer but may lie beyond the
+      // Date-representable range (allowFuture sets no upper bound);
+      // formatting it must never throw out of this never-throws verifier.
+      const expDate = new Date(obj.expires_at * 1000);
+      const expStr = Number.isNaN(expDate.getTime()) ? "a date beyond the representable range" : expDate.toISOString();
+      if (obj.expires_at <= now) { fail("not expired", `expired at ${expStr}`); return { ok: false, checks, id: bindingId(bytes) }; }
       const warn = obj.expires_at - now < 30 * 86400;
-      checks.push({ label: "not expired", detail: warn ? "expires within 30 days — renew soon" : `valid until ${new Date(obj.expires_at * 1000).toISOString()}`, ok: true, warn });
+      checks.push({ label: "not expired", detail: warn ? "expires within 30 days — renew soon" : `valid until ${expStr}`, ok: true, warn });
     } else {
       checks.push({ label: "not expired", detail: "no expiry set (permanent binding)", ok: true });
     }

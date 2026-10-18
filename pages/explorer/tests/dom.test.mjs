@@ -27,7 +27,7 @@ test("all id lookups in app.js resolve to an element in index.html", () => {
 
 test("cache-buster keys present and pinned on css + js", () => {
   assert.ok(html.includes('href="styles.css?v=5"'), "styles.css ?v= pin moved — bump it deliberately, never silently");
-  assert.ok(html.includes('src="app.js?v=4"'), "app.js ?v= pin moved — bump it deliberately, never silently");
+  assert.ok(html.includes('src="app.js?v=5"'), "app.js ?v= pin moved — bump it deliberately, never silently");
 });
 
 test("attribution: PRL address and @kshot9000 present", () => {

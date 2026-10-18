@@ -81,6 +81,18 @@ test("summary: health flags mempool >=90%, auth failures, rpc errors", () => {
   assert.match(texts, /RPC error rate/);
 });
 
+test("summary: Date-unrepresentable tip timestamp is treated as absent, never rendered", () => {
+  // The app formats tipTimestamp with toISOString(); a hostile or broken
+  // endpoint emitting 1e300 would throw RangeError and blank the chain
+  // table. The core must null it at the boundary instead.
+  const huge = SCRAPE.replace("pearld_chain_tip_timestamp_seconds 900", "pearld_chain_tip_timestamp_seconds 1e300");
+  const s = M.summarize(M.parseExposition(huge), 1000);
+  assert.equal(s.chain.tipTimestamp, null);
+  assert.equal(s.chain.tipAgeSeconds, null);
+  const neg = SCRAPE.replace("pearld_chain_tip_timestamp_seconds 900", "pearld_chain_tip_timestamp_seconds -5");
+  assert.equal(M.summarize(M.parseExposition(neg), 1000).chain.tipTimestamp, null);
+});
+
 test("summary: non-pearld scrape is flagged, not summarised as healthy", () => {
   const s = M.summarize(M.parseExposition("go_goroutines 12\n"), 1000);
   assert.equal(s.isPearld, false);

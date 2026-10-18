@@ -75,7 +75,7 @@ distinct from `PearlEscrowNUMS/v1` and `PearlWillNUMS/v1` (asserted by test).
 - `src/index.js` — browser entry (`window.PearlBurn`, explicit assignment)
 - `pearl-burn.bundle.js` — committed esbuild IIFE bundle (built via `node build.mjs`)
 - `qrcode.min.js` — vendored QR library (same copy as Pearl Will)
-- `tests/burn.test.mjs` — 16 core tests (pinned vectors, tamper regressions, domain separation, exact fee math)
+- `tests/burn.test.mjs` — 17 core tests (pinned vectors, tamper regressions, domain separation, exact fee math)
 - `tests/dom.test.mjs` — 7 DOM/bundle tests (shipped bundle == tested core, HTML wiring, cache keys, attribution)
 - `tests/loader.mjs` — node ESM loader shim (shared pattern)
 
