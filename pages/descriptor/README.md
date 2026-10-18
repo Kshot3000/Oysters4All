@@ -54,7 +54,7 @@ node --no-warnings --loader ./tests/loader.mjs --test tests/*.test.mjs
 node hidden_files/qa-tools/atlas-qa.cjs   # headless Chromium, file:// + CDP
 ```
 
-33 unit tests + 31 DOM checks + 16/16 real-browser QA checks, zero console
+34 unit tests + 31 DOM checks + 16/16 real-browser QA checks, zero console
 errors.
 
 ## Files

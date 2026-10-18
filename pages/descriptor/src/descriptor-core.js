@@ -991,6 +991,15 @@ export function validateRanges(ast) {
   return { ranged: ranged.length, total: keyExprs.length };
 }
 
+/** Cap on multipath branches per descriptor. Expansion is textual: every
+ *  branch re-scans and re-parses the whole body, so the branch count is an
+ *  amplification factor on the (already length-capped) input — a crafted
+ *  <0;1;...;12000> span inside the 100k cap took >30 s to expand while the
+ *  parser alone handled it in ~30 ms. Real BIP-389 use is 2 branches
+ *  (receive/change); 128 is generous headroom, matching this file's other
+ *  depth caps (MAX_EXPR_DEPTH, the taptree walk). */
+export const MAX_MULTIPATH_BRANCHES = 128;
+
 /** Expand every multipath key into per-branch descriptors (BIP-389).
  *  Done textually: each <a;b;...> span is replaced by its b-th option, in
  *  order, so every branch stays a parseable descriptor. All multipath spans
@@ -1006,6 +1015,9 @@ export function expandDescriptorMultipath(input) {
     throw new DescError("multipath branches must all have the same number of paths");
   }
   if (n < 2) throw new DescError("multipath <> needs at least two paths");
+  if (n > MAX_MULTIPATH_BRANCHES) {
+    throw new DescError(`multipath with ${n} branches exceeds the ${MAX_MULTIPATH_BRANCHES}-branch limit — refusing`);
+  }
   const out = [];
   for (let b = 0; b < n; b++) {
     let bi = 0;

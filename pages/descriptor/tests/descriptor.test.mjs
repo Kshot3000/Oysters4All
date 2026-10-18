@@ -224,6 +224,16 @@ describe("multipath expansion (BIP-389)", () => {
   it("refuses mismatched multipath arity", () => {
     refused(() => D.expandDescriptorMultipath(`tr(${xpub}<0;1>/*,pk(${xpub}<0;1;2>/*))`), "same number");
   });
+  it("caps multipath branches — expansion re-scans/re-parses per branch, so the count is an amplification factor", () => {
+    // A 5,000-option span fits the 100k length cap and parses in ~30 ms,
+    // but expanding it re-scans + re-parses the body per branch (>30 s at
+    // 12,000 branches on pristine code). It must refuse as DescError, fast.
+    const many = Array.from({ length: 5000 }, (_, i) => String(i)).join(";");
+    refused(() => D.expandDescriptorMultipath(`tr(${xpub}<${many}>/*)`), "branch limit");
+    // The boundary itself still expands: exactly MAX branches is allowed.
+    const atCap = Array.from({ length: D.MAX_MULTIPATH_BRANCHES }, (_, i) => String(i)).join(";");
+    assert.equal(D.expandDescriptorMultipath(`tr(${xpub}<${atCap}>/*)`).length, D.MAX_MULTIPATH_BRANCHES);
+  });
 });
 
 describe("addr(), raw(), legacy types", () => {
