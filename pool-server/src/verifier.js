@@ -87,6 +87,12 @@ export class VerifierPool {
       if (!line) continue;
       let msg;
       try { msg = JSON.parse(line); } catch { continue; }
+      // A "null" (or bare scalar) line is valid JSON but not a response:
+      // reading msg._seq on null throws inside this stdout 'data' handler,
+      // an uncaught exception that kills the pool process — the same crash
+      // class as a null stratum envelope. Ignore non-object lines like
+      // unparseable ones.
+      if (!msg || typeof msg !== "object") continue;
       const p = w.pending.get(msg._seq);
       if (p) { w.pending.delete(msg._seq); p.resolve(msg); }
     }

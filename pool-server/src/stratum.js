@@ -143,6 +143,16 @@ export class StratumServer {
       const [method, params, id] = msg;
       msg = { jsonrpc: "2.0", id: id ?? null, method, params };
     }
+    // Any other non-object envelope (null, a bare number/string/boolean) is
+    // an invalid request, not a method call. `null` is the dangerous one:
+    // it is valid JSON, but reading msg.id on it throws — and this handler
+    // runs on the socket 'data' event with no enclosing try/catch, so the
+    // TypeError was an uncaught exception that killed the whole pool
+    // process. One unauthenticated "null" line must never do that.
+    if (!msg || typeof msg !== "object") {
+      this._replyErr(conn, null, -32600, "Invalid Request");
+      return;
+    }
     const id = msg.id ?? null;
     const method = msg.method;
     const params = msg.params;
@@ -254,7 +264,17 @@ export class StratumServer {
     }
     const proofB64 = field === "plain_proof" ? p.plain_proof : p.plain_proof_zst;
     const encoding = conn.gzip ? "gzip" : field === "plain_proof_zst" ? "zstd" : "plain";
-    const res = await this.pool.submitShare(conn.sessionId, { jobId, field, proofB64, encoding });
+    // submitShare converts verifier failures to a verdict, but an unexpected
+    // throw anywhere in the pipeline must still fail THIS share closed —
+    // as an unhandled rejection from the socket handler it would kill the
+    // process (same crash class as the null-envelope deref above).
+    let res;
+    try {
+      res = await this.pool.submitShare(conn.sessionId, { jobId, field, proofB64, encoding });
+    } catch {
+      this._replyErr(conn, id, 20, "Invalid share");
+      return;
+    }
     if (res.ok) {
       this._trackShare(conn, res.stale);
       this._replyOk(conn, id);

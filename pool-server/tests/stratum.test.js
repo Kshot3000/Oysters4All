@@ -202,5 +202,29 @@ test("raw stratum-v1 array envelopes are tolerated", async () => {
   });
 });
 
+test("null and scalar envelopes -> -32600, connection and server survive", async () => {
+  await withServer(async (ctx, mk) => {
+    const c = mk(ctx.port);
+    // "null" is valid JSON but its .id deref used to throw uncaught in the
+    // socket data handler and kill the whole pool process (unauthenticated
+    // remote DoS). Scalars took the same unguarded path.
+    c.sock.write("null\n");
+    const r0 = await c.next();
+    assert.equal(r0.error.code, -32600);
+    c.sock.write("123\n");
+    const r1 = await c.next();
+    assert.equal(r1.error.code, -32600);
+    c.sock.write('"hi"\n');
+    const r2 = await c.next();
+    assert.equal(r2.error.code, -32600);
+    // The same connection still authorizes and receives a job afterwards.
+    c.send({ id: 3, method: "mining.authorize", params: { wallet: WALLET, worker: "w" } });
+    const ack = await c.next();
+    assert.equal(ack.result, true);
+    const notify = await c.next();
+    assert.equal(notify.method, "mining.notify");
+  });
+});
+
 // Keep the import used (real VerifierPool is covered in verifier-protocol.test.js).
 void VerifierPool;
