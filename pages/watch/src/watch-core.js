@@ -89,7 +89,17 @@ export function shortTxid(t) {
 }
 export function fmtTime(ms) {
   const d = new Date(Number(ms));
+  // An imported/persisted event can carry a non-numeric or out-of-range ts:
+  // toISOString() on an Invalid Date throws RangeError and would blank the
+  // whole render — fall back to an em dash like the node desk does.
+  if (Number.isNaN(d.getTime())) return "—";
   return d.toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC");
+}
+
+/** ISO string for a timestamp, or "" when it is not a representable date. */
+function isoOrEmpty(ms) {
+  const d = new Date(Number(ms));
+  return Number.isNaN(d.getTime()) ? "" : d.toISOString();
 }
 export function fmtAge(ms, nowMs) {
   const s = Math.max(0, Math.floor((Number(nowMs) - Number(ms)) / 1000));
@@ -406,7 +416,7 @@ export function eventsToCSV(events) {
   const rows = ["ts_utc,kind,rule_id,rule_label,address,txid,grains,confirmations,message"];
   for (const e of events) {
     rows.push([
-      new Date(Number(e.ts)).toISOString(), e.kind, e.ruleId, q(e.ruleLabel),
+      isoOrEmpty(e.ts), e.kind, e.ruleId, q(e.ruleLabel),
       e.address || "", e.txid || "", e.grains || "",
       e.confirmations ?? "", q(e.message),
     ].join(","));

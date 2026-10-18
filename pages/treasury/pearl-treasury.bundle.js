@@ -7263,6 +7263,7 @@ zoo`.split("\n");
       else d.setUTCMonth(d.getUTCMonth() + every);
     }
     if (guard >= 5e3) throw new Error("schedule runaway");
+    if (!Number.isFinite(d.getTime())) throw new Error("schedule runaway \u2014 due date out of range");
     return d.toISOString();
   }
   function auditAppend(log, { kind, actor, detail }) {

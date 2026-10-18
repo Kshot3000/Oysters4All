@@ -160,7 +160,11 @@ export function fmtAgeSec(s) {
 
 export function fmtUnixSec(sec) {
   if (sec === null || sec === undefined || !Number.isFinite(Number(sec)) || sec <= 0) return "—";
-  return new Date(Number(sec) * 1000).toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC");
+  const d = new Date(Number(sec) * 1000);
+  // Finite is not enough: an endpoint returning milliseconds-as-seconds
+  // (or any value past the Date range) makes toISOString() throw RangeError.
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC");
 }
 
 // Escape untrusted strings (peer user-agents) before innerHTML.

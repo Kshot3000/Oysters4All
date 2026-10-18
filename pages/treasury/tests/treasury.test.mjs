@@ -258,6 +258,15 @@ test("nextDueISO walks the calendar forward", () => {
   assert.equal(T.nextDueISO(start, null, "2026-11-01T00:00:00.000Z"), start, "no recurrence -> start itself");
 });
 
+test("nextDueISO refuses a schedule that steps out of the Date range (no raw RangeError)", () => {
+  const nearMax = new Date(8.64e15 - 86400000).toISOString();
+  const after = new Date(8.64e15 - 1000).toISOString();
+  assert.throws(
+    () => T.nextDueISO(nearMax, { unit: "days", every: 120 }, after),
+    (e) => e instanceof Error && !(e instanceof RangeError) && /out of range|runaway/.test(e.message),
+  );
+});
+
 /* ---------- audit chain ---------- */
 
 test("audit chain appends, verifies, and detects tampering", () => {

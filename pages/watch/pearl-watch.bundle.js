@@ -4788,7 +4788,12 @@ zoo`.split("\n");
   }
   function fmtTime(ms) {
     const d = new Date(Number(ms));
+    if (Number.isNaN(d.getTime())) return "\u2014";
     return d.toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC");
+  }
+  function isoOrEmpty(ms) {
+    const d = new Date(Number(ms));
+    return Number.isNaN(d.getTime()) ? "" : d.toISOString();
   }
   function fmtAge(ms, nowMs) {
     const s = Math.max(0, Math.floor((Number(nowMs) - Number(ms)) / 1e3));
@@ -5058,7 +5063,7 @@ zoo`.split("\n");
     const rows = ["ts_utc,kind,rule_id,rule_label,address,txid,grains,confirmations,message"];
     for (const e of events) {
       rows.push([
-        new Date(Number(e.ts)).toISOString(),
+        isoOrEmpty(e.ts),
         e.kind,
         e.ruleId,
         q(e.ruleLabel),

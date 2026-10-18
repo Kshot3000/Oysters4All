@@ -78,6 +78,10 @@ test("formatters", () => {
   assert.equal(fmtAgeSec(90000), "1d 1h");
   assert.equal(fmtUnixSec(0), "—");
   assert.ok(fmtUnixSec(1391626433).includes("2014"));
+  // Finite is not representable: ms-as-seconds or any endpoint value past
+  // the Date range used to RangeError out of toISOString().
+  assert.equal(fmtUnixSec(9999999999999), "—");
+  assert.equal(fmtUnixSec(1e15), "—");
   assert.equal(escHtml('<script>alert("x")</script>'), "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;");
 });
 

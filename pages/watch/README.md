@@ -47,7 +47,7 @@ lineup. Built by [@kshot9000](https://x.com/kshot9000).
 
 ## Tests
 
-- `node --no-warnings --loader ./tests/loader.mjs --test tests/watch.test.mjs` — 29/29 core tests
+- `node --no-warnings --loader ./tests/loader.mjs --test tests/watch.test.mjs` — 31/31 core tests
 - `node --no-warnings --loader ./tests/loader.mjs --test tests/watch.dom.test.mjs` — 9/9 DOM tests (real bundle + app.js in a vm DOM, stubbed Blockbook)
 - Real-browser QA: 18/18 checks green (headless Chromium 152, `file://` + CDP,
   stubbed Blockbook, zero console/page errors). QA script lives in

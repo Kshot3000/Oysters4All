@@ -175,7 +175,9 @@ var PearlNode = (() => {
   }
   function fmtUnixSec(sec) {
     if (sec === null || sec === void 0 || !Number.isFinite(Number(sec)) || sec <= 0) return "\u2014";
-    return new Date(Number(sec) * 1e3).toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC");
+    const d = new Date(Number(sec) * 1e3);
+    if (Number.isNaN(d.getTime())) return "\u2014";
+    return d.toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC");
   }
   function escHtml(s) {
     return String(s === null || s === void 0 ? "" : s).replace(/[&<>"']/g, (c) => ({

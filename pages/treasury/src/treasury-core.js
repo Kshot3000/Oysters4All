@@ -472,6 +472,9 @@ export function nextDueISO(startISO, recurrence, afterISO) {
     else d.setUTCMonth(d.getUTCMonth() + every);
   }
   if (guard >= 5000) throw new Error("schedule runaway");
+  // Stepping past the representable Date range leaves d invalid — refuse
+  // with a clean error instead of a raw RangeError from toISOString().
+  if (!Number.isFinite(d.getTime())) throw new Error("schedule runaway — due date out of range");
   return d.toISOString();
 }
 

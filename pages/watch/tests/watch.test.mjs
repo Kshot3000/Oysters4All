@@ -14,6 +14,7 @@ import {
   diffSnapshots,
   RULE_KINDS, normalizeRule, evaluateRules,
   eventsToCSV, serializeWatchState, deserializeWatchState, defaultWatchState,
+  fmtTime,
 } from "../src/index.js";
 import { encodeBech32m, decodeBech32m, sha256, hexToBytes } from "../../sign/src/crypto.js";
 
@@ -345,6 +346,29 @@ test("eventsToCSV quotes safely", () => {
   assert.equal(lines.length, 2);
   assert.ok(lines[0].startsWith("ts_utc,kind,"));
   assert.ok(lines[1].includes('"say ""hi"", bob"'));
+});
+
+test("bad timestamps never throw out of the date formatters (Invalid-Date class)", () => {
+  // Events pass through deserializeWatchState unvalidated and state is
+  // file-importable: a non-numeric or out-of-range ts used to RangeError
+  // out of fmtTime (blanking the events render) and eventsToCSV.
+  assert.equal(fmtTime("not-a-time"), "—");
+  assert.equal(fmtTime(1e20), "—");
+  assert.equal(fmtTime(Number.NaN), "—");
+  assert.ok(fmtTime(1700000000000).startsWith("2023-"));
+  const st = deserializeWatchState(JSON.stringify({
+    watched: [], rules: [],
+    events: [
+      { ts: "not-a-time", kind: "incoming", ruleId: "r1", ruleLabel: "x", message: "hi" },
+      { ts: 1e20, kind: "incoming", ruleId: "r1", ruleLabel: "x", message: "hi" },
+      { ts: 1700000000000, kind: "incoming", ruleId: "r1", ruleLabel: "x", message: "hi" },
+    ],
+  }), N);
+  const csv = eventsToCSV(st.events);
+  const lines = csv.split("\n");
+  assert.equal(lines.length, 4);
+  assert.ok(lines[1].startsWith(","), "bad ts exports as an empty cell, not a throw");
+  assert.ok(lines[3].startsWith("2023-"), "valid ts still exports as ISO");
 });
 
 test("serialize/deserialize round-trips and validates", () => {
