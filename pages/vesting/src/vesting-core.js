@@ -394,10 +394,24 @@ export function parseDescriptor(descriptor) {
 /** Re-derive a schedule from a descriptor + per-tranche expected amounts.
  *  Throws if recomputation does not reproduce the descriptor (tampered). */
 export function scheduleFromDescriptor(descriptor, amounts = null) {
+  if (amounts != null && !Array.isArray(amounts)) {
+    throw new Error("amounts must be a list of grain amounts (one per tranche) or omitted");
+  }
   const p = parseDescriptor(descriptor);
   const tranches = p.locks.map((lock, i) => {
     const forge = forgeTranche(p.network, p.beneficiary, p.funder, lock, p.revocable);
-    return { index: i, ...forge, amountGrains: amounts && amounts[i] != null ? amounts[i] : 0, lockDateISO: new Date(lock * 1000).toISOString() };
+    let amountGrains = 0;
+    if (amounts && amounts[i] != null) {
+      amountGrains = amounts[i];
+      // Same bar as forged tranches in planSchedule: a supplied expected
+      // amount is a real tranche amount, never a lenient parse — NaN,
+      // floats, negatives, unsafe integers and sub-dust values are refused
+      // instead of being carried into funding/claim labels.
+      if (!Number.isSafeInteger(amountGrains) || amountGrains < DUST_GRAIN) {
+        throw new Error(`tranche ${i + 1}: amount must be a positive integer >= dust (${DUST_GRAIN} grains)`);
+      }
+    }
+    return { index: i, ...forge, amountGrains, lockDateISO: new Date(lock * 1000).toISOString() };
   });
   const recomputed = descriptorFor(p.network, p.beneficiary, p.funder, p.revocable, p.mode, p.locks);
   if (recomputed !== String(descriptor).trim()) throw new Error("descriptor failed self-consistency check");

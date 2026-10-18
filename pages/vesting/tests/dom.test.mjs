@@ -255,6 +255,21 @@ test("track: descriptor loads and re-derives the same addresses", () => {
   $("track-descriptor").value = "vesting:v1:prl:garbage";
   $("track-load").click();
   assert.equal($("track-err").hidden, false);
+  // track amounts are strict whole grains: parseInt silently truncated
+  // "100000000.9" to 100000000 and "1e8" to 1 — both are now refused
+  $("track-descriptor").value = desc;
+  for (const bad of ["100000000.9", "1e8", "-5", "abc", "100"]) {
+    $("track-amounts").value = bad;
+    $("track-load").click();
+    assert.equal($("track-err").hidden, false, "bad track amount refused: " + bad);
+  }
+  // the forged tranches' exact grain amounts load cleanly
+  $("track-amounts").value = "100000000, 200000000, 300000000";
+  $("track-load").click();
+  assert.equal($("track-err").hidden, true, "no track error: " + $("track-err").textContent);
+  $("track-amounts").value = "";
+  const src = fs.readFileSync(resolvePath(dir, "app.js"), "utf8");
+  assert.ok(!src.includes("parseInt(x.trim()"), "no parseInt on the track-amounts field");
 });
 
 test("claim: matured tranches listed; UTXO load needs Blockbook (honest error, no network)", async () => {
@@ -319,8 +334,8 @@ test("forge rejects silently-misparsed custom amounts and impossible dates", () 
   assert.ok(src.includes("E.parsePRLToGrains($(\"total\").value)"), "total uses exact parser");
   assert.ok(src.includes("E.parsePRLToGrains(m[4])"), "custom amounts use exact parser");
   assert.ok(!/parseFloat\([^)]*\)\s*\*\s*E\.GRAIN_PER_PRL/.test(src), "no float money parse remains");
-  assert.ok(html.includes("pearl-vesting.bundle.js?v=10"), "bundle cache pin");
-  assert.ok(html.includes("app.js?v=5"), "app cache pin");
+  assert.ok(html.includes("pearl-vesting.bundle.js?v=11"), "bundle cache pin");
+  assert.ok(html.includes("app.js?v=6"), "app cache pin");
   assert.deepEqual(errors, [], "console errors: " + errors.join(" | "));
 });
 
@@ -349,6 +364,6 @@ test("forge rejects silently-truncated tranche counts", () => {
   $("forge").click();
   assert.equal($("forge-err").hidden, false);
   assert.ok(/tranche count/.test($("forge-err").textContent), "error text: " + $("forge-err").textContent);
-  assert.ok(html.includes("app.js?v=5"), "app cache pin");
+  assert.ok(html.includes("app.js?v=6"), "app cache pin");
   assert.deepEqual(errors, [], "console errors: " + errors.join(" | "));
 });

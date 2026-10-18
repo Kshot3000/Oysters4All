@@ -254,7 +254,18 @@
     hideErr("track-err");
     try {
       const amounts = $("track-amounts").value.trim()
-        ? $("track-amounts").value.split(",").map((x) => parseInt(x.trim(), 10))
+        ? $("track-amounts").value.split(",").map((x) => {
+          const t = x.trim();
+          // Strict whole-grain parse: parseInt silently truncated
+          // "100000000.9" to 100000000 and "1e8" to 1, so the tracked
+          // schedule showed (and claim options labelled) the wrong
+          // expected amount. Refuse anything that is not exact digits,
+          // and refuse values past the safe-integer range via BigInt.
+          if (!/^\d+$/.test(t)) throw new Error("track amounts must be whole grains (comma-separated integers): " + t.slice(0, 24));
+          const b = BigInt(t);
+          if (b > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("track amount too large: " + t.slice(0, 24));
+          return Number(b);
+        })
         : null;
       const { schedule, tranches } = E.scheduleFromDescriptor($("track-descriptor").value, amounts);
       S.network = schedule.networkHrp === "tprl" ? E.NETWORKS.testnet : E.NETWORKS.mainnet;

@@ -168,6 +168,28 @@ test("descriptor round-trip: re-derives identical addresses", () => {
   assert.throws(() => parseDescriptor(schedule.descriptor.replace(":r:", ":x:")), /vesting:v1/);
 });
 
+test("scheduleFromDescriptor: supplied amounts are validated, not trusted", () => {
+  const start = 1_790_000_000;
+  const { schedule, tranches } = planSchedule({
+    network: net, beneficiaryXOnly: B.xonly, funderXOnly: F.xonly,
+    totalGrains: 2 * GRAIN_PER_PRL, startTime: start,
+    cliffSeconds: 0, vestSeconds: 86_400 * 90, trancheCount: 3, revocable: true,
+  });
+  // omitted amounts still default to 0 (unknown)
+  assert.deepEqual(scheduleFromDescriptor(schedule.descriptor).tranches.map((t) => t.amountGrains), [0, 0, 0]);
+  // valid amounts round-trip exactly
+  assert.deepEqual(
+    scheduleFromDescriptor(schedule.descriptor, tranches.map((t) => t.amountGrains)).tranches.map((t) => t.amountGrains),
+    tranches.map((t) => t.amountGrains),
+  );
+  // every lenient shape the old app-layer parseInt produced is refused here:
+  // NaN, negative, float, unsafe integer, sub-dust, and non-array amounts
+  for (const bad of [[NaN], [-5000], [1.5], [9007199254740992], [100], ["1000"], [0]]) {
+    assert.throws(() => scheduleFromDescriptor(schedule.descriptor, bad), /amount must be/, JSON.stringify(bad));
+  }
+  assert.throws(() => scheduleFromDescriptor(schedule.descriptor, "1000"), /must be a list/);
+});
+
 test("isMature boundary", () => {
   assert.equal(isMature(1_800_000_000, 1_800_000_000), true);
   assert.equal(isMature(1_800_000_000, 1_799_999_999), false);
