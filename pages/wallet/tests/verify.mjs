@@ -273,5 +273,60 @@ const testnet = W.NETWORKS.testnet;
   } finally { globalThis.fetch = realFetch; }
 }
 
+/* Service worker: the HTML shell is the version manifest (it carries the
+   ?v= pins), so navigations must be network-first — a cache-first shell
+   froze installed PWAs at the build current when the cache name last
+   changed (v2, 2026-10-01) through five later wallet releases. Loads the
+   real sw.js with mocked caches/fetch: prime an OLD shell, serve a NEW
+   one, and require the navigation to return the NEW shell while pinned
+   assets stay cache-first and offline navigation falls back to cache. */
+{
+  const { readFileSync } = await import("node:fs");
+  const swSrc = readFileSync(new URL("../sw.js", import.meta.url), "utf8");
+  const ORIGIN = "https://example.test";
+  const resp = (body) => ({ body, clone() { return resp(body); } });
+  const stores = new Map();
+  const cachesMock = {
+    async open(name) {
+      if (!stores.has(name)) stores.set(name, new Map());
+      const m = stores.get(name);
+      return { async addAll(urls) { for (const u of urls) m.set(new URL(u, ORIGIN + "/pages/wallet/").href, resp("SHELL:" + u)); },
+               async put(req, r) { m.set(typeof req === "string" ? new URL(req, ORIGIN + "/").href : req.url, r); } };
+    },
+    async keys() { return [...stores.keys()]; },
+    async delete(name) { return stores.delete(name); },
+    async match(req) {
+      const url = typeof req === "string" ? new URL(req, ORIGIN + "/pages/wallet/").href : req.url;
+      for (const m of stores.values()) if (m.has(url)) return m.get(url);
+      return undefined;
+    },
+  };
+  let online = true;
+  const fetchMock = async (req) => {
+    if (!online) throw new Error("offline");
+    const url = typeof req === "string" ? req : req.url;
+    if (url.endsWith("/index.html")) return resp("NEW-SHELL");
+    return resp("NET:" + url);
+  };
+  const listeners = {};
+  const selfMock = { addEventListener: (t, fn) => { listeners[t] = fn; }, location: { origin: ORIGIN }, skipWaiting: async () => {}, clients: { claim: async () => {} } };
+  new Function("self", "caches", "fetch", "URL", swSrc)(selfMock, cachesMock, fetchMock, URL);
+  let wp; const waitUntil = (x) => { wp = x; };
+  listeners.install({ waitUntil }); await wp;
+  listeners.activate({ waitUntil }); await wp;
+  const store = stores.get([...stores.keys()][0]);
+  const idxKey = [...store.keys()].find((k) => k.endsWith("/index.html"));
+  store.set(idxKey, resp("OLD-SHELL"));
+  async function dispatch(url, mode) {
+    let out; const ev = { request: { url, method: "GET", mode }, respondWith(x) { out = x; }, waitUntil() {} };
+    listeners.fetch(ev); return out ? (await out).body : "(passthrough)";
+  }
+  const nav = await dispatch(ORIGIN + "/pages/wallet/index.html", "navigate");
+  ok("sw navigation is network-first (new shell wins over cached old shell)", nav === "NEW-SHELL", String(nav));
+  online = false;
+  const navOff = await dispatch(ORIGIN + "/pages/wallet/index.html", "navigate");
+  ok("sw offline navigation falls back to the cached shell", navOff === "NEW-SHELL", String(navOff));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.error("FAILURES:", failures); process.exit(1); }

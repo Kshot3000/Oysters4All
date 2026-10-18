@@ -1,9 +1,15 @@
 /* Pearl Wallet service worker — offline app shell for the installed PWA.
-   Strategy: cache-first for same-origin app assets; network-only for
-   everything else (Blockbook / indexer / CoinGecko must never be cached —
-   balances and prices go stale fast, and cached API data would lie).
+   Strategy: network-first for navigations / the HTML shell (the shell is
+   the version manifest — it carries the ?v= pins for every asset, so a
+   cache-first shell froze installed PWAs at whatever build was current
+   when the cache name last changed, security fixes included); cache-first
+   for the ?v=-pinned assets themselves (immutable under the fleet's
+   cache-key discipline); network-only for everything cross-origin
+   (Blockbook / indexer / CoinGecko must never be cached — balances and
+   prices go stale fast, and cached API data would lie). Offline
+   navigations fall back to the cached shell.
 */
-var CACHE = "pearl-wallet-v2";
+var CACHE = "pearl-wallet-v3";
 var SHELL = [
   "./",
   "./index.html",
@@ -40,6 +46,22 @@ self.addEventListener("fetch", function (event) {
   // API traffic: never cache, never serve stale.
   if (url.origin !== self.location.origin) return;
   if (event.request.method !== "GET") return;
+  // Navigations and the shell document: network-first, cache as fallback.
+  var isShell = event.request.mode === "navigate" ||
+    url.pathname.endsWith("/") || url.pathname.endsWith("/index.html");
+  if (isShell) {
+    event.respondWith(
+      fetch(event.request).then(function (res) {
+        var copy = res.clone();
+        caches.open(CACHE).then(function (c) { c.put(event.request, copy); });
+        return res;
+      }).catch(function () {
+        return caches.match(event.request, { ignoreSearch: false })
+          .then(function (hit) { return hit || caches.match("./index.html"); });
+      })
+    );
+    return;
+  }
   event.respondWith(
     caches.match(event.request, { ignoreSearch: false }).then(function (hit) {
       if (hit) return hit;
