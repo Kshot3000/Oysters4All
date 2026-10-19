@@ -100,7 +100,19 @@ export class Pool {
     const headerBuf = Buffer.from(tpl.headerHex, "hex");
     headerBuf.writeUInt32LE(ts >>> 0, 68); // bump job timestamp
     const headerHex = headerBuf.toString("hex");
-    for (const diff of this._activeDiffs()) {
+    const activeDiffs = this._activeDiffs();
+    // Prune difficulties no miner is on anymore. Vardiff retargets a
+    // miner every few shares, so without this the map retained one job
+    // per distinct difficulty EVER used — a single miner's churn grew
+    // it without bound for the life of the process, and poolStats()
+    // reported those dead difficulties as "active" forever (even with
+    // zero miners connected). Stale-share detection is unaffected: it
+    // resolves old jobs through the separately bounded jobHistory map,
+    // and only compares against the current job for a miner's OWN diff.
+    for (const diff of [...this.jobsByDiff.keys()]) {
+      if (!activeDiffs.includes(diff)) this.jobsByDiff.delete(diff);
+    }
+    for (const diff of activeDiffs) {
       const jobId = `${(this.jobCounter++ >>> 0).toString(16).padStart(8, "0")}_${diff}`;
       const target = targetForDiff(diff);
       const job = {
@@ -352,7 +364,10 @@ export class Pool {
       ...this.stats,
       uptimeSec: Math.floor((Date.now() - this.stats.startedAt) / 1000),
       minersOnline: this.miners.size,
-      activeDiffs: [...this.jobsByDiff.keys()],
+      // Report the difficulties miners are actually on, computed live —
+      // never the job map's keys, which can hold a just-vacated diff
+      // between a disconnect/retarget and the next job issue.
+      activeDiffs: this._activeDiffs(),
       certVersion: this.cfg.certVersion,
       network: this.networkId,
       miners,

@@ -209,6 +209,34 @@ test("addMiner clamps a non-finite or over-max static difficulty to maxDiff", as
   await pool.stop();
 });
 
+test("jobsByDiff is pruned to active difficulties and stats report only those", async () => {
+  const { pool } = await makePool();
+  try {
+    const { miner } = addMiner(pool);
+    assert.deepEqual([...pool.jobsByDiff.keys()], [1024]);
+    // Vardiff churn: each retarget lands the miner on a new difficulty and
+    // issues fresh jobs — the vacated difficulties must not be retained.
+    for (const d of [3000, 4500, 7000, 999]) {
+      miner.diff = d;
+      pool._issueJobs("test");
+      assert.deepEqual([...pool.jobsByDiff.keys()], [d], `only the active diff ${d} is retained`);
+      assert.deepEqual(pool.poolStats().activeDiffs, [d]);
+    }
+    // The current job for the active diff still resolves (stale detection
+    // compares against it), and old jobs remain reachable via jobHistory.
+    assert.equal(pool.jobsByDiff.get(999).diff, 999);
+    assert.ok(pool.jobHistory.size > 1);
+    // Disconnect: stats must stop reporting the vacated diff immediately,
+    // and the next job issue prunes the map back to the idle default.
+    pool.removeMiner(miner.id);
+    assert.deepEqual(pool.poolStats().activeDiffs, [1024]);
+    pool._issueJobs("test");
+    assert.deepEqual([...pool.jobsByDiff.keys()], [1024]);
+  } finally {
+    await pool.stop();
+  }
+});
+
 test("vardiff disabled for static-difficulty miners", async () => {
   const { pool } = await makePool({}, { vardiffWindow: 4 });
   const jobs = [];
