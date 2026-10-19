@@ -12,6 +12,16 @@
  */
 import { targetForDiff, targetToCompact, targetToHexBE, nowSec } from "./util.js";
 
+// Miner.shareTimes retention bound. _retarget trims vardiff miners to
+// its evaluation window, but it returns before the trim for
+// static-difficulty miners — and submitShare pushes one timestamp per
+// accepted share — so a static miner's array grew by one entry per share
+// for the life of its connection. _estRate only ever reads a recent
+// window ("share-difficulty per second over the miner's recent window"),
+// so retaining the last 64 timestamps (eight vardiff windows) changes no
+// behavior; it only bounds the array.
+const MAX_SHARE_TIMES = 64;
+
 const DEFAULTS = {
   initialDiff: 2097152,   // HeroMiners/LuckyPool starting share difficulty
   minDiff: 1024,          // floor (CPU test ports go ~26000; allow lower for tests)
@@ -288,6 +298,11 @@ export class Pool {
     this.stats.sharesValid++;
     if (stale) this.stats.sharesStale++;
     this._retarget(miner);
+    // Enforce the retention bound for EVERY miner (see MAX_SHARE_TIMES):
+    // _retarget's own trim never runs on the static-difficulty path.
+    if (miner.shareTimes.length > MAX_SHARE_TIMES) {
+      miner.shareTimes = miner.shareTimes.slice(-MAX_SHARE_TIMES);
+    }
 
     // Accounting (stale shares are validated but earn no PPLNS weight — documented).
     if (this.payouts && !stale) {

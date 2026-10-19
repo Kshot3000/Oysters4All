@@ -252,3 +252,24 @@ test("vardiff disabled for static-difficulty miners", async () => {
   assert.equal(miner.diff, 2048);
   await pool.stop();
 });
+
+test("shareTimes stays bounded for static-difficulty miners", async () => {
+  const { pool } = await makePool();
+  try {
+    // _retarget returns before its trim for static miners, so without the
+    // submitShare cap this array grew by one entry per accepted share for
+    // the life of the connection (500 shares -> 500 entries on the old code).
+    const { miner } = addMiner(pool, WALLET, { staticDiff: 2048 });
+    for (let i = 0; i < 200; i++) {
+      const s = submit(Buffer.from("bounded-proof-" + i).toString("base64"));
+      s.jobId = pool.jobsByDiff.get(miner.diff).jobId;
+      const r = await pool.submitShare(miner.id, s);
+      assert.ok(r.ok);
+    }
+    assert.equal(miner.sharesValid, 200);
+    assert.equal(miner.diff, 2048, "static difficulty unchanged");
+    assert.equal(miner.shareTimes.length, 64, `shareTimes must be capped at 64, got ${miner.shareTimes.length}`);
+  } finally {
+    await pool.stop();
+  }
+});

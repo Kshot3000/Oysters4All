@@ -62,3 +62,27 @@ test("verifier pool: well-behaved worker still round-trips a verify", async () =
     await v.stop();
   }
 });
+
+const NEVER = `
+process.stdin.resume();
+`;
+
+test("verifier pool: pending requests per worker are capped, excess verify() rejects busy", async () => {
+  const v = new VerifierPool({ binary: fakeWorker(NEVER), workers: 1, timeoutMs: 300 });
+  await v.start();
+  try {
+    // Fire 300 verifies at a worker that never answers. On the old code all
+    // 300 sat in w.pending until their timeouts; the cap must hold pending
+    // at 256 and refuse the remaining 44 immediately as verifier-busy.
+    const promises = [];
+    for (let i = 0; i < 300; i++) promises.push(v.verify({ proof_b64: "AAAA", encoding: "plain" }));
+    assert.equal(v.workers[0].pending.size, 256, `pending must be capped at 256, got ${v.workers[0].pending.size}`);
+    const results = await Promise.allSettled(promises);
+    const busy = results.filter((r) => r.status === "rejected" && /busy/.test(r.reason.message));
+    const timedOut = results.filter((r) => r.status === "rejected" && /timeout/.test(r.reason.message));
+    assert.equal(busy.length, 44, `expected 44 busy rejections, got ${busy.length}`);
+    assert.equal(timedOut.length, 256, `expected 256 timeout rejections, got ${timedOut.length}`);
+  } finally {
+    await v.stop();
+  }
+});

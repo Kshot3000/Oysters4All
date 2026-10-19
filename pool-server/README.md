@@ -60,6 +60,12 @@ The stratum server speaks the three dialects documented in the live captures:
   or over-weight the pool).
 * `solo:<address>` mines solo: no PPLNS weight, a solo block pays the finder directly.
 * Stale-share abuse: >30% stale after 1000 shares → 3600 s ban (HeroMiners-style tier).
+* Share pipelining is capped: at most 32 shares per connection may be in
+  verification at once (excess submits are refused with code `20`, never
+  queued), and each verifier worker holds at most 256 pending requests
+  (excess shares fail closed as verifier-busy). Fabricated proofs are free
+  to make and expensive to verify; the caps keep one miner from
+  monopolizing the verifiers or growing pool memory with in-flight proofs.
 * Stratum replies use the reference-pool framing and codes:
   `20` invalid share, `21` job not found, `22` duplicate share, `24` unauthorized.
 

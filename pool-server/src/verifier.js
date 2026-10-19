@@ -20,6 +20,18 @@ const DEFAULT_BINARY =
 // crossing the cap fails the worker like any other worker error.
 const MAX_WORKER_BUF_BYTES = 1024 * 1024;
 
+// Cap in-flight requests per worker. verify() otherwise accepts every
+// call a stratum connection pipelines: each pending entry holds a
+// request open for up to timeoutMs (60 s default), and the request lines
+// themselves buffer in the worker's stdin — so an unbounded caller could
+// grow pool memory and monopolize every worker with fabricated proofs
+// that cost nothing to make and a full STARK verification to reject.
+// The stratum layer caps each CONNECTION at 32 in flight; this is the
+// pool-wide second layer, so no number of connections can exceed it.
+// Past the cap, verify() rejects immediately ("verifier busy") and the
+// share fails closed like any other verifier failure.
+const MAX_PENDING_PER_WORKER = 256;
+
 export class VerifierPool {
   /**
    * @param {object} opts
@@ -104,6 +116,7 @@ export class VerifierPool {
    */
   verify(req) {
     const w = this._pick();
+    if (!w) return Promise.reject(new Error("verifier busy: too many shares in flight"));
     return new Promise((resolve, reject) => {
       const seq = ++w.seq;
       const timer = setTimeout(() => {
@@ -123,11 +136,15 @@ export class VerifierPool {
   }
 
   _pick() {
-    // Round-robin, skipping dead workers (they are replaced async; pick any live one).
+    // Round-robin, skipping dead workers (they are replaced async; pick
+    // any live one) AND workers already holding the pending cap.
     for (let k = 0; k < this.workers.length; k++) {
       const w = this.workers[(this.next + k) % this.workers.length];
-      if (!w.dead) { this.next = (this.next + k + 1) % this.workers.length; return w; }
+      if (!w.dead && w.pending.size < MAX_PENDING_PER_WORKER) { this.next = (this.next + k + 1) % this.workers.length; return w; }
     }
+    // A live worker exists but every one is saturated: report busy (null)
+    // so verify() rejects instead of queueing past the cap.
+    if (this.workers.some((w) => !w.dead)) return null;
     // All dead (respawning) — use slot 0; the write will fail and the caller rejects.
     return this.workers[0];
   }

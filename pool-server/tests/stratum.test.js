@@ -325,5 +325,72 @@ test("re-authorize on one connection replaces the session instead of leaking min
   });
 });
 
+test("pipelined submits are capped per connection; refused shares never reach the verifier", async () => {
+  // Slow verifier (40 ms/share) standing in for the real STARK verifier.
+  let concurrent = 0, maxConcurrent = 0, calls = 0;
+  const slowVerifier = {
+    async start() {}, async stop() {},
+    async verify(req) {
+      calls++; concurrent++; maxConcurrent = Math.max(maxConcurrent, concurrent);
+      await new Promise((r) => setTimeout(r, 40));
+      concurrent--;
+      const digest = createHash("sha256").update(Buffer.from(req.proof_b64, "base64")).digest("hex");
+      return { ok: true, digest, block: false };
+    },
+  };
+  const provider = new SyntheticProvider({ networkDiff: 1024, startHeight: 5000 });
+  const pool = new Pool({
+    templateProvider: provider, verifierPool: slowVerifier,
+    payouts: new Payouts({ stateFile: null }),
+    initialDiff: 1024, minDiff: 64, jobIntervalSec: 3600,
+  });
+  await pool.start();
+  const srv = new StratumServer({ pool, host: "127.0.0.1", port: 0, networkId: "mainnet", log: () => {} });
+  await srv.start();
+  const c = client(srv.server.address().port);
+  try {
+    c.send({ id: 1, method: "mining.authorize", params: { wallet: WALLET, worker: "pipe" } });
+    await c.next(); // ack
+    const notify = await c.next();
+    const jobId = notify.params.job_id;
+    // 100 submits in ONE write. On the old code all 100 ran through the
+    // verifier concurrently; the per-connection cap (32) must admit 32
+    // and refuse the other 68 immediately, without a verifier call.
+    const N = 100;
+    let payload = "";
+    for (let i = 0; i < N; i++) {
+      const proof = Buffer.from("pipe-test-" + i).toString("base64");
+      payload += JSON.stringify({ id: 100 + i, method: "mining.submit", params: { job_id: jobId, plain_proof: proof } }) + "\n";
+    }
+    c.sock.write(payload);
+    let ok = 0, refused = 0;
+    for (let got = 0; got < N;) {
+      const m = await c.next(5000);
+      if (m.method === "mining.notify") continue; // vardiff job pushes interleave
+      got++;
+      if (m.result === true) ok++;
+      else if (m.error && m.error.code === 20 && /in flight/.test(m.error.message)) refused++;
+      else assert.fail("unexpected reply " + JSON.stringify(m));
+    }
+    assert.equal(ok, 32, `expected 32 admitted shares, got ${ok}`);
+    assert.equal(refused, N - 32, `expected ${N - 32} in-flight refusals, got ${refused}`);
+    assert.equal(calls, 32, `verifier must see only the admitted shares, got ${calls}`);
+    assert.ok(maxConcurrent <= 32, `verifier concurrency must stay <= 32, got ${maxConcurrent}`);
+    // Slots free up once verification drains: a normal submit still works.
+    const proof = Buffer.from("pipe-test-after").toString("base64");
+    c.send({ id: 999, method: "mining.submit", params: { job_id: jobId, plain_proof: proof } });
+    for (;;) {
+      const after = await c.next(5000);
+      if (after.method === "mining.notify") continue;
+      assert.equal(after.result, true);
+      break;
+    }
+  } finally {
+    c.close();
+    await srv.stop();
+    await pool.stop();
+  }
+});
+
 // Keep the import used (real VerifierPool is covered in verifier-protocol.test.js).
 void VerifierPool;

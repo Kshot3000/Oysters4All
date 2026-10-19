@@ -44,6 +44,16 @@ const BAN_SECONDS = 3600;
 // for the life of the session and repeat the worker in every stats reply.
 const MAX_WORKER_LENGTH = 256;
 const MAX_AGENT_LENGTH = 256;
+// Submits are fire-and-forget: _onLine never waits for one share's
+// verification before dispatching the next line, so without a bound one
+// connection could pipeline an unlimited number of shares into the
+// verifier at once — each in-flight share retains its proof string and a
+// verifier pending entry for up to the 60 s verifier timeout, and
+// fabricated proofs are free while verification is the pool's most
+// expensive operation. Honest miners pipeline a handful of shares at
+// most; anything past this cap is refused immediately (never queued —
+// a queue would retain the same proofs the cap exists to bound).
+const MAX_INFLIGHT_SUBMITS = 32;
 
 export class StratumServer {
   /**
@@ -95,6 +105,7 @@ export class StratumServer {
       sessionId: null,
       agent: "",
       gzip: false,
+      pendingSubmits: 0,  // shares currently in verification (capped)
     };
     this.conns.add(conn);
     sock.setEncoding("utf8");
@@ -300,6 +311,19 @@ export class StratumServer {
   async _onSubmit(conn, id, params) {
     const p = (params && typeof params === "object" && !Array.isArray(params)) ? params : {};
     if (!conn.sessionId) { this._replyErr(conn, id, 24, "Unauthorized worker"); return; }
+    if (conn.pendingSubmits >= MAX_INFLIGHT_SUBMITS) {
+      this._replyErr(conn, id, 20, "Too many shares in flight");
+      return;
+    }
+    conn.pendingSubmits++;
+    try {
+      await this._submitAuthorized(conn, id, p);
+    } finally {
+      conn.pendingSubmits--;
+    }
+  }
+
+  async _submitAuthorized(conn, id, p) {
     const jobId = p.job_id ? String(p.job_id) : "";
     let field = null;
     if (typeof p.plain_proof === "string") field = "plain_proof";
