@@ -253,6 +253,58 @@ test("vardiff disabled for static-difficulty miners", async () => {
   await pool.stop();
 });
 
+test("a join at a novel difficulty neither re-issues other miners' jobs nor evicts them", async () => {
+  const { pool } = await makePool();
+  try {
+    const { miner, jobs } = addMiner(pool);
+    const jobA = jobs[0];
+    // Pool-level equivalent of stratum re-authorize churn: each join is a
+    // new session at a DISTINCT static difficulty (the previous session
+    // is retired first, exactly like _onAuthorize). On the old code every
+    // join demand-issued jobs for ALL active difficulties: miner A got a
+    // fresh notify per join, and the 64-entry jobHistory filled with
+    // 2 entries per join until A's live job fell out — its shares then
+    // returned code 21 instead of being accepted.
+    let prev = null;
+    for (let i = 0; i < 40; i++) {
+      if (prev) pool.removeMiner(prev);
+      prev = "atk-" + i;
+      pool.addMiner({
+        id: prev, wallet: WALLET, worker: "atk", solo: false,
+        dialect: "kryptex", staticDiff: 3_000_000 + i * 104729, sendJob: () => {},
+      });
+    }
+    assert.equal(jobs.length, 1, "no fresh job may be pushed to A by another miner's join");
+    assert.ok(pool.jobsByDiff.get(3_000_000 + 39 * 104729), "the joining miner still gets its own job");
+    const s = submit(Buffer.from("novel-diff-victim-proof").toString("base64"));
+    s.jobId = jobA.jobId;
+    const r = await pool.submitShare(miner.id, s);
+    assert.equal(r.ok, true, "A's live job must still resolve after the join churn");
+  } finally {
+    await pool.stop();
+  }
+});
+
+test("a current job resolves even when jobHistory no longer holds it", async () => {
+  const { pool } = await makePool();
+  try {
+    const { miner, jobs } = addMiner(pool);
+    // White-box: simulate any history churn that drops the current job —
+    // the job a miner is currently assigned must never be "not found".
+    pool.jobHistory.clear();
+    const s = submit(Buffer.from("current-job-fallback-proof").toString("base64"));
+    s.jobId = jobs[0].jobId;
+    const r = await pool.submitShare(miner.id, s);
+    assert.deepEqual(r, { ok: true, stale: false, block: false });
+    // A genuinely unknown job still returns 21.
+    const s2 = submit(Buffer.from("unknown-job-proof").toString("base64"));
+    s2.jobId = "deadbeef_1024";
+    assert.equal((await pool.submitShare(miner.id, s2)).code, 21);
+  } finally {
+    await pool.stop();
+  }
+});
+
 test("shareTimes stays bounded for static-difficulty miners", async () => {
   const { pool } = await makePool();
   try {

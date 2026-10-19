@@ -122,40 +122,80 @@ export class Pool {
     for (const diff of [...this.jobsByDiff.keys()]) {
       if (!activeDiffs.includes(diff)) this.jobsByDiff.delete(diff);
     }
-    for (const diff of activeDiffs) {
-      const jobId = `${(this.jobCounter++ >>> 0).toString(16).padStart(8, "0")}_${diff}`;
-      const target = targetForDiff(diff);
-      const job = {
-        jobId, headerHex, target,
-        targetHex: targetToHexBE(target),
-        nbits: targetToCompact(target),
-        height: tpl.height,
-        certVersion: tpl.certVersion ?? this.cfg.certVersion,
-        diff,
-        templateId: tpl.templateId,
-        networkTarget: tpl.networkTarget,
-        createdAt: ts,
-        reason,
-      };
-      this.jobsByDiff.set(diff, job);
-      this.jobHistory.set(jobId, job);
-      while (this.jobHistory.size > this.cfg.jobHistory) {
-        const oldest = this.jobHistory.keys().next().value;
-        this.jobHistory.delete(oldest);
-      }
-      // Push to miners on this difficulty.
-      for (const m of this.miners.values()) {
-        if (m.authorized && m.diff === diff && m.sendJob) m.sendJob(job);
-      }
-    }
+    for (const diff of activeDiffs) this._issueJob(diff, headerHex, tpl, ts, reason);
     this._lastJobAt = ts;
+  }
+
+  /** Create, record, and push the current job for ONE difficulty. */
+  _issueJob(diff, headerHex, tpl, ts, reason) {
+    const jobId = `${(this.jobCounter++ >>> 0).toString(16).padStart(8, "0")}_${diff}`;
+    const target = targetForDiff(diff);
+    const job = {
+      jobId, headerHex, target,
+      targetHex: targetToHexBE(target),
+      nbits: targetToCompact(target),
+      height: tpl.height,
+      certVersion: tpl.certVersion ?? this.cfg.certVersion,
+      diff,
+      templateId: tpl.templateId,
+      networkTarget: tpl.networkTarget,
+      createdAt: ts,
+      reason,
+    };
+    this.jobsByDiff.set(diff, job);
+    this.jobHistory.set(jobId, job);
+    while (this.jobHistory.size > this.cfg.jobHistory) {
+      const oldest = this.jobHistory.keys().next().value;
+      this.jobHistory.delete(oldest);
+    }
+    // Push to miners on this difficulty.
+    for (const m of this.miners.values()) {
+      if (m.authorized && m.diff === diff && m.sendJob) m.sendJob(job);
+    }
+    return job;
+  }
+
+  /**
+   * Issue a job for a single newly-needed difficulty ONLY. A demand for
+   * one miner's difficulty must never re-issue every difficulty: the
+   * fleet-wide path pushes a fresh mining.notify to EVERY miner and
+   * spends one jobHistory slot PER active difficulty, and authorize is
+   * unauthenticated — so a connection re-authorizing with a novel d=
+   * difficulty per line (or, innocently, a burst of vardiff retargets)
+   * churned the bounded 64-entry history until other miners' live jobs
+   * fell out of it and their shares came back code 21 "Job not found"
+   * instead of being accepted (stale shares are accepted, flagged).
+   * The vacated-difficulty prune from _issueJobs still runs here, so
+   * the job map cannot grow between fleet-wide issues either.
+   */
+  _issueJobForDiff(diff, reason) {
+    const tpl = this._template;
+    if (!tpl) return null;
+    const activeDiffs = this._activeDiffs();
+    for (const d of [...this.jobsByDiff.keys()]) {
+      if (!activeDiffs.includes(d)) this.jobsByDiff.delete(d);
+    }
+    if (!activeDiffs.includes(diff)) return null;
+    const ts = nowSec();
+    const headerBuf = Buffer.from(tpl.headerHex, "hex");
+    headerBuf.writeUInt32LE(ts >>> 0, 68); // bump job timestamp
+    // Deliberately does NOT touch _lastJobAt: the interval cadence that
+    // refreshes every miner's job must not be starved by join bursts.
+    return this._issueJob(diff, headerBuf.toString("hex"), tpl, ts, reason);
   }
 
   /** Current job for a miner's difficulty (issues one if missing). */
   jobFor(miner) {
     let job = this.jobsByDiff.get(miner.diff);
     if (!job || job.templateId !== this._templateId) {
-      this._issueJobs("demand");
+      if (job) {
+        // A job exists but for a superseded template: every miner needs
+        // a fresh job on the new template — fleet-wide is correct here.
+        this._issueJobs("demand");
+      } else {
+        // Only this miner's difficulty is missing: issue only for it.
+        this._issueJobForDiff(miner.diff, "demand");
+      }
       job = this.jobsByDiff.get(miner.diff);
     }
     return job;
@@ -247,7 +287,16 @@ export class Pool {
     const miner = this.miners.get(minerId);
     if (!miner || !miner.authorized) return { ok: false, code: 24, message: "Unauthorized worker" };
 
-    const job = this.jobHistory.get(submit.jobId);
+    let job = this.jobHistory.get(submit.jobId);
+    if (!job) {
+      // A CURRENT job must never be "not found": jobHistory is a bounded
+      // late-submit window, and however it was churned, the job a miner
+      // is currently assigned is in jobsByDiff and resolves from there.
+      // Only genuinely superseded jobs depend on the history window.
+      for (const j of this.jobsByDiff.values()) {
+        if (j.jobId === submit.jobId) { job = j; break; }
+      }
+    }
     if (!job) return { ok: false, code: 21, message: "Job not found" };
 
     const field = submit.field;

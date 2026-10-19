@@ -66,6 +66,12 @@ The stratum server speaks the three dialects documented in the live captures:
   (excess shares fail closed as verifier-busy). Fabricated proofs are free
   to make and expensive to verify; the caps keep one miner from
   monopolizing the verifiers or growing pool memory with in-flight proofs.
+* Job issuance is scoped to need: a miner joining (or retargeting) at a
+  difficulty that has no job yet gets a job for that difficulty only —
+  other miners are not re-notified, and the bounded late-submit job
+  history is spent one slot per new job, never one slot per difficulty
+  per join. A miner's currently assigned job always resolves for share
+  submission; only superseded jobs depend on the history window.
 * Stratum replies use the reference-pool framing and codes:
   `20` invalid share, `21` job not found, `22` duplicate share, `24` unauthorized.
 
