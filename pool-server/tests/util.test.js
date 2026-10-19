@@ -15,6 +15,12 @@ test("targetForDiff(2097152) matches the documented HeroMiners share target", ()
   assert.equal(targetToCompact(targetForDiff(2097152)), 0x1a07fff8);
 });
 
+test("target helpers refuse non-finite difficulty with a named error", () => {
+  assert.throws(() => targetForDiff(Infinity), /targetForDiff: difficulty must be finite/);
+  assert.throws(() => targetForDiff(NaN), /targetForDiff: difficulty must be finite/);
+  assert.throws(() => kryptexTargetForDiff(Infinity), /kryptexTargetForDiff: difficulty must be finite/);
+});
+
 test("kryptex target convention differs from pdiff by 65535/65536", () => {
   const p = targetForDiff(2097152);
   const k = kryptexTargetForDiff(2097152);

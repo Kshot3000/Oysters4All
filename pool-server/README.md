@@ -55,7 +55,9 @@ The stratum server speaks the three dialects documented in the live captures:
   `target`, `header` (152-hex / 76-byte `IncompleteBlockHeader`), `height`, `cert_version`.
 * Difficulty retargeting is **job-based** (LuckyPool-style): a fresh `mining.notify` arrives at
   the new difficulty. Starting difficulty 2,097,152; vardiff targets one share per ~15 s.
-* Password `d=<N>` selects a static difficulty (Kryptex-style, minimum 2,097,152).
+* Password `d=<N>` selects a static difficulty (Kryptex-style, minimum 2,097,152,
+  clamped at the pool's max difficulty — an absurd `d=` value can never crash
+  or over-weight the pool).
 * `solo:<address>` mines solo: no PPLNS weight, a solo block pays the finder directly.
 * Stale-share abuse: >30% stale after 1000 shares → 3600 s ban (HeroMiners-style tier).
 * Stratum replies use the reference-pool framing and codes:

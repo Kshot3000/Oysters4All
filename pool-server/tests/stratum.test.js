@@ -128,6 +128,35 @@ test("kryptex password d=N selects static difficulty", async () => {
   });
 });
 
+test("kryptex password d=<huge> clamps to the pool maxDiff and the server survives", async () => {
+  await withServer(async (ctx, mk) => {
+    // 400 nines: parseInt is Infinity, which used to flow into
+    // targetForDiff's BigInt() and kill the whole pool process with an
+    // uncaught RangeError from a single unauthenticated authorize line.
+    const c1 = mk(ctx.port);
+    c1.send({ id: 2, method: "mining.authorize", params: [`${WALLET}.evil`, "d=" + "9".repeat(400)] });
+    const ack = await c1.next();
+    assert.equal(ack.result, true);
+    const notify = await c1.next();
+    assert.match(notify.params.job_id, /^[0-9a-f]{8}_1099511627776$/); // 2**40 = cfg.maxDiff
+    // 20 nines: finite (1e20) but still far above maxDiff — same clamp.
+    const c2 = mk(ctx.port);
+    c2.send({ id: 3, method: "mining.authorize", params: [`${WALLET}.evil2`, "d=" + "9".repeat(20)] });
+    await c2.next();
+    const notify2 = await c2.next();
+    assert.match(notify2.params.job_id, /^[0-9a-f]{8}_1099511627776$/);
+    const miners = [...ctx.pool.miners.values()];
+    assert.equal(miners.length, 2);
+    assert.ok(miners.every((m) => m.diff === 2 ** 40 && m.staticDiff));
+    // A normal authorize still works afterwards on a fresh connection.
+    const c3 = mk(ctx.port);
+    c3.send({ id: 4, method: "mining.authorize", params: { wallet: WALLET, worker: "w" } });
+    const ack3 = await c3.next();
+    assert.equal(ack3.result, true);
+    await c3.next(); // job
+  });
+});
+
 test("kryptex v2: object authorize with type v2 -> ack echoes v2", async () => {
   await withServer(async (ctx, mk) => {
     const c = mk(ctx.port);

@@ -184,6 +184,18 @@ test("vardiff raises difficulty for fast miners via a fresh job", async () => {
   await pool.stop();
 });
 
+test("addMiner clamps a non-finite or over-max static difficulty to maxDiff", async () => {
+  const { pool } = await makePool();
+  const inf = addMiner(pool, WALLET, { staticDiff: Infinity });
+  assert.equal(inf.miner.diff, 2 ** 40);
+  assert.equal(inf.miner.staticDiff, true);
+  assert.ok(inf.jobs.length >= 1, "a job must be issued at the clamped difficulty");
+  assert.equal(inf.jobs[0].diff, 2 ** 40);
+  const huge = addMiner(pool, WALLET, { staticDiff: 1e20 });
+  assert.equal(huge.miner.diff, 2 ** 40);
+  await pool.stop();
+});
+
 test("vardiff disabled for static-difficulty miners", async () => {
   const { pool } = await makePool({}, { vardiffWindow: 4 });
   const jobs = [];

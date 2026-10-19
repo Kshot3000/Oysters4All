@@ -142,14 +142,22 @@ export class Pool {
   /* ---------------- miners ---------------- */
 
   addMiner(session) {
+    // A caller-supplied static difficulty is clamped to the pool's own
+    // bounds no matter who computed it: Infinity or a >maxDiff value here
+    // would otherwise reach targetForDiff's BigInt conversion (RangeError
+    // on Infinity) or mint jobs/PPLNS weight above the vardiff ceiling.
+    const rawStatic = session.staticDiff;
+    const diff = rawStatic
+      ? Math.min(this.cfg.maxDiff, Math.max(1, Math.floor(rawStatic)))
+      : this.cfg.initialDiff;
     const miner = {
       id: session.id,
       wallet: session.wallet,
       worker: session.worker || "",
       solo: !!session.solo,
       dialect: session.dialect,
-      diff: session.staticDiff || this.cfg.initialDiff,
-      staticDiff: !!session.staticDiff,
+      diff,
+      staticDiff: !!rawStatic,
       authorized: true,
       connectedAt: Date.now(),
       lastShareAt: 0,

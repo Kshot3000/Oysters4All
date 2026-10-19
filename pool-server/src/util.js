@@ -16,15 +16,24 @@ export const GRAIN_PER_PRL = 100_000_000n;
 
 /* ---------------- difficulty / target ---------------- */
 
+/** Finite-difficulty guard: BigInt(Infinity/NaN) throws a cryptic RangeError;
+ *  name the contract instead. Callers that take difficulty from the wire
+ *  must clamp before calling (stratum's d= parser and Pool.addMiner do). */
+function diffToBigInt(diff, fn) {
+  const f = Math.floor(diff);
+  if (!Number.isFinite(f)) throw new Error(`${fn}: difficulty must be finite`);
+  return BigInt(Math.max(1, f));
+}
+
 /** Bitcoin pdiff share target for a difficulty: floor(0xFFFF * 2^208 / diff). */
 export function targetForDiff(diff) {
-  const d = BigInt(Math.max(1, Math.floor(diff)));
+  const d = diffToBigInt(diff, "targetForDiff");
   return ((0xffffn << 208n) / d);
 }
 
 /** Kryptex's target convention: floor(2^224 / diff) - 1 (kept for reference). */
 export function kryptexTargetForDiff(diff) {
-  const d = BigInt(Math.max(1, Math.floor(diff)));
+  const d = diffToBigInt(diff, "kryptexTargetForDiff");
   return ((1n << 224n) / d) - 1n;
 }
 

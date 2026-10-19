@@ -192,7 +192,16 @@ export class StratumServer {
     const m = /(?:^|[,\s])d=(\d+)/i.exec(String(password || ""));
     if (!m) return null;
     // Kryptex documents a 2,097,152 minimum for password-set difficulty.
-    return Math.max(2097152, parseInt(m[1], 10));
+    // Clamp BOTH ends. The password is unauthenticated remote input:
+    // parseInt of a long digit run is Infinity (400 nines) and a merely
+    // huge finite value (20 nines -> 1e20) sailed past the pool's own
+    // maxDiff. Infinity flowed through addMiner into targetForDiff's
+    // BigInt(...) conversion, which throws RangeError — uncaught in the
+    // socket handler, it killed the whole pool process from a single
+    // authorize line. Clamping to the pool's maxDiff (the same bound
+    // vardiff enforces) makes every d= value a usable difficulty.
+    const cap = this.pool?.cfg?.maxDiff ?? 2 ** 40;
+    return Math.min(cap, Math.max(2097152, parseInt(m[1], 10)));
   }
 
   _onAuthorize(conn, id, params) {
@@ -226,12 +235,24 @@ export class StratumServer {
     // Ack first, then the job (matches the documented pool order: authorize
     // reply immediately followed by mining.notify).
     this._replyOk(conn, id, { type: ackType });
-    const miner = this.pool.addMiner({
-      id: sessionId,
-      wallet, worker, solo, dialect,
-      staticDiff,
-      sendJob: (job) => this._sendJob(conn, job),
-    });
+    // Fail closed per-connection: addMiner issues a job synchronously, and
+    // any unexpected throw there must never escape into the socket 'data'
+    // handler as an uncaught exception that kills the pool (the crash
+    // class the null-envelope and _onSubmit guards already close).
+    let miner;
+    try {
+      miner = this.pool.addMiner({
+        id: sessionId,
+        wallet, worker, solo, dialect,
+        staticDiff,
+        sendJob: (job) => this._sendJob(conn, job),
+      });
+    } catch {
+      conn.sessionId = null;
+      try { this.pool.removeMiner(sessionId); } catch { /* ignore */ }
+      this._replyErr(conn, id, 24, "Unauthorized worker");
+      return;
+    }
     void miner;
     this.log(`auth ${dialect} wallet=${wallet.slice(0, 12)}... worker=${worker || "-"} solo=${solo} diff=${staticDiff || "vardiff"}`);
   }
