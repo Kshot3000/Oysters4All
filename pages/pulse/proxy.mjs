@@ -56,8 +56,20 @@ const server = http.createServer(async (req, res) => {
   try {
     const upstream = await fetch(target, {
       headers: { accept: 'application/json', 'user-agent': 'pearl-pulse-proxy/1.0' },
+      signal: AbortSignal.timeout(15000),
     });
-    const buf = Buffer.from(await upstream.arrayBuffer());
+    // Cap the buffered body: arrayBuffer() buffered a spewing or
+    // compromised upstream's response whole, with no timeout — the same
+    // unbounded-reader class the fleet caps everywhere else (16 MiB).
+    const MAX_BODY_BYTES = 16 * 1024 * 1024;
+    const chunks = [];
+    let total = 0;
+    for await (const chunk of upstream.body) {
+      total += chunk.byteLength;
+      if (total > MAX_BODY_BYTES) throw new Error('upstream response exceeded the 16 MiB proxy limit');
+      chunks.push(chunk);
+    }
+    const buf = Buffer.concat(chunks);
     res.writeHead(upstream.status, {
       'content-type': upstream.headers.get('content-type') || 'application/json',
     });

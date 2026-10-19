@@ -90,3 +90,50 @@ test("PearldProvider builds a header from a mocked getblocktemplate", async () =
   // coinbasevalue = subsidy + fees.
   assert.equal(t.coinbaseValueGrains, blockSubsidyGrains(119376) + 1000n);
 });
+
+test("PearldProvider refuses wrong-shape templates with a named error, never a raw engine throw or silent corruption", async () => {
+  const base = {
+    version: 0x20000000,
+    previousblockhash: "dd".repeat(32),
+    transactions: [{ hash: "bb".repeat(32), fee: 1000 }],
+    coinbasetxn: { hash: "aa".repeat(32) },
+    curtime: 1759000000,
+    bits: "1a07fff8",
+    height: 119376,
+    requiredcertversion: 3,
+  };
+  const cases = [
+    ["height at the subsidy division-by-zero", (t) => { t.height = -650226; }],
+    ["non-numeric height", (t) => { t.height = "abc"; }],
+    ["float fee", (t) => { t.transactions[0].fee = 1.5; }],
+    ["string fee", (t) => { t.transactions[0].fee = "abc"; }],
+    ["numeric tx hash", (t) => { t.transactions[0].hash = 123; }],
+    ["non-hex tx hash (was silently folded into the merkle root)", (t) => { t.transactions[0].hash = "zz"; }],
+    ["missing previousblockhash", (t) => { delete t.previousblockhash; }],
+    ["missing bits (was silently nbits 0)", (t) => { delete t.bits; }],
+  ];
+  for (const [name, mutate] of cases) {
+    const p = new PearldProvider({ url: "http://127.0.0.1:1" });
+    const t = structuredClone(base);
+    mutate(t);
+    p._rpc = async () => t;
+    await assert.rejects(() => p.getTemplate(true), /getblocktemplate:/, name);
+  }
+  // Control: the unmutated template still builds.
+  const ok = new PearldProvider({ url: "http://127.0.0.1:1" });
+  ok._rpc = async () => structuredClone(base);
+  assert.equal((await ok.getTemplate(true)).height, 119376);
+});
+
+test("PearldProvider _rpc refuses a response body past the 16 MiB cap", async () => {
+  const { createServer } = await import("node:http");
+  const big = JSON.stringify({ jsonrpc: "1.0", id: "pool", error: null, result: { pad: "x".repeat(17 * 1024 * 1024) } });
+  const srv = createServer((req, res) => { res.writeHead(200, { "content-type": "application/json" }); res.end(big); });
+  await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+  try {
+    const p = new PearldProvider({ url: `http://127.0.0.1:${srv.address().port}` });
+    await assert.rejects(() => p._rpc("getblocktemplate", []), /16 MiB limit/);
+  } finally {
+    srv.close();
+  }
+});

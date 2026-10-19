@@ -161,7 +161,22 @@ export class PearldProvider {
     if (this.user) headers.Authorization = "Basic " + Buffer.from(`${this.user}:${this.pass}`).toString("base64");
     const res = await fetch(this.url, { method: "POST", headers, body, signal: AbortSignal.timeout(15000) });
     if (!res.ok) throw new Error(`pearld HTTP ${res.status}`);
-    const j = await res.json();
+    // Cap the response body: a getblocktemplate reply is bounded by the
+    // block it describes, and every other RPC client in this fleet caps
+    // its body (wPRL 16 MiB, Hermes prl-cli 16 MiB, faucet 1 MiB) — an
+    // unbounded res.json() let a spewing or compromised endpoint grow
+    // pool memory without limit within the 15 s timeout window.
+    const MAX_RPC_BODY_BYTES = 16 * 1024 * 1024;
+    const chunks = [];
+    let total = 0;
+    for await (const chunk of res.body) {
+      total += chunk.byteLength;
+      if (total > MAX_RPC_BODY_BYTES) {
+        throw new Error(`pearld ${method}: response exceeded the 16 MiB limit — refusing to buffer`);
+      }
+      chunks.push(chunk);
+    }
+    const j = JSON.parse(Buffer.concat(chunks).toString("utf8"));
     if (j.error) throw new Error(`pearld ${method}: ${j.error.message || JSON.stringify(j.error)}`);
     return j.result;
   }
@@ -175,29 +190,67 @@ export class PearldProvider {
     const now = Date.now();
     if (!force && this._cached && now - this._lastPoll < this.pollSec * 1000) return this._cached;
     const t = await this._rpc("getblocktemplate", [{ capabilities: ["coinbasetxn"] }]);
+    // Validate the template's shape at this boundary. Every field below
+    // feeds a conversion that throws a cryptic engine error — or worse,
+    // silently corrupts — on a wrong shape: a non-hex txid was folded
+    // into the merkle root as an empty buffer, a missing `bits` became
+    // nbits 0, a float/string fee died in BigInt(), and a crafted height
+    // (-650226, or "abc") died as a division-by-zero / NaN RangeError
+    // inside blockSubsidyGrains. A bad template must fail HERE with a
+    // named error the pool's poll loop can log and retry past.
+    const bad = (what) => { throw new Error(`getblocktemplate: ${what}`); };
+    if (!t || typeof t !== "object" || Array.isArray(t)) bad("result is not an object");
+    const intField = (v, name, min) => {
+      const n = typeof v === "string" && /^-?\d+$/.test(v) ? Number(v) : v;
+      if (!Number.isSafeInteger(n) || n < min) bad(`${name} is not a safe integer >= ${min}`);
+      return n;
+    };
+    const hex64 = (v, name) => {
+      if (typeof v !== "string" || !/^[0-9a-fA-F]{64}$/.test(v)) bad(`${name} is not a 64-char hex string`);
+      return v;
+    };
+    const height = intField(t.height, "height", 1);
+    const version = intField(t.version, "version", 0);
+    const curtime = intField(t.curtime, "curtime", 0);
+    const certVersion = intField(t.requiredcertversion, "requiredcertversion", 0);
+    if (typeof t.bits !== "string" || !/^[0-9a-fA-F]{1,8}$/.test(t.bits)) bad("bits is not a hex string");
+    const prevHex = hex64(t.previousblockhash, "previousblockhash");
+    if (t.transactions !== undefined && !Array.isArray(t.transactions)) bad("transactions is not an array");
+    const txs = t.transactions || [];
     const txids = [];
-    if (t.coinbasetxn?.hash) txids.push(t.coinbasetxn.hash);
-    for (const tx of t.transactions || []) txids.push(tx.hash || tx.txid);
+    if (t.coinbasetxn !== undefined) {
+      if (!t.coinbasetxn || typeof t.coinbasetxn !== "object") bad("coinbasetxn is not an object");
+      txids.push(hex64(t.coinbasetxn.hash, "coinbasetxn.hash"));
+    }
+    for (const tx of txs) {
+      if (!tx || typeof tx !== "object") bad("transaction entry is not an object");
+      txids.push(hex64(tx.hash ?? tx.txid, "transaction hash"));
+    }
     if (txids.length === 0) throw new Error("getblocktemplate returned no transactions");
     const merkleHex = merkleRootDisplay(txids);
     const nbits = parseInt(t.bits, 16) >>> 0;
     const header = buildHeaderBytes({
-      version: t.version >>> 0,
-      prevHex: t.previousblockhash,
+      version: version >>> 0,
+      prevHex,
       merkleHex,
-      timestamp: Number(t.curtime),
+      timestamp: curtime,
       nbits,
     });
     // coinbasevalue isn't returned in coinbasetxn mode; derive from subsidy + fees.
     let fees = 0n;
-    for (const tx of t.transactions || []) fees += BigInt(tx.fee || 0);
-    const coinbaseValueGrains = blockSubsidyGrains(Number(t.height)) + fees;
+    for (const tx of txs) {
+      if (tx.fee === undefined || tx.fee === null) continue;
+      if (Number.isSafeInteger(tx.fee) && tx.fee >= 0) fees += BigInt(tx.fee);
+      else if (typeof tx.fee === "string" && /^\d+$/.test(tx.fee)) fees += BigInt(tx.fee);
+      else bad("transaction fee is not a non-negative integer");
+    }
+    const coinbaseValueGrains = blockSubsidyGrains(height) + fees;
     const tpl = headerToTemplate({
-      height: Number(t.height),
+      height,
       headerBuf: header,
-      certVersion: Number(t.requiredcertversion),
+      certVersion,
       coinbaseValueGrains,
-      templateId: `${t.height}:${t.previousblockhash}`,
+      templateId: `${height}:${prevHex}`,
       source: this.source,
     });
     tpl.raw = t; // keep for block assembly / debugging
