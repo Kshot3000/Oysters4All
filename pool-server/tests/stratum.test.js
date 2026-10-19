@@ -434,5 +434,53 @@ test("connections are capped globally; excess sockets are closed and slots free 
   }
 });
 
+test("line rate is capped per connection: a pipelined flood gets its socket destroyed, honest traffic is untouched", async () => {
+  await withServer(async ({ port }, mk) => {
+    // Under the window: 50 pipelined unknown-method lines each get their
+    // -32601 reply and the connection stays open and usable.
+    const calm = mk(port);
+    await new Promise((r) => calm.sock.on("connect", r));
+    let burst = "";
+    for (let i = 0; i < 50; i++) burst += JSON.stringify({ id: i + 1, method: "mining.ping" }) + "\n";
+    calm.sock.write(burst);
+    for (let i = 0; i < 50; i++) {
+      const m = await calm.next();
+      assert.equal(m.error.code, -32601);
+    }
+    calm.send({ id: 99, method: "mining.authorize", params: { wallet: WALLET, worker: "calm" } });
+    const ack = await calm.next();
+    assert.equal(ack.result, true);
+
+    // Over the window: 1500 pipelined lines in one write. On pristine
+    // code every line is processed and answered and the socket stays
+    // open; with the cap the socket is destroyed mid-burst, so the
+    // client sees a close and strictly fewer replies than lines sent.
+    const flood = connect(port, "127.0.0.1");
+    flood.on("error", () => {});
+    await new Promise((r) => flood.on("connect", r));
+    let floodReplies = 0;
+    flood.setEncoding("utf8");
+    flood.on("data", (d) => { floodReplies += (d.match(/\n/g) || []).length; });
+    const closed = new Promise((r) => flood.on("close", r));
+    let lines = "";
+    for (let i = 0; i < 1500; i++) lines += JSON.stringify({ id: i + 1, method: "mining.ping" }) + "\n";
+    flood.write(lines);
+    await Promise.race([
+      closed,
+      new Promise((_, reject) => setTimeout(() => reject(new Error("flood socket was not destroyed")), 5000)),
+    ]);
+    assert.ok(floodReplies < 1500, `expected the flood to be cut off, got ${floodReplies} replies`);
+
+    // Other connections are unaffected: a fresh miner still authorizes.
+    const hon = mk(port);
+    await new Promise((r) => hon.sock.on("connect", r));
+    hon.send({ id: 1, method: "mining.authorize", params: { wallet: WALLET, worker: "honest" } });
+    const hack = await hon.next();
+    assert.equal(hack.result, true);
+    const job = await hon.next();
+    assert.equal(job.method, "mining.notify");
+  });
+});
+
 // Keep the import used (real VerifierPool is covered in verifier-protocol.test.js).
 void VerifierPool;

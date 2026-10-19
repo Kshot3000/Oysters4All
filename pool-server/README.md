@@ -73,6 +73,14 @@ The stratum server speaks the three dialects documented in the live captures:
   here is per connection, so this outermost cap is what they multiply
   against; it is global rather than per-address because mining farms
   legitimately run many rigs behind one NAT address.
+* Line rate is capped per connection: at most 1000 stratum lines per
+  10 seconds (subscribe, authorize, submit, malformed — every line
+  counts, because every line is processed synchronously and the costly
+  ones need no credentials). Past the cap the socket is closed without
+  a reply. Honest traffic is nowhere near it: vardiff targets one share
+  per ~15 s and a connection authorizes once, so the cap only ever
+  fires on a flood that would otherwise keep the pool's event loop busy
+  re-authorizing, re-issuing jobs, and answering garbage indefinitely.
 * Job issuance is scoped to need: a miner joining (or retargeting) at a
   difficulty that has no job yet gets a job for that difficulty only —
   other miners are not re-notified, and the bounded late-submit job

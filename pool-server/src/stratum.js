@@ -70,6 +70,23 @@ const MAX_INFLIGHT_SUBMITS = 32;
 // capacity. Refusals are silent (no reply, no log line): anything else
 // would let a connection flood write unbounded output of its own.
 const MAX_CONNECTIONS = 4096;
+// Every line is processed synchronously inside the socket 'data' handler,
+// and the expensive lines are unauthenticated: one authorize costs address
+// validation, a session replacement, a job issuance, and three reply
+// writes (~26 µs measured), while malformed and unknown lines still cost
+// a parse and a reply each. Nothing bounded how many lines one connection
+// could make the pool process, so a single connection pipelining novel-
+// difficulty authorizes kept the event loop saturated indefinitely —
+// 557 ms of measured loop lag and a 770 ms honest authorize mid-flood,
+// against ~0 ms unflooded. The submit path has its own in-flight cap, but
+// it bounds concurrency, not line rate. This window bounds the rate for
+// EVERY line type: past it the socket is destroyed, silently, on the
+// same flood posture as the connection cap. Calibration: vardiff targets
+// one share per ~15 s per miner and a connection needs one subscribe plus
+// one authorize, so 100 lines/second sustained is roughly 1500x honest
+// traffic — no documented dialect pipelines anywhere near it.
+const MAX_LINES_PER_WINDOW = 1000;
+const LINE_WINDOW_MS = 10_000;
 
 export class StratumServer {
   /**
@@ -133,6 +150,8 @@ export class StratumServer {
       agent: "",
       gzip: false,
       pendingSubmits: 0,  // shares currently in verification (capped)
+      lineWindowStart: 0, // start of the current line-rate window (ms)
+      lineCount: 0,       // lines processed in the current window
     };
     this.conns.add(conn);
     sock.setEncoding("utf8");
@@ -171,8 +190,30 @@ export class StratumServer {
     while ((nl = conn.buf.indexOf("\n")) >= 0) {
       const line = conn.buf.slice(0, nl).trim();
       conn.buf = conn.buf.slice(nl + 1);
-      if (line) this._onLine(conn, line);
+      if (!line) continue;
+      if (!this._lineAllowed(conn)) return; // over the line-rate window: socket destroyed
+      this._onLine(conn, line);
     }
+  }
+
+  /**
+   * Per-connection line-rate window (see MAX_LINES_PER_WINDOW). Returns
+   * false — and destroys the socket before any further line is parsed —
+   * once a connection exceeds the window. Refusal is silent: a reply or
+   * log line per refused line would hand the flood a second amplifier.
+   */
+  _lineAllowed(conn) {
+    const now = Date.now();
+    if (now - conn.lineWindowStart >= LINE_WINDOW_MS) {
+      conn.lineWindowStart = now;
+      conn.lineCount = 0;
+    }
+    conn.lineCount++;
+    if (conn.lineCount > MAX_LINES_PER_WINDOW) {
+      try { conn.sock.destroy(); } catch { /* ignore */ }
+      return false;
+    }
+    return true;
   }
 
   _onLine(conn, line) {
