@@ -295,5 +295,35 @@ test("null and scalar envelopes -> -32600, connection and server survive", async
   });
 });
 
+test("re-authorize on one connection replaces the session instead of leaking miners", async () => {
+  await withServer(async (ctx, mk) => {
+    const c = mk(ctx.port);
+    c.send({ id: 1, method: "mining.authorize", params: { wallet: WALLET, worker: "w1" } });
+    await c.next(); await c.next(); // ack + job
+    assert.equal(ctx.pool.miners.size, 1);
+    // A REFUSED re-authorize must not kill the live session.
+    c.send({ id: 2, method: "mining.authorize", params: { wallet: "not-an-address", worker: "x" } });
+    const refused = await c.next();
+    assert.equal(refused.error.code, 24);
+    assert.equal(ctx.pool.miners.size, 1);
+    assert.equal([...ctx.pool.miners.values()][0].worker, "w1");
+    // Repeated valid re-authorizes: exactly one miner at all times, and it
+    // is the newest session. On pristine code each authorize leaked one
+    // record (5 authorizes -> 5 miners, 4 of them orphaned forever).
+    for (let i = 3; i <= 5; i++) {
+      c.send({ id: i, method: "mining.authorize", params: { wallet: WALLET, worker: "w" + i } });
+      await c.next(); await c.next(); // ack + job
+      assert.equal(ctx.pool.miners.size, 1);
+      assert.equal([...ctx.pool.miners.values()][0].worker, "w" + i);
+    }
+    assert.equal(ctx.pool.poolStats().minersOnline, 1);
+    // Disconnect removes the one live session — no ghost remains.
+    c.close();
+    await new Promise((r) => setTimeout(r, 200));
+    assert.equal(ctx.pool.miners.size, 0);
+    assert.equal(ctx.pool.poolStats().minersOnline, 0);
+  });
+});
+
 // Keep the import used (real VerifierPool is covered in verifier-protocol.test.js).
 void VerifierPool;

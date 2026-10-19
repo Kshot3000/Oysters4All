@@ -240,6 +240,21 @@ export class StratumServer {
     conn.dialect = dialect;
 
     const staticDiff = this._staticDiff(login.password);
+    // Re-authorize replaces the session, it does not add one. Every
+    // validation failure above returns before this point, so a miner whose
+    // re-authorize is REFUSED keeps its existing session; but once a new
+    // authorize has passed validation, the previous miner record must be
+    // retired before the new session id overwrites conn.sessionId — the
+    // old id is reachable nowhere after that assignment (close removes
+    // only the CURRENT id), so each re-authorize otherwise leaked one
+    // miner record for the life of the process: unbounded unauthenticated
+    // retention, minersOnline counting ghosts after disconnect, and the
+    // ghost's difficulty staying "active" (and its sendJob closure firing
+    // duplicate jobs at this socket) forever.
+    if (conn.sessionId) {
+      this.pool.removeMiner(conn.sessionId);
+      conn.sessionId = null;
+    }
     const sessionId = randHex(8);
     conn.sessionId = sessionId;
     // Ack first, then the job (matches the documented pool order: authorize
