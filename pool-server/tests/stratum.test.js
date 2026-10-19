@@ -157,6 +157,46 @@ test("kryptex password d=<huge> clamps to the pool maxDiff and the server surviv
   });
 });
 
+test("oversized worker names are refused and agent strings are bounded", async () => {
+  await withServer(async (ctx, mk) => {
+    // The 64 MiB line cap exists for proof submissions, but identity labels
+    // were retained unbounded: one unauthenticated authorize stored a
+    // megabyte worker string in the miner record (repeated by every stats
+    // reply), and subscribe stored a megabyte agent string per connection.
+    const longWorker = "w".repeat(257);
+    const c1 = mk(ctx.port);
+    c1.send({ id: 1, method: "mining.authorize", params: { wallet: WALLET, worker: longWorker } });
+    const r1 = await c1.next();
+    assert.equal(r1.result, null);
+    assert.equal(r1.error.code, 24);
+    assert.equal(ctx.pool.miners.size, 0);
+
+    const c2 = mk(ctx.port);
+    c2.send({ id: 2, method: "mining.authorize", params: [`${WALLET}.${longWorker}`, "x"] });
+    const r2 = await c2.next();
+    assert.equal(r2.result, null);
+    assert.equal(r2.error.code, 24);
+    assert.equal(ctx.pool.miners.size, 0);
+
+    // Agent is informational only: it is capped on storage, not a reason to
+    // refuse an otherwise valid miner or subscriber.
+    const c3 = mk(ctx.port);
+    c3.send({ id: 3, method: "mining.subscribe", params: ["a".repeat(100000)] });
+    await new Promise((r) => setTimeout(r, 100));
+    const conn3 = [...ctx.srv.conns].find((conn) => conn.agent.length > 0);
+    assert.equal(conn3.agent.length, 256);
+
+    const c4 = mk(ctx.port);
+    c4.send({ id: 4, method: "mining.authorize", params: { wallet: WALLET, worker: "w", agent: "b".repeat(100000) } });
+    const ack4 = await c4.next();
+    assert.equal(ack4.result, true);
+    await c4.next(); // job
+    const conn4 = [...ctx.srv.conns].find((conn) => conn.agent.startsWith("b"));
+    assert.equal(conn4.agent.length, 256);
+    assert.equal([...ctx.pool.miners.values()][0].worker, "w");
+  });
+});
+
 test("kryptex v2: object authorize with type v2 -> ack echoes v2", async () => {
   await withServer(async (ctx, mk) => {
     const c = mk(ctx.port);

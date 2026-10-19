@@ -142,6 +142,10 @@ export class Pool {
   /* ---------------- miners ---------------- */
 
   addMiner(session) {
+    // Defense in depth for the stratum identity cap: a worker label is
+    // retained in miner stats and block candidates, so no caller may use
+    // addMiner to store an unbounded label if the wire parser changes.
+    if (String(session.worker || "").length > 256) throw new Error("addMiner: worker name too long");
     // A caller-supplied static difficulty is clamped to the pool's own
     // bounds no matter who computed it: Infinity or a >maxDiff value here
     // would otherwise reach targetForDiff's BigInt conversion (RangeError

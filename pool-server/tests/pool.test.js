@@ -69,6 +69,19 @@ test("pool issues jobs whose target matches the miner difficulty", async () => {
   await pool.stop();
 });
 
+test("addMiner refuses an unbounded worker label", async () => {
+  const { pool } = await makePool();
+  try {
+    assert.throws(
+      () => pool.addMiner({ id: "sess-long", wallet: WALLET, worker: "w".repeat(257), dialect: "hero", sendJob: () => {} }),
+      /worker name too long/,
+    );
+    assert.equal(pool.miners.size, 0);
+  } finally {
+    await pool.stop();
+  }
+});
+
 test("share pipeline: unauthorized, unknown job, bad field", async () => {
   const { pool } = await makePool();
   const { miner, jobs } = addMiner(pool);

@@ -38,6 +38,12 @@ import { isValidPearlAddress, splitLogin, nowSec, randHex } from "./util.js";
 const BAN_AFTER_SHARES = 1000;
 const BAN_STALE_RATE = 0.30;
 const BAN_SECONDS = 3600;
+// Identity strings are labels, not payloads. The 64 MiB line cap exists for
+// proof submissions; without a field cap, one unauthenticated authorize or
+// subscribe could make the pool retain a megabyte-long worker/agent string
+// for the life of the session and repeat the worker in every stats reply.
+const MAX_WORKER_LENGTH = 256;
+const MAX_AGENT_LENGTH = 256;
 
 export class StratumServer {
   /**
@@ -159,7 +165,7 @@ export class StratumServer {
     if (method === "mining.subscribe") {
       // Kryptex: silent. Just note the dialect + agent.
       if (conn.dialect === null && Array.isArray(params)) conn.dialect = "kryptex";
-      if (Array.isArray(params) && typeof params[0] === "string") conn.agent = params[0];
+      if (Array.isArray(params) && typeof params[0] === "string") conn.agent = params[0].slice(0, MAX_AGENT_LENGTH);
       return; // no reply
     }
     if (method === "mining.authorize") return void this._onAuthorize(conn, id, params);
@@ -213,10 +219,14 @@ export class StratumServer {
       return;
     }
     const { wallet, worker, solo } = splitLogin(login.login);
-    if (login.agent) conn.agent = login.agent;
+    if (login.agent) conn.agent = login.agent.slice(0, MAX_AGENT_LENGTH);
 
     const fail = (message) => this._replyErr(conn, id, 24, message);
     if (!wallet) return fail("Unauthorized worker");
+    // Reject rather than truncate: the worker name is an identity label in
+    // miner stats and block candidates, so silently shortening it could
+    // merge two distinct workers into one apparent identity.
+    if (worker.length > MAX_WORKER_LENGTH) return fail("Unauthorized worker: worker name too long");
     // Ban check (stale-share abuse tier).
     const bannedUntil = this.bans.get(wallet);
     if (bannedUntil && nowSec() < bannedUntil) return fail("Banned: stale share rate exceeded");
