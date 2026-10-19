@@ -112,6 +112,11 @@ export function createApi(deps) {
     }
   });
 
+  // Outermost connection bound (the pool servers carry the same cap):
+  // this API binds all interfaces and each request fans out to chain
+  // RPC calls, so held-open partial requests must not accumulate
+  // without limit. Past the cap Node drops new sockets at accept time.
+  server.maxConnections = cfg.maxConnections ?? 512;
   return { server, getReserves, getHealth };
 }
 

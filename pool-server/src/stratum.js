@@ -54,6 +54,22 @@ const MAX_AGENT_LENGTH = 256;
 // most; anything past this cap is refused immediately (never queued —
 // a queue would retain the same proofs the cap exists to bound).
 const MAX_INFLIGHT_SUBMITS = 32;
+// Every other stratum bound is PER connection (32 in-flight submits, a
+// 64 MiB line buffer), so each one is multiplied by the number of
+// connections — and nothing bounded that number: a connection costs no
+// credentials and need never even authorize, yet it is retained for up
+// to its 10-minute idle timeout (an idle trickle resets it), holding
+// its socket, its conn record, and up to a line-buffer's worth of
+// memory just below the cap. One host could therefore hold the pool's
+// memory and file descriptors open with arbitrarily many connections
+// while staying under every per-connection cap. This is the outermost
+// bound, the one the per-connection caps multiply against. It is a
+// GLOBAL cap, deliberately not per-address: mining farms legitimately
+// run many rigs behind one NAT address, so a per-IP cap would refuse
+// honest fleets while a global cap only refuses past the pool's total
+// capacity. Refusals are silent (no reply, no log line): anything else
+// would let a connection flood write unbounded output of its own.
+const MAX_CONNECTIONS = 4096;
 
 export class StratumServer {
   /**
@@ -71,6 +87,7 @@ export class StratumServer {
     this.host = opts.host || "0.0.0.0";
     this.tls = opts.tls || null;
     this.networkId = opts.networkId || "mainnet";
+    this.maxConnections = opts.maxConnections ?? MAX_CONNECTIONS;
     this.log = opts.log || (() => {});
     this.server = null;
     this.conns = new Set();
@@ -83,6 +100,8 @@ export class StratumServer {
     this.server = this.tls
       ? createTlsServer({ key: readFileSync(this.tls.key), cert: readFileSync(this.tls.cert) }, onConn)
       : createTcpServer(onConn);
+    // Native backstop for the _onConnection check (same bound).
+    this.server.maxConnections = this.maxConnections;
     await new Promise((resolve, reject) => {
       this.server.once("error", reject);
       this.server.listen(this.port, this.host, () => { this.server.off("error", reject); resolve(); });
@@ -97,6 +116,14 @@ export class StratumServer {
   }
 
   _onConnection(sock) {
+    // Past the global cap the socket is destroyed before any conn
+    // record, buffer, or timeout is allocated for it (see
+    // MAX_CONNECTIONS). Existing connections are never touched, and a
+    // slot frees the moment one of them closes.
+    if (this.conns.size >= this.maxConnections) {
+      try { sock.destroy(); } catch { /* ignore */ }
+      return;
+    }
     const conn = {
       sock,
       id: randHex(8),

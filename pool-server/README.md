@@ -66,6 +66,13 @@ The stratum server speaks the three dialects documented in the live captures:
   (excess shares fail closed as verifier-busy). Fabricated proofs are free
   to make and expensive to verify; the caps keep one miner from
   monopolizing the verifiers or growing pool memory with in-flight proofs.
+* Connections are capped globally: at most 4096 stratum connections
+  (and 512 dashboard-API connections) may be open at once — excess
+  sockets are closed at accept time, before any session state exists,
+  and a slot frees the moment a connection closes. Every other bound
+  here is per connection, so this outermost cap is what they multiply
+  against; it is global rather than per-address because mining farms
+  legitimately run many rigs behind one NAT address.
 * Job issuance is scoped to need: a miner joining (or retargeting) at a
   difficulty that has no job yet gets a job for that difficulty only —
   other miners are not re-notified, and the bounded late-submit job

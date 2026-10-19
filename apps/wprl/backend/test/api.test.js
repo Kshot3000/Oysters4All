@@ -96,6 +96,46 @@ test("HTTP server routes /reserves, /health, and 404", async () => {
   }
 });
 
+test("HTTP server caps simultaneous connections; held partial requests cannot crowd out clients", async () => {
+  const d = doubles();
+  d.cfg = { ...CFG, maxConnections: 2 };
+  const { server } = createApi(d);
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = server.address().port;
+  const { connect } = await import("node:net");
+  const { default: http } = await import("node:http");
+  const tryGet = (ms = 1500) =>
+    new Promise((resolve) => {
+      const req = http.get({ host: "127.0.0.1", port, path: "/health", timeout: ms, agent: false }, (res) => {
+        res.resume();
+        res.on("end", () => resolve(res.statusCode));
+      });
+      req.on("timeout", () => { req.destroy(); resolve(0); });
+      req.on("error", () => resolve(0));
+    });
+  const held = [];
+  try {
+    assert.equal(server.maxConnections, 2);
+    assert.equal(await tryGet(), 200);
+    const hold = () => {
+      const s = connect(port, "127.0.0.1", () => s.write("GET /health HTTP/1.1\r\nHost: x\r\n"));
+      s.on("error", () => {});
+      held.push(s);
+    };
+    hold(); hold();
+    await new Promise((r) => setTimeout(r, 300));
+    // Both slots held by partial requests: a real client must not get
+    // in (on the old code there was no cap and it succeeded).
+    assert.notEqual(await tryGet(), 200);
+    held[0].destroy();
+    await new Promise((r) => setTimeout(r, 300));
+    assert.equal(await tryGet(), 200);
+  } finally {
+    for (const s of held) s.destroy();
+    server.close();
+  }
+});
+
 test("/health reports 503 when a dependency is down", async () => {
   const d = doubles();
   d.provider = { getBlockNumber: async () => { throw new Error("connection refused"); } };

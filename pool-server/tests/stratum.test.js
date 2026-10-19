@@ -392,5 +392,47 @@ test("pipelined submits are capped per connection; refused shares never reach th
   }
 });
 
+test("connections are capped globally; excess sockets are closed and slots free on close", async () => {
+  const provider = new SyntheticProvider({ networkDiff: 1024, startHeight: 5000 });
+  const pool = new Pool({
+    templateProvider: provider, verifierPool: mockVerifier(),
+    payouts: new Payouts({ stateFile: null }),
+    initialDiff: 1024, minDiff: 64, jobIntervalSec: 3600,
+  });
+  await pool.start();
+  const srv = new StratumServer({ pool, host: "127.0.0.1", port: 0, networkId: "mainnet", log: () => {}, maxConnections: 3 });
+  await srv.start();
+  const port = srv.server.address().port;
+  const socks = [];
+  const open = () => new Promise((resolve) => {
+    const s = connect(port, "127.0.0.1");
+    const rec = { s, closed: false };
+    s.on("close", () => { rec.closed = true; });
+    s.on("error", () => {});
+    s.on("connect", () => resolve(rec));
+    socks.push(rec);
+  });
+  try {
+    // Six idle, never-authorized connections against a cap of 3: on the
+    // old code the cap did not exist and all six were retained.
+    const recs = [];
+    for (let i = 0; i < 6; i++) recs.push(await open());
+    await new Promise((r) => setTimeout(r, 300));
+    assert.equal(srv.conns.size, 3);
+    assert.equal(recs.filter((c) => c.closed).length, 3);
+    // Existing connections are untouched, and a slot frees on close.
+    recs.find((c) => !c.closed).s.destroy();
+    await new Promise((r) => setTimeout(r, 300));
+    const extra = await open();
+    await new Promise((r) => setTimeout(r, 300));
+    assert.equal(extra.closed, false);
+    assert.equal(srv.conns.size, 3);
+  } finally {
+    for (const rec of socks) rec.s.destroy();
+    await srv.stop();
+    await pool.stop();
+  }
+});
+
 // Keep the import used (real VerifierPool is covered in verifier-protocol.test.js).
 void VerifierPool;

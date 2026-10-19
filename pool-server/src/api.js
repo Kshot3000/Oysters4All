@@ -16,19 +16,40 @@
 import { createServer } from "node:http";
 import { formatPRL } from "./util.js";
 
+// The API's handlers are synchronous and stateless, but its sockets are
+// not free: a client that sends a partial request and holds it open
+// occupies a connection until the headers timeout, and nothing bounded
+// how many such connections could accumulate — the same missing
+// outermost bound the stratum server carries MAX_CONNECTIONS for (the
+// API binds to localhost by default, but its own header comment invites
+// putting it behind a public reverse proxy). Past the cap a new socket
+// is destroyed at accept time, before any request state exists.
+const MAX_API_CONNECTIONS = 512;
+
 export class ApiServer {
-  constructor({ pool, payouts, config, host = "127.0.0.1", port = 8888, log = () => {} }) {
+  constructor({ pool, payouts, config, host = "127.0.0.1", port = 8888, log = () => {}, maxConnections }) {
     this.pool = pool;
     this.payouts = payouts;
     this.config = config;
     this.host = host;
     this.port = port;
     this.log = log;
+    this.maxConnections = maxConnections ?? MAX_API_CONNECTIONS;
     this.server = null;
+    this._conns = new Set();
   }
 
   async start() {
     this.server = createServer((req, res) => this._handle(req, res));
+    this.server.maxConnections = this.maxConnections;
+    this.server.on("connection", (sock) => {
+      if (this._conns.size >= this.maxConnections) {
+        try { sock.destroy(); } catch { /* ignore */ }
+        return;
+      }
+      this._conns.add(sock);
+      sock.on("close", () => this._conns.delete(sock));
+    });
     await new Promise((resolve, reject) => {
       this.server.once("error", reject);
       this.server.listen(this.port, this.host, () => { this.server.off("error", reject); resolve(); });
@@ -37,7 +58,10 @@ export class ApiServer {
   }
 
   async stop() {
-    if (this.server) await new Promise((r) => this.server.close(r));
+    if (!this.server) return;
+    for (const sock of this._conns) { try { sock.destroy(); } catch { /* ignore */ } }
+    this._conns.clear();
+    await new Promise((r) => this.server.close(r));
   }
 
   _json(res, obj, status = 200) {

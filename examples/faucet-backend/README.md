@@ -57,6 +57,7 @@ reports `walletConfigured: false` and every drip is refused with HTTP 503 —
 | `OYSTER_RPC_USER` / `OYSTER_RPC_PASS` | — | required for payouts |
 | `CORS_ORIGIN` | `*` | allowed browser origin |
 | `STORE_FILE` | `./drips.json` | drip history (rate limiting) |
+| `MAX_CONNECTIONS` | `512` | max simultaneous HTTP connections (excess sockets are dropped at accept time) |
 
 ## Tests
 

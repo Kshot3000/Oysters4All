@@ -31,6 +31,11 @@ const CFG = {
   oysterUser: process.env.OYSTER_RPC_USER || '',
   oysterPass: process.env.OYSTER_RPC_PASS || '',
   corsOrigin: process.env.CORS_ORIGIN || '*',
+  // Outermost connection bound (the pool servers carry the same cap):
+  // a client that sends a partial request and holds it open occupies a
+  // socket until the headers timeout, and without a cap arbitrarily
+  // many such sockets accumulate. Past the cap Node drops new sockets.
+  maxConnections: (() => { const n = Number(process.env.MAX_CONNECTIONS || 512); return Number.isInteger(n) && n >= 1 ? n : 512; })(),
   storeFile: process.env.STORE_FILE || path.join(process.cwd(), 'drips.json'),
 };
 if (!['testnet', 'testnet2'].includes(CFG.network)) {
@@ -231,6 +236,7 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+server.maxConnections = CFG.maxConnections;
 server.listen(CFG.port, CFG.host, () => {
   console.log(`Pearl faucet backend on http://${CFG.host}:${CFG.port} (network=${CFG.network})`);
   console.log(`  max drip ${CFG.maxDripPRL} tPRL, cooldown ${CFG.cooldownHours}h, daily cap ${CFG.dailyCapPRL} tPRL`);
